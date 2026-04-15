@@ -9,7 +9,7 @@
 
 ## 当前阶段
 - 当前阶段：Phase 0：架构底座
-- 当前阶段目标：初始化 Gradle 多模块工程，逐步打通 Java 核心最小执行链路
+- 当前阶段目标：初始化 Maven 多模块工程，逐步打通 Java 核心最小执行链路
 - 当前主线任务：仓库初始化、工程骨架初始化、Java 核心基础模块骨架落地
 
 ## 阶段判断说明
@@ -24,7 +24,8 @@
 ## 已完成
 - [x] 阅读项目入口、技术方案、Phase2 落地文档、Phase3 Java 骨架文档、CDP 文档、Native Messaging 文档、Edge TS 文档
 - [x] 初始化 git 仓库
-- [x] 初始化 Gradle 多模块目录与根构建配置
+- [x] 初始化 Maven 多模块目录与根构建配置
+- [x] 完成 common-core、common-json、dsl-model、dsl-parser 基础 Java 骨架
 
 ## 进行中
 - [ ] Java 核心基础模块代码骨架
@@ -43,11 +44,29 @@
 # 3. 已完成模块清单
 
 ## Java 核心平台
-- 模块名：Gradle 多模块工程骨架
+- 模块名：Maven 多模块工程骨架
   - 状态：已初始化
-  - 说明：创建 apps 与 libs 模块，并按 Phase2 文档建立模块依赖边界
-  - 对应文件：`settings.gradle.kts`、`build.gradle.kts`、各模块 `build.gradle.kts`
+  - 说明：创建 apps 与 libs 模块，并按 Phase2 文档建立模块依赖边界；已根据当前开发要求从 Gradle 切换为 Maven
+  - 对应文件：`pom.xml`、各模块 `pom.xml`
   - 对应文档：`enterprise_web_test_platform_phase2_implementation_design.md`
+
+- 模块名：common-core
+  - 状态：基础骨架已完成
+  - 说明：提供基础异常、错误码、ID 工具、通用 Result
+  - 对应文件：`libs/common-core/src/main/java/com/example/webtest/common/**`
+  - 对应文档：`enterprise_web_test_platform_phase3_java_core_code_skeleton.md`
+
+- 模块名：common-json
+  - 状态：基础门面已完成，真实 JSON 依赖未接入
+  - 说明：提供 `Jsons` 门面；当前为可编译占位，后续接 Jackson 或其他 JSON 实现
+  - 对应文件：`libs/common-json/src/main/java/com/example/webtest/json/Jsons.java`
+  - 对应文档：`enterprise_web_test_platform_phase3_java_core_code_skeleton.md`
+
+- 模块名：dsl-model / dsl-parser
+  - 状态：基础骨架已完成
+  - 说明：提供 DSL 模型、解析接口和基础校验器
+  - 对应文件：`libs/dsl-model/src/main/java/com/example/webtest/dsl/model/**`、`libs/dsl-parser/src/main/java/com/example/webtest/dsl/**`
+  - 对应文档：`enterprise_web_test_platform_phase3_java_core_code_skeleton.md`
 
 ## CDP 域封装
 - 域名：未开始
@@ -76,22 +95,26 @@
 - 2026-04-16
 
 ## 本次任务目标
-- 初始化仓库和 Phase 0 工程骨架，完成后提交。
+- 初始化仓库和 Phase 0 工程骨架；根据后续要求将构建体系从 Gradle 调整为 Maven。
 
 ## 本次完成内容
 - 执行 `git init`
-- 创建根 Gradle 配置
+- 创建根 Maven 聚合 POM
 - 创建 apps/libs/ui/extension/config/runs/scripts/tools 目录
-- 按设计文档创建首批模块的 `build.gradle.kts`
+- 按设计文档创建首批模块的 `pom.xml`
 - 添加 `.gitignore`
+- 实现 common-core、common-json、dsl-model、dsl-parser 基础 Java 骨架
+- 使用 `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests package` 验证通过
 
 ## 修改文件
 - `.gitignore`
-- `settings.gradle.kts`
-- `build.gradle.kts`
-- `gradle.properties`
-- `apps/**/build.gradle.kts`
-- `libs/**/build.gradle.kts`
+- `pom.xml`
+- `apps/**/pom.xml`
+- `libs/**/pom.xml`
+- `libs/common-core/src/main/java/**`
+- `libs/common-json/src/main/java/**`
+- `libs/dsl-model/src/main/java/**`
+- `libs/dsl-parser/src/main/java/**`
 - `config/**/.gitkeep`
 - `extension/edge-extension/.gitkeep`
 - `ui/**/.gitkeep`
@@ -107,25 +130,26 @@
 - `enterprise_web_test_platform_phase3_java_core_code_skeleton.md`
 
 ## 当前结果
-- [ ] 已完成并可运行
-- [x] 已完成但未联调
+- [x] 已完成并可运行
+- [ ] 已完成但未联调
 - [ ] 部分完成
 - [ ] 暂停
 - [ ] 有阻塞
 
 ## 当前阻塞点
 - 暂无阻塞。
-- 需要继续验证本地 Gradle/Java 环境是否可用。
+- Maven 构建可用；当前机器 JDK 为 17，和设计文档的 Java 21 存在差异。
 
 ---
 
 # 5. 当前系统状态总结
 
 ## 能运行到哪一步
-- 当前仅完成工程骨架，尚未实现 Java 入口类和业务链路。
+- 当前完成 Maven 工程骨架和 common/dsl 基础 Java 骨架，尚未实现 Java 入口类和业务链路。
 
 ## 当前已打通链路
-- 文档 -> 阶段判断 -> Gradle 模块结构。
+- 文档 -> 阶段判断 -> Maven 模块结构。
+- common-core/common-json/dsl-model/dsl-parser 编译链路。
 
 ## 当前未打通链路
 - CDP 连接链路。
@@ -134,7 +158,7 @@
 - Edge 插件链路。
 
 ## 当前最薄弱部分
-- 目前还没有 Java 代码实现，下一步应优先落地 common/dsl/cdp/browser 基础骨架。
+- CDP 与 browser-core 尚未实现，下一步应优先落地 cdp-client/browser-core 基础骨架。
 
 ---
 
@@ -152,6 +176,18 @@
   - 是否阻塞：不阻塞工程初始化。
   - 临时方案：先实现接口和骨架，再做本机 Edge 联调。
 
+- 问题 3：
+  - 现象：设计文档要求 Java 21，但当前环境为 JDK 17。
+  - 影响范围：Maven 目前使用 `maven.compiler.release=17` 以保证本机可构建。
+  - 是否阻塞：不阻塞当前骨架开发。
+  - 临时方案：后续安装 JDK 21 后，将根 `pom.xml` 中 `maven.compiler.release` 调整为 21。
+
+- 问题 4：
+  - 现象：`common-json` 目前是 JSON 门面占位，尚未接入 Jackson。
+  - 影响范围：`DefaultDslParser.parseJson` 调用时会抛出 `JSON_NOT_CONFIGURED`。
+  - 是否阻塞：不阻塞编译，不满足 DSL 真实解析。
+  - 临时方案：下一阶段接入 Jackson 或实现最小 JSON 解析。
+
 ---
 
 # 7. 临时决策记录
@@ -168,6 +204,12 @@
   - 影响：空模块会先存在，后续按优先级补实现。
   - 后续是否要调整：可根据实际依赖收敛模块。
 
+- 决策 3：
+  - 内容：构建工具从 Gradle 切换为 Maven。
+  - 原因：当前开发要求调整为 Maven，且本机 Maven 可用。
+  - 影响：Phase2 文档中的 Gradle 示例仅作为模块边界参考，实际工程以 Maven POM 为准。
+  - 后续是否要调整：除非明确要求，不再回切 Gradle。
+
 ---
 
 # 8. 禁止重复修改 / 注意事项
@@ -179,19 +221,20 @@
 - 不要把 Native Messaging 用作大文件/大截图传输通道
 - 不要在 Host stdout 打普通日志，避免污染协议输出
 - 当前 `runs/` 目录只跟踪 `.gitkeep`，运行产物不要提交
+- 当前 `.m2/` 为工作区 Maven 本地仓库，不要提交
 
 ---
 
 # 9. 下一步建议
 
 ## 最高优先级
-1. 实现 `libs/common-core` 基础异常、错误码、ID 工具
-2. 实现 `libs/common-json` JSON 工具骨架
-3. 实现 `libs/dsl-model` 与 `libs/dsl-parser` 基础模型和接口
+1. 接入 `common-json` 的真实 JSON 实现
+2. 实现 `libs/cdp-client` 的请求/响应/事件模型和 `CdpClient` 接口
+3. 实现 `libs/browser-core` 的 Session 与 PageController 接口骨架
 
 ## 次优先级
-1. 实现 `libs/cdp-client` 的请求/响应/事件模型和 `CdpClient` 接口
-2. 实现 `libs/browser-core` 的 Session 与 PageController 接口骨架
+1. 实现 `execution-context`
+2. 实现最小 `execution-engine` 编排骨架
 
 ## 暂时不做
 - Edge 插件 UI
