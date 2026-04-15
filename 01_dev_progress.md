@@ -57,8 +57,8 @@
   - 对应文档：`enterprise_web_test_platform_phase3_java_core_code_skeleton.md`
 
 - 模块名：common-json
-  - 状态：基础门面已完成，真实 JSON 依赖未接入
-  - 说明：提供 `Jsons` 门面；当前为可编译占位，后续接 Jackson 或其他 JSON 实现
+  - 状态：基础实现已完成
+  - 说明：提供 `Jsons` 门面，已接入 Jackson JSON/YAML；未知字段忽略，枚举大小写不敏感
   - 对应文件：`libs/common-json/src/main/java/com/example/webtest/json/Jsons.java`
   - 对应文档：`enterprise_web_test_platform_phase3_java_core_code_skeleton.md`
 
@@ -200,10 +200,10 @@
   - 临时方案：后续安装 JDK 21 后，将根 `pom.xml` 中 `maven.compiler.release` 调整为 21。
 
 - 问题 4：
-  - 现象：`common-json` 目前是 JSON 门面占位，尚未接入 Jackson。
-  - 影响范围：`DefaultDslParser.parseJson` 调用时会抛出 `JSON_NOT_CONFIGURED`。
-  - 是否阻塞：不阻塞编译，不满足 DSL 真实解析。
-  - 临时方案：下一阶段接入 Jackson 或实现最小 JSON 解析。
+  - 现象：`common-json` 已接入 Jackson，但尚未补充 DSL parser 单元测试。
+  - 影响范围：解析能力已可用，但边界用例未验证。
+  - 是否阻塞：不阻塞当前阶段。
+  - 临时方案：后续补充 DSL JSON/YAML 解析测试。
 
 ---
 
@@ -245,9 +245,9 @@
 # 9. 下一步建议
 
 ## 最高优先级
-1. 接入 `common-json` 的真实 JSON 实现
-2. 实现 `DefaultCdpClient` 的真实 WebSocket 传输
-3. 实现 `DefaultBrowserSessionManager` 启动 Edge 与查询 DevTools endpoint
+1. 实现 `DefaultCdpClient` 的真实 WebSocket 传输
+2. 实现 `DefaultBrowserSessionManager` 启动 Edge 与查询 DevTools endpoint
+3. 补充 DSL parser 单元测试
 
 ## 次优先级
 1. 实现最小 `execution-engine` 编排骨架
