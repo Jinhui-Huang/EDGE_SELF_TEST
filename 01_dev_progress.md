@@ -82,10 +82,10 @@
 
 ## CDP 域封装
 - 域名：Raw CDP Client
-  - 状态：接口与默认实现骨架已完成
-  - 已实现命令：尚未实现真实发送；`DefaultCdpClient.send` 当前明确抛出未实现异常
-  - 已监听事件：无
-  - 风险：后续真实联调依赖 WebSocket 传输实现、本机 Edge 启动参数和 CDP 端口
+  - 状态：基础 WebSocket 传输已完成
+  - 已实现命令：`connect`、`close`、同步 `send`、请求 ID、响应等待、超时、CDP error 映射
+  - 已监听事件：支持按 `method` 分发事件给已注册 listener
+  - 风险：尚未与真实 Edge DevTools endpoint 联调；事件 payload 目前以 Jackson `JsonNode` 透传
 
 ## Native Messaging Host
 - 模块名：目录占位
@@ -188,10 +188,10 @@
   - 临时方案：以当前工作区文件为准，从 Phase 0 开始记录。
 
 - 问题 2：
-  - 现象：CDP 真实链路尚未实现；当前 `DefaultCdpClient.send` 为明确失败的骨架实现。
-  - 影响范围：无法验证启动 Edge、打开页面和截图。
+  - 现象：CDP WebSocket 传输已实现，但尚未与真实 Edge DevTools endpoint 联调。
+  - 影响范围：尚不能确认真实打开页面和截图链路。
   - 是否阻塞：不阻塞工程初始化。
-  - 临时方案：下一阶段实现 WebSocket 传输、请求 ID、响应等待、事件分发，再做本机 Edge 联调。
+  - 临时方案：下一阶段实现 Edge 启动和 DevTools endpoint 查询，再做本机联调。
 
 - 问题 3：
   - 现象：设计文档要求 Java 21，但当前环境为 JDK 17。
@@ -245,8 +245,8 @@
 # 9. 下一步建议
 
 ## 最高优先级
-1. 实现 `DefaultCdpClient` 的真实 WebSocket 传输
-2. 实现 `DefaultBrowserSessionManager` 启动 Edge 与查询 DevTools endpoint
+1. 实现 `DefaultBrowserSessionManager` 启动 Edge 与查询 DevTools endpoint
+2. 将 `DefaultPageController` 的 navigate/reload/currentUrl/title/screenshot/getHtml 对接 CDP
 3. 补充 DSL parser 单元测试
 
 ## 次优先级
