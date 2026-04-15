@@ -28,8 +28,8 @@
 - [x] 完成 common-core、common-json、dsl-model、dsl-parser 基础 Java 骨架
 
 ## 进行中
-- [ ] Java 核心基础模块代码骨架
-- [ ] CDP Client 与 Browser Core 接口骨架
+- [x] Java 核心基础模块代码骨架
+- [x] CDP Client 与 Browser Core 接口骨架
 
 ## 未开始
 - [ ] 最小浏览器链路：启动 Edge、连接 CDP、打开页面、截图
@@ -68,12 +68,24 @@
   - 对应文件：`libs/dsl-model/src/main/java/com/example/webtest/dsl/model/**`、`libs/dsl-parser/src/main/java/com/example/webtest/dsl/**`
   - 对应文档：`enterprise_web_test_platform_phase3_java_core_code_skeleton.md`
 
+- 模块名：execution-context
+  - 状态：基础骨架已完成
+  - 说明：提供运行 ID、Session ID 与变量上下文
+  - 对应文件：`libs/execution-context/src/main/java/com/example/webtest/execution/context/ExecutionContext.java`
+  - 对应文档：`enterprise_web_test_platform_phase3_java_core_code_skeleton.md`
+
+- 模块名：browser-core
+  - 状态：接口与默认实现骨架已完成
+  - 说明：提供 Session 管理、PageController、截图选项、Console/Network 事件模型
+  - 对应文件：`libs/browser-core/src/main/java/com/example/webtest/browser/**`
+  - 对应文档：`enterprise_web_test_platform_phase3_java_core_code_skeleton.md`、`cdp_domain_encapsulation_detailed_design.md`
+
 ## CDP 域封装
-- 域名：未开始
-  - 状态：待实现
-  - 已实现命令：无
+- 域名：Raw CDP Client
+  - 状态：接口与默认实现骨架已完成
+  - 已实现命令：尚未实现真实发送；`DefaultCdpClient.send` 当前明确抛出未实现异常
   - 已监听事件：无
-  - 风险：后续真实联调依赖本机 Edge 启动参数和 CDP 端口
+  - 风险：后续真实联调依赖 WebSocket 传输实现、本机 Edge 启动参数和 CDP 端口
 
 ## Native Messaging Host
 - 模块名：目录占位
@@ -104,6 +116,7 @@
 - 按设计文档创建首批模块的 `pom.xml`
 - 添加 `.gitignore`
 - 实现 common-core、common-json、dsl-model、dsl-parser 基础 Java 骨架
+- 实现 execution-context、cdp-client、browser-core 基础 Java 骨架
 - 使用 `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests package` 验证通过
 
 ## 修改文件
@@ -115,6 +128,9 @@
 - `libs/common-json/src/main/java/**`
 - `libs/dsl-model/src/main/java/**`
 - `libs/dsl-parser/src/main/java/**`
+- `libs/execution-context/src/main/java/**`
+- `libs/cdp-client/src/main/java/**`
+- `libs/browser-core/src/main/java/**`
 - `config/**/.gitkeep`
 - `extension/edge-extension/.gitkeep`
 - `ui/**/.gitkeep`
@@ -145,11 +161,12 @@
 # 5. 当前系统状态总结
 
 ## 能运行到哪一步
-- 当前完成 Maven 工程骨架和 common/dsl 基础 Java 骨架，尚未实现 Java 入口类和业务链路。
+- 当前完成 Maven 工程骨架、common/dsl/execution-context/cdp-client/browser-core 基础 Java 骨架，尚未实现 Java 入口类和真实浏览器链路。
 
 ## 当前已打通链路
 - 文档 -> 阶段判断 -> Maven 模块结构。
 - common-core/common-json/dsl-model/dsl-parser 编译链路。
+- execution-context/cdp-client/browser-core 编译链路。
 
 ## 当前未打通链路
 - CDP 连接链路。
@@ -158,7 +175,7 @@
 - Edge 插件链路。
 
 ## 当前最薄弱部分
-- CDP 与 browser-core 尚未实现，下一步应优先落地 cdp-client/browser-core 基础骨架。
+- CDP WebSocket 传输、Edge 启动和真实 Page 操作尚未实现，下一步应优先接入 JSON 实现和 CDP 真实传输。
 
 ---
 
@@ -171,10 +188,10 @@
   - 临时方案：以当前工作区文件为准，从 Phase 0 开始记录。
 
 - 问题 2：
-  - 现象：CDP 真实链路尚未实现。
+  - 现象：CDP 真实链路尚未实现；当前 `DefaultCdpClient.send` 为明确失败的骨架实现。
   - 影响范围：无法验证启动 Edge、打开页面和截图。
   - 是否阻塞：不阻塞工程初始化。
-  - 临时方案：先实现接口和骨架，再做本机 Edge 联调。
+  - 临时方案：下一阶段实现 WebSocket 传输、请求 ID、响应等待、事件分发，再做本机 Edge 联调。
 
 - 问题 3：
   - 现象：设计文档要求 Java 21，但当前环境为 JDK 17。
@@ -229,12 +246,12 @@
 
 ## 最高优先级
 1. 接入 `common-json` 的真实 JSON 实现
-2. 实现 `libs/cdp-client` 的请求/响应/事件模型和 `CdpClient` 接口
-3. 实现 `libs/browser-core` 的 Session 与 PageController 接口骨架
+2. 实现 `DefaultCdpClient` 的真实 WebSocket 传输
+3. 实现 `DefaultBrowserSessionManager` 启动 Edge 与查询 DevTools endpoint
 
 ## 次优先级
-1. 实现 `execution-context`
-2. 实现最小 `execution-engine` 编排骨架
+1. 实现最小 `execution-engine` 编排骨架
+2. 实现 locator/action/wait/assertion 的第一版接口骨架
 
 ## 暂时不做
 - Edge 插件 UI
