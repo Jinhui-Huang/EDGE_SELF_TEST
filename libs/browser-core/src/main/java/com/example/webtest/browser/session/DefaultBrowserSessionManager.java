@@ -55,7 +55,7 @@ public class DefaultBrowserSessionManager implements BrowserSessionManager {
         try {
             Process process = startEdge(safeOptions, debugPort);
             session.setBrowserProcessId(String.valueOf(process.pid()));
-            String endpoint = waitForWebSocketEndpoint(debugPort);
+            String endpoint = waitForPageWebSocketEndpoint(debugPort);
             session.setWsEndpoint(endpoint);
             cdpClient.connect(endpoint);
             session.setStatus(SessionStatus.CONNECTED);
@@ -133,19 +133,13 @@ public class DefaultBrowserSessionManager implements BrowserSessionManager {
         return DEFAULT_EDGE_EXECUTABLE;
     }
 
-    private String waitForWebSocketEndpoint(int debugPort) {
-        URI uri = URI.create("http://127.0.0.1:" + debugPort + "/json/version");
-        HttpRequest request = HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(2)).GET().build();
+    private String waitForPageWebSocketEndpoint(int debugPort) {
         RuntimeException lastError = null;
         for (int attempt = 0; attempt < 30; attempt++) {
             try {
-                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-                if (response.statusCode() == 200) {
-                    JsonNode root = Jsons.JSON.readTree(response.body());
-                    JsonNode endpoint = root.get("webSocketDebuggerUrl");
-                    if (endpoint != null && !endpoint.asText().isBlank()) {
-                        return endpoint.asText();
-                    }
+                Optional<String> pageEndpoint = queryPageEndpoint(debugPort);
+                if (pageEndpoint.isPresent()) {
+                    return pageEndpoint.get();
                 }
             } catch (IOException e) {
                 lastError = new BaseException(ErrorCodes.CDP_CONNECT_TIMEOUT, "Failed to query DevTools endpoint", e);
@@ -159,6 +153,27 @@ public class DefaultBrowserSessionManager implements BrowserSessionManager {
                 ErrorCodes.CDP_CONNECT_TIMEOUT,
                 "Timed out waiting for Edge DevTools endpoint on port " + debugPort,
                 lastError);
+    }
+
+    private Optional<String> queryPageEndpoint(int debugPort) throws IOException, InterruptedException {
+        URI uri = URI.create("http://127.0.0.1:" + debugPort + "/json/list");
+        HttpRequest request = HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(2)).GET().build();
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() != 200) {
+            return Optional.empty();
+        }
+        JsonNode targets = Jsons.JSON.readTree(response.body());
+        if (!targets.isArray()) {
+            return Optional.empty();
+        }
+        for (JsonNode target : targets) {
+            JsonNode type = target.get("type");
+            JsonNode endpoint = target.get("webSocketDebuggerUrl");
+            if (type != null && "page".equals(type.asText()) && endpoint != null && !endpoint.asText().isBlank()) {
+                return Optional.of(endpoint.asText());
+            }
+        }
+        return Optional.empty();
     }
 
     private int findFreePort() {

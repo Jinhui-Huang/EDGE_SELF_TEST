@@ -76,9 +76,15 @@
 
 - 模块名：browser-core
   - 状态：基础实现已完成，尚未真实联调
-  - 说明：提供 Session 管理、Edge 启动、DevTools endpoint 查询、PageController 基础 CDP 调用、截图选项、Console/Network 事件模型
+  - 说明：提供 Session 管理、Edge 启动、Page target DevTools endpoint 查询、PageController 基础 CDP 调用、截图选项、Console/Network 事件模型
   - 对应文件：`libs/browser-core/src/main/java/com/example/webtest/browser/**`
   - 对应文档：`enterprise_web_test_platform_phase3_java_core_code_skeleton.md`、`cdp_domain_encapsulation_detailed_design.md`
+
+- 模块名：apps/core-platform smoke 入口
+  - 状态：已添加，尚未运行真实 Edge smoke
+  - 说明：提供 `CorePlatformApp`，目标链路为启动 headless Edge、导航 data URL、截图到 `runs/smoke/screenshot.png`
+  - 对应文件：`apps/core-platform/src/main/java/com/example/webtest/platform/CorePlatformApp.java`
+  - 对应文档：`enterprise_web_test_platform_tech_design.md` 附录 A、`enterprise_web_test_platform_phase3_java_core_code_skeleton.md` 附录 A
 
 ## CDP 域封装
 - 域名：Raw CDP Client
@@ -188,10 +194,10 @@
   - 临时方案：以当前工作区文件为准，从 Phase 0 开始记录。
 
 - 问题 2：
-  - 现象：CDP WebSocket 传输、Edge 启动和 PageController 基础调用已实现，但尚未与真实 Edge 做端到端联调。
+  - 现象：CDP WebSocket 传输、Edge 启动、Page target endpoint 查询、PageController 基础调用和 smoke 入口已实现，但尚未运行真实 Edge 端到端 smoke。
   - 影响范围：尚不能确认真实打开页面和截图链路。
   - 是否阻塞：不阻塞工程初始化。
-  - 临时方案：下一阶段添加最小 core-platform Main 或集成测试，执行启动 Edge -> navigate -> screenshot。
+  - 临时方案：下一次优先运行 `CorePlatformApp`，验证启动 Edge -> navigate -> screenshot。
 
 - 问题 3：
   - 现象：设计文档要求 Java 21，但当前环境为 JDK 17。
@@ -245,8 +251,8 @@
 # 9. 下一步建议
 
 ## 最高优先级
-1. 添加最小 core-platform Main 或集成测试
-2. 执行启动 Edge -> navigate -> screenshot 的真实联调
+1. 执行 `CorePlatformApp` 真实 smoke：启动 Edge -> navigate -> screenshot
+2. 根据 smoke 结果修复 CDP/page endpoint/截图链路
 3. 补充 DSL parser 单元测试
 
 ## 次优先级
@@ -314,9 +320,24 @@
 
 为减少 token 消耗，下次若继续 Java 核心骨架开发，优先阅读：
 - `01_dev_progress.md`
-- `enterprise_web_test_platform_phase3_java_core_code_skeleton.md` 第 5-9 章
-- `enterprise_web_test_platform_phase2_implementation_design.md` 第 3-8、20-21 章
-- 如涉及 CDP 真实实现，再读 `cdp_domain_encapsulation_detailed_design.md` 第 4-8 章
+- `enterprise_web_test_platform_phase3_java_core_code_skeleton.md` 第 8-9、20-21 章
+- `cdp_domain_encapsulation_detailed_design.md` 第 4-8、19-21 章
+- 如继续 DSL/编排，再读 `enterprise_web_test_platform_phase3_java_core_code_skeleton.md` 第 6-7、17 章
+
+## 下次接手关键记忆
+- 构建工具已从 Gradle 切换为 Maven；不要再恢复 Gradle。
+- 当前 Maven 命令：`mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests package`。
+- 当前环境只有 JDK 17，所以根 `pom.xml` 暂用 `maven.compiler.release=17`；设计文档目标仍是 Java 21。
+- `.m2/` 是工作区本地 Maven 仓库，已加入 `.gitignore`。
+- 已提交阶段：
+  - `fd075fc`：初始化仓库结构
+  - `a6c7549`：切换 Maven 并添加 common/dsl 骨架
+  - `a9cbaed`：添加 cdp/browser/execution-context 骨架
+  - `3cdd1c2`：启用 Jackson JSON 支持
+  - `57cee84`：实现 CDP WebSocket client
+  - `f95bb7b`：实现 Edge 启动与 PageController CDP 基础命令
+- 当前未提交阶段即将提交：core-platform smoke 入口，以及 Page target endpoint 查询修正。
+- 下次优先验证 smoke 入口，不要先大规模扩展新模块。
 
 ---
 

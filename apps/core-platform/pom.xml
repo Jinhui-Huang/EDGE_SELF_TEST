@@ -27,5 +27,13 @@
             <groupId>com.example.webtest</groupId>
             <artifactId>security-audit</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.example.webtest</groupId>
+            <artifactId>cdp-client</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.example.webtest</groupId>
+            <artifactId>browser-core</artifactId>
+        </dependency>
     </dependencies>
 </project>
