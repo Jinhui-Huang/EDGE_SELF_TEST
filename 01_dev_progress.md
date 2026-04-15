@@ -75,8 +75,8 @@
   - 对应文档：`enterprise_web_test_platform_phase3_java_core_code_skeleton.md`
 
 - 模块名：browser-core
-  - 状态：接口与默认实现骨架已完成
-  - 说明：提供 Session 管理、PageController、截图选项、Console/Network 事件模型
+  - 状态：基础实现已完成，尚未真实联调
+  - 说明：提供 Session 管理、Edge 启动、DevTools endpoint 查询、PageController 基础 CDP 调用、截图选项、Console/Network 事件模型
   - 对应文件：`libs/browser-core/src/main/java/com/example/webtest/browser/**`
   - 对应文档：`enterprise_web_test_platform_phase3_java_core_code_skeleton.md`、`cdp_domain_encapsulation_detailed_design.md`
 
@@ -175,7 +175,7 @@
 - Edge 插件链路。
 
 ## 当前最薄弱部分
-- CDP WebSocket 传输、Edge 启动和真实 Page 操作尚未实现，下一步应优先接入 JSON 实现和 CDP 真实传输。
+- CDP WebSocket 传输、Edge 启动和 PageController 基础 CDP 调用已实现；尚未做真实 Edge 端到端联调。
 
 ---
 
@@ -188,10 +188,10 @@
   - 临时方案：以当前工作区文件为准，从 Phase 0 开始记录。
 
 - 问题 2：
-  - 现象：CDP WebSocket 传输已实现，但尚未与真实 Edge DevTools endpoint 联调。
+  - 现象：CDP WebSocket 传输、Edge 启动和 PageController 基础调用已实现，但尚未与真实 Edge 做端到端联调。
   - 影响范围：尚不能确认真实打开页面和截图链路。
   - 是否阻塞：不阻塞工程初始化。
-  - 临时方案：下一阶段实现 Edge 启动和 DevTools endpoint 查询，再做本机联调。
+  - 临时方案：下一阶段添加最小 core-platform Main 或集成测试，执行启动 Edge -> navigate -> screenshot。
 
 - 问题 3：
   - 现象：设计文档要求 Java 21，但当前环境为 JDK 17。
@@ -245,8 +245,8 @@
 # 9. 下一步建议
 
 ## 最高优先级
-1. 实现 `DefaultBrowserSessionManager` 启动 Edge 与查询 DevTools endpoint
-2. 将 `DefaultPageController` 的 navigate/reload/currentUrl/title/screenshot/getHtml 对接 CDP
+1. 添加最小 core-platform Main 或集成测试
+2. 执行启动 Edge -> navigate -> screenshot 的真实联调
 3. 补充 DSL parser 单元测试
 
 ## 次优先级
