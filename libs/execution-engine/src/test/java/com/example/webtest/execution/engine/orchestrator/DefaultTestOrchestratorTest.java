@@ -4,12 +4,14 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.example.webtest.browser.page.ElementState;
 import com.example.webtest.browser.page.PageController;
 import com.example.webtest.browser.page.ScreenshotOptions;
-import com.example.webtest.dsl.parser.DefaultDslParser;
 import com.example.webtest.dsl.model.ActionType;
 import com.example.webtest.dsl.model.StepDefinition;
+import com.example.webtest.dsl.model.TargetDefinition;
 import com.example.webtest.dsl.model.TestCaseDefinition;
+import com.example.webtest.dsl.parser.DefaultDslParser;
 import com.example.webtest.dsl.validator.DefaultDslValidator;
 import com.example.webtest.execution.context.ExecutionContext;
 import com.example.webtest.execution.engine.result.RunOptions;
@@ -94,12 +96,72 @@ class DefaultTestOrchestratorTest {
         assertEquals(List.of("navigate:https://example.test"), pageController.calls);
     }
 
+    @Test
+    void executeRoutesClickAndFillThroughActionEngine() {
+        FakePageController pageController = new FakePageController();
+        TestCaseDefinition definition = new TestCaseDefinition();
+        definition.setSteps(List.of(
+                targetStep("fill-search", ActionType.FILL, "#search", "codex"),
+                targetStep("click-submit", ActionType.CLICK, "#submit", null)));
+
+        RunResult result = new DefaultTestOrchestrator(pageController).execute(definition, new RunOptions());
+
+        assertEquals(RunStatus.SUCCESS, result.getStatus());
+        assertEquals(List.of(
+                "findElement:css:#search:0",
+                "findElement:css:#search:0",
+                "fillElement:css:#search:0=codex",
+                "findElement:css:#submit:0",
+                "findElement:css:#submit:0",
+                "clickElement:css:#submit:0"), pageController.calls);
+    }
+
+    @Test
+    void executeRoutesExplicitWaitsThroughActionEngine() {
+        FakePageController pageController = new FakePageController();
+        TestCaseDefinition definition = new TestCaseDefinition();
+        definition.setSteps(List.of(
+                targetStep("wait-search", ActionType.WAIT_FOR_ELEMENT, "#search", null),
+                targetStep("wait-submit", ActionType.WAIT_FOR_VISIBLE, "#submit", null),
+                targetStep("wait-hidden", ActionType.WAIT_FOR_HIDDEN, "#hidden", null),
+                waitUrlStep("wait-url", "https://example.test/app/dashboard")));
+
+        RunResult result = new DefaultTestOrchestrator(pageController).execute(definition, new RunOptions());
+
+        assertEquals(RunStatus.SUCCESS, result.getStatus());
+        assertEquals(List.of(
+                "findElement:css:#search:0",
+                "findElement:css:#submit:0",
+                "findElement:css:#hidden:0",
+                "currentUrl"), pageController.calls);
+    }
+
     private StepDefinition step(String id, ActionType action, String url, String expected) {
         StepDefinition step = new StepDefinition();
         step.setId(id);
         step.setAction(action);
         step.setUrl(url);
         step.setExpected(expected);
+        return step;
+    }
+
+    private StepDefinition targetStep(String id, ActionType action, String selector, Object value) {
+        TargetDefinition target = new TargetDefinition();
+        target.setBy("css");
+        target.setValue(selector);
+        StepDefinition step = new StepDefinition();
+        step.setId(id);
+        step.setAction(action);
+        step.setTarget(target);
+        step.setValue(value);
+        return step;
+    }
+
+    private StepDefinition waitUrlStep(String id, String expectedUrl) {
+        StepDefinition step = new StepDefinition();
+        step.setId(id);
+        step.setAction(ActionType.WAIT_FOR_URL);
+        step.setExpected(expectedUrl);
         return step;
     }
 
@@ -139,6 +201,28 @@ class DefaultTestOrchestratorTest {
         public String getHtml(ExecutionContext context) {
             calls.add("getHtml");
             return "<html></html>";
+        }
+
+        @Override
+        public ElementState findElement(String by, String value, Integer index, ExecutionContext context) {
+            calls.add("findElement:" + by + ":" + value + ":" + index);
+            ElementState state = new ElementState();
+            boolean hidden = "#hidden".equals(value);
+            state.setFound(!hidden);
+            state.setCount(hidden ? 0 : 1);
+            state.setVisible(!hidden);
+            state.setActionable(!hidden);
+            return state;
+        }
+
+        @Override
+        public void clickElement(String by, String value, Integer index, ExecutionContext context) {
+            calls.add("clickElement:" + by + ":" + value + ":" + index);
+        }
+
+        @Override
+        public void fillElement(String by, String value, Integer index, String text, ExecutionContext context) {
+            calls.add("fillElement:" + by + ":" + value + ":" + index + "=" + text);
         }
     }
 }

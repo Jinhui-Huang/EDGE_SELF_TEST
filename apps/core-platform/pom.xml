@@ -17,6 +17,10 @@
         </dependency>
         <dependency>
             <groupId>com.example.webtest</groupId>
+            <artifactId>dsl-parser</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.example.webtest</groupId>
             <artifactId>native-messaging</artifactId>
         </dependency>
         <dependency>

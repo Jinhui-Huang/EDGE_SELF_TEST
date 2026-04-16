@@ -17,11 +17,28 @@
         </dependency>
         <dependency>
             <groupId>com.example.webtest</groupId>
+            <artifactId>wait-engine</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.example.webtest</groupId>
             <artifactId>browser-core</artifactId>
         </dependency>
         <dependency>
             <groupId>com.example.webtest</groupId>
             <artifactId>execution-context</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.example.webtest</groupId>
+            <artifactId>dsl-model</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.example.webtest</groupId>
+            <artifactId>common-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 </project>

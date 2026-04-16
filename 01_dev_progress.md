@@ -464,3 +464,336 @@
 ## 下一步
 - 实现最小 `locator-engine` 和浏览器 DOM 交互能力，用于支撑 `CLICK` / `FILL`。
 - 或先给 `core-platform` 增加稳定的 DSL smoke 入口，读取 DSL 文件并调用 `DefaultDslRunService`。
+
+## 2026-04-16 core-platform DSL smoke 入口开发记录
+## 本次任务
+- 保存当前接手记忆和进度，并在两条路线中优先选择改动面较小的 `core-platform` DSL smoke 入口。
+
+## 完成内容
+- 为 `CorePlatformApp` 增加 `dsl-smoke` 命令入口，可读取 DSL 文件并调用 `DefaultDslRunService`。
+- 新增 `config/smoke/core-platform-smoke.yml`，覆盖真实 Edge 中的 `GOTO`、`ASSERT_TITLE`、`SCREENSHOT` 最小链路。
+- `DefaultPageController.navigate` 现在会在 `Page.navigate` 后等待 `Page.loadEventFired`，避免 DSL 编排器在页面尚未加载时立即执行断言或截图。
+- `apps/core-platform` 显式声明 `dsl-parser` 依赖，因为入口类直接构造 `DefaultDslParser` / `DefaultDslValidator`。
+- 已真实运行 headless Edge DSL smoke，输出截图到 `runs/dsl-smoke/capture-page.png`。
+- 已复查本项目 Edge 调试进程，无 `webtest-edge-*` 或 `remote-debugging-port` 残留。
+
+## 修改文件
+- `memory.txt`
+- `apps/core-platform/pom.xml`
+- `apps/core-platform/src/main/java/com/example/webtest/platform/CorePlatformApp.java`
+- `libs/browser-core/src/main/java/com/example/webtest/browser/page/DefaultPageController.java`
+- `config/smoke/core-platform-smoke.yml`
+- `01_dev_progress.md`
+
+## 当前状态
+- 受影响模块测试通过：`mvn "-Dmaven.repo.local=.m2/repository" -pl libs/browser-core,libs/execution-engine,apps/core-platform -am test`
+- Maven 全量构建通过：`mvn "-Dmaven.repo.local=.m2/repository" -q package`
+- Maven 本地安装通过：`mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+- core-platform DSL smoke 通过。运行方式：
+  - 先在仓库根目录执行 install。
+  - 再进入 `apps/core-platform` 执行 `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`
+- smoke 输出：
+  - `DSL smoke run: dsl-smoke-run`
+  - `Status: SUCCESS`
+  - `Output dir: D:\txt\edge_self_test\runs\dsl-smoke`
+  - `capture-page SCREENSHOT SUCCESS artifact=D:\txt\edge_self_test\runs\dsl-smoke\capture-page.png`
+
+## 已知问题
+- `core-platform` 从聚合根直接执行 `exec:java` 的主类解析差异仍未单独处理；当前稳定方式仍是先 install，再从 `apps/core-platform` 执行。
+- `DefaultPageController.navigate` 使用固定 5 秒页面加载等待，后续应迁移到正式 `wait-engine` 或可配置超时策略。
+- 当前 DSL 编排器仍只支持最小动作集合，`CLICK` / `FILL` 等 DOM 交互动作尚未实现。
+- 设计目标仍是 Java 21，但当前环境继续按既有决策使用 JDK 17 / `maven.compiler.release=17`。
+
+## 下一步
+- 开始实现最小 `locator-engine` 与 `action-engine` 浏览器 DOM 交互链路，优先支持 `CLICK` / `FILL`。
+- 之后把 `DefaultTestOrchestrator` 的 unsupported action 分支逐步接到 action/locator/wait 模块，而不是继续在编排器里堆业务细节。
+
+## 2026-04-16 locator/action DOM 交互链路开发记录
+
+## 本次任务
+- 实现最小 `locator-engine` 与 `action-engine` 浏览器 DOM 交互链路，让 DSL 的 `CLICK` / `FILL` 能在真实 Edge 中执行。
+
+## 完成内容
+- `browser-core` 扩展 `PageController`，新增 `findElement`、`clickElement`、`fillElement` 三个最小 DOM 交互方法。
+- `DefaultPageController` 通过 CDP `Runtime.evaluate` 执行 DOM 查询和交互，当前支持基础定位方式：`css` / `selector` / `id` / `name` / `tag` / `text` / `role` / `testid`。
+- 新增 `ElementState`，用于承载浏览器侧元素状态：是否找到、匹配数量、是否可见、是否可操作。
+- 新增 `locator-engine` 最小实现：
+  - `ResolveResult`
+  - `ElementResolver`
+  - `DefaultElementResolver`
+- 新增 `action-engine` 最小实现：
+  - `StepResult`
+  - `ActionExecutor`
+  - `DefaultActionExecutor`
+  - `StepActionHandler`
+  - `BrowserInteractionService`
+  - `DefaultBrowserInteractionService`
+  - `ClickActionHandler`
+  - `FillActionHandler`
+- `DefaultTestOrchestrator` 现在将 `CLICK` / `FILL` 分支接入 `ActionExecutor`，不再作为 unsupported action 失败。
+- 扩展 `config/smoke/core-platform-smoke.yml`，在真实 headless Edge 中执行：
+  - `FILL` 输入 `#search`
+  - `CLICK` 点击 `#submit`
+  - `ASSERT_TITLE` 验证按钮点击后的标题变化
+- 新增/扩展单元测试，覆盖 locator 解析、action 分派、orchestrator 到 action-engine 的调用链。
+
+## 修改文件
+- `memory.txt`
+- `libs/browser-core/pom.xml`
+- `libs/browser-core/src/main/java/com/example/webtest/browser/page/ElementState.java`
+- `libs/browser-core/src/main/java/com/example/webtest/browser/page/PageController.java`
+- `libs/browser-core/src/main/java/com/example/webtest/browser/page/DefaultPageController.java`
+- `libs/locator-engine/pom.xml`
+- `libs/locator-engine/src/main/java/com/example/webtest/locator/model/ResolveResult.java`
+- `libs/locator-engine/src/main/java/com/example/webtest/locator/resolver/ElementResolver.java`
+- `libs/locator-engine/src/main/java/com/example/webtest/locator/resolver/DefaultElementResolver.java`
+- `libs/locator-engine/src/test/java/com/example/webtest/locator/resolver/DefaultElementResolverTest.java`
+- `libs/action-engine/pom.xml`
+- `libs/action-engine/src/main/java/com/example/webtest/action/result/StepResult.java`
+- `libs/action-engine/src/main/java/com/example/webtest/action/executor/ActionExecutor.java`
+- `libs/action-engine/src/main/java/com/example/webtest/action/executor/DefaultActionExecutor.java`
+- `libs/action-engine/src/main/java/com/example/webtest/action/handler/StepActionHandler.java`
+- `libs/action-engine/src/main/java/com/example/webtest/action/handler/BrowserInteractionService.java`
+- `libs/action-engine/src/main/java/com/example/webtest/action/handler/DefaultBrowserInteractionService.java`
+- `libs/action-engine/src/main/java/com/example/webtest/action/handler/ClickActionHandler.java`
+- `libs/action-engine/src/main/java/com/example/webtest/action/handler/FillActionHandler.java`
+- `libs/action-engine/src/test/java/com/example/webtest/action/executor/DefaultActionExecutorTest.java`
+- `libs/execution-engine/src/main/java/com/example/webtest/execution/engine/orchestrator/DefaultTestOrchestrator.java`
+- `libs/execution-engine/src/test/java/com/example/webtest/execution/engine/orchestrator/DefaultTestOrchestratorTest.java`
+- `config/smoke/core-platform-smoke.yml`
+- `01_dev_progress.md`
+
+## 当前状态
+- 受影响模块测试通过：`mvn "-Dmaven.repo.local=.m2/repository" -pl libs/browser-core,libs/locator-engine,libs/action-engine,libs/execution-engine,apps/core-platform -am test`
+- Maven 全量构建通过：`mvn "-Dmaven.repo.local=.m2/repository" -q package`
+- Maven 本地安装通过：`mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+- core-platform DSL smoke 通过。运行方式：
+  - 先在仓库根目录执行 install。
+  - 再进入 `apps/core-platform` 执行 `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`
+- smoke 输出：
+  - `DSL smoke run: dsl-smoke-run`
+  - `Status: SUCCESS`
+  - `fill-search FILL SUCCESS`
+  - `click-submit CLICK SUCCESS`
+  - `assert-click-title ASSERT_TITLE SUCCESS`
+  - `capture-page SCREENSHOT SUCCESS artifact=D:\txt\edge_self_test\runs\dsl-smoke\capture-page.png`
+- 已复查本项目 Edge 调试进程，无 `webtest-edge-*` 或 `remote-debugging-port` 残留。
+
+## 已知问题
+- DOM 定位和交互仍是最小实现，尚未支持 frame、shadow DOM、复杂可访问性名称、坐标点击、键盘输入序列、文件上传等完整能力。
+- `CLICK` / `FILL` 当前依赖即时 `findElement` 结果，还没有接入正式 `wait-engine` 的轮询等待和可配置超时。
+- `DefaultPageController.navigate` 仍使用固定 5 秒页面加载等待，后续应迁移到正式 `wait-engine` 或统一超时策略。
+- `core-platform` 从聚合根直接执行 `exec:java` 的主类解析差异仍未单独处理；当前稳定方式仍是先 install，再从 `apps/core-platform` 执行。
+- 设计目标仍是 Java 21，但当前环境继续按既有决策使用 JDK 17 / `maven.compiler.release=17`。
+
+## 下一步
+- 实现最小 `wait-engine`，优先支持 `WAIT_FOR_ELEMENT` / `WAIT_FOR_VISIBLE`，并让 `CLICK` / `FILL` 可在动作前按 `timeoutMs` 等待目标元素。
+- 继续将 `DefaultTestOrchestrator` 的其他 unsupported action 分支逐步迁移到 action/locator/wait/assertion/artifact 模块。
+- 后续可为 core-platform 增加稳定 Maven exec 配置，减少从聚合根和子模块运行时的命令差异。
+
+## 下次建议优先阅读
+- `01_dev_progress.md` 最新一节。
+- `enterprise_web_test_platform_phase3_java_core_code_skeleton.md` 第 12 章 wait-engine 骨架，以及第 22 章编排器接入示例。
+- `enterprise_web_test_platform_phase2_implementation_design.md` 第 10 章等待模块设计。
+
+## 2026-04-16 wait-engine 最小等待链路开发记录
+## 本次任务
+- 实现最小 `wait-engine`，优先支持 `WAIT_FOR_ELEMENT` / `WAIT_FOR_VISIBLE`，并让 `CLICK` / `FILL` 在动作前按 `timeoutMs` 等待目标元素可见。
+
+## 完成内容
+- 新增 `WaitEngine` 接口和 `DefaultWaitEngine` 默认实现。
+- `DefaultWaitEngine` 通过 `ElementResolver` 轮询元素状态，当前支持 `waitForElement` 和 `waitForVisible`。
+- 等待超时会抛出明确错误，包含等待目标、超时时间和最后一次元素状态。
+- 新增 `WaitActionHandler`，将 DSL 的 `WAIT_FOR_ELEMENT` / `WAIT_FOR_VISIBLE` 接入 `ActionExecutor`。
+- `ClickActionHandler` / `FillActionHandler` 现在在提供 `WaitEngine` 时，会先按步骤 `timeoutMs` 等待元素可见，再执行点击或填充。
+- `DefaultTestOrchestrator` 默认装配 `DefaultWaitEngine`，并把 `WAIT_FOR_ELEMENT` / `WAIT_FOR_VISIBLE` 分发给 action/wait 链路。
+- 扩展 `config/smoke/core-platform-smoke.yml`，增加真实 Edge DSL smoke 中的 `wait_for_visible` 步骤，并给 `fill` / `click` 增加 `timeoutMs`。
+- 新增/扩展单元测试覆盖等待轮询、超时错误、动作前置等待、显式等待动作分发和 orchestrator 分发链路。
+
+## 修改文件
+- `libs/wait-engine/pom.xml`
+- `libs/wait-engine/src/main/java/com/example/webtest/wait/engine/WaitEngine.java`
+- `libs/wait-engine/src/main/java/com/example/webtest/wait/engine/DefaultWaitEngine.java`
+- `libs/wait-engine/src/test/java/com/example/webtest/wait/engine/DefaultWaitEngineTest.java`
+- `libs/action-engine/pom.xml`
+- `libs/action-engine/src/main/java/com/example/webtest/action/handler/ClickActionHandler.java`
+- `libs/action-engine/src/main/java/com/example/webtest/action/handler/FillActionHandler.java`
+- `libs/action-engine/src/main/java/com/example/webtest/action/handler/WaitActionHandler.java`
+- `libs/action-engine/src/test/java/com/example/webtest/action/executor/DefaultActionExecutorTest.java`
+- `libs/execution-engine/src/main/java/com/example/webtest/execution/engine/orchestrator/DefaultTestOrchestrator.java`
+- `libs/execution-engine/src/test/java/com/example/webtest/execution/engine/orchestrator/DefaultTestOrchestratorTest.java`
+- `config/smoke/core-platform-smoke.yml`
+- `memory.txt`
+- `01_dev_progress.md`
+
+## 当前状态
+- 受影响模块测试通过：`mvn "-Dmaven.repo.local=.m2/repository" -pl libs/wait-engine,libs/action-engine,libs/execution-engine,apps/core-platform -am test`
+- Maven 全量构建通过：`mvn "-Dmaven.repo.local=.m2/repository" -q package`
+- Maven 本地安装通过：`mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+- core-platform DSL smoke 通过。运行方式：
+  - 在仓库根目录先执行 install。
+  - 再进入 `apps/core-platform` 执行 `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`
+- smoke 输出包含：
+  - `wait-search WAIT_FOR_VISIBLE SUCCESS`
+  - `fill-search FILL SUCCESS`
+  - `click-submit CLICK SUCCESS`
+  - `assert-click-title ASSERT_TITLE SUCCESS`
+  - `capture-page SCREENSHOT SUCCESS artifact=D:\txt\edge_self_test\runs\dsl-smoke\capture-page.png`
+- 复查本项目 Edge 调试进程，无 `webtest-edge-*` 或 `remote-debugging-port` 残留。
+
+## 已知问题
+- `wait-engine` 目前是最小轮询实现，只支持 `WAIT_FOR_ELEMENT` / `WAIT_FOR_VISIBLE`，尚未支持 `WAIT_FOR_HIDDEN` / `WAIT_FOR_TEXT` / `WAIT_FOR_URL` / `WAIT_FOR_RESPONSE`。
+- 当前轮询间隔固定为 100ms，尚未做统一超时策略对象或事件优先等待。
+- `CLICK` / `FILL` 当前前置等待条件为元素可见，尚未区分更细的 actionable、enabled、stable 等状态。
+- `DefaultPageController.navigate` 仍使用固定 5 秒页面加载等待，后续应迁移到正式 wait-engine 或统一超时策略。
+- `core-platform` 从聚合根直接执行 `exec:java` 的主类解析差异仍未单独处理；当前稳定方式仍是先 install，再从 `apps/core-platform` 执行。
+- 设计目标仍是 Java 21，但当前环境继续按既有决策使用 JDK 17 / `maven.compiler.release=17`。
+
+## 下一步
+- 扩展 `wait-engine` 支持 `WAIT_FOR_HIDDEN` / `WAIT_FOR_URL`，把页面导航和 URL 等待逐步纳入统一等待能力。
+- 开始抽离 assertion 能力，把 `ASSERT_TITLE` / `ASSERT_URL` 从 `DefaultTestOrchestrator` 迁移到 `assertion-engine`，减少编排器里的业务细节。
+- 后续可为 core-platform 增加稳定 Maven exec 配置，减少从聚合根和子模块运行时的命令差异。
+
+## 下次建议优先阅读
+- `01_dev_progress.md` 最新一节。
+- `enterprise_web_test_platform_phase2_implementation_design.md` 第 10 章等待模块设计、第 11 章断言模块设计。
+- `enterprise_web_test_platform_phase3_java_core_code_skeleton.md` 第 12 章 wait-engine 骨架、第 13 章 assertion-engine 骨架、第 22 章编排器接入示例。
+
+## 2026-04-16 assertion-engine 标题与 URL 断言抽离记录
+## 本次任务
+- 开始抽离 assertion 能力，把 `ASSERT_TITLE` / `ASSERT_URL` 从 `DefaultTestOrchestrator` 迁移到 `assertion-engine`，减少编排器里的业务细节。
+
+## 完成内容
+- 新增 `assertion-engine` 最小骨架：
+  - `AssertionResult`
+  - `AssertionEngine`
+  - `DefaultAssertionEngine`
+  - `AssertionHandler`
+- 新增浏览器页面断言 handler：
+  - `AssertTitleHandler`：通过 `PageController.title` 获取实际标题，并与 DSL `expected` 精确比较。
+  - `AssertUrlHandler`：通过 `PageController.currentUrl` 获取实际 URL，并与 DSL `expected` 精确比较。
+- `DefaultTestOrchestrator` 默认装配 `DefaultAssertionEngine`，并将 `ASSERT_TITLE` / `ASSERT_URL` 分发到 assertion 链路；编排器只处理成功/失败结果，不再内联断言业务逻辑。
+- 断言失败仍统一抛出 `ASSERTION_FAILED`，保持现有执行记录和失败停止语义不变。
+- `DefaultDslValidator` 新增断言校验：`ASSERT_TITLE` / `ASSERT_URL` 必须提供 `expected`。
+- 新增/扩展测试：
+  - `DefaultAssertionEngineTest` 覆盖 title/url handler 分发与断言失败消息。
+  - `DefaultDslParserTest` 覆盖断言缺少 `expected` 的 DSL 校验失败。
+  - 既有 `DefaultTestOrchestratorTest` 继续覆盖断言失败停止链路。
+
+## 修改文件
+- `libs/assertion-engine/pom.xml`
+- `libs/assertion-engine/src/main/java/com/example/webtest/assertion/model/AssertionResult.java`
+- `libs/assertion-engine/src/main/java/com/example/webtest/assertion/engine/AssertionEngine.java`
+- `libs/assertion-engine/src/main/java/com/example/webtest/assertion/engine/DefaultAssertionEngine.java`
+- `libs/assertion-engine/src/main/java/com/example/webtest/assertion/handler/AssertionHandler.java`
+- `libs/assertion-engine/src/main/java/com/example/webtest/assertion/handler/AssertTitleHandler.java`
+- `libs/assertion-engine/src/main/java/com/example/webtest/assertion/handler/AssertUrlHandler.java`
+- `libs/assertion-engine/src/test/java/com/example/webtest/assertion/engine/DefaultAssertionEngineTest.java`
+- `libs/execution-engine/src/main/java/com/example/webtest/execution/engine/orchestrator/DefaultTestOrchestrator.java`
+- `libs/dsl-parser/src/main/java/com/example/webtest/dsl/validator/DefaultDslValidator.java`
+- `libs/dsl-parser/src/test/java/com/example/webtest/dsl/parser/DefaultDslParserTest.java`
+- `memory.txt`
+- `01_dev_progress.md`
+
+## 当前状态
+- 受影响模块测试通过：`mvn "-Dmaven.repo.local=.m2/repository" -pl libs/assertion-engine,libs/dsl-parser,libs/execution-engine,apps/core-platform -am test`
+- Maven 全量构建通过：`mvn "-Dmaven.repo.local=.m2/repository" -q package`
+- Maven 本地安装通过：`mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+- core-platform DSL smoke 通过。运行方式：
+  - 在仓库根目录先执行 install。
+  - 再进入 `apps/core-platform` 执行 `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`
+- smoke 输出包含：
+  - `open-smoke-page GOTO SUCCESS`
+  - `assert-title ASSERT_TITLE SUCCESS`
+  - `wait-url WAIT_FOR_URL SUCCESS`
+  - `wait-search WAIT_FOR_VISIBLE SUCCESS`
+  - `wait-absent WAIT_FOR_HIDDEN SUCCESS`
+  - `fill-search FILL SUCCESS`
+  - `click-submit CLICK SUCCESS`
+  - `assert-click-title ASSERT_TITLE SUCCESS`
+  - `capture-page SCREENSHOT SUCCESS artifact=D:\txt\edge_self_test\runs\dsl-smoke\capture-page.png`
+- 复查本项目 Edge 调试进程，无 `webtest-edge-*` 或 `remote-debugging-port` 残留。
+
+## 已知问题
+- `assertion-engine` 当前只支持 `ASSERT_TITLE` / `ASSERT_URL`，且仍是精确字符串比较；尚未支持 contains、regex、glob、URL 归一化或大小写/空白策略。
+- `ASSERT_TEXT` / `ASSERT_VISIBLE` / `ASSERT_NOT_VISIBLE` / `ASSERT_VALUE` / `ASSERT_ATTR` / `ASSERT_DB` / `ASSERT_SCREENSHOT` 等仍未实现。
+- `DefaultTestOrchestrator` 仍内联处理 `GOTO`、`REFRESH`、`SCREENSHOT` 等动作；`SCREENSHOT` 尚未迁移到 `artifact-engine`。
+- `WAIT_FOR_URL` 与 `ASSERT_URL` 当前策略不同但都偏最小实现：前者在 wait-engine 轮询精确匹配，后者在 assertion-engine 单次精确比较。
+- 设计目标仍是 Java 21，但当前环境继续按既有决策使用 JDK 17 / `maven.compiler.release=17`。
+
+## 下一步
+- 继续扩展 `assertion-engine`，优先实现：
+  - `ASSERT_TEXT`：基于 `ElementResolver` 定位目标元素，再从页面侧读取文本并比较。
+  - `ASSERT_VISIBLE` / `ASSERT_NOT_VISIBLE`：复用 `ElementResolver` 的 found/visible 状态。
+- 或开始抽离 `artifact-engine`，把 `SCREENSHOT` 从 `DefaultTestOrchestrator` 迁移出去。
+- 后续可考虑统一断言匹配策略对象，覆盖 exact / contains / regex / glob / normalized URL。
+
+## 下次建议优先阅读
+- `01_dev_progress.md` 最新一节。
+- `enterprise_web_test_platform_phase2_implementation_design.md` 第 11 章断言模块设计、第 12 章产物模块设计。
+- `enterprise_web_test_platform_phase3_java_core_code_skeleton.md` 第 13 章 assertion-engine 骨架、第 14 章 artifact-engine 骨架、第 22 章编排器接入示例。
+
+## 2026-04-16 wait-engine 隐藏与 URL 等待扩展记录
+## 本次任务
+- 继续扩展 `wait-engine`，在既有 `WAIT_FOR_ELEMENT` / `WAIT_FOR_VISIBLE` 基础上支持 `WAIT_FOR_HIDDEN` / `WAIT_FOR_URL`。
+
+## 完成内容
+- `WaitEngine` 新增 `waitForHidden` 和 `waitForUrl` 接口。
+- `DefaultWaitEngine` 新增隐藏等待：当目标元素不存在或不可见时判定成功，继续复用 `ElementResolver` 的轮询模型。
+- `DefaultWaitEngine` 新增 URL 等待：通过可选 `PageController` 轮询 `currentUrl`，直到等于 DSL 步骤的 `expected` 或 `url`。
+- `WaitActionHandler` 支持分发 `WAIT_FOR_HIDDEN` / `WAIT_FOR_URL`，并保持默认超时 `DefaultWaitEngine.DEFAULT_TIMEOUT_MS`。
+- `DefaultTestOrchestrator` 默认装配 `DefaultWaitEngine(elementResolver, pageController)`，并把 `WAIT_FOR_HIDDEN` / `WAIT_FOR_URL` 交给 action/wait 链路执行。
+- `DefaultDslValidator` 增加等待动作校验：元素等待必须提供 `target`，`WAIT_FOR_URL` 必须提供 `expected` 或 `url`。
+- `config/smoke/core-platform-smoke.yml` 增加真实 Edge smoke 步骤：
+  - `wait-url WAIT_FOR_URL`
+  - `wait-absent WAIT_FOR_HIDDEN`
+- 扩展单元测试覆盖隐藏等待、URL 轮询、action 分发和 orchestrator 分发链路。
+
+## 修改文件
+- `libs/wait-engine/src/main/java/com/example/webtest/wait/engine/WaitEngine.java`
+- `libs/wait-engine/src/main/java/com/example/webtest/wait/engine/DefaultWaitEngine.java`
+- `libs/wait-engine/src/test/java/com/example/webtest/wait/engine/DefaultWaitEngineTest.java`
+- `libs/action-engine/src/main/java/com/example/webtest/action/handler/WaitActionHandler.java`
+- `libs/action-engine/src/test/java/com/example/webtest/action/executor/DefaultActionExecutorTest.java`
+- `libs/execution-engine/src/main/java/com/example/webtest/execution/engine/orchestrator/DefaultTestOrchestrator.java`
+- `libs/execution-engine/src/test/java/com/example/webtest/execution/engine/orchestrator/DefaultTestOrchestratorTest.java`
+- `libs/dsl-parser/src/main/java/com/example/webtest/dsl/validator/DefaultDslValidator.java`
+- `config/smoke/core-platform-smoke.yml`
+- `memory.txt`
+- `01_dev_progress.md`
+
+## 当前状态
+- 受影响模块测试通过：`mvn "-Dmaven.repo.local=.m2/repository" -pl libs/wait-engine,libs/action-engine,libs/execution-engine,apps/core-platform -am test`
+- Maven 全量构建通过：`mvn "-Dmaven.repo.local=.m2/repository" -q package`
+- Maven 本地安装通过：`mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+- core-platform DSL smoke 通过。运行方式：
+  - 在仓库根目录先执行 install。
+  - 再进入 `apps/core-platform` 执行 `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`
+- smoke 输出包含：
+  - `wait-url WAIT_FOR_URL SUCCESS`
+  - `wait-search WAIT_FOR_VISIBLE SUCCESS`
+  - `wait-absent WAIT_FOR_HIDDEN SUCCESS`
+  - `fill-search FILL SUCCESS`
+  - `click-submit CLICK SUCCESS`
+  - `assert-click-title ASSERT_TITLE SUCCESS`
+  - `capture-page SCREENSHOT SUCCESS artifact=D:\txt\edge_self_test\runs\dsl-smoke\capture-page.png`
+- 复查本项目 Edge 调试进程，无 `webtest-edge-*` 或 `remote-debugging-port` 残留。
+
+## 已知问题
+- `WAIT_FOR_URL` 当前只支持精确字符串相等，尚未支持 contains、regex、glob 或 URL 归一化。
+- `wait-engine` 仍是固定 100ms 轮询，尚未引入统一等待策略对象、事件优先等待或可配置 poll interval。
+- `WAIT_FOR_TEXT` / `WAIT_FOR_RESPONSE` 仍未实现。
+- `DefaultPageController.navigate` 仍使用固定 5 秒页面加载等待，尚未迁移到统一 wait-engine 超时策略。
+- `CLICK` / `FILL` 当前前置等待条件为元素可见，尚未区分更细的 actionable、enabled、stable 等状态。
+- `core-platform` 从聚合根直接执行 `exec:java` 的主类解析差异仍未单独处理；当前稳定方式仍是先 install，再从 `apps/core-platform` 执行。
+- 设计目标仍是 Java 21，但当前环境继续按既有决策使用 JDK 17 / `maven.compiler.release=17`。
+
+## 下一步
+- 开始抽离 assertion 能力，把 `ASSERT_TITLE` / `ASSERT_URL` 从 `DefaultTestOrchestrator` 迁移到 `assertion-engine`，减少编排器里的业务细节。
+- 或继续补齐等待动作，优先实现 `WAIT_FOR_TEXT`，再考虑 `WAIT_FOR_RESPONSE` 与网络观察模块的边界。
+- 后续可为 core-platform 增加稳定 Maven exec 配置，减少从聚合根和子模块运行时的命令差异。
+
+## 下次建议优先阅读
+- `01_dev_progress.md` 最新一节。
+- `enterprise_web_test_platform_phase2_implementation_design.md` 第 10 章等待模块设计、第 11 章断言模块设计。
+- `enterprise_web_test_platform_phase3_java_core_code_skeleton.md` 第 12 章 wait-engine 骨架、第 13 章 assertion-engine 骨架、第 22 章编排器接入示例。

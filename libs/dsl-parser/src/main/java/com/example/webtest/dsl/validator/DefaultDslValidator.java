@@ -35,6 +35,19 @@ public class DefaultDslValidator implements DslValidator {
                 && step.getTarget() == null) {
             throw new BaseException(ErrorCodes.DSL_VALIDATION_FAILED, "Target is required for click/fill");
         }
+        if ((step.getAction() == ActionType.WAIT_FOR_ELEMENT
+                || step.getAction() == ActionType.WAIT_FOR_VISIBLE
+                || step.getAction() == ActionType.WAIT_FOR_HIDDEN)
+                && step.getTarget() == null) {
+            throw new BaseException(ErrorCodes.DSL_VALIDATION_FAILED, "Target is required for element wait");
+        }
+        if (step.getAction() == ActionType.WAIT_FOR_URL && isBlank(step.getExpected()) && isBlank(step.getUrl())) {
+            throw new BaseException(ErrorCodes.DSL_VALIDATION_FAILED, "WAIT_FOR_URL requires expected or url");
+        }
+        if ((step.getAction() == ActionType.ASSERT_TITLE || step.getAction() == ActionType.ASSERT_URL)
+                && isBlank(step.getExpected())) {
+            throw new BaseException(ErrorCodes.DSL_VALIDATION_FAILED, "Assertion step requires expected");
+        }
     }
 
     private boolean isBlank(String value) {

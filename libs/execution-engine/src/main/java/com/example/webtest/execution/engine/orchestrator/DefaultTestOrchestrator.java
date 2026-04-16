@@ -1,5 +1,17 @@
 package com.example.webtest.execution.engine.orchestrator;
 
+import com.example.webtest.action.executor.ActionExecutor;
+import com.example.webtest.action.executor.DefaultActionExecutor;
+import com.example.webtest.action.handler.ClickActionHandler;
+import com.example.webtest.action.handler.DefaultBrowserInteractionService;
+import com.example.webtest.action.handler.FillActionHandler;
+import com.example.webtest.action.handler.WaitActionHandler;
+import com.example.webtest.action.result.StepResult;
+import com.example.webtest.assertion.engine.AssertionEngine;
+import com.example.webtest.assertion.engine.DefaultAssertionEngine;
+import com.example.webtest.assertion.handler.AssertTitleHandler;
+import com.example.webtest.assertion.handler.AssertUrlHandler;
+import com.example.webtest.assertion.model.AssertionResult;
 import com.example.webtest.browser.page.PageController;
 import com.example.webtest.browser.page.ScreenshotOptions;
 import com.example.webtest.common.exception.BaseException;
@@ -13,6 +25,10 @@ import com.example.webtest.execution.engine.result.RunOptions;
 import com.example.webtest.execution.engine.result.RunResult;
 import com.example.webtest.execution.engine.result.RunStatus;
 import com.example.webtest.execution.engine.result.StepExecutionRecord;
+import com.example.webtest.locator.resolver.DefaultElementResolver;
+import com.example.webtest.locator.resolver.ElementResolver;
+import com.example.webtest.wait.engine.DefaultWaitEngine;
+import com.example.webtest.wait.engine.WaitEngine;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
@@ -24,9 +40,36 @@ import java.util.Objects;
 
 public class DefaultTestOrchestrator implements TestOrchestrator {
     private final PageController pageController;
+    private final ActionExecutor actionExecutor;
+    private final AssertionEngine assertionEngine;
 
     public DefaultTestOrchestrator(PageController pageController) {
         this.pageController = Objects.requireNonNull(pageController, "pageController must not be null");
+        ElementResolver elementResolver = new DefaultElementResolver(pageController);
+        WaitEngine waitEngine = new DefaultWaitEngine(elementResolver, pageController);
+        DefaultBrowserInteractionService browserInteractionService = new DefaultBrowserInteractionService(pageController);
+        this.actionExecutor = new DefaultActionExecutor(List.of(
+                new ClickActionHandler(elementResolver, browserInteractionService, waitEngine),
+                new FillActionHandler(elementResolver, browserInteractionService, waitEngine),
+                new WaitActionHandler(waitEngine)));
+        this.assertionEngine = new DefaultAssertionEngine(List.of(
+                new AssertTitleHandler(pageController),
+                new AssertUrlHandler(pageController)));
+    }
+
+    public DefaultTestOrchestrator(PageController pageController, ActionExecutor actionExecutor) {
+        this(pageController, actionExecutor, new DefaultAssertionEngine(List.of(
+                new AssertTitleHandler(pageController),
+                new AssertUrlHandler(pageController))));
+    }
+
+    public DefaultTestOrchestrator(
+            PageController pageController,
+            ActionExecutor actionExecutor,
+            AssertionEngine assertionEngine) {
+        this.pageController = Objects.requireNonNull(pageController, "pageController must not be null");
+        this.actionExecutor = Objects.requireNonNull(actionExecutor, "actionExecutor must not be null");
+        this.assertionEngine = Objects.requireNonNull(assertionEngine, "assertionEngine must not be null");
     }
 
     @Override
@@ -114,11 +157,25 @@ public class DefaultTestOrchestrator implements TestOrchestrator {
             case GOTO -> pageController.navigate(resolveUrl(definition.getBaseUrl(), step.getUrl()), context);
             case REFRESH -> pageController.reload(context);
             case SCREENSHOT -> writeScreenshot(outputDir, record.getStepId(), context, record);
-            case ASSERT_TITLE -> assertEquals(step.getExpected(), pageController.title(context), "title");
-            case ASSERT_URL -> assertEquals(step.getExpected(), pageController.currentUrl(context), "url");
+            case ASSERT_TITLE, ASSERT_URL -> executeAssertion(step, context);
+            case CLICK, FILL, WAIT_FOR_ELEMENT, WAIT_FOR_VISIBLE, WAIT_FOR_HIDDEN, WAIT_FOR_URL -> executeAction(step, context);
             default -> throw new BaseException(
                     ErrorCodes.ACTION_EXECUTION_FAILED,
                     "Unsupported action in minimal orchestrator: " + action);
+        }
+    }
+
+    private void executeAssertion(StepDefinition step, ExecutionContext context) {
+        AssertionResult result = assertionEngine.assertStep(step, context);
+        if (!result.isSuccess()) {
+            throw new BaseException(ErrorCodes.ASSERTION_FAILED, result.getMessage());
+        }
+    }
+
+    private void executeAction(StepDefinition step, ExecutionContext context) {
+        StepResult result = actionExecutor.execute(step, context);
+        if (!result.isSuccess()) {
+            throw new BaseException(ErrorCodes.ACTION_EXECUTION_FAILED, result.getMessage());
         }
     }
 
@@ -130,14 +187,6 @@ public class DefaultTestOrchestrator implements TestOrchestrator {
             record.setArtifactPath(screenshotPath);
         } catch (IOException e) {
             throw new BaseException(ErrorCodes.ACTION_EXECUTION_FAILED, "Failed to write screenshot", e);
-        }
-    }
-
-    private void assertEquals(String expected, String actual, String field) {
-        if (!Objects.equals(expected, actual)) {
-            throw new BaseException(
-                    ErrorCodes.ASSERTION_FAILED,
-                    "Expected " + field + " [" + expected + "] but was [" + actual + "]");
         }
     }
 

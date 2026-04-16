@@ -1,0 +1,52 @@
+id: core-platform-dsl-smoke
+name: Core platform DSL smoke
+steps:
+  - id: open-smoke-page
+    name: Open smoke page
+    action: goto
+    url: "data:text/html;charset=utf-8;base64,PCFkb2N0eXBlIGh0bWw+CjxodG1sPgo8aGVhZD48dGl0bGU+RWRnZSBTZWxmIFRlc3QgRFNMIFNtb2tlPC90aXRsZT48L2hlYWQ+Cjxib2R5Pgo8bWFpbj4KPGgxPkVkZ2UgU2VsZiBUZXN0IERTTCBTbW9rZTwvaDE+CjxpbnB1dCBpZD0ic2VhcmNoIiBhcmlhLWxhYmVsPSJTZWFyY2giIC8+CjxidXR0b24gaWQ9InN1Ym1pdCIgb25jbGljaz0iZG9jdW1lbnQudGl0bGU9J0NsaWNrZWQ6ICcrZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ3NlYXJjaCcpLnZhbHVlIj5TdWJtaXQ8L2J1dHRvbj4KPC9tYWluPgo8L2JvZHk+CjwvaHRtbD4="
+  - id: assert-title
+    name: Assert title
+    action: assert_title
+    expected: Edge Self Test DSL Smoke
+  - id: wait-url
+    name: Wait for smoke page URL
+    action: wait_for_url
+    timeoutMs: 3000
+    expected: "data:text/html;charset=utf-8;base64,PCFkb2N0eXBlIGh0bWw+CjxodG1sPgo8aGVhZD48dGl0bGU+RWRnZSBTZWxmIFRlc3QgRFNMIFNtb2tlPC90aXRsZT48L2hlYWQ+Cjxib2R5Pgo8bWFpbj4KPGgxPkVkZ2UgU2VsZiBUZXN0IERTTCBTbW9rZTwvaDE+CjxpbnB1dCBpZD0ic2VhcmNoIiBhcmlhLWxhYmVsPSJTZWFyY2giIC8+CjxidXR0b24gaWQ9InN1Ym1pdCIgb25jbGljaz0iZG9jdW1lbnQudGl0bGU9J0NsaWNrZWQ6ICcrZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ3NlYXJjaCcpLnZhbHVlIj5TdWJtaXQ8L2J1dHRvbj4KPC9tYWluPgo8L2JvZHk+CjwvaHRtbD4="
+  - id: wait-search
+    name: Wait for search input
+    action: wait_for_visible
+    timeoutMs: 3000
+    target:
+      by: css
+      value: "#search"
+  - id: wait-absent
+    name: Wait for absent panel
+    action: wait_for_hidden
+    timeoutMs: 3000
+    target:
+      by: css
+      value: "#absent-panel"
+  - id: fill-search
+    name: Fill search input
+    action: fill
+    timeoutMs: 3000
+    target:
+      by: css
+      value: "#search"
+    value: codex
+  - id: click-submit
+    name: Click submit button
+    action: click
+    timeoutMs: 3000
+    target:
+      by: css
+      value: "#submit"
+  - id: assert-click-title
+    name: Assert click updated title
+    action: assert_title
+    expected: "Clicked: codex"
+  - id: capture-page
+    name: Capture page
+    action: screenshot

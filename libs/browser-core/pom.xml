@@ -23,5 +23,9 @@
             <groupId>com.example.webtest</groupId>
             <artifactId>common-core</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.example.webtest</groupId>
+            <artifactId>common-json</artifactId>
+        </dependency>
     </dependencies>
 </project>

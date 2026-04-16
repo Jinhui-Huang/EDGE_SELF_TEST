@@ -61,3 +61,64 @@ G. 计划修改的文件列表
 考虑token的消耗情况，你每次开发完后只列出需要查看的文档内容给下一次开发用就行，
 以减少token消耗为目标去阅读开发文档
 如果你发现文档和代码现状不一致，先指出差异，再给出建议，不要直接跳过。
+
+【最近一次接手记忆 - 2026-04-16】
+- 用户要求“开始下一步”，本轮按进度文档选择实现最小 `locator-engine` / `action-engine` / DOM 输入链路。
+- 已完成 `CLICK` / `FILL` 最小链路：`DefaultTestOrchestrator` 会把这两个动作交给 `ActionExecutor`，再经 `ElementResolver` 和 `BrowserInteractionService` 调用 `PageController` 的 DOM 方法。
+- `browser-core` 已新增基于 CDP `Runtime.evaluate` 的 `findElement` / `clickElement` / `fillElement`，当前支持 `css` / `selector` / `id` / `name` / `tag` / `text` / `role` / `testid` 基础定位。
+- `config/smoke/core-platform-smoke.yml` 已扩展到真实 `FILL` 输入、`CLICK` 按钮、再断言标题变化。
+- 当前可用验证命令：
+  1. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/browser-core,libs/locator-engine,libs/action-engine,libs/execution-engine,apps/core-platform -am test`
+  2. `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+  3. `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+  4. 在 `apps/core-platform` 下执行 `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`
+- 最新 DSL smoke 已真实启动 headless Edge 并通过，输出包含：
+  - `fill-search FILL SUCCESS`
+  - `click-submit CLICK SUCCESS`
+  - `assert-click-title ASSERT_TITLE SUCCESS`
+  - 截图输出为 `runs/dsl-smoke/capture-page.png`
+- 本轮复查后未发现带 `webtest-edge-*` 或 `remote-debugging-port` 的本项目 Edge 残留进程。
+- 下一步优先建议：把等待能力从固定页面加载和即时元素查找迁移到最小 `wait-engine`，优先支持 `WAIT_FOR_ELEMENT` / `WAIT_FOR_VISIBLE`，再让 `CLICK` / `FILL` 可配置等待超时。
+
+【最新接手记忆 - 2026-04-16】
+- 本轮已完成最小 `wait-engine`：新增 `WaitEngine` / `DefaultWaitEngine`，通过 `ElementResolver` 轮询元素状态，支持 `WAIT_FOR_ELEMENT` / `WAIT_FOR_VISIBLE`。
+- `WaitActionHandler` 已接入 `action-engine`，`DefaultTestOrchestrator` 默认装配 `DefaultWaitEngine`，并把 `WAIT_FOR_ELEMENT` / `WAIT_FOR_VISIBLE` 分发给 action/wait 链路。
+- `CLICK` / `FILL` 在默认装配下会先按步骤 `timeoutMs` 等待元素可见，再执行 DOM 交互。
+- `config/smoke/core-platform-smoke.yml` 已加入 `wait-search WAIT_FOR_VISIBLE`，并给 `fill-search` / `click-submit` 设置 `timeoutMs: 3000`。
+- 当前验证通过：
+  1. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/wait-engine,libs/action-engine,libs/execution-engine,apps/core-platform -am test`
+  2. `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+  3. `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+  4. 在 `apps/core-platform` 执行 `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`
+- 最新 DSL smoke 输出包含：`wait-search WAIT_FOR_VISIBLE SUCCESS`、`fill-search FILL SUCCESS`、`click-submit CLICK SUCCESS`、`assert-click-title ASSERT_TITLE SUCCESS`，截图仍输出到 `runs/dsl-smoke/capture-page.png`。
+- 本轮复查后未发现带 `webtest-edge-*` 或 `remote-debugging-port` 的本项目 Edge 调试进程残留。
+- 下一步建议：扩展 `wait-engine` 的 `WAIT_FOR_HIDDEN` / `WAIT_FOR_URL`，或开始把 `ASSERT_TITLE` / `ASSERT_URL` 从 `DefaultTestOrchestrator` 迁移到 `assertion-engine`。
+
+【最新接手记忆 - 2026-04-16】
+- 本轮已扩展 `wait-engine` 支持 `WAIT_FOR_HIDDEN` / `WAIT_FOR_URL`。
+- `WaitEngine` 新增 `waitForHidden` / `waitForUrl`；`DefaultWaitEngine` 继续用 `ElementResolver` 轮询隐藏状态，并通过 `PageController.currentUrl()` 轮询 URL。
+- `WaitActionHandler`、`DefaultTestOrchestrator` 和 `DefaultDslValidator` 已接入新增等待动作；`DefaultTestOrchestrator` 默认装配 `DefaultWaitEngine(elementResolver, pageController)`。
+- `WAIT_FOR_URL` 当前用步骤 `expected` 优先，其次用 `url`；匹配策略是精确字符串相等。
+- `config/smoke/core-platform-smoke.yml` 已加入 `wait-url WAIT_FOR_URL` 和 `wait-absent WAIT_FOR_HIDDEN`。
+- 当前验证通过：
+  1. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/wait-engine,libs/action-engine,libs/execution-engine,apps/core-platform -am test`
+  2. `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+  3. `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+  4. 在 `apps/core-platform` 执行 `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`
+- 最新 DSL smoke 输出包含：`wait-url WAIT_FOR_URL SUCCESS`、`wait-search WAIT_FOR_VISIBLE SUCCESS`、`wait-absent WAIT_FOR_HIDDEN SUCCESS`、`fill-search FILL SUCCESS`、`click-submit CLICK SUCCESS`、`assert-click-title ASSERT_TITLE SUCCESS`，截图仍输出到 `runs/dsl-smoke/capture-page.png`。
+- 本轮复查后未发现带 `webtest-edge-*` 或 `remote-debugging-port` 的本项目 Edge 调试进程残留。
+- 下一步建议：优先开始抽离 `assertion-engine`，把 `ASSERT_TITLE` / `ASSERT_URL` 从 `DefaultTestOrchestrator` 迁移出去；或者继续补 `WAIT_FOR_TEXT`。
+
+【最新接手记忆 - 2026-04-16】
+- 本轮已完成最小 `assertion-engine` 抽离：新增 `AssertionResult` / `AssertionEngine` / `DefaultAssertionEngine` / `AssertionHandler`，并实现 `AssertTitleHandler` 与 `AssertUrlHandler`。
+- `DefaultTestOrchestrator` 已不再直接执行 `ASSERT_TITLE` / `ASSERT_URL` 业务断言；默认装配 `DefaultAssertionEngine`，断言失败统一转为 `ASSERTION_FAILED`。
+- `DefaultDslValidator` 已补充 `ASSERT_TITLE` / `ASSERT_URL` 校验：必须提供 `expected`。
+- 新增 `DefaultAssertionEngineTest` 覆盖 title/url handler 分发与失败消息；扩展 `DefaultDslParserTest` 覆盖断言缺少 expected 的校验失败。
+- 当前验证通过：
+  1. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/assertion-engine,libs/dsl-parser,libs/execution-engine,apps/core-platform -am test`
+  2. `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+  3. `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+  4. 在 `apps/core-platform` 执行 `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`
+- 最新 DSL smoke 输出包含：`assert-title ASSERT_TITLE SUCCESS`、`wait-url WAIT_FOR_URL SUCCESS`、`wait-search WAIT_FOR_VISIBLE SUCCESS`、`wait-absent WAIT_FOR_HIDDEN SUCCESS`、`fill-search FILL SUCCESS`、`click-submit CLICK SUCCESS`、`assert-click-title ASSERT_TITLE SUCCESS`，截图输出到 `runs/dsl-smoke/capture-page.png`。
+- 本轮复查后未发现带 `webtest-edge-*` 或 `remote-debugging-port` 的本项目 Edge 调试进程残留。
+- 下一步建议：继续扩展 `assertion-engine`，优先实现基于 `ElementResolver` / `PageController` 的 `ASSERT_TEXT` / `ASSERT_VISIBLE` / `ASSERT_NOT_VISIBLE`；或开始把 `SCREENSHOT` 从 `DefaultTestOrchestrator` 迁移到 `artifact-engine`。

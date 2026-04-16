@@ -110,4 +110,20 @@ class DefaultDslParserTest {
 
         assertThrows(BaseException.class, () -> parser.parseJson(json));
     }
+
+    @Test
+    void parseJsonRejectsAssertionWithoutExpectedValue() {
+        String json = """
+                {
+                  "id": "invalid-assertion",
+                  "steps": [
+                    {
+                      "action": "assert_title"
+                    }
+                  ]
+                }
+                """;
+
+        assertThrows(BaseException.class, () -> parser.parseJson(json));
+    }
 }

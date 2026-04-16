@@ -14,4 +14,10 @@ public interface PageController {
     byte[] screenshot(ExecutionContext context, ScreenshotOptions options);
 
     String getHtml(ExecutionContext context);
+
+    ElementState findElement(String by, String value, Integer index, ExecutionContext context);
+
+    void clickElement(String by, String value, Integer index, ExecutionContext context);
+
+    void fillElement(String by, String value, Integer index, String text, ExecutionContext context);
 }
