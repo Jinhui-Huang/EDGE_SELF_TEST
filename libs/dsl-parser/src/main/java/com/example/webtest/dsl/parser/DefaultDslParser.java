@@ -17,7 +17,11 @@ public class DefaultDslParser implements DslParser {
     @Override
     public TestCaseDefinition parse(Path path) {
         try {
-            return parseJson(Files.readString(path));
+            String content = Files.readString(path);
+            if (isYaml(path)) {
+                return parseYaml(content);
+            }
+            return parseJson(content);
         } catch (IOException e) {
             throw new IllegalStateException("Failed to read DSL file: " + path, e);
         }
@@ -28,5 +32,17 @@ public class DefaultDslParser implements DslParser {
         TestCaseDefinition definition = Jsons.readValue(json, TestCaseDefinition.class);
         validator.validate(definition);
         return definition;
+    }
+
+    @Override
+    public TestCaseDefinition parseYaml(String yaml) {
+        TestCaseDefinition definition = Jsons.readYamlValue(yaml, TestCaseDefinition.class);
+        validator.validate(definition);
+        return definition;
+    }
+
+    private boolean isYaml(Path path) {
+        String fileName = path.getFileName().toString().toLowerCase();
+        return fileName.endsWith(".yaml") || fileName.endsWith(".yml");
     }
 }

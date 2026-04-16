@@ -342,3 +342,79 @@
 ---
 
 **文件结束**
+
+---
+
+## 2026-04-16 本次开发记录
+
+## 本次任务
+- 验证并修正 core-platform smoke 链路：启动 Edge -> 连接 CDP -> 导航 data URL -> 截图。
+
+## 完成内容
+- 已真实运行 Edge headless smoke，截图生成到仓库根目录 `runs/smoke/screenshot.png`。
+- 修正 `CorePlatformApp` 的截图输出路径，使其从子模块目录运行时仍写入仓库根 `runs/`。
+- 修正 smoke data URL 编码方式，改为 base64，避免页面标题中的空格被解析为 `+`。
+- smoke 等待 `Page.loadEventFired` 超时时现在会显式失败。
+- smoke 结束时通过 `BrowserSessionManager.close(sessionId)` 关闭 CDP 和 Edge 进程。
+
+## 修改文件
+- `apps/core-platform/src/main/java/com/example/webtest/platform/CorePlatformApp.java`
+- `01_dev_progress.md`
+
+## 当前状态
+- Maven 全量构建通过：`mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests package`
+- Maven 本地安装通过：`mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+- core-platform smoke 通过，输出：
+  - `Smoke screenshot: D:\txt\edge_self_test\runs\smoke\screenshot.png`
+  - `Page title: Edge Self Test Smoke`
+
+## 已知问题
+- 从聚合根直接执行 `exec:java` 仍会在根项目解析主类，当前可用方式是先 `install`，再从 `apps/core-platform` 执行 `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp"`。
+- 设计目标仍是 Java 21，但当前环境按既有决策继续使用 JDK 17 / `maven.compiler.release=17`。
+
+## 下一步
+- 补充 DSL parser JSON/YAML 单元测试。
+- 开始实现最小 `execution-engine` 编排骨架，将 DSL 解析结果接到 browser-core/page-controller。
+- 后续可给 core-platform 增加更稳定的运行入口或 Maven exec 配置，减少手工命令差异。
+
+## 2026-04-16 追加修正
+- 补强 `DefaultBrowserSessionManager.close`：关闭 session 时会先销毁 Edge 子进程，再等待父进程退出，超时后强制销毁，避免 headless Edge 调试进程残留。
+- 修改文件追加：`libs/browser-core/src/main/java/com/example/webtest/browser/session/DefaultBrowserSessionManager.java`
+- 复验 smoke 后，未发现带 `webtest-edge-*` 或 `remote-debugging-port` 的本项目 Edge 残留进程。
+
+---
+
+## 2026-04-16 下一轮开发记录
+
+## 本次任务
+- 补充 DSL parser JSON/YAML 单元测试，并补齐 parser 层 YAML 解析入口。
+
+## 完成内容
+- 为 `DslParser` 增加 `parseYaml(String yaml)`。
+- `DefaultDslParser.parse(Path)` 现在会按 `.yaml` / `.yml` 扩展名选择 YAML 解析，其余文件继续按 JSON 解析。
+- 增加 JUnit 5 测试依赖管理和 `dsl-parser` 测试依赖。
+- 新增 `DefaultDslParserTest`，覆盖：
+  - JSON DSL 解析。
+  - YAML DSL 解析。
+  - `parse(Path)` 对 `.yml` 文件的自动分派。
+  - 缺少 URL 的 `goto` 步骤校验失败。
+
+## 修改文件
+- `pom.xml`
+- `libs/dsl-parser/pom.xml`
+- `libs/dsl-parser/src/main/java/com/example/webtest/dsl/parser/DslParser.java`
+- `libs/dsl-parser/src/main/java/com/example/webtest/dsl/parser/DefaultDslParser.java`
+- `libs/dsl-parser/src/test/java/com/example/webtest/dsl/parser/DefaultDslParserTest.java`
+- `01_dev_progress.md`
+
+## 当前状态
+- DSL parser 定向测试通过：`mvn "-Dmaven.repo.local=.m2/repository" -pl libs/dsl-parser test`
+- Maven 全量构建通过：`mvn "-Dmaven.repo.local=.m2/repository" -q package`
+
+## 已知问题
+- 设计目标仍是 Java 21，但当前环境继续按既有决策使用 JDK 17 / `maven.compiler.release=17`。
+- core-platform 从聚合根直接执行 `exec:java` 的主类解析差异仍未处理。
+
+## 下一步
+- 开始实现最小 `execution-engine` 编排骨架，将 DSL 解析结果接到 browser-core/page-controller。
+- 后续可为 core-platform 增加稳定的 Maven exec 配置，减少手工运行命令差异。

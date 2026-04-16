@@ -7,4 +7,6 @@ public interface DslParser {
     TestCaseDefinition parse(Path path);
 
     TestCaseDefinition parseJson(String json);
+
+    TestCaseDefinition parseYaml(String yaml);
 }

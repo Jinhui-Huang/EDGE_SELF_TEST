@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 public class DefaultBrowserSessionManager implements BrowserSessionManager {
     private static final String DEFAULT_EDGE_EXECUTABLE = "msedge";
@@ -82,7 +83,28 @@ public class DefaultBrowserSessionManager implements BrowserSessionManager {
         cdpClient.close();
         Process process = processes.remove(sessionId);
         if (process != null) {
-            process.destroy();
+            stopProcess(process);
+        }
+    }
+
+    private void stopProcess(Process process) {
+        List<ProcessHandle> descendants = process.descendants().toList();
+        descendants.forEach(ProcessHandle::destroy);
+        process.destroy();
+        try {
+            if (!process.waitFor(3, TimeUnit.SECONDS)) {
+                descendants.stream()
+                        .filter(ProcessHandle::isAlive)
+                        .forEach(ProcessHandle::destroyForcibly);
+                process.destroyForcibly();
+                process.waitFor(3, TimeUnit.SECONDS);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            descendants.stream()
+                    .filter(ProcessHandle::isAlive)
+                    .forEach(ProcessHandle::destroyForcibly);
+            process.destroyForcibly();
         }
     }
 
