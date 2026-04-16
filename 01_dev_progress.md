@@ -418,3 +418,49 @@
 ## 下一步
 - 开始实现最小 `execution-engine` 编排骨架，将 DSL 解析结果接到 browser-core/page-controller。
 - 后续可为 core-platform 增加稳定的 Maven exec 配置，减少手工运行命令差异。
+
+---
+
+## 2026-04-16 execution-engine 最小骨架开发记录
+
+## 本次任务
+- 按文档下一步实现最小 `execution-engine` 编排骨架，将 DSL 解析结果接到 `browser-core` 的 `PageController`。
+
+## 完成内容
+- 新增 `TestOrchestrator` 接口和 `DefaultTestOrchestrator` 默认实现。
+- 新增轻量运行结果模型：`RunOptions`、`RunResult`、`RunStatus`、`StepExecutionRecord`。
+- 最小编排器当前支持：
+  - `GOTO`：调用 `PageController.navigate`，支持结合 `baseUrl` 解析相对 URL。
+  - `REFRESH`：调用 `PageController.reload`。
+  - `SCREENSHOT`：调用 `PageController.screenshot` 并写入运行输出目录。
+  - `ASSERT_TITLE`：调用 `PageController.title` 并断言。
+  - `ASSERT_URL`：调用 `PageController.currentUrl` 并断言。
+- 新增 `DslRunService` / `DefaultDslRunService`，负责从 `DslParser.parse(Path)` 读取 DSL 后交给编排器执行。
+- 为 `execution-engine` 增加 JUnit 5 测试依赖。
+- 新增 `DefaultTestOrchestratorTest`，覆盖 DSL 步骤分派、截图落盘、默认失败短路和 DSL 文件解析后执行。
+
+## 修改文件
+- `libs/execution-engine/pom.xml`
+- `libs/execution-engine/src/main/java/com/example/webtest/execution/engine/orchestrator/TestOrchestrator.java`
+- `libs/execution-engine/src/main/java/com/example/webtest/execution/engine/orchestrator/DefaultTestOrchestrator.java`
+- `libs/execution-engine/src/main/java/com/example/webtest/execution/engine/service/DslRunService.java`
+- `libs/execution-engine/src/main/java/com/example/webtest/execution/engine/service/DefaultDslRunService.java`
+- `libs/execution-engine/src/main/java/com/example/webtest/execution/engine/result/RunOptions.java`
+- `libs/execution-engine/src/main/java/com/example/webtest/execution/engine/result/RunResult.java`
+- `libs/execution-engine/src/main/java/com/example/webtest/execution/engine/result/RunStatus.java`
+- `libs/execution-engine/src/main/java/com/example/webtest/execution/engine/result/StepExecutionRecord.java`
+- `libs/execution-engine/src/test/java/com/example/webtest/execution/engine/orchestrator/DefaultTestOrchestratorTest.java`
+- `01_dev_progress.md`
+
+## 当前状态
+- execution-engine 定向测试通过：`mvn "-Dmaven.repo.local=.m2/repository" -pl libs/execution-engine test`
+- Maven 全量构建通过：`mvn "-Dmaven.repo.local=.m2/repository" -q package`
+
+## 已知问题
+- 当前编排器仍是最小骨架，尚未接入完整 `action-engine` / `locator-engine` / `wait-engine` / `report-engine`。
+- `CLICK` / `FILL` 等需要元素定位和 DOM 交互的动作尚未实现。
+- `DefaultDslRunService` 已打通 DSL 文件到编排器，但还没有在 `core-platform` 中提供统一命令入口。
+
+## 下一步
+- 实现最小 `locator-engine` 和浏览器 DOM 交互能力，用于支撑 `CLICK` / `FILL`。
+- 或先给 `core-platform` 增加稳定的 DSL smoke 入口，读取 DSL 文件并调用 `DefaultDslRunService`。
