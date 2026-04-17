@@ -10,6 +10,7 @@ import com.example.webtest.dsl.validator.DefaultDslValidator;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -59,6 +60,14 @@ class DefaultDslParserTest {
         String yaml = """
                 id: case-yaml
                 name: YAML parser smoke
+                reportPolicy:
+                  retentionCleanupOnRun: true
+                  retentionKeepLatest: 20
+                  retentionOlderThanDays: 30
+                  retentionMaxTotalMb: 512
+                  retentionPruneArtifactsOnly: true
+                  retentionDeleteStatuses:
+                    - FAILED
                 steps:
                   - id: open
                     action: goto
@@ -77,6 +86,12 @@ class DefaultDslParserTest {
         assertEquals(2, definition.getSteps().size());
         assertEquals(ActionType.FILL, definition.getSteps().get(1).getAction());
         assertEquals("codex", definition.getSteps().get(1).getValue());
+        assertEquals(true, definition.getReportPolicy().isRetentionCleanupOnRun());
+        assertEquals(20, definition.getReportPolicy().getRetentionKeepLatest());
+        assertEquals(30, definition.getReportPolicy().getRetentionOlderThanDays());
+        assertEquals(512L, definition.getReportPolicy().getRetentionMaxTotalMb());
+        assertEquals(true, definition.getReportPolicy().isRetentionPruneArtifactsOnly());
+        assertEquals(List.of("FAILED"), definition.getReportPolicy().getRetentionDeleteStatuses());
     }
 
     @Test
@@ -160,6 +175,106 @@ class DefaultDslParserTest {
                         "value": "#search"
                       },
                       "expected": "Search"
+                    }
+                  ]
+                }
+                """;
+
+        assertThrows(BaseException.class, () -> parser.parseJson(json));
+    }
+
+    @Test
+    void parseJsonRejectsEnabledAssertionWithoutTarget() {
+        String json = """
+                {
+                  "id": "invalid-enabled-assertion",
+                  "steps": [
+                    {
+                      "action": "assert_enabled"
+                    }
+                  ]
+                }
+                """;
+
+        assertThrows(BaseException.class, () -> parser.parseJson(json));
+    }
+
+    @Test
+    void parseJsonRejectsInvalidReportRetentionPolicy() {
+        String json = """
+                {
+                  "id": "invalid-retention",
+                  "reportPolicy": {
+                    "retentionCleanupOnRun": true,
+                    "retentionKeepLatest": 0
+                  },
+                  "steps": [
+                    {
+                      "action": "goto",
+                      "url": "https://example.test"
+                    }
+                  ]
+                }
+                """;
+
+        assertThrows(BaseException.class, () -> parser.parseJson(json));
+    }
+
+    @Test
+    void parseJsonRejectsInvalidReportRetentionStatus() {
+        String json = """
+                {
+                  "id": "invalid-retention-status",
+                  "reportPolicy": {
+                    "retentionCleanupOnRun": true,
+                    "retentionDeleteStatuses": ["BROKEN"]
+                  },
+                  "steps": [
+                    {
+                      "action": "goto",
+                      "url": "https://example.test"
+                    }
+                  ]
+                }
+                """;
+
+        assertThrows(BaseException.class, () -> parser.parseJson(json));
+    }
+
+    @Test
+    void parseJsonRejectsInvalidReportRetentionSizeQuota() {
+        String json = """
+                {
+                  "id": "invalid-retention-size",
+                  "reportPolicy": {
+                    "retentionCleanupOnRun": true,
+                    "retentionMaxTotalMb": -1
+                  },
+                  "steps": [
+                    {
+                      "action": "goto",
+                      "url": "https://example.test"
+                    }
+                  ]
+                }
+                """;
+
+        assertThrows(BaseException.class, () -> parser.parseJson(json));
+    }
+
+    @Test
+    void parseJsonRejectsArtifactPruneWithoutRetentionCleanup() {
+        String json = """
+                {
+                  "id": "invalid-artifact-prune",
+                  "reportPolicy": {
+                    "retentionPruneArtifactsOnly": true,
+                    "retentionKeepLatest": 1
+                  },
+                  "steps": [
+                    {
+                      "action": "goto",
+                      "url": "https://example.test"
                     }
                   ]
                 }

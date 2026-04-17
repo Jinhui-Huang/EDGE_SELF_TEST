@@ -5,6 +5,7 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 public class StepExecutionRecord {
     private String stepId;
@@ -86,7 +87,12 @@ public class StepExecutionRecord {
     }
 
     public void setArtifacts(List<ArtifactRef> artifacts) {
-        this.artifacts = artifacts == null ? new ArrayList<>() : new ArrayList<>(artifacts);
+        this.artifacts = new ArrayList<>();
+        if (artifacts != null) {
+            for (ArtifactRef artifact : artifacts) {
+                addArtifact(artifact);
+            }
+        }
         this.artifactPath = this.artifacts.isEmpty() ? null : this.artifacts.get(0).getPath();
     }
 
@@ -94,9 +100,37 @@ public class StepExecutionRecord {
         if (artifact == null) {
             return;
         }
-        artifacts.add(artifact);
+        addArtifactIfAbsent(artifact);
+        if (artifact.getRelatedArtifacts() != null) {
+            for (ArtifactRef relatedArtifact : artifact.getRelatedArtifacts()) {
+                addArtifactIfAbsent(relatedArtifact);
+            }
+        }
         if (artifactPath == null) {
             artifactPath = artifact.getPath();
         }
+    }
+
+    private void addArtifactIfAbsent(ArtifactRef artifact) {
+        if (artifact == null) {
+            return;
+        }
+        for (ArtifactRef existing : artifacts) {
+            if (sameArtifact(existing, artifact)) {
+                return;
+            }
+        }
+        artifacts.add(artifact);
+    }
+
+    private boolean sameArtifact(ArtifactRef left, ArtifactRef right) {
+        if (left == right) {
+            return true;
+        }
+        if (left == null || right == null) {
+            return false;
+        }
+        return Objects.equals(left.getType(), right.getType())
+                && Objects.equals(left.getPath(), right.getPath());
     }
 }

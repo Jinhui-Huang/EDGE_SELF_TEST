@@ -7,6 +7,7 @@ import com.example.webtest.assertion.handler.AssertTitleHandler;
 import com.example.webtest.assertion.handler.AssertUrlHandler;
 import com.example.webtest.assertion.handler.AssertTextHandler;
 import com.example.webtest.assertion.handler.AssertAttrHandler;
+import com.example.webtest.assertion.handler.AssertEnabledHandler;
 import com.example.webtest.assertion.handler.AssertValueHandler;
 import com.example.webtest.assertion.handler.AssertVisibleHandler;
 import com.example.webtest.assertion.model.AssertionResult;
@@ -71,6 +72,34 @@ class DefaultAssertionEngineTest {
                 "elementText:css:#headline:0",
                 "findElement:css:#headline:0",
                 "findElement:css:#hidden:0"), pageController.calls);
+    }
+
+    @Test
+    void assertStepDispatchesEnabledHandlers() {
+        FakePageController pageController = new FakePageController();
+        ElementResolver elementResolver = new DefaultElementResolver(pageController);
+        DefaultAssertionEngine engine = new DefaultAssertionEngine(List.of(new AssertEnabledHandler(elementResolver)));
+
+        AssertionResult enabled = engine.assertStep(targetStep("enabled", ActionType.ASSERT_ENABLED, "#headline", null), context());
+        AssertionResult disabled = engine.assertStep(targetStep("disabled", ActionType.ASSERT_DISABLED, "#disabled", null), context());
+
+        assertTrue(enabled.isSuccess());
+        assertTrue(disabled.isSuccess());
+        assertEquals(List.of(
+                "findElement:css:#headline:0",
+                "findElement:css:#disabled:0"), pageController.calls);
+    }
+
+    @Test
+    void assertStepReturnsFailureWhenEnabledStateDiffers() {
+        FakePageController pageController = new FakePageController();
+        ElementResolver elementResolver = new DefaultElementResolver(pageController);
+        DefaultAssertionEngine engine = new DefaultAssertionEngine(List.of(new AssertEnabledHandler(elementResolver)));
+
+        AssertionResult result = engine.assertStep(targetStep("disabled", ActionType.ASSERT_DISABLED, "#headline", null), context());
+
+        assertEquals(false, result.isSuccess());
+        assertEquals("Expected element to be disabled", result.getMessage());
     }
 
     @Test
@@ -171,7 +200,8 @@ class DefaultAssertionEngineTest {
             state.setFound(!hidden);
             state.setCount(hidden ? 0 : 1);
             state.setVisible(!hidden);
-            state.setActionable(!hidden);
+            state.setEnabled(!"#disabled".equals(value));
+            state.setActionable(!hidden && state.isEnabled());
             return state;
         }
 

@@ -345,3 +345,447 @@ G. 计划修改的文件列表
 - 复查未发现带 `webtest-edge-*` 或 `remote-debugging-port` 的本项目 Edge 调试残留进程。
 - 已知问题：HTML 报告仍是单页静态报告；慢步骤摘要固定最多 3 条；非图片 artifact 尚无专门预览；`RunResult.reportPath` 仍指向 `report.json`。
 - 下一步建议：优先生成独立报告索引页；或扩展 artifact 生命周期 DOM dump / console-network dump / before-after step 钩子；也可补 `ASSERT_ENABLED` / `ASSERT_DISABLED`。
+【最新接手记忆 - 2026-04-17】
+- 本轮按上一轮建议优先生成独立报告索引页，继续增强 `report-engine`，保持 `report.json`、`report.html`、`RunResult.reportPath` 和 core-platform 控制台输出兼容。
+- `DefaultReportEngine` 现在生成 `${outputDir}/report.json` 与 `${outputDir}/report.html` 后，会刷新父目录 `index.html`；典型 smoke 输出为 `runs/dsl-smoke/report.json`、`runs/dsl-smoke/report.html` 和 `runs/index.html`。
+- 索引页扫描报告根目录下包含 `report.json` 的一级子目录，按 `finishedAt` 倒序列出 runId、OK/FAILED、total/passed/failed/skipped/durationMs、startedAt/finishedAt，并提供 HTML / JSON 链接；失败 run 行会高亮。
+- `DefaultReportEngineTest` 已覆盖单次索引生成、多 run 索引刷新、倒序展示和 report 链接；既有单次报告页能力继续保留：失败导航、键盘导航、慢步骤摘要、筛选计数、details、artifact 元信息和图片预览。
+- 当前验证通过：
+  1. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine -am test -q`
+  2. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,libs/execution-engine,apps/core-platform -am test -q`
+  3. `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+  4. `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+  5. 在 `apps/core-platform` 执行 `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`
+- 最新 smoke 通过，输出目录 `D:\txt\edge_self_test\runs\dsl-smoke` 包含 `report.json`、`report.html`、`capture-page.png`；`D:\txt\edge_self_test\runs\index.html` 已确认包含 `dsl-smoke-run`、`dsl-smoke/report.html`、`dsl-smoke/report.json`。
+- 已知问题：索引页只扫描一级 run 目录，不支持搜索/筛选/分页/历史清理或跨根目录聚合；非图片 artifact 仍无专门预览；`RunResult.reportPath` 仍指向 `report.json`。
+- 下一步建议：优先扩展 artifact 生命周期能力（DOM dump、console/network dump、before/after step 钩子）并让报告页对非图片 artifact 提供专门预览；或补齐 `ASSERT_ENABLED` / `ASSERT_DISABLED`；也可继续增强索引页搜索/筛选和失败 run 快速定位。
+Hand-off note - 2026-04-17:
+- Continued the next step after report index generation by extending artifact lifecycle support with failure DOM dumps.
+- `ArtifactCollector` now has `captureDomDump(outputDir, artifactName, context)`.
+- `DefaultArtifactCollector` writes `${artifactName}.html` from `PageController.getHtml(context)` and returns an `ArtifactRef` with `type=dom` and `contentType=text/html`.
+- `DefaultTestOrchestrator` now captures failure artifacts through one path: screenshot when `ReportPolicy.screenshotOnFailure` or `FailurePolicy.SCREENSHOT_*` requires it, and DOM dump when `ReportPolicy.saveDomOnFailure` is true. Missing `ReportPolicy` keeps both defaults enabled.
+- When only `screenshotOnFailure=false` is set, failure DOM dump is still captured because `saveDomOnFailure` defaults to true. Set both `screenshotOnFailure=false` and `saveDomOnFailure=false` to suppress all failure artifacts.
+- `DefaultReportEngine` now renders `text/html` artifacts with a sandboxed iframe preview in `report.html`, while image previews and artifact metadata remain unchanged.
+- Current working tree also includes the previous report index page work: `${outputDir}/report.json` and `${outputDir}/report.html` generation refreshes the parent `index.html`.
+- Verified:
+  1. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/artifact-engine,libs/execution-engine,libs/report-engine,apps/core-platform -am test -q`
+  2. `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+  3. `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+  4. from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`
+- Latest DSL smoke succeeded and output remains `D:\txt\edge_self_test\runs\dsl-smoke`, including `report.json`, `report.html`, `capture-page.png`; parent `runs/index.html` is refreshed.
+- Next recommended step: add console/network dump artifacts or before/after step hooks, then add report previews for those text/json artifacts. Alternative: improve index page filtering/search, or add `ASSERT_ENABLED` / `ASSERT_DISABLED`.
+
+Hand-off note - 2026-04-17:
+- Continued the artifact lifecycle work after failure DOM dumps by adding failure-time console dump artifacts and text/json report previews.
+- `PageController` now has default `startConsoleCapture(context)` and `consoleEvents(context)` methods.
+- `DefaultPageController` overrides those methods: it enables CDP `Runtime.enable`, listens to `Runtime.consoleAPICalled`, and stores console event time/level/message records for the current run.
+- `ArtifactCollector` now has `captureConsoleDump(outputDir, artifactName, context)`.
+- `DefaultArtifactCollector` writes `${artifactName}.json` from `PageController.consoleEvents(context)` and returns `ArtifactRef(type=console, contentType=application/json)`. It converts `Instant` values to strings before using `Jsons` because the current shared Jackson config does not include the Java time module.
+- `ReportPolicy` now includes `saveConsoleOnFailure`, defaulting to true.
+- `DefaultTestOrchestrator` starts console capture at run start when console failure artifacts are enabled. On failure, it now captures screenshot, DOM, and console artifacts according to policy. Missing `ReportPolicy` enables all three. To suppress all failure artifacts, set `screenshotOnFailure=false`, `saveDomOnFailure=false`, and `saveConsoleOnFailure=false`.
+- `DefaultReportEngine` now embeds bounded text/json previews in `report.html` with `<pre class="artifact-text-preview">`; HTML artifacts still use sandboxed iframe previews, and image previews are unchanged.
+- Verified:
+  1. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/browser-core,libs/artifact-engine,libs/execution-engine,libs/report-engine,apps/core-platform -am test -q`
+  2. `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+  3. `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+  4. from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`
+- Latest DSL smoke succeeded and output remains `D:\txt\edge_self_test\runs\dsl-smoke`, including `report.json`, `report.html`, and `capture-page.png`; parent `runs/index.html` is refreshed.
+- Rechecked local Edge debug processes after smoke; no project `webtest-edge-*` / `remote-debugging-port` process remained.
+- Known gaps: network dump artifacts are still not implemented; before/after step artifact hooks are not implemented; console capture only covers events after orchestrator run start; text/json preview is capped at 12000 characters.
+- Next recommended step: implement network dump artifacts via CDP Network events and reuse the report text/json preview path. Alternative: add before/after step artifact hooks or implement `ASSERT_ENABLED` / `ASSERT_DISABLED`.
+
+Hand-off note - 2026-04-17:
+- Continued the artifact lifecycle work after console dumps by adding failure-time network dump artifacts.
+- Added `NetworkEvent` in `browser-core` with time/event/requestId/url/method/status/mimeType/errorText fields.
+- `PageController` now has default `startNetworkCapture(context)` and `networkEvents(context)` methods.
+- `DefaultPageController` now enables CDP `Network.enable`, listens to `Network.requestWillBeSent`, `Network.responseReceived`, and `Network.loadingFailed`, and stores bounded event summaries for later artifact capture.
+- `ArtifactCollector` now has `captureNetworkDump(outputDir, artifactName, context)`.
+- `DefaultArtifactCollector` writes `${artifactName}.json` from `PageController.networkEvents(context)` and returns `ArtifactRef(type=network, contentType=application/json)`. It serializes `Instant` values to strings, matching console dump behavior.
+- `ReportPolicy` now includes `saveNetworkOnFailure`, defaulting to true.
+- `DefaultTestOrchestrator` starts network capture at run start when network failure artifacts are enabled. On failure, it now captures screenshot, DOM, console, and network artifacts according to policy. Missing `ReportPolicy` enables all four. To suppress all failure artifacts, set `screenshotOnFailure=false`, `saveDomOnFailure=false`, `saveConsoleOnFailure=false`, and `saveNetworkOnFailure=false`.
+- `DefaultReportEngine` did not need new code for network previews because network dumps are JSON and use the existing text/json preview path.
+- Verified:
+  1. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/browser-core,libs/artifact-engine,libs/execution-engine,libs/report-engine,apps/core-platform -am test -q`
+  2. `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+  3. `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+  4. from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`
+- Latest DSL smoke succeeded and output remains `D:\txt\edge_self_test\runs\dsl-smoke`, including `report.json`, `report.html`, and `capture-page.png`; parent `runs/index.html` is refreshed.
+- Rechecked local Edge debug processes after smoke; no project `webtest-edge-*` / `remote-debugging-port` process remained.
+- Known gaps: before/after step artifact hooks are not implemented; network capture stores request/response/failure summaries only and does not capture bodies or headers; console/network capture starts at orchestrator run start, so earlier browser events are outside the capture window.
+- Next recommended step: add before/after step artifact hooks, or implement `ASSERT_ENABLED` / `ASSERT_DISABLED`.
+
+Hand-off note - 2026-04-17:
+- Continued the artifact lifecycle work after network dumps by adding opt-in before/after step artifact hooks.
+- `ReportPolicy` now includes `screenshotBeforeStep`, `screenshotAfterStep`, `saveDomBeforeStep`, and `saveDomAfterStep`. All four default to false so normal runs do not produce per-step artifacts unless explicitly requested.
+- `DefaultTestOrchestrator` now captures before-step artifacts immediately before the step action/assertion and after-step artifacts for both successful and failed steps. Hook artifact failures are appended to the step message and do not override the primary step result.
+- Hook artifact names are stable: `${stepId}-before.png`, `${stepId}-before-dom.html`, `${stepId}-after.png`, and `${stepId}-after-dom.html`.
+- Failure artifact behavior remains unchanged: missing `ReportPolicy` still captures failure screenshot, DOM, console, and network artifacts by default; the new before/after hooks are separate opt-in policy flags.
+- Added execution-engine tests covering successful before/after screenshot + DOM hooks and after-step DOM capture when a step fails with failure artifacts disabled.
+- Verified so far:
+  1. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/dsl-model,libs/execution-engine,libs/report-engine,apps/core-platform -am test -q`
+  2. `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+- Additional verification passed:
+  3. `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+  4. from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`
+- Latest DSL smoke succeeded and output remains `D:\txt\edge_self_test\runs\dsl-smoke`, including `report.json`, `report.html`, and `capture-page.png`; parent `runs/index.html` is refreshed.
+- Rechecked local Edge debug processes after smoke; no project `webtest-edge-*` / `remote-debugging-port` process remained.
+- Known gaps: before/after hooks currently cover screenshot and DOM only, not console/network deltas; network artifacts still store summaries only and do not capture bodies or headers.
+- Next recommended step: either add console/network delta artifacts around step hooks, implement `ASSERT_ENABLED` / `ASSERT_DISABLED`, or improve report index search/filtering.
+
+Hand-off note - 2026-04-17:
+- Continued the before/after step artifact hook work by adding opt-in console/network delta artifacts.
+- `ReportPolicy` now includes `saveConsoleBeforeStep`, `saveConsoleAfterStep`, `saveNetworkBeforeStep`, and `saveNetworkAfterStep`. All four default to false, so existing runs do not emit per-step console/network artifacts unless explicitly enabled.
+- `ArtifactCollector` now has overloads for `captureConsoleDump(outputDir, artifactName, events)` and `captureNetworkDump(outputDir, artifactName, events)`. Existing context-based failure dump methods still work and delegate to the overloads.
+- `DefaultTestOrchestrator` starts console/network capture when either failure artifacts or step hook artifacts require it.
+- Step hook console/network dumps are delta-based. After-step hooks capture events emitted during the current step when before hooks are disabled, or since the before hook when both phases are enabled. Before-step hooks capture events accumulated since the previous hook cursor.
+- Hook artifact names are `${stepId}-before-console.json`, `${stepId}-after-console.json`, `${stepId}-before-network.json`, and `${stepId}-after-network.json`.
+- Hook capture failures are appended to the current step message and do not override the primary step result.
+- Report rendering needed no change because these artifacts are JSON and reuse the existing text/json preview path.
+- Added tests in artifact-engine for provided-event dump overloads and in execution-engine for after-step console/network delta capture.
+- Verified:
+  1. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/artifact-engine,libs/execution-engine,libs/report-engine,apps/core-platform -am test -q`
+  2. `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+  3. `git diff --check`
+  4. `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+  5. from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`
+- Latest DSL smoke succeeded and output remains `D:\txt\edge_self_test\runs\dsl-smoke`, including `report.json`, `report.html`, and `capture-page.png`; parent `runs/index.html` is refreshed.
+- Rechecked local Edge debug processes after smoke; no project `webtest-edge-*` / `remote-debugging-port` Edge process remained. The only match was the PowerShell query process itself.
+- Known gaps: network artifacts still store summaries only, without headers or bodies; console/network capture starts at orchestrator run start; step hook deltas use event-list cursors rather than a formal `PageController` checkpoint API.
+- Next recommended step: implement `ASSERT_ENABLED` / `ASSERT_DISABLED`. Alternatives: improve report index search/filtering or enrich network artifact capture.
+
+Hand-off note - 2026-04-17:
+- Continued from the before/after console/network step hook work by implementing `ASSERT_ENABLED` / `ASSERT_DISABLED`.
+- Added `AssertEnabledHandler` in `assertion-engine`.
+- `ElementState` / `ResolveResult` now carry a distinct `enabled` signal, separate from `actionable`.
+- `DefaultPageController` sets `enabled` from disabled / `aria-disabled`, while `actionable` remains visibility plus enabled.
+- `ASSERT_ENABLED` succeeds when the resolved element is found and enabled.
+- `ASSERT_DISABLED` succeeds when the resolved element is found and not enabled.
+- `DefaultTestOrchestrator` now wires `AssertEnabledHandler` into both default assertion engine construction paths and routes both actions through assertion execution.
+- `DefaultDslValidator` now requires a target for enabled/disabled assertions.
+- Added assertion-engine tests covering enabled/disabled success and state mismatch failure.
+- Added DSL parser validation coverage for missing enabled assertion target.
+- Extended execution-engine routing coverage with `ASSERT_ENABLED` and `ASSERT_DISABLED`.
+- Updated `config/smoke/core-platform-smoke.yml` so the real smoke page includes a disabled field and executes both new assertions.
+- Verified:
+  1. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/assertion-engine,libs/dsl-parser,libs/execution-engine -am test -q`
+  2. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/assertion-engine,libs/dsl-parser,libs/execution-engine,libs/report-engine,apps/core-platform -am test -q`
+  3. `git diff --check`
+  4. `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+  5. `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+  6. from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`
+- Latest smoke succeeded with `ASSERT_ENABLED` and `ASSERT_DISABLED` step output, writing `D:\txt\edge_self_test\runs\dsl-smoke` and refreshing parent `runs/index.html`.
+- Rechecked local Edge debug processes after smoke; no project `webtest-edge-*` / `remote-debugging-port` process remained.
+- Known gaps: enabled/disabled semantics only cover disabled / `aria-disabled`, network artifacts still omit headers/bodies, and step hook deltas still use event-list cursors.
+- Next recommended step: improve report index search/filtering and failed-run quick navigation. Alternatives: enrich network artifacts with headers/body metadata, or add a formal artifact event checkpoint API.
+
+Hand-off note - 2026-04-17:
+- Continued after `ASSERT_ENABLED` / `ASSERT_DISABLED` by improving the generated parent report index at `runs/index.html`.
+- `DefaultReportEngine` report index now includes a run search box, `All` / `Failed` / `OK` filters, failed-run quick links, and a no-failure message when all indexed runs pass.
+- Index rows now have stable anchors and client-side metadata: `id="run-N"`, `data-index`, `data-status`, and `data-search`.
+- Keyboard support on the index page: `/` focuses search, `f` jumps to the first failed run, `n` to the next failed run, and `p` to the previous failed run.
+- Existing `report.json` structure and per-run `report.html` behavior remain unchanged.
+- Extended `DefaultReportEngineTest` to cover the new index controls, failed-run/no-failed-run states, search/filter script, and keyboard navigation snippets.
+- Verified:
+  1. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine -am test -q`
+  2. `git diff --check`
+  3. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,apps/core-platform -am test -q`
+  4. `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+  5. `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+  6. from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`
+- Latest smoke succeeded and refreshed `D:\txt\edge_self_test\runs\dsl-smoke` plus parent `D:\txt\edge_self_test\runs\index.html`; the index contains `data-search-input`, `Failed (0)`, `No failed runs.`, keyboard help, and the `dsl-smoke-run` row.
+- Rechecked local Edge debug processes after smoke; no project `webtest-edge-*` / `remote-debugging-port` process remained.
+- Known gaps: index filtering is client-side only and has no paging/date-range/history cleanup; network artifacts still omit headers/bodies; step hook deltas still use event-list cursors.
+- Next recommended step: enrich network artifact capture with headers/body metadata. Alternatives: add a formal artifact event checkpoint API or extend report index paging/date filters/cleanup.
+
+Hand-off note - 2026-04-17:
+- Continued after report index search/filtering by enriching network artifact capture with headers/body metadata.
+- `NetworkEvent` now carries request headers, request body preview, response headers, encoded length, response body preview, base64 flag, truncation flags, and body capture error.
+- `DefaultPageController` now listens to `Network.loadingFinished` and records a `body` network event. It fetches response bodies lazily in `networkEvents(context)` via `Network.getResponseBody`, avoiding synchronous CDP calls inside the WebSocket event callback.
+- Request/response event capture now includes CDP header maps. Request and response body previews are capped at 12000 characters and include truncation flags.
+- `DefaultArtifactCollector` writes the enriched network fields into network JSON artifacts, reusing the existing report JSON/text preview path.
+- Added `libs/browser-core/src/test/java/com/example/webtest/browser/page/DefaultPageControllerTest.java` for network header/body capture and extended `DefaultArtifactCollectorTest` for enriched network JSON output.
+- `libs/browser-core/pom.xml` now has a test-scope `junit-jupiter` dependency to support browser-core unit tests.
+- Verified:
+  1. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/browser-core,libs/artifact-engine -am test -q`
+  2. `git diff --check`
+  3. `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+  4. `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+  5. from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`
+- Latest smoke succeeded and refreshed `D:\txt\edge_self_test\runs\dsl-smoke` plus parent `runs/index.html`.
+- Rechecked local Edge debug processes after smoke; no project `webtest-edge-*` / `remote-debugging-port` process remained.
+- Known gaps: response body capture is best-effort and stores CDP failures as `bodyError`; large bodies are preview-capped rather than stored separately; step hook deltas still rely on event-list cursors.
+- Next recommended step: add a formal artifact event checkpoint API so console/network deltas stop depending on raw list cursor positions. Alternatives: report index paging/date filters/cleanup or separate large network body artifacts.
+
+Hand-off note - 2026-04-17:
+- Continued after network artifact header/body enrichment by adding a formal artifact event checkpoint API.
+- Added `EventCheckpoint` and `EventDelta<T>` in `browser-core`.
+- `PageController` now exposes default checkpoint/delta APIs: `consoleCheckpoint`, `consoleEventsSince`, `networkCheckpoint`, and `networkEventsSince`.
+- `DefaultTestOrchestrator` now carries `EventCheckpoint` objects for step hook console/network deltas instead of raw list indexes.
+- Existing semantics are preserved: after-only hooks capture current-step events; before+after hooks split at the before checkpoint; failure dumps still use full context event lists.
+- Added `DefaultPageControllerTest` coverage for console checkpoint delta capture and checkpoint advancement.
+- Verified:
+  1. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/browser-core,libs/execution-engine -am test -q`
+  2. `git diff --check`
+  3. `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+  4. `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+  5. from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`
+- Latest smoke succeeded and refreshed `D:\txt\edge_self_test\runs\dsl-smoke`, including successful `ASSERT_ENABLED` / `ASSERT_DISABLED` and screenshot artifact output.
+- Rechecked local Edge debug processes after smoke; no project `webtest-edge-*` / `remote-debugging-port` process remained.
+- Known gaps: default checkpointing is still snapshot/list based internally; response body capture is best-effort and preview-capped; large network bodies are not separate artifacts.
+- Next recommended step: store large network bodies as separate artifacts. Alternative: add report index paging/date filters/cleanup.
+
+Hand-off note - 2026-04-17:
+- Continued after the artifact event checkpoint API by adding sidecar files for large network request/response bodies.
+- `NetworkEvent` now has full-body fields for truncated request/response bodies plus `requestBodyArtifactPath` and `responseBodyArtifactPath` for JSON dump references.
+- `DefaultPageController` still caps inline body previews at 12000 characters, but retains the full body only when truncation occurs.
+- `DefaultArtifactCollector` writes truncated network bodies under `${artifactName}-bodies/` and includes the relative sidecar path in the network JSON dump.
+- Text request/response bodies are written as UTF-8 `.txt`; base64-encoded response bodies are decoded into `.bin` files.
+- Existing report rendering did not change; sidecar paths are currently visible in the network JSON artifact preview/file, not as separate top-level report artifact cards.
+- Added browser-core test coverage for full-body retention after truncation.
+- Added artifact-engine test coverage for sidecar body files and JSON artifact path fields.
+- Verified:
+  1. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/browser-core,libs/artifact-engine -am test -q`
+  2. `git diff --check`
+  3. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/browser-core,libs/artifact-engine,libs/execution-engine,libs/report-engine,apps/core-platform -am test -q`
+  4. `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+  5. `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+  6. from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`
+- Latest smoke succeeded and refreshed `D:\txt\edge_self_test\runs\dsl-smoke`.
+- Rechecked local Edge debug processes after smoke; no project `webtest-edge-*` / `remote-debugging-port` process remained.
+- Known gaps: sidecar body files are not yet first-class report artifact links; response body capture remains best-effort; large bodies are held in memory until artifact collection.
+- Next recommended step: expose network body sidecar files as first-class report artifact links. Alternative: extend report index paging/date filters/cleanup.
+
+Hand-off note - 2026-04-17:
+- Continued after large network body sidecar artifacts by exposing truncated network body sidecars as first-class report artifact links.
+- `ArtifactRef` now has `relatedArtifacts`; `DefaultArtifactCollector.captureNetworkDump(...)` attaches generated request/response body sidecar refs to the primary network JSON ref.
+- Related sidecar artifact types are `network-request-body` and `network-response-body`; text sidecars use `text/plain`, base64-decoded binary response sidecars use `application/octet-stream`.
+- `StepExecutionRecord.addArtifact(...)` now promotes related artifacts into the step artifact list while preserving the primary artifact as `artifactPath`.
+- `DefaultReportEngine` needed no production change because it already renders every step artifact in `artifacts`; report tests now verify sidecar artifact links and text previews.
+- Added `StepExecutionRecordTest` for related artifact promotion and extended `DefaultArtifactCollectorTest` for sidecar related refs.
+- Verified:
+  1. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/artifact-engine,libs/execution-engine,libs/report-engine -am test -q`
+  2. `git diff --check` (line-ending warnings only)
+  3. `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+  4. `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+  5. from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`
+- Latest smoke succeeded and refreshed `D:\txt\edge_self_test\runs\dsl-smoke`; no project `webtest-edge-*` / `remote-debugging-port` process remained after smoke.
+- Known gaps: sidecars appear only for truncated bodies; CDP response body capture remains best-effort; large bodies are still held in memory until artifact collection writes them.
+- Next recommended step: extend report index paging/date filters/cleanup, or add streaming/spooling for very large network bodies.
+
+Hand-off note - 2026-04-17:
+- Continued after network body sidecar report links by extending the generated parent report index.
+- `DefaultReportEngine` now emits date range filters for run start date, a page size selector, Previous/Next pagination, and a live `data-index-status` count for matching runs/pages.
+- Index rows now include `data-started` and `data-finished` in addition to the existing status/search metadata.
+- Existing index behavior remains: client-side search, All/Failed/OK filters, failed-run quick links, and `/`, `f`, `n`, `p` keyboard shortcuts.
+- Added a static cleanup note: deleting a run directory from the report root removes it from the next generated index. There is no automatic deletion or retention policy yet.
+- Report JSON and per-run `report.html` were not changed.
+- Extended `DefaultReportEngineTest` for the new date controls, page size/pagination controls, row metadata, and filtering/paging script output.
+- Verified:
+  1. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine -am test -q`
+  2. `git diff --check` (line-ending warnings only)
+  3. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,apps/core-platform -am test -q`
+  4. `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+  5. `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+  6. from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`
+- Latest smoke succeeded and refreshed `D:\txt\edge_self_test\runs\dsl-smoke` plus parent `runs/index.html`; confirmed generated index contains `data-date-from`, `data-page-size`, `data-index-status`, cleanup guidance, and pagination status script.
+- Rechecked local Edge debug processes after smoke; no project `webtest-edge-*` / `remote-debugging-port` process remained.
+- Known gaps: index filtering/paging is still client-side only; cleanup is guidance-only; large network bodies are still held in memory until artifact collection writes them.
+- Next recommended step: add streaming/spooling for very large network bodies to reduce in-memory retention. Alternative: add a configurable report retention cleanup command.
+
+Hand-off note - 2026-04-17:
+- Continued after report index paging/date filtering by adding temporary spooling for truncated network bodies.
+- `NetworkEvent` now has request/response body spool path fields alongside the existing full-body compatibility fields.
+- `DefaultPageController` writes truncated full request/response bodies to temp files as soon as they are captured and keeps only the 12000-character preview on the event object; if spooling fails, it falls back to the previous in-memory full-body field.
+- `DefaultArtifactCollector` writes network body sidecar artifacts from spool files when present, deletes the temp spool files after successful copy/decode, and still supports the older `requestBodyFull` / `responseBodyFull` fields.
+- Base64 response spool files are decoded into `.bin` sidecars, preserving existing report artifact content types and links.
+- Added/updated tests for page-controller spool creation, collector sidecar writing from spool, base64 decode, and temp spool cleanup.
+- Verified:
+  1. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/browser-core,libs/artifact-engine -am test -q`
+  2. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/browser-core,libs/artifact-engine,libs/execution-engine,libs/report-engine,apps/core-platform -am test -q`
+  3. `git diff --check` (line-ending warnings only)
+  4. `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+  5. `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+  6. from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`
+- Latest smoke succeeded and refreshed `D:\txt\edge_self_test\runs\dsl-smoke`; no project `webtest-edge-*` / `remote-debugging-port` Edge process remained after smoke.
+- Known gaps: CDP still allocates body strings transiently; sidecars still appear after artifact collection; temp spool files can remain if the JVM exits before collection.
+- Next recommended step: add a configurable report retention cleanup command, or add explicit temp-spool lifecycle cleanup on run/session close.
+
+Hand-off note - 2026-04-17:
+- Continued after network body spooling by adding a configurable report retention cleanup command.
+- Added `ReportCleanupOptions` / `ReportCleanupResult` and `ReportEngine.cleanupReportRuns(reportRoot, options)`.
+- `DefaultReportEngine.cleanupReportRuns(...)` scans only first-level report run directories that contain `report.json`, sorts them consistently with the parent index, applies keep-latest and finished-before cutoff rules, and refreshes `index.html` after applied deletion.
+- `keepLatest` protects the newest N runs even when a cutoff is set. Dry-run mode reports matching directories without deleting them or rewriting the index.
+- Added `core-platform report-cleanup [reportRoot] [--keep-latest N] [--older-than-days N] [--apply|--dry-run]`; defaults are `runs`, `keepLatest=20`, and dry-run.
+- `apps/core-platform/pom.xml` now declares a direct `report-engine` dependency for the cleanup CLI.
+- Added `DefaultReportEngineTest` coverage for keep-latest deletion, cutoff dry-run behavior, and index refresh.
+- Verified:
+  1. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,apps/core-platform -am test -q`
+  2. `git diff --check` (line-ending warnings only)
+  3. `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+  4. from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=report-cleanup --help"`
+  5. from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=report-cleanup ..\..\runs --dry-run --keep-latest 20"`; output scanned 1 run, kept 1, would delete 0.
+  6. `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+- Known gaps: cleanup is CLI/API only, not in-report UI; retention defaults are not yet wired into DSL/report policy config; no status/size-based retention yet.
+- Next recommended step: add explicit temp-spool lifecycle cleanup on run/session close. Alternative: wire report retention defaults into DSL/report policy config or add status/size-based cleanup rules.
+
+Hand-off note - 2026-04-17:
+- Continued after report retention cleanup by adding explicit lifecycle cleanup for temporary network body spool files.
+- Added `PageController.cleanupNetworkBodySpools(context)` as a default no-op hook.
+- `DefaultPageController.cleanupNetworkBodySpools(...)` deletes referenced request/response spool temp files and clears the spool path fields on the live `NetworkEvent` objects.
+- `DefaultPageController.startNetworkCapture(...)` now cleanup-sweeps existing spool files before clearing prior network events, which handles controller reuse across runs.
+- `DefaultTestOrchestrator.execute(...)` now wraps run execution and report generation in `finally` and calls the page-controller cleanup hook so run failures and report-generation failures do not leave known spool files behind.
+- Cleanup is best-effort and intentionally does not mask the original run result or exception.
+- Added tests:
+  1. `DefaultPageControllerTest.cleanupNetworkBodySpoolsDeletesTemporaryFiles`
+  2. `DefaultTestOrchestratorTest.executeCleansNetworkBodySpoolsAfterRun`
+- Verified:
+  1. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/browser-core,libs/execution-engine -am test -q`
+  2. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/browser-core,libs/artifact-engine,libs/execution-engine,libs/report-engine,apps/core-platform -am test -q`
+  3. `git diff --check` (line-ending warnings only)
+- Known gaps: CDP still transiently allocates large response bodies before spooling; hard JVM/process crashes can still leave OS temp files; report retention defaults are not wired into DSL/report policy config.
+- Next recommended step: wire report retention defaults into DSL/report policy config. Alternatives: add status/size-based cleanup rules or a startup sweep for orphaned `webtest-network-body-*.tmp` files.
+
+Hand-off note - 2026-04-17:
+- Continued after temp spool lifecycle cleanup by wiring report retention defaults into DSL `reportPolicy`.
+- `ReportPolicy` now has `retentionCleanupOnRun`, `retentionKeepLatest`, and `retentionOlderThanDays`.
+- `DefaultDslValidator` validates retention fields: keep-latest must be >= 1, older-than-days must be >= 0, and cleanup-on-run requires at least one retention rule.
+- `DefaultTestOrchestrator` now calls `ReportEngine.cleanupReportRuns(...)` after generating the current run report when DSL retention cleanup is enabled.
+- If only `retentionOlderThanDays` is configured, the orchestrator sets `keepLatest=1` so the newest/current report run is protected.
+- `config/smoke/core-platform-smoke.yml` now includes:
+  - `reportPolicy.retentionCleanupOnRun: true`
+  - `reportPolicy.retentionKeepLatest: 20`
+- Added parser coverage for YAML retention policy parsing and invalid JSON retention validation.
+- Added orchestrator coverage proving `retentionKeepLatest: 1` deletes an older report run after the new run report is written.
+- Verified:
+  1. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/dsl-parser,libs/execution-engine -am test -q`
+  2. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/dsl-model,libs/dsl-parser,libs/execution-engine,libs/report-engine,apps/core-platform -am test -q`
+  3. `git diff --check` (line-ending warnings only)
+  4. `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+  5. `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+  6. from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`
+- Latest smoke succeeded with 16 successful steps and refreshed `D:\txt\edge_self_test\runs\dsl-smoke` plus `runs/index.html`.
+- Rechecked local Edge debug processes after smoke; no project `webtest-edge-*` / `remote-debugging-port` process remained.
+- Known gaps: retention has no status-based rules, size quotas, or artifact-only pruning; cleanup is still CLI/API/run-level only, not an in-report browser action.
+- Next recommended step: add status-based report cleanup rules. Alternatives: add size-quota cleanup or startup sweep for orphaned `webtest-network-body-*.tmp` files.
+
+Hand-off note - 2026-04-17:
+- Continued after DSL report retention by adding status-based report cleanup rules.
+- `ReportCleanupOptions` now has `deleteStatuses`, validated as `OK` or `FAILED`.
+- `DefaultReportEngine.cleanupReportRuns(...)` now deletes by aggregate report status:
+  - `FAILED` when report summary failed count is greater than zero.
+  - `OK` when report summary failed count is zero.
+- Existing cleanup semantics are preserved:
+  - `keepLatest` still deletes runs beyond the newest N and protects the newest N from other rules.
+  - cutoff cleanup and dry-run behavior are unchanged.
+- `core-platform report-cleanup` now accepts `--status OK|FAILED[,..]`; help output was updated.
+- DSL `reportPolicy.retentionDeleteStatuses` was added and validated; invalid statuses fail DSL validation.
+- `DefaultTestOrchestrator` wires DSL status retention into report cleanup after the current report is generated.
+- Tests added/updated:
+  1. `DefaultReportEngineTest.cleanupReportRunsDeletesMatchingStatus`
+  2. DSL YAML parsing of `retentionDeleteStatuses`
+  3. DSL invalid status validation
+  4. `DefaultTestOrchestratorTest.executeAppliesReportRetentionStatusPolicyAfterReportGeneration`
+- Verified:
+  1. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,libs/dsl-parser,libs/execution-engine,apps/core-platform -am test -q`
+  2. `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+  3. `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+  4. `git diff --check` (line-ending warnings only)
+  5. from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=report-cleanup --help"`
+  6. from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`
+- Latest smoke succeeded with 16 successful steps and refreshed `D:\txt\edge_self_test\runs\dsl-smoke` plus `runs/index.html`.
+- Rechecked local Edge debug processes after smoke; no `msedge.exe` project `webtest-edge-*` / `remote-debugging-port` process remained.
+- Known gaps: no size quota cleanup, no artifact-only pruning, no step-level status cleanup filters, and no in-report cleanup action.
+- Next recommended step: add size-quota report cleanup rules. Alternatives: artifact-only pruning or startup sweep for orphaned `webtest-network-body-*.tmp` files.
+
+Hand-off note - 2026-04-17:
+- Continued after status-based report cleanup by adding size-quota report cleanup rules.
+- `ReportCleanupOptions` now has `maxTotalBytes`, validated as non-negative.
+- `DefaultReportEngine.cleanupReportRuns(...)` computes first-level report run directory sizes and can delete oldest unprotected runs until retained run size is within `maxTotalBytes`.
+- Existing cleanup semantics are preserved:
+  - `keepLatest` protects newest runs from age, status, and size-quota deletion.
+  - keep-latest, finished-before, and status deletions are considered before size quota.
+  - dry-run reports matching directories without deleting files or refreshing `index.html`.
+- `core-platform report-cleanup` now accepts `--max-total-mb N`; help and CLI output were updated.
+- DSL `reportPolicy.retentionMaxTotalMb` was added and validated; negative values fail DSL validation.
+- `DefaultTestOrchestrator` wires DSL size retention into report cleanup after generating the current report. If only age or size retention is configured, it sets `keepLatest=1` to protect the newest/current run.
+- Tests added/updated:
+  1. `DefaultReportEngineTest.cleanupReportRunsDeletesOldestRunsUntilUnderSizeQuota`
+  2. `DefaultReportEngineTest.cleanupReportRunsProtectsLatestRunsFromSizeQuota`
+  3. YAML parsing of `retentionMaxTotalMb`
+  4. DSL invalid negative size quota validation
+- Verified:
+  1. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,libs/dsl-parser,libs/execution-engine,apps/core-platform -am test -q`
+  2. `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+  3. `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+  4. `git diff --check` (line-ending warnings only)
+  5. from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=report-cleanup --help"`
+  6. from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=report-cleanup ..\..\runs --dry-run --keep-latest 20 --max-total-mb 1024"`; output scanned 1 run, kept 1, would delete 0.
+  7. from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`
+- Latest smoke succeeded with 16 successful steps and refreshed `D:\txt\edge_self_test\runs\dsl-smoke` plus parent `runs/index.html`.
+- Rechecked local Edge debug processes after smoke; no `msedge.exe` project `webtest-edge-*` / `remote-debugging-port` process remained.
+- Known gaps: no artifact-only pruning, no per-artifact quota, no startup sweep for orphaned `webtest-network-body-*.tmp` files, and no in-report cleanup action.
+- Next recommended step: add artifact-only pruning rules. Alternatives: startup sweep for orphaned temp network body spools or in-report cleanup affordances.
+
+Hand-off note - 2026-04-17:
+- Continued after size-quota report cleanup by adding artifact-only pruning rules.
+- `ReportCleanupOptions` now has `pruneArtifactsOnly`; `ReportCleanupResult` now reports `deletedArtifactPaths` in addition to deleted run directories.
+- `DefaultReportEngine.cleanupReportRuns(...)` now reuses existing cleanup selection rules for artifact pruning:
+  - keep-latest still protects newest runs.
+  - older-than, status, and size-quota matching can select runs for pruning.
+  - with artifact-only enabled, matched run directories plus `report.json` and `report.html` are retained.
+  - only artifact paths referenced from `report.json` are deleted, and empty artifact subdirectories are removed.
+  - dry-run reports artifact paths without deleting or refreshing the index.
+- `core-platform report-cleanup` now accepts `--prune-artifacts-only` and prints deleted artifact counts/paths.
+- DSL `reportPolicy.retentionPruneArtifactsOnly` was added and validated; it requires `retentionCleanupOnRun`.
+- `DefaultTestOrchestrator` wires artifact-only retention into report cleanup after report generation.
+- Tests added/updated:
+  1. `DefaultReportEngineTest.cleanupReportRunsPrunesArtifactsOnlyForMatchingRuns`
+  2. `DefaultReportEngineTest.cleanupReportRunsPrunesArtifactsOnlyDryRunWithoutDeletingFiles`
+  3. YAML parsing of `retentionPruneArtifactsOnly`
+  4. DSL invalid artifact-prune validation
+  5. `DefaultTestOrchestratorTest.executeAppliesReportRetentionArtifactPrunePolicyAfterReportGeneration`
+- Verified:
+  1. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,libs/dsl-parser,libs/execution-engine,apps/core-platform -am test -q`
+  2. `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+  3. `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+  4. `git diff --check` (line-ending warnings only)
+  5. from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=report-cleanup --help"`
+  6. from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=report-cleanup ..\..\runs --dry-run --keep-latest 20 --prune-artifacts-only"`; output scanned 1 run, kept 1, would delete 0 runs and 0 artifacts.
+  7. from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`
+- Latest smoke succeeded with 16 successful steps and refreshed `D:\txt\edge_self_test\runs\dsl-smoke` plus parent `runs/index.html`.
+- Rechecked local Edge debug processes after smoke; no `msedge.exe` project `webtest-edge-*` / `remote-debugging-port` process remained.
+- Known gaps: pruned artifact links remain in report HTML/JSON; pruning only deletes report-referenced artifacts and does not sweep unreferenced files; no startup sweep for orphaned temp network body spools; no in-report cleanup action.
+- Next recommended step: add a startup sweep for orphaned `webtest-network-body-*.tmp` files. Alternatives: add in-report cleanup affordances or report metadata markers for pruned artifacts.
+
+Hand-off note - 2026-04-17:
+- Continued after artifact-only report cleanup by adding startup cleanup for orphaned network body spool temp files.
+- `DefaultPageController` now defines shared `webtest-network-body-` / `.tmp` constants, accepts an injectable temp directory for tests, and runs a best-effort orphan sweep when constructed.
+- The sweep scans the configured temp directory for `webtest-network-body-*.tmp` regular files and deletes only files older than 1 hour, so concurrent or just-created spool files are left alone.
+- Spooling large request/response bodies now uses the same configured temp directory that startup cleanup scans.
+- Added `DefaultPageControllerTest.startupSweepDeletesOnlyStaleOrphanNetworkBodySpools`, covering deletion of stale matching files and preservation of recent or non-matching files.
+- Verified:
+  1. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/browser-core -am test -q`
+  2. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/browser-core,libs/execution-engine -am test -q`
+  3. `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+  4. `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+  5. `git diff --check` (line-ending warnings only)
+  6. from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`
+- Latest smoke succeeded with 16 successful steps and refreshed `D:\txt\edge_self_test\runs\dsl-smoke` plus parent `runs/index.html`.
+- Rechecked local Edge debug processes after smoke; no `msedge.exe` project `webtest-edge-*` / `remote-debugging-port` process remained.
+- Known gaps: matching temp files newer than 1 hour can remain after a recent crash; cleanup does not sweep unrelated temp files or report artifact directories; CDP can still allocate large response bodies before spooling.
+- Next recommended step: add report metadata markers for pruned artifacts so report links can indicate removed artifacts instead of silently pointing at missing files. Alternatives: in-report cleanup affordances or configurable spool orphan grace period.
+
+Hand-off note - 2026-04-17:
+- Continued after orphan network body spool startup cleanup by adding report metadata markers for artifact-only cleanup.
+- `DefaultReportEngine.cleanupReportRuns(...)` now rewrites pruned runs' `report.json` and `report.html` after non-dry-run artifact-only pruning deletes referenced artifact files.
+- Deleted artifact entries in `report.json` now get `pruned: true` and `prunedAt`; legacy step-level `artifactPath` gets `artifactPruned: true` and `artifactPrunedAt` when it points at a deleted artifact.
+- Deleted artifact previews are cleared, and `report.html` renders pruned artifacts as non-clickable "removed by cleanup" labels with `status: pruned` metadata instead of broken links/previews.
+- Dry-run pruning remains read-only and does not mutate files or metadata.
+- Added test coverage in `DefaultReportEngineTest.cleanupReportRunsPrunesArtifactsOnlyForMatchingRuns` for JSON markers, regenerated HTML, and removal of the old artifact link.
+- Verified:
+  1. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine -am test -q`
+  2. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,libs/execution-engine,apps/core-platform -am test -q`
+  3. `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+  4. `git diff --check` (line-ending warnings only)
+- Known gaps: reports pruned before this change remain unmarked unless cleanup runs again against matching runs; artifact-only pruning still only covers paths referenced by `report.json`; no in-report cleanup action yet.
+- Next recommended step: add in-report cleanup affordances or a maintenance command to re-mark legacy pruned reports. Alternative: make the network body spool orphan grace period configurable.

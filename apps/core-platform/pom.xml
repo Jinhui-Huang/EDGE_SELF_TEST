@@ -39,5 +39,9 @@
             <groupId>com.example.webtest</groupId>
             <artifactId>browser-core</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.example.webtest</groupId>
+            <artifactId>report-engine</artifactId>
+        </dependency>
     </dependencies>
 </project>

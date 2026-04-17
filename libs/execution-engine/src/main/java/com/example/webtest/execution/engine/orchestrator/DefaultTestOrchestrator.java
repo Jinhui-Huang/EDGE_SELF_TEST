@@ -10,9 +10,14 @@ import com.example.webtest.action.result.StepResult;
 import com.example.webtest.artifact.collector.ArtifactCollector;
 import com.example.webtest.artifact.collector.DefaultArtifactCollector;
 import com.example.webtest.artifact.model.ArtifactRef;
+import com.example.webtest.browser.observer.ConsoleEvent;
+import com.example.webtest.browser.observer.EventCheckpoint;
+import com.example.webtest.browser.observer.EventDelta;
+import com.example.webtest.browser.observer.NetworkEvent;
 import com.example.webtest.assertion.engine.AssertionEngine;
 import com.example.webtest.assertion.engine.DefaultAssertionEngine;
 import com.example.webtest.assertion.handler.AssertAttrHandler;
+import com.example.webtest.assertion.handler.AssertEnabledHandler;
 import com.example.webtest.assertion.handler.AssertTextHandler;
 import com.example.webtest.assertion.handler.AssertTitleHandler;
 import com.example.webtest.assertion.handler.AssertUrlHandler;
@@ -36,16 +41,20 @@ import com.example.webtest.execution.engine.result.StepExecutionRecord;
 import com.example.webtest.locator.resolver.DefaultElementResolver;
 import com.example.webtest.locator.resolver.ElementResolver;
 import com.example.webtest.report.engine.DefaultReportEngine;
+import com.example.webtest.report.engine.ReportCleanupOptions;
 import com.example.webtest.report.engine.ReportEngine;
 import com.example.webtest.report.model.ReportStepRecord;
 import com.example.webtest.wait.engine.DefaultWaitEngine;
 import com.example.webtest.wait.engine.WaitEngine;
 import java.net.URI;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 public class DefaultTestOrchestrator implements TestOrchestrator {
     private final PageController pageController;
@@ -69,7 +78,8 @@ public class DefaultTestOrchestrator implements TestOrchestrator {
                 new AssertTextHandler(elementResolver, pageController),
                 new AssertValueHandler(elementResolver, pageController),
                 new AssertAttrHandler(elementResolver, pageController),
-                new AssertVisibleHandler(elementResolver)));
+                new AssertVisibleHandler(elementResolver),
+                new AssertEnabledHandler(elementResolver)));
         this.artifactCollector = new DefaultArtifactCollector(pageController);
         this.reportEngine = new DefaultReportEngine();
     }
@@ -120,31 +130,81 @@ public class DefaultTestOrchestrator implements TestOrchestrator {
             definition.getVars().forEach(context::setVariable);
         }
 
-        Instant runStartedAt = Instant.now();
-        List<StepExecutionRecord> records = new ArrayList<>();
-        boolean failed = false;
+        try {
+            Instant runStartedAt = Instant.now();
+            List<StepExecutionRecord> records = new ArrayList<>();
+            boolean failed = false;
+            startArtifactCapture(definition, context);
 
-        failed = executeSteps(definition.getBeforeAll(), definition, context, outputDir, safeOptions, records, false);
-        if (!failed || !safeOptions.isStopOnFailure()) {
-            failed = executeSteps(definition.getSteps(), definition, context, outputDir, safeOptions, records, true) || failed;
+            failed = executeSteps(definition.getBeforeAll(), definition, context, outputDir, safeOptions, records, false);
+            if (!failed || !safeOptions.isStopOnFailure()) {
+                failed = executeSteps(definition.getSteps(), definition, context, outputDir, safeOptions, records, true) || failed;
+            }
+            failed = executeSteps(definition.getAfterAll(), definition, context, outputDir, safeOptions, records, false) || failed;
+            Instant runFinishedAt = Instant.now();
+
+            RunResult result = new RunResult();
+            result.setRunId(runId);
+            result.setStatus(failed ? RunStatus.FAILED : RunStatus.SUCCESS);
+            result.setStartedAt(runStartedAt);
+            result.setFinishedAt(runFinishedAt);
+            result.setOutputDir(outputDir);
+            result.setStepRecords(records);
+            result.setReportPath(reportEngine.generateRunReport(
+                    context,
+                    outputDir,
+                    runStartedAt,
+                    runFinishedAt,
+                    toReportStepRecords(records)));
+            cleanupReportRunsIfNeeded(definition, outputDir);
+            return result;
+        } finally {
+            cleanupArtifactCapture(context);
         }
-        failed = executeSteps(definition.getAfterAll(), definition, context, outputDir, safeOptions, records, false) || failed;
-        Instant runFinishedAt = Instant.now();
+    }
 
-        RunResult result = new RunResult();
-        result.setRunId(runId);
-        result.setStatus(failed ? RunStatus.FAILED : RunStatus.SUCCESS);
-        result.setStartedAt(runStartedAt);
-        result.setFinishedAt(runFinishedAt);
-        result.setOutputDir(outputDir);
-        result.setStepRecords(records);
-        result.setReportPath(reportEngine.generateRunReport(
-                context,
-                outputDir,
-                runStartedAt,
-                runFinishedAt,
-                toReportStepRecords(records)));
-        return result;
+    private void cleanupReportRunsIfNeeded(TestCaseDefinition definition, Path outputDir) {
+        ReportPolicy reportPolicy = definition.getReportPolicy();
+        if (reportPolicy == null || !reportPolicy.isRetentionCleanupOnRun()) {
+            return;
+        }
+        ReportCleanupOptions cleanupOptions = reportCleanupOptions(reportPolicy);
+        if (cleanupOptions.getKeepLatest() == null
+                && cleanupOptions.getDeleteFinishedBefore() == null
+                && cleanupOptions.getMaxTotalBytes() == null
+                && cleanupOptions.getDeleteStatuses().isEmpty()) {
+            return;
+        }
+        Path reportRoot = outputDir == null ? null : outputDir.toAbsolutePath().normalize().getParent();
+        if (reportRoot == null) {
+            return;
+        }
+        reportEngine.cleanupReportRuns(reportRoot, cleanupOptions);
+    }
+
+    private ReportCleanupOptions reportCleanupOptions(ReportPolicy reportPolicy) {
+        ReportCleanupOptions options = new ReportCleanupOptions();
+        Integer keepLatest = reportPolicy.getRetentionKeepLatest();
+        if (keepLatest != null) {
+            options.setKeepLatest(keepLatest);
+        } else if (reportPolicy.getRetentionOlderThanDays() != null || reportPolicy.getRetentionMaxTotalMb() != null) {
+            options.setKeepLatest(1);
+        }
+        Integer olderThanDays = reportPolicy.getRetentionOlderThanDays();
+        if (olderThanDays != null) {
+            options.setDeleteFinishedBefore(Instant.now().minus(Duration.ofDays(olderThanDays.longValue())));
+        }
+        Long maxTotalMb = reportPolicy.getRetentionMaxTotalMb();
+        if (maxTotalMb != null) {
+            options.setMaxTotalBytes(maxTotalMb * 1024L * 1024L);
+        }
+        Set<String> deleteStatuses = new LinkedHashSet<>(reportPolicy.getRetentionDeleteStatuses());
+        if (!deleteStatuses.isEmpty()) {
+            options.setDeleteStatuses(deleteStatuses);
+        }
+        options.setPruneArtifactsOnly(reportPolicy.isRetentionPruneArtifactsOnly());
+        options.setDryRun(false);
+        return options;
     }
 
     private List<ReportStepRecord> toReportStepRecords(List<StepExecutionRecord> records) {
@@ -178,6 +238,8 @@ public class DefaultTestOrchestrator implements TestOrchestrator {
         }
 
         boolean failed = false;
+        EventCheckpoint consoleCheckpoint = EventCheckpoint.at(0);
+        EventCheckpoint networkCheckpoint = EventCheckpoint.at(0);
         for (int i = 0; i < steps.size(); i++) {
             StepDefinition step = steps.get(i);
             StepExecutionRecord record = new StepExecutionRecord();
@@ -185,22 +247,35 @@ public class DefaultTestOrchestrator implements TestOrchestrator {
             record.setStepName(step.getName());
             record.setAction(step.getAction() == null ? null : step.getAction().name());
             record.setStartedAt(Instant.now());
+            StepArtifactCursor artifactCursor = new StepArtifactCursor(consoleCheckpoint, networkCheckpoint);
+            if (hasStepConsoleHooks(definition) && !shouldCaptureStepConsole(definition, "before")) {
+                artifactCursor.consoleCheckpoint = consoleCheckpoint(context);
+            }
+            if (hasStepNetworkHooks(definition) && !shouldCaptureStepNetwork(definition, "before")) {
+                artifactCursor.networkCheckpoint = networkCheckpoint(context);
+            }
             try {
+                captureStepArtifactsIfNeeded(definition, outputDir, context, record, "before", artifactCursor);
                 executeStep(step, definition, context, outputDir, record);
                 record.setStatus(RunStatus.SUCCESS.name());
             } catch (Exception e) {
                 failed = true;
                 record.setStatus(RunStatus.FAILED.name());
                 record.setMessage(e.getMessage());
-                captureFailureScreenshotIfNeeded(definition, step, outputDir, context, record);
-                records.add(record);
+                captureFailureArtifactsIfNeeded(definition, step, outputDir, context, record);
+                captureStepArtifactsIfNeeded(definition, outputDir, context, record, "after", artifactCursor);
                 if (stopOnFailure && shouldStopAfterFailure(step, options)) {
+                    records.add(record);
                     return true;
                 }
-                continue;
             } finally {
+                if (!RunStatus.FAILED.name().equals(record.getStatus())) {
+                    captureStepArtifactsIfNeeded(definition, outputDir, context, record, "after", artifactCursor);
+                }
                 record.setFinishedAt(Instant.now());
             }
+            consoleCheckpoint = artifactCursor.consoleCheckpoint;
+            networkCheckpoint = artifactCursor.networkCheckpoint;
             records.add(record);
         }
         return failed;
@@ -220,7 +295,8 @@ public class DefaultTestOrchestrator implements TestOrchestrator {
             case GOTO -> pageController.navigate(resolveUrl(definition.getBaseUrl(), step.getUrl()), context);
             case REFRESH -> pageController.reload(context);
             case SCREENSHOT -> writeScreenshot(outputDir, record.getStepId(), context, record);
-            case ASSERT_TITLE, ASSERT_URL, ASSERT_TEXT, ASSERT_VALUE, ASSERT_ATTR, ASSERT_VISIBLE, ASSERT_NOT_VISIBLE -> executeAssertion(step, context);
+            case ASSERT_TITLE, ASSERT_URL, ASSERT_TEXT, ASSERT_VALUE, ASSERT_ATTR,
+                    ASSERT_VISIBLE, ASSERT_NOT_VISIBLE, ASSERT_ENABLED, ASSERT_DISABLED -> executeAssertion(step, context);
             case CLICK, FILL, WAIT_FOR_ELEMENT, WAIT_FOR_VISIBLE, WAIT_FOR_HIDDEN, WAIT_FOR_URL -> executeAction(step, context);
             default -> throw new BaseException(
                     ErrorCodes.ACTION_EXECUTION_FAILED,
@@ -247,22 +323,116 @@ public class DefaultTestOrchestrator implements TestOrchestrator {
         record.addArtifact(artifact);
     }
 
-    private void captureFailureScreenshotIfNeeded(
+    private void captureFailureArtifactsIfNeeded(
             TestCaseDefinition definition,
             StepDefinition step,
             Path outputDir,
             ExecutionContext context,
             StepExecutionRecord record) {
-        if (!shouldCaptureFailureScreenshot(definition, step)) {
-            return;
+        if (shouldCaptureFailureScreenshot(definition, step)) {
+            try {
+                ArtifactRef artifact = artifactCollector.captureScreenshot(outputDir, record.getStepId() + "-failure", context);
+                record.addArtifact(artifact);
+            } catch (Exception artifactError) {
+                appendArtifactError(record, "failure screenshot", artifactError);
+            }
         }
+        if (shouldCaptureFailureDom(definition)) {
+            try {
+                ArtifactRef artifact = artifactCollector.captureDomDump(outputDir, record.getStepId() + "-failure-dom", context);
+                record.addArtifact(artifact);
+            } catch (Exception artifactError) {
+                appendArtifactError(record, "failure DOM dump", artifactError);
+            }
+        }
+        if (shouldCaptureFailureConsole(definition)) {
+            try {
+                ArtifactRef artifact = artifactCollector.captureConsoleDump(outputDir, record.getStepId() + "-failure-console", context);
+                record.addArtifact(artifact);
+            } catch (Exception artifactError) {
+                appendArtifactError(record, "failure console dump", artifactError);
+            }
+        }
+        if (shouldCaptureFailureNetwork(definition)) {
+            try {
+                ArtifactRef artifact = artifactCollector.captureNetworkDump(outputDir, record.getStepId() + "-failure-network", context);
+                record.addArtifact(artifact);
+            } catch (Exception artifactError) {
+                appendArtifactError(record, "failure network dump", artifactError);
+            }
+        }
+    }
+
+    private void captureStepArtifactsIfNeeded(
+            TestCaseDefinition definition,
+            Path outputDir,
+            ExecutionContext context,
+            StepExecutionRecord record,
+            String phase,
+            StepArtifactCursor cursor) {
+        if (shouldCaptureStepScreenshot(definition, phase)) {
+            try {
+                ArtifactRef artifact = artifactCollector.captureScreenshot(outputDir, record.getStepId() + "-" + phase, context);
+                record.addArtifact(artifact);
+            } catch (Exception artifactError) {
+                appendArtifactError(record, phase + " step screenshot", artifactError);
+            }
+        }
+        if (shouldCaptureStepDom(definition, phase)) {
+            try {
+                ArtifactRef artifact = artifactCollector.captureDomDump(outputDir, record.getStepId() + "-" + phase + "-dom", context);
+                record.addArtifact(artifact);
+            } catch (Exception artifactError) {
+                appendArtifactError(record, phase + " step DOM dump", artifactError);
+            }
+        }
+        if (shouldCaptureStepConsole(definition, phase)) {
+            try {
+                EventDelta<ConsoleEvent> delta = pageController.consoleEventsSince(context, cursor.consoleCheckpoint);
+                ArtifactRef artifact = artifactCollector.captureConsoleDump(
+                        outputDir,
+                        record.getStepId() + "-" + phase + "-console",
+                        delta.getEvents());
+                cursor.consoleCheckpoint = delta.getCheckpoint();
+                record.addArtifact(artifact);
+            } catch (Exception artifactError) {
+                appendArtifactError(record, phase + " step console dump", artifactError);
+            }
+        }
+        if (shouldCaptureStepNetwork(definition, phase)) {
+            try {
+                EventDelta<NetworkEvent> delta = pageController.networkEventsSince(context, cursor.networkCheckpoint);
+                ArtifactRef artifact = artifactCollector.captureNetworkDump(
+                        outputDir,
+                        record.getStepId() + "-" + phase + "-network",
+                        delta.getEvents());
+                cursor.networkCheckpoint = delta.getCheckpoint();
+                record.addArtifact(artifact);
+            } catch (Exception artifactError) {
+                appendArtifactError(record, phase + " step network dump", artifactError);
+            }
+        }
+    }
+
+    private EventCheckpoint consoleCheckpoint(ExecutionContext context) {
         try {
-            ArtifactRef artifact = artifactCollector.captureScreenshot(outputDir, record.getStepId() + "-failure", context);
-            record.addArtifact(artifact);
-        } catch (Exception artifactError) {
-            String message = record.getMessage() == null ? "" : record.getMessage();
-            record.setMessage(message + " (failed to capture failure screenshot: " + artifactError.getMessage() + ")");
+            return pageController.consoleCheckpoint(context);
+        } catch (Exception e) {
+            return EventCheckpoint.at(0);
         }
+    }
+
+    private EventCheckpoint networkCheckpoint(ExecutionContext context) {
+        try {
+            return pageController.networkCheckpoint(context);
+        } catch (Exception e) {
+            return EventCheckpoint.at(0);
+        }
+    }
+
+    private void appendArtifactError(StepExecutionRecord record, String artifactType, Exception artifactError) {
+        String message = record.getMessage() == null ? "" : record.getMessage();
+        record.setMessage(message + " (failed to capture " + artifactType + ": " + artifactError.getMessage() + ")");
     }
 
     private boolean shouldCaptureFailureScreenshot(TestCaseDefinition definition, StepDefinition step) {
@@ -273,6 +443,90 @@ public class DefaultTestOrchestrator implements TestOrchestrator {
         }
         ReportPolicy reportPolicy = definition.getReportPolicy();
         return reportPolicy == null || reportPolicy.isScreenshotOnFailure();
+    }
+
+    private boolean shouldCaptureFailureDom(TestCaseDefinition definition) {
+        ReportPolicy reportPolicy = definition.getReportPolicy();
+        return reportPolicy == null || reportPolicy.isSaveDomOnFailure();
+    }
+
+    private boolean shouldCaptureFailureConsole(TestCaseDefinition definition) {
+        ReportPolicy reportPolicy = definition.getReportPolicy();
+        return reportPolicy == null || reportPolicy.isSaveConsoleOnFailure();
+    }
+
+    private boolean shouldCaptureFailureNetwork(TestCaseDefinition definition) {
+        ReportPolicy reportPolicy = definition.getReportPolicy();
+        return reportPolicy == null || reportPolicy.isSaveNetworkOnFailure();
+    }
+
+    private boolean shouldCaptureStepScreenshot(TestCaseDefinition definition, String phase) {
+        ReportPolicy reportPolicy = definition.getReportPolicy();
+        if (reportPolicy == null) {
+            return false;
+        }
+        return "before".equals(phase) ? reportPolicy.isScreenshotBeforeStep() : reportPolicy.isScreenshotAfterStep();
+    }
+
+    private boolean shouldCaptureStepDom(TestCaseDefinition definition, String phase) {
+        ReportPolicy reportPolicy = definition.getReportPolicy();
+        if (reportPolicy == null) {
+            return false;
+        }
+        return "before".equals(phase) ? reportPolicy.isSaveDomBeforeStep() : reportPolicy.isSaveDomAfterStep();
+    }
+
+    private boolean shouldCaptureStepConsole(TestCaseDefinition definition, String phase) {
+        ReportPolicy reportPolicy = definition.getReportPolicy();
+        if (reportPolicy == null) {
+            return false;
+        }
+        return "before".equals(phase) ? reportPolicy.isSaveConsoleBeforeStep() : reportPolicy.isSaveConsoleAfterStep();
+    }
+
+    private boolean shouldCaptureStepNetwork(TestCaseDefinition definition, String phase) {
+        ReportPolicy reportPolicy = definition.getReportPolicy();
+        if (reportPolicy == null) {
+            return false;
+        }
+        return "before".equals(phase) ? reportPolicy.isSaveNetworkBeforeStep() : reportPolicy.isSaveNetworkAfterStep();
+    }
+
+    private boolean hasStepConsoleHooks(TestCaseDefinition definition) {
+        ReportPolicy reportPolicy = definition.getReportPolicy();
+        return reportPolicy != null
+                && (reportPolicy.isSaveConsoleBeforeStep() || reportPolicy.isSaveConsoleAfterStep());
+    }
+
+    private boolean hasStepNetworkHooks(TestCaseDefinition definition) {
+        ReportPolicy reportPolicy = definition.getReportPolicy();
+        return reportPolicy != null
+                && (reportPolicy.isSaveNetworkBeforeStep() || reportPolicy.isSaveNetworkAfterStep());
+    }
+
+    private void startArtifactCapture(TestCaseDefinition definition, ExecutionContext context) {
+        if (shouldCaptureFailureConsole(definition) || hasStepConsoleHooks(definition)) {
+            try {
+                pageController.startConsoleCapture(context);
+            } catch (Exception e) {
+                // Artifact collection must not block the primary run.
+            }
+        }
+        if (shouldCaptureFailureNetwork(definition) || hasStepNetworkHooks(definition)) {
+            try {
+                pageController.startNetworkCapture(context);
+            } catch (Exception e) {
+                // Artifact collection must not block the primary run.
+            }
+        }
+    }
+
+    private void cleanupArtifactCapture(ExecutionContext context) {
+        try {
+            pageController.cleanupNetworkBodySpools(context);
+        } catch (Exception e) {
+            // Artifact cleanup must not mask the run result or the original failure.
+        }
     }
 
     private boolean shouldStopAfterFailure(StepDefinition step, RunOptions options) {
@@ -308,7 +562,8 @@ public class DefaultTestOrchestrator implements TestOrchestrator {
                 new AssertTextHandler(elementResolver, pageController),
                 new AssertValueHandler(elementResolver, pageController),
                 new AssertAttrHandler(elementResolver, pageController),
-                new AssertVisibleHandler(elementResolver)));
+                new AssertVisibleHandler(elementResolver),
+                new AssertEnabledHandler(elementResolver)));
     }
 
     private String stepId(StepDefinition step, int index) {
@@ -316,5 +571,15 @@ public class DefaultTestOrchestrator implements TestOrchestrator {
             return step.getId();
         }
         return "step-" + (index + 1);
+    }
+
+    private static final class StepArtifactCursor {
+        private EventCheckpoint consoleCheckpoint;
+        private EventCheckpoint networkCheckpoint;
+
+        private StepArtifactCursor(EventCheckpoint consoleCheckpoint, EventCheckpoint networkCheckpoint) {
+            this.consoleCheckpoint = consoleCheckpoint;
+            this.networkCheckpoint = networkCheckpoint;
+        }
     }
 }

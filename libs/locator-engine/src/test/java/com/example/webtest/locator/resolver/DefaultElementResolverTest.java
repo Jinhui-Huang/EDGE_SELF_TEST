@@ -25,6 +25,7 @@ class DefaultElementResolverTest {
 
         assertTrue(result.isFound());
         assertTrue(result.isUnique());
+        assertTrue(result.isEnabled());
         assertTrue(result.isActionable());
         assertEquals("css:#submit:0", pageController.calls.get(0));
     }
@@ -67,6 +68,7 @@ class DefaultElementResolverTest {
             state.setFound(true);
             state.setCount(1);
             state.setVisible(true);
+            state.setEnabled(true);
             state.setActionable(true);
             return state;
         }

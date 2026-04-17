@@ -1,10 +1,13 @@
 id: core-platform-dsl-smoke
 name: Core platform DSL smoke
+reportPolicy:
+  retentionCleanupOnRun: true
+  retentionKeepLatest: 20
 steps:
   - id: open-smoke-page
     name: Open smoke page
     action: goto
-    url: "data:text/html;charset=utf-8;base64,PCFkb2N0eXBlIGh0bWw+CjxodG1sPgo8aGVhZD48dGl0bGU+RWRnZSBTZWxmIFRlc3QgRFNMIFNtb2tlPC90aXRsZT48L2hlYWQ+Cjxib2R5Pgo8bWFpbj4KPGgxIGlkPSJoZWFkbGluZSI+RWRnZSBTZWxmIFRlc3QgRFNMIFNtb2tlPC9oMT4KPGlucHV0IGlkPSJzZWFyY2giIGFyaWEtbGFiZWw9IlNlYXJjaCIgLz4KPGRpdiBpZD0iaGlkZGVuLXBhbmVsIiBzdHlsZT0iZGlzcGxheTpub25lIj5IaWRkZW48L2Rpdj4KPGJ1dHRvbiBpZD0ic3VibWl0IiBvbmNsaWNrPSJkb2N1bWVudC50aXRsZT0nQ2xpY2tlZDogJytkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnc2VhcmNoJykudmFsdWUiPlN1Ym1pdDwvYnV0dG9uPgo8L21haW4+CjwvYm9keT4KPC9odG1sPg=="
+    url: "data:text/html;charset=utf-8;base64,PCFkb2N0eXBlIGh0bWw+CjxodG1sPgo8aGVhZD48dGl0bGU+RWRnZSBTZWxmIFRlc3QgRFNMIFNtb2tlPC90aXRsZT48L2hlYWQ+Cjxib2R5Pgo8bWFpbj4KPGgxIGlkPSJoZWFkbGluZSI+RWRnZSBTZWxmIFRlc3QgRFNMIFNtb2tlPC9oMT4KPGlucHV0IGlkPSJzZWFyY2giIGFyaWEtbGFiZWw9IlNlYXJjaCIgLz4KPGlucHV0IGlkPSJkaXNhYmxlZC1maWVsZCIgZGlzYWJsZWQgdmFsdWU9ImxvY2tlZCIgLz4KPGRpdiBpZD0iaGlkZGVuLXBhbmVsIiBzdHlsZT0iZGlzcGxheTpub25lIj5IaWRkZW48L2Rpdj4KPGJ1dHRvbiBpZD0ic3VibWl0IiBvbmNsaWNrPSJkb2N1bWVudC50aXRsZT0nQ2xpY2tlZDogJytkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnc2VhcmNoJykudmFsdWUiPlN1Ym1pdDwvYnV0dG9uPgo8L21haW4+CjwvYm9keT4KPC9odG1sPg=="
   - id: assert-title
     name: Assert title
     action: assert_title
@@ -13,7 +16,7 @@ steps:
     name: Wait for smoke page URL
     action: wait_for_url
     timeoutMs: 3000
-    expected: "data:text/html;charset=utf-8;base64,PCFkb2N0eXBlIGh0bWw+CjxodG1sPgo8aGVhZD48dGl0bGU+RWRnZSBTZWxmIFRlc3QgRFNMIFNtb2tlPC90aXRsZT48L2hlYWQ+Cjxib2R5Pgo8bWFpbj4KPGgxIGlkPSJoZWFkbGluZSI+RWRnZSBTZWxmIFRlc3QgRFNMIFNtb2tlPC9oMT4KPGlucHV0IGlkPSJzZWFyY2giIGFyaWEtbGFiZWw9IlNlYXJjaCIgLz4KPGRpdiBpZD0iaGlkZGVuLXBhbmVsIiBzdHlsZT0iZGlzcGxheTpub25lIj5IaWRkZW48L2Rpdj4KPGJ1dHRvbiBpZD0ic3VibWl0IiBvbmNsaWNrPSJkb2N1bWVudC50aXRsZT0nQ2xpY2tlZDogJytkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnc2VhcmNoJykudmFsdWUiPlN1Ym1pdDwvYnV0dG9uPgo8L21haW4+CjwvYm9keT4KPC9odG1sPg=="
+    expected: "data:text/html;charset=utf-8;base64,PCFkb2N0eXBlIGh0bWw+CjxodG1sPgo8aGVhZD48dGl0bGU+RWRnZSBTZWxmIFRlc3QgRFNMIFNtb2tlPC90aXRsZT48L2hlYWQ+Cjxib2R5Pgo8bWFpbj4KPGgxIGlkPSJoZWFkbGluZSI+RWRnZSBTZWxmIFRlc3QgRFNMIFNtb2tlPC9oMT4KPGlucHV0IGlkPSJzZWFyY2giIGFyaWEtbGFiZWw9IlNlYXJjaCIgLz4KPGlucHV0IGlkPSJkaXNhYmxlZC1maWVsZCIgZGlzYWJsZWQgdmFsdWU9ImxvY2tlZCIgLz4KPGRpdiBpZD0iaGlkZGVuLXBhbmVsIiBzdHlsZT0iZGlzcGxheTpub25lIj5IaWRkZW48L2Rpdj4KPGJ1dHRvbiBpZD0ic3VibWl0IiBvbmNsaWNrPSJkb2N1bWVudC50aXRsZT0nQ2xpY2tlZDogJytkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnc2VhcmNoJykudmFsdWUiPlN1Ym1pdDwvYnV0dG9uPgo8L21haW4+CjwvYm9keT4KPC9odG1sPg=="
   - id: assert-headline-visible
     name: Assert headline visible
     action: assert_visible
@@ -34,6 +37,18 @@ steps:
     target:
       by: css
       value: "#search"
+  - id: assert-search-enabled
+    name: Assert search input enabled
+    action: assert_enabled
+    target:
+      by: css
+      value: "#search"
+  - id: assert-disabled-field
+    name: Assert disabled field disabled
+    action: assert_disabled
+    target:
+      by: css
+      value: "#disabled-field"
   - id: wait-absent
     name: Wait for hidden panel
     action: wait_for_hidden

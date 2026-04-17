@@ -6,6 +6,7 @@ public class ResolveResult {
     private boolean found;
     private boolean unique;
     private boolean visible;
+    private boolean enabled;
     private boolean actionable;
     private String by;
     private String value;
@@ -39,6 +40,14 @@ public class ResolveResult {
 
     public boolean isActionable() {
         return actionable;
+    }
+
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
     }
 
     public void setActionable(boolean actionable) {

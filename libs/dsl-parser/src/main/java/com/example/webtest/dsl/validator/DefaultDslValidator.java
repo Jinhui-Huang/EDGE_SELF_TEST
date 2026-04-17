@@ -3,6 +3,7 @@ package com.example.webtest.dsl.validator;
 import com.example.webtest.common.exception.BaseException;
 import com.example.webtest.common.exception.ErrorCodes;
 import com.example.webtest.dsl.model.ActionType;
+import com.example.webtest.dsl.model.ReportPolicy;
 import com.example.webtest.dsl.model.StepDefinition;
 import com.example.webtest.dsl.model.TestCaseDefinition;
 
@@ -15,9 +16,56 @@ public class DefaultDslValidator implements DslValidator {
         if (definition.getSteps() == null || definition.getSteps().isEmpty()) {
             throw new BaseException(ErrorCodes.DSL_VALIDATION_FAILED, "Steps must not be empty");
         }
+        validateReportPolicy(definition.getReportPolicy());
 
         for (StepDefinition step : definition.getSteps()) {
             validateStep(step);
+        }
+    }
+
+    private void validateReportPolicy(ReportPolicy reportPolicy) {
+        if (reportPolicy == null) {
+            return;
+        }
+        Integer keepLatest = reportPolicy.getRetentionKeepLatest();
+        if (keepLatest != null && keepLatest < 1) {
+            throw new BaseException(
+                    ErrorCodes.DSL_VALIDATION_FAILED,
+                    "reportPolicy.retentionKeepLatest must be greater than or equal to 1");
+        }
+        Integer olderThanDays = reportPolicy.getRetentionOlderThanDays();
+        if (olderThanDays != null && olderThanDays < 0) {
+            throw new BaseException(
+                    ErrorCodes.DSL_VALIDATION_FAILED,
+                    "reportPolicy.retentionOlderThanDays must be greater than or equal to 0");
+        }
+        Long maxTotalMb = reportPolicy.getRetentionMaxTotalMb();
+        if (maxTotalMb != null && maxTotalMb < 0) {
+            throw new BaseException(
+                    ErrorCodes.DSL_VALIDATION_FAILED,
+                    "reportPolicy.retentionMaxTotalMb must be greater than or equal to 0");
+        }
+        for (String status : reportPolicy.getRetentionDeleteStatuses()) {
+            String normalizedStatus = status == null ? "" : status.trim().toUpperCase();
+            if (!"OK".equals(normalizedStatus) && !"FAILED".equals(normalizedStatus)) {
+                throw new BaseException(
+                        ErrorCodes.DSL_VALIDATION_FAILED,
+                        "reportPolicy.retentionDeleteStatuses supports only OK or FAILED");
+            }
+        }
+        if (reportPolicy.isRetentionCleanupOnRun()
+                && keepLatest == null
+                && olderThanDays == null
+                && maxTotalMb == null
+                && reportPolicy.getRetentionDeleteStatuses().isEmpty()) {
+            throw new BaseException(
+                    ErrorCodes.DSL_VALIDATION_FAILED,
+                    "reportPolicy retention cleanup requires retentionKeepLatest, retentionOlderThanDays, retentionMaxTotalMb, or retentionDeleteStatuses");
+        }
+        if (reportPolicy.isRetentionPruneArtifactsOnly() && !reportPolicy.isRetentionCleanupOnRun()) {
+            throw new BaseException(
+                    ErrorCodes.DSL_VALIDATION_FAILED,
+                    "reportPolicy.retentionPruneArtifactsOnly requires retentionCleanupOnRun");
         }
     }
 
@@ -72,6 +120,10 @@ public class DefaultDslValidator implements DslValidator {
         if ((step.getAction() == ActionType.ASSERT_VISIBLE || step.getAction() == ActionType.ASSERT_NOT_VISIBLE)
                 && step.getTarget() == null) {
             throw new BaseException(ErrorCodes.DSL_VALIDATION_FAILED, "Target is required for visibility assertion");
+        }
+        if ((step.getAction() == ActionType.ASSERT_ENABLED || step.getAction() == ActionType.ASSERT_DISABLED)
+                && step.getTarget() == null) {
+            throw new BaseException(ErrorCodes.DSL_VALIDATION_FAILED, "Target is required for enabled assertion");
         }
     }
 

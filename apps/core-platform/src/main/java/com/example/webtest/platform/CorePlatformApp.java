@@ -19,12 +19,19 @@ import com.example.webtest.execution.engine.result.RunStatus;
 import com.example.webtest.execution.engine.result.StepExecutionRecord;
 import com.example.webtest.execution.engine.service.DefaultDslRunService;
 import com.example.webtest.execution.engine.service.DslRunService;
+import com.example.webtest.report.engine.DefaultReportEngine;
+import com.example.webtest.report.engine.ReportCleanupOptions;
+import com.example.webtest.report.engine.ReportCleanupResult;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Base64;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -33,6 +40,10 @@ public final class CorePlatformApp {
     }
 
     public static void main(String[] args) throws Exception {
+        if (args.length > 0 && "report-cleanup".equals(args[0])) {
+            runReportCleanup(args);
+            return;
+        }
         if (args.length > 0 && "dsl-smoke".equals(args[0])) {
             Path dslPath = args.length > 1
                     ? Path.of(args[1])
@@ -41,6 +52,107 @@ public final class CorePlatformApp {
             return;
         }
         runRawSmoke();
+    }
+
+    private static void runReportCleanup(String[] args) {
+        Path reportRoot = workspaceRoot().resolve("runs");
+        ReportCleanupOptions options = new ReportCleanupOptions();
+        options.setKeepLatest(20);
+        options.setDryRun(true);
+
+        for (int index = 1; index < args.length; index++) {
+            String arg = args[index];
+            if ("--help".equals(arg) || "-h".equals(arg)) {
+                printReportCleanupUsage();
+                return;
+            } else if ("--apply".equals(arg)) {
+                options.setDryRun(false);
+            } else if ("--dry-run".equals(arg)) {
+                options.setDryRun(true);
+            } else if ("--keep-latest".equals(arg)) {
+                options.setKeepLatest(Integer.parseInt(requiredValue(args, ++index, arg)));
+            } else if (arg.startsWith("--keep-latest=")) {
+                options.setKeepLatest(Integer.parseInt(arg.substring("--keep-latest=".length())));
+            } else if ("--older-than-days".equals(arg)) {
+                options.setDeleteFinishedBefore(daysCutoff(requiredValue(args, ++index, arg)));
+            } else if (arg.startsWith("--older-than-days=")) {
+                options.setDeleteFinishedBefore(daysCutoff(arg.substring("--older-than-days=".length())));
+            } else if ("--status".equals(arg)) {
+                addCleanupStatuses(options, requiredValue(args, ++index, arg));
+            } else if (arg.startsWith("--status=")) {
+                addCleanupStatuses(options, arg.substring("--status=".length()));
+            } else if ("--max-total-mb".equals(arg)) {
+                options.setMaxTotalBytes(megabytes(requiredValue(args, ++index, arg), arg));
+            } else if (arg.startsWith("--max-total-mb=")) {
+                options.setMaxTotalBytes(megabytes(arg.substring("--max-total-mb=".length()), "--max-total-mb"));
+            } else if ("--prune-artifacts-only".equals(arg)) {
+                options.setPruneArtifactsOnly(true);
+            } else if (!arg.startsWith("--")) {
+                reportRoot = Path.of(arg);
+            } else {
+                throw new IllegalArgumentException("Unknown report-cleanup option: " + arg);
+            }
+        }
+
+        ReportCleanupResult result = new DefaultReportEngine().cleanupReportRuns(reportRoot, options);
+        System.out.println("Report cleanup root: " + result.reportRoot());
+        System.out.println("Mode: " + (result.dryRun() ? "dry-run" : "apply"));
+        System.out.println("Scanned runs: " + result.scannedRuns());
+        System.out.println("Kept runs: " + result.keptRuns());
+        System.out.println("Delete statuses: " + (options.getDeleteStatuses().isEmpty() ? "(none)" : options.getDeleteStatuses()));
+        System.out.println("Max total MB: " + (options.getMaxTotalBytes() == null ? "(none)" : options.getMaxTotalBytes() / 1024L / 1024L));
+        System.out.println("Prune artifacts only: " + options.isPruneArtifactsOnly());
+        System.out.println((result.dryRun() ? "Would delete" : "Deleted") + " runs: "
+                + result.deletedRunDirectories().size());
+        for (Path directory : result.deletedRunDirectories()) {
+            System.out.println(directory);
+        }
+        System.out.println((result.dryRun() ? "Would delete" : "Deleted") + " artifacts: "
+                + result.deletedArtifactPaths().size());
+        for (Path artifact : result.deletedArtifactPaths()) {
+            System.out.println(artifact);
+        }
+    }
+
+    private static void printReportCleanupUsage() {
+        System.out.println("""
+                Usage: report-cleanup [reportRoot] [--keep-latest N] [--older-than-days N] [--status OK|FAILED[,..]] [--max-total-mb N] [--prune-artifacts-only] [--apply|--dry-run]
+                Defaults: reportRoot=./runs, keepLatest=20, dry-run.
+                """);
+    }
+
+    private static String requiredValue(String[] args, int index, String option) {
+        if (index >= args.length) {
+            throw new IllegalArgumentException("Missing value for " + option);
+        }
+        return args[index];
+    }
+
+    private static Instant daysCutoff(String value) {
+        long days = Long.parseLong(value);
+        if (days < 0) {
+            throw new IllegalArgumentException("--older-than-days must be greater than or equal to 0");
+        }
+        return Instant.now().minus(Duration.ofDays(days));
+    }
+
+    private static long megabytes(String value, String option) {
+        long megabytes = Long.parseLong(value);
+        if (megabytes < 0) {
+            throw new IllegalArgumentException(option + " must be greater than or equal to 0");
+        }
+        return megabytes * 1024L * 1024L;
+    }
+
+    private static void addCleanupStatuses(ReportCleanupOptions options, String value) {
+        Set<String> statuses = new LinkedHashSet<>(options.getDeleteStatuses());
+        for (String status : value.split(",")) {
+            String normalized = status.trim();
+            if (!normalized.isBlank()) {
+                statuses.add(normalized);
+            }
+        }
+        options.setDeleteStatuses(statuses);
     }
 
     private static void runRawSmoke() throws Exception {

@@ -2,12 +2,15 @@ package com.example.webtest.artifact.model;
 
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 
 public class ArtifactRef {
     private String type;
     private Path path;
     private String contentType;
     private Instant createdAt;
+    private List<ArtifactRef> relatedArtifacts = new ArrayList<>();
 
     public String getType() {
         return type;
@@ -39,5 +42,19 @@ public class ArtifactRef {
 
     public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public List<ArtifactRef> getRelatedArtifacts() {
+        return relatedArtifacts;
+    }
+
+    public void setRelatedArtifacts(List<ArtifactRef> relatedArtifacts) {
+        this.relatedArtifacts = relatedArtifacts == null ? new ArrayList<>() : new ArrayList<>(relatedArtifacts);
+    }
+
+    public void addRelatedArtifact(ArtifactRef artifact) {
+        if (artifact != null) {
+            relatedArtifacts.add(artifact);
+        }
     }
 }

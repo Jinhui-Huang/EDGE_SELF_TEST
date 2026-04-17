@@ -17,4 +17,6 @@ public interface ReportEngine {
             Instant runStartedAt,
             Instant runFinishedAt,
             List<ReportStepRecord> stepRecords);
+
+    ReportCleanupResult cleanupReportRuns(Path reportRoot, ReportCleanupOptions options);
 }

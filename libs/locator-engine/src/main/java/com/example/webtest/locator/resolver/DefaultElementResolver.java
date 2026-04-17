@@ -47,6 +47,7 @@ public class DefaultElementResolver implements ElementResolver {
         result.setFound(safeState.isFound());
         result.setUnique(safeState.getCount() == 1);
         result.setVisible(safeState.isVisible());
+        result.setEnabled(safeState.isEnabled());
         result.setActionable(safeState.isActionable());
         result.setBy(candidate.by());
         result.setValue(candidate.value());
