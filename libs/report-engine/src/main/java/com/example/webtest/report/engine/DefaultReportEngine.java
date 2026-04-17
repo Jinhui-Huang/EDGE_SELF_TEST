@@ -127,6 +127,84 @@ public class DefaultReportEngine implements ReportEngine {
         }
     }
 
+    @Override
+    public ReportStorageDiagnosticsResult diagnoseReportStorage(Path reportRoot) {
+        if (reportRoot == null) {
+            throw new BaseException(ErrorCodes.REPORT_GENERATION_FAILED, "Report root is required for diagnostics");
+        }
+        Path normalizedReportRoot = reportRoot.toAbsolutePath().normalize();
+        if (!Files.isDirectory(normalizedReportRoot)) {
+            throw new BaseException(
+                    ErrorCodes.REPORT_GENERATION_FAILED,
+                    "Report root does not exist or is not a directory: " + normalizedReportRoot);
+        }
+        try {
+            List<ReportIndexEntry> entries = reportIndexEntries(normalizedReportRoot, null, null);
+            List<ReportStorageDiagnosticsResult.RunStorageSummary> runs = new ArrayList<>();
+            Map<String, ArtifactTypeTotals> artifactTypeTotals = new LinkedHashMap<>();
+            long totalRunBytes = 0L;
+            long referencedArtifactBytes = 0L;
+            int referencedArtifactCount = 0;
+            int missingArtifactCount = 0;
+            int prunedArtifactCount = 0;
+            for (ReportIndexEntry entry : entries) {
+                Map<String, Object> report = readReportJson(entry.directory().resolve("report.json"));
+                List<ArtifactDiagnostic> artifacts = report == null
+                        ? List.of()
+                        : artifactDiagnostics(entry.directory(), report);
+                long runArtifactBytes = 0L;
+                int runMissingArtifacts = 0;
+                int runPrunedArtifacts = 0;
+                for (ArtifactDiagnostic artifact : artifacts) {
+                    runArtifactBytes = saturatedAdd(runArtifactBytes, artifact.bytes());
+                    if (artifact.missing()) {
+                        runMissingArtifacts++;
+                    }
+                    if (artifact.pruned()) {
+                        runPrunedArtifacts++;
+                    }
+                    artifactTypeTotals
+                            .computeIfAbsent(artifact.type(), ignored -> new ArtifactTypeTotals())
+                            .add(artifact);
+                }
+                totalRunBytes = saturatedAdd(totalRunBytes, entry.sizeBytes());
+                referencedArtifactBytes = saturatedAdd(referencedArtifactBytes, runArtifactBytes);
+                referencedArtifactCount += artifacts.size();
+                missingArtifactCount += runMissingArtifacts;
+                prunedArtifactCount += runPrunedArtifacts;
+                runs.add(new ReportStorageDiagnosticsResult.RunStorageSummary(
+                        entry.runId(),
+                        entry.directory(),
+                        entry.status(),
+                        entry.finishedAt(),
+                        entry.sizeBytes(),
+                        runArtifactBytes,
+                        artifacts.size(),
+                        runMissingArtifacts,
+                        runPrunedArtifacts));
+            }
+            List<ReportStorageDiagnosticsResult.ArtifactTypeSummary> artifactTypes = artifactTypeTotals.entrySet()
+                    .stream()
+                    .map(entry -> entry.getValue().summary(entry.getKey()))
+                    .toList();
+            return new ReportStorageDiagnosticsResult(
+                    normalizedReportRoot,
+                    entries.size(),
+                    totalRunBytes,
+                    referencedArtifactBytes,
+                    referencedArtifactCount,
+                    missingArtifactCount,
+                    prunedArtifactCount,
+                    List.copyOf(artifactTypes),
+                    List.copyOf(runs));
+        } catch (IOException e) {
+            throw new BaseException(
+                    ErrorCodes.REPORT_GENERATION_FAILED,
+                    "Failed to diagnose report storage under: " + normalizedReportRoot,
+                    e);
+        }
+    }
+
     private Map<String, Object> report(
             ExecutionContext context,
             Path outputDir,
@@ -413,6 +491,10 @@ public class DefaultReportEngine implements ReportEngine {
     }
 
     private long saturatedAdd(long left, long right) {
+        return saturatedAddStatic(left, right);
+    }
+
+    private static long saturatedAddStatic(long left, long right) {
         long result = left + right;
         if (((left ^ result) & (right ^ result)) < 0) {
             return Long.MAX_VALUE;
@@ -591,6 +673,71 @@ public class DefaultReportEngine implements ReportEngine {
             }
         }
         return List.copyOf(paths);
+    }
+
+    private List<ArtifactDiagnostic> artifactDiagnostics(Path runDirectory, Map<String, Object> report)
+            throws IOException {
+        Map<Path, ArtifactDiagnostic> artifacts = new LinkedHashMap<>();
+        Path normalizedRunDirectory = runDirectory.toAbsolutePath().normalize();
+        for (Object value : list(report.get("steps"))) {
+            Map<?, ?> step = map(value);
+            addArtifactDiagnostic(
+                    artifacts,
+                    normalizedRunDirectory,
+                    step.get("artifactPath"),
+                    "legacy",
+                    booleanValue(step.get("artifactPruned")));
+            for (Object artifactValue : list(step.get("artifacts"))) {
+                Map<?, ?> artifact = map(artifactValue);
+                addArtifactDiagnostic(
+                        artifacts,
+                        normalizedRunDirectory,
+                        artifact.get("path"),
+                        text(artifact.get("type")),
+                        booleanValue(artifact.get("pruned")));
+            }
+        }
+        return List.copyOf(artifacts.values());
+    }
+
+    private void addArtifactDiagnostic(
+            Map<Path, ArtifactDiagnostic> artifacts,
+            Path runDirectory,
+            Object value,
+            String type,
+            boolean pruned) throws IOException {
+        Path normalized = normalizedArtifactPath(runDirectory, value);
+        if (normalized == null
+                || !normalized.startsWith(runDirectory)
+                || normalized.equals(runDirectory.resolve("report.json"))
+                || normalized.equals(runDirectory.resolve("report.html"))) {
+            return;
+        }
+        String safeType = type == null || type.isBlank() ? "unknown" : type;
+        boolean exists = Files.exists(normalized);
+        long bytes = 0L;
+        if (exists) {
+            bytes = Files.isDirectory(normalized) ? directorySize(normalized) : Files.size(normalized);
+        }
+        ArtifactDiagnostic previous = artifacts.get(normalized);
+        if (previous != null) {
+            String mergedType = "legacy".equals(previous.type()) && !"legacy".equals(safeType)
+                    ? safeType
+                    : previous.type();
+            artifacts.put(normalized, new ArtifactDiagnostic(
+                    mergedType,
+                    normalized,
+                    bytes,
+                    !exists && !(previous.pruned() || pruned),
+                    previous.pruned() || pruned));
+            return;
+        }
+        artifacts.put(normalized, new ArtifactDiagnostic(
+                safeType,
+                normalized,
+                bytes,
+                !exists && !pruned,
+                pruned));
     }
 
     private void addArtifactPath(Set<Path> paths, Path runDirectory, Object value) {
@@ -887,6 +1034,7 @@ public class DefaultReportEngine implements ReportEngine {
                   <code>report-cleanup runs --dry-run --keep-latest 20</code>
                   <code>report-cleanup runs --dry-run --keep-latest 20 --prune-artifacts-only</code>
                   <code>report-maintenance runs --mark-missing-artifacts --dry-run</code>
+                  <code>report-diagnostics runs</code>
                 </div>
                 <div class="meta">Keyboard: / search, f first failed, n next failed, p previous failed.</div>
                 """.formatted(entries.size(), failedRuns, okRuns);
@@ -1180,6 +1328,41 @@ public class DefaultReportEngine implements ReportEngine {
     }
 
     private record CleanupOutcome(List<Path> deletedRunDirectories, List<Path> deletedArtifactPaths) {
+    }
+
+    private record ArtifactDiagnostic(
+            String type,
+            Path path,
+            long bytes,
+            boolean missing,
+            boolean pruned) {
+    }
+
+    private static final class ArtifactTypeTotals {
+        private int count;
+        private int missingCount;
+        private int prunedCount;
+        private long bytes;
+
+        private void add(ArtifactDiagnostic artifact) {
+            count++;
+            if (artifact.missing()) {
+                missingCount++;
+            }
+            if (artifact.pruned()) {
+                prunedCount++;
+            }
+            bytes = saturatedAddStatic(bytes, artifact.bytes());
+        }
+
+        private ReportStorageDiagnosticsResult.ArtifactTypeSummary summary(String type) {
+            return new ReportStorageDiagnosticsResult.ArtifactTypeSummary(
+                    type,
+                    count,
+                    missingCount,
+                    prunedCount,
+                    bytes);
+        }
     }
 
     private String rowClass(String status, Long durationMs, Long slowestDurationMs) {

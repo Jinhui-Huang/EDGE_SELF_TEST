@@ -2763,3 +2763,48 @@
 ## Next Step
 - Prefer adding report storage diagnostics such as artifact totals by type/run.
 - Alternative: expose the network body spool grace period through DSL/run options if runtime scenario-level control becomes necessary.
+
+## 2026-04-17 report storage diagnostics record
+
+## Task
+- Continued after configurable network body spool cleanup by adding read-only report storage diagnostics for run and artifact usage.
+
+## Completed
+- Added `ReportStorageDiagnosticsResult`.
+- Extended `ReportEngine` with `diagnoseReportStorage(reportRoot)`.
+- `DefaultReportEngine` now scans first-level report run directories and reports:
+  - total run directory bytes.
+  - referenced artifact bytes.
+  - referenced artifact count.
+  - missing unmarked artifact count.
+  - pruned artifact count.
+  - artifact totals by type.
+  - per-run storage summaries with status, finished time, run bytes, artifact bytes, missing count, and pruned count.
+- Artifact diagnostics de-duplicate paths per run and reuse the existing report-root/run-directory safety boundary.
+- Added `core-platform report-diagnostics [reportRoot]`.
+- Added the diagnostics command to the report index maintenance note.
+
+## Modified Files
+- `apps/core-platform/src/main/java/com/example/webtest/platform/CorePlatformApp.java`
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/ReportEngine.java`
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/ReportStorageDiagnosticsResult.java`
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/DefaultReportEngine.java`
+- `libs/report-engine/src/test/java/com/example/webtest/report/engine/DefaultReportEngineTest.java`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,apps/core-platform -am test -q`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+- Passed from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=report-diagnostics --help"`
+- Passed from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=report-diagnostics ..\..\runs"`; output scanned 1 run, 29217 total run bytes, 9296 referenced artifact bytes, 1 screenshot artifact, 0 missing, 0 pruned.
+
+## Known Gaps
+- Diagnostics are CLI/API only and are not yet rendered as a report-index storage panel.
+- Diagnostics count only report-referenced artifacts; unreferenced files under a run directory are included in run bytes but not artifact totals.
+- Artifact byte accounting can include existing files marked pruned if a report is inconsistent with disk state.
+
+## Next Step
+- Prefer rendering storage diagnostics in `runs/index.html` so report size/artifact totals are visible without running CLI.
+- Alternative: expose the network body spool grace period through DSL/run options if scenario-level runtime control becomes necessary.

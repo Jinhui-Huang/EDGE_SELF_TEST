@@ -23,6 +23,7 @@ import com.example.webtest.report.engine.DefaultReportEngine;
 import com.example.webtest.report.engine.ReportCleanupOptions;
 import com.example.webtest.report.engine.ReportCleanupResult;
 import com.example.webtest.report.engine.ReportMaintenanceResult;
+import com.example.webtest.report.engine.ReportStorageDiagnosticsResult;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -47,6 +48,10 @@ public final class CorePlatformApp {
         }
         if (args.length > 0 && "report-maintenance".equals(args[0])) {
             runReportMaintenance(args);
+            return;
+        }
+        if (args.length > 0 && "report-diagnostics".equals(args[0])) {
+            runReportDiagnostics(args);
             return;
         }
         if (args.length > 0 && "dsl-smoke".equals(args[0])) {
@@ -169,6 +174,57 @@ public final class CorePlatformApp {
         System.out.println("""
                 Usage: report-maintenance [reportRoot] --mark-missing-artifacts [--apply|--dry-run]
                 Defaults: reportRoot=./runs, dry-run.
+                """);
+    }
+
+    private static void runReportDiagnostics(String[] args) {
+        Path reportRoot = workspaceRoot().resolve("runs");
+
+        for (int index = 1; index < args.length; index++) {
+            String arg = args[index];
+            if ("--help".equals(arg) || "-h".equals(arg)) {
+                printReportDiagnosticsUsage();
+                return;
+            } else if (!arg.startsWith("--")) {
+                reportRoot = Path.of(arg);
+            } else {
+                throw new IllegalArgumentException("Unknown report-diagnostics option: " + arg);
+            }
+        }
+
+        ReportStorageDiagnosticsResult result = new DefaultReportEngine().diagnoseReportStorage(reportRoot);
+        System.out.println("Report diagnostics root: " + result.reportRoot());
+        System.out.println("Scanned runs: " + result.scannedRuns());
+        System.out.println("Total run bytes: " + result.totalRunBytes());
+        System.out.println("Referenced artifact bytes: " + result.referencedArtifactBytes());
+        System.out.println("Referenced artifacts: " + result.referencedArtifactCount());
+        System.out.println("Missing artifacts: " + result.missingArtifactCount());
+        System.out.println("Pruned artifacts: " + result.prunedArtifactCount());
+        System.out.println("Artifact types:");
+        for (ReportStorageDiagnosticsResult.ArtifactTypeSummary type : result.artifactTypes()) {
+            System.out.println("  " + type.type()
+                    + " count=" + type.count()
+                    + " bytes=" + type.bytes()
+                    + " missing=" + type.missingCount()
+                    + " pruned=" + type.prunedCount());
+        }
+        System.out.println("Runs:");
+        for (ReportStorageDiagnosticsResult.RunStorageSummary run : result.runs()) {
+            System.out.println("  " + run.runId()
+                    + " status=" + run.status()
+                    + " runBytes=" + run.runBytes()
+                    + " artifactBytes=" + run.referencedArtifactBytes()
+                    + " artifacts=" + run.referencedArtifactCount()
+                    + " missing=" + run.missingArtifactCount()
+                    + " pruned=" + run.prunedArtifactCount()
+                    + " dir=" + run.directory());
+        }
+    }
+
+    private static void printReportDiagnosticsUsage() {
+        System.out.println("""
+                Usage: report-diagnostics [reportRoot]
+                Defaults: reportRoot=./runs.
                 """);
     }
 

@@ -21,4 +21,6 @@ public interface ReportEngine {
     ReportCleanupResult cleanupReportRuns(Path reportRoot, ReportCleanupOptions options);
 
     ReportMaintenanceResult markMissingArtifactsPruned(Path reportRoot, boolean dryRun);
+
+    ReportStorageDiagnosticsResult diagnoseReportStorage(Path reportRoot);
 }

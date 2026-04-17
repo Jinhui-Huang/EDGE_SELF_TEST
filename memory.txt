@@ -848,3 +848,26 @@ Hand-off note - 2026-04-17:
   7. `git diff --check` (line-ending warnings only)
 - Known gaps: the setting is not exposed as DSL or CLI configuration; cleanup still targets only `webtest-network-body-*.tmp` files; CDP may still allocate large bodies before spooling.
 - Next recommended step: add report storage diagnostics such as artifact totals by type/run. Alternative: expose this grace period through DSL/run options if scenario-level runtime control becomes necessary.
+
+Hand-off note - 2026-04-17:
+- Continued after configurable network body spool cleanup by adding read-only report storage diagnostics.
+- Added `ReportStorageDiagnosticsResult` and `ReportEngine.diagnoseReportStorage(reportRoot)`.
+- `DefaultReportEngine.diagnoseReportStorage(...)` scans first-level run directories, reads `report.json`, de-duplicates referenced artifact paths per run, and returns:
+  1. total run directory bytes,
+  2. referenced artifact bytes,
+  3. referenced artifact count,
+  4. missing unmarked artifact count,
+  5. pruned artifact count,
+  6. artifact totals by type,
+  7. per-run storage summaries.
+- Added `core-platform report-diagnostics [reportRoot]`; default root remains `runs`.
+- `runs/index.html` generation now includes `report-diagnostics runs` in the static maintenance command note.
+- Added `DefaultReportEngineTest.diagnoseReportStorageSummarizesArtifactsByRunAndType`.
+- Verified:
+  1. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,apps/core-platform -am test -q`
+  2. `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+  3. `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+  4. from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=report-diagnostics --help"`
+  5. from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=report-diagnostics ..\..\runs"`; output scanned 1 run, 29217 total run bytes, 9296 referenced artifact bytes, 1 screenshot artifact, 0 missing, 0 pruned.
+- Known gaps: diagnostics are CLI/API only; unreferenced files are counted in run bytes but not artifact totals; inconsistent reports can still mark an existing file as pruned.
+- Next recommended step: render storage diagnostics in `runs/index.html` so report size/artifact totals are visible without CLI. Alternative: expose the network body spool grace period through DSL/run options if scenario-level runtime control becomes necessary.

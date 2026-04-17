@@ -166,6 +166,7 @@ class DefaultReportEngineTest {
         assertTrue(index.contains("<code>report-cleanup runs --dry-run --keep-latest 20</code>"));
         assertTrue(index.contains("<code>report-cleanup runs --dry-run --keep-latest 20 --prune-artifacts-only</code>"));
         assertTrue(index.contains("<code>report-maintenance runs --mark-missing-artifacts --dry-run</code>"));
+        assertTrue(index.contains("<code>report-diagnostics runs</code>"));
         assertTrue(index.contains("<div class=\"meta\">Keyboard: / search, f first failed, n next failed, p previous failed.</div>"));
         assertTrue(index.contains("<tr id=\"run-1\" data-index=\"0\" data-status=\"FAILED\""));
         assertTrue(index.contains("data-started=\"2026-04-17T00:00:00Z\" data-finished=\"2026-04-17T00:00:05Z\""));
@@ -455,6 +456,62 @@ class DefaultReportEngineTest {
         assertEquals(1, result.markedArtifactPaths().size());
         assertTrue(result.dryRun());
         assertEquals(originalReport, Files.readString(tempDir.resolve("legacy-run").resolve("report.json")));
+    }
+
+    @Test
+    void diagnoseReportStorageSummarizesArtifactsByRunAndType() throws Exception {
+        DefaultReportEngine engine = new DefaultReportEngine();
+        writeRunWithArtifact(engine, "old-run", "2026-04-17T00:00:00Z", "2026-04-17T00:00:01Z");
+        writeRunWithArtifact(engine, "missing-run", "2026-04-17T00:01:00Z", "2026-04-17T00:01:01Z");
+        writeRunWithArtifact(engine, "new-run", "2026-04-17T00:02:00Z", "2026-04-17T00:02:01Z");
+
+        ReportCleanupOptions options = new ReportCleanupOptions();
+        options.setDeleteFinishedBefore(Instant.parse("2026-04-17T00:00:30Z"));
+        options.setPruneArtifactsOnly(true);
+        engine.cleanupReportRuns(tempDir, options);
+        Files.delete(tempDir.resolve("missing-run").resolve("artifact.txt"));
+
+        ReportStorageDiagnosticsResult result = engine.diagnoseReportStorage(tempDir);
+
+        long newTextBytes = Files.size(tempDir.resolve("new-run").resolve("artifact.txt"));
+        long newNetworkBytes = Files.size(tempDir.resolve("new-run").resolve("network").resolve("body.txt"));
+        long missingNetworkBytes = Files.size(tempDir.resolve("missing-run").resolve("network").resolve("body.txt"));
+
+        assertEquals(tempDir.toAbsolutePath().normalize(), result.reportRoot());
+        assertEquals(3, result.scannedRuns());
+        assertEquals(6, result.referencedArtifactCount());
+        assertEquals(1, result.missingArtifactCount());
+        assertEquals(2, result.prunedArtifactCount());
+        assertEquals(newTextBytes + newNetworkBytes + missingNetworkBytes, result.referencedArtifactBytes());
+        assertTrue(result.totalRunBytes() > result.referencedArtifactBytes());
+
+        ReportStorageDiagnosticsResult.ArtifactTypeSummary textType = result.artifactTypes().stream()
+                .filter(type -> "text".equals(type.type()))
+                .findFirst()
+                .orElseThrow();
+        assertEquals(3, textType.count());
+        assertEquals(1, textType.missingCount());
+        assertEquals(1, textType.prunedCount());
+        assertEquals(newTextBytes, textType.bytes());
+
+        ReportStorageDiagnosticsResult.ArtifactTypeSummary networkType = result.artifactTypes().stream()
+                .filter(type -> "network-response-body".equals(type.type()))
+                .findFirst()
+                .orElseThrow();
+        assertEquals(3, networkType.count());
+        assertEquals(0, networkType.missingCount());
+        assertEquals(1, networkType.prunedCount());
+        assertEquals(newNetworkBytes + missingNetworkBytes, networkType.bytes());
+
+        ReportStorageDiagnosticsResult.RunStorageSummary missingRun = result.runs().stream()
+                .filter(run -> "missing-run".equals(run.runId()))
+                .findFirst()
+                .orElseThrow();
+        assertEquals("OK", missingRun.status());
+        assertEquals(2, missingRun.referencedArtifactCount());
+        assertEquals(1, missingRun.missingArtifactCount());
+        assertEquals(0, missingRun.prunedArtifactCount());
+        assertEquals(missingNetworkBytes, missingRun.referencedArtifactBytes());
     }
 
     private void writeRun(DefaultReportEngine engine, String runId, String startedAt, String finishedAt) {
