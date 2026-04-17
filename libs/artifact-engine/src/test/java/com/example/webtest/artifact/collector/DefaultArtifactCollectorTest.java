@@ -1,37 +1,38 @@
-package com.example.webtest.locator.resolver;
+package com.example.webtest.artifact.collector;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import com.example.webtest.artifact.model.ArtifactRef;
 import com.example.webtest.browser.page.ElementState;
 import com.example.webtest.browser.page.PageController;
 import com.example.webtest.browser.page.ScreenshotOptions;
-import com.example.webtest.dsl.model.TargetDefinition;
 import com.example.webtest.execution.context.ExecutionContext;
-import com.example.webtest.locator.model.ResolveResult;
-import java.util.ArrayList;
-import java.util.List;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
-class DefaultElementResolverTest {
+class DefaultArtifactCollectorTest {
+    @TempDir
+    Path tempDir;
+
     @Test
-    void resolveUsesPageControllerAndMapsElementState() {
-        FakePageController pageController = new FakePageController();
-        TargetDefinition target = new TargetDefinition();
-        target.setBy("css");
-        target.setValue("#submit");
+    void captureScreenshotWritesPngAndReturnsReference() throws IOException {
+        DefaultArtifactCollector collector = new DefaultArtifactCollector(new FakePageController());
 
-        ResolveResult result = new DefaultElementResolver(pageController).resolve(target, new ExecutionContext("run-1"));
+        ArtifactRef ref = collector.captureScreenshot(tempDir, "step-1", new ExecutionContext("run-1"));
 
-        assertTrue(result.isFound());
-        assertTrue(result.isUnique());
-        assertTrue(result.isActionable());
-        assertEquals("css:#submit:0", pageController.calls.get(0));
+        assertEquals("screenshot", ref.getType());
+        assertEquals("image/png", ref.getContentType());
+        assertEquals(tempDir.resolve("step-1.png"), ref.getPath());
+        assertNotNull(ref.getCreatedAt());
+        assertArrayEquals(new byte[] {1, 2, 3}, Files.readAllBytes(ref.getPath()));
     }
 
     private static final class FakePageController implements PageController {
-        private final List<String> calls = new ArrayList<>();
-
         @Override
         public void navigate(String url, ExecutionContext context) {
         }
@@ -42,49 +43,43 @@ class DefaultElementResolverTest {
 
         @Override
         public String currentUrl(ExecutionContext context) {
-            return null;
+            return "";
         }
 
         @Override
         public String title(ExecutionContext context) {
-            return null;
+            return "";
         }
 
         @Override
         public byte[] screenshot(ExecutionContext context, ScreenshotOptions options) {
-            return new byte[0];
+            return new byte[] {1, 2, 3};
         }
 
         @Override
         public String getHtml(ExecutionContext context) {
-            return null;
+            return "";
         }
 
         @Override
         public ElementState findElement(String by, String value, Integer index, ExecutionContext context) {
-            calls.add(by + ":" + value + ":" + index);
-            ElementState state = new ElementState();
-            state.setFound(true);
-            state.setCount(1);
-            state.setVisible(true);
-            state.setActionable(true);
-            return state;
+            return new ElementState();
         }
 
         @Override
         public String elementText(String by, String value, Integer index, ExecutionContext context) {
-            return null;
+            return "";
         }
 
         @Override
         public String elementValue(String by, String value, Integer index, ExecutionContext context) {
-            return null;
+            return "";
         }
 
         @Override
         public String elementAttribute(
                 String by, String value, Integer index, String attributeName, ExecutionContext context) {
-            return null;
+            return "";
         }
 
         @Override

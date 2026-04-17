@@ -13,11 +13,24 @@
     <dependencies>
         <dependency>
             <groupId>com.example.webtest</groupId>
+            <artifactId>common-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.example.webtest</groupId>
+            <artifactId>common-json</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.example.webtest</groupId>
             <artifactId>artifact-engine</artifactId>
         </dependency>
         <dependency>
             <groupId>com.example.webtest</groupId>
             <artifactId>execution-context</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 </project>

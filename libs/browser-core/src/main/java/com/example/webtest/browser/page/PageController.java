@@ -17,6 +17,12 @@ public interface PageController {
 
     ElementState findElement(String by, String value, Integer index, ExecutionContext context);
 
+    String elementText(String by, String value, Integer index, ExecutionContext context);
+
+    String elementValue(String by, String value, Integer index, ExecutionContext context);
+
+    String elementAttribute(String by, String value, Integer index, String attributeName, ExecutionContext context);
+
     void clickElement(String by, String value, Integer index, ExecutionContext context);
 
     void fillElement(String by, String value, Integer index, String text, ExecutionContext context);

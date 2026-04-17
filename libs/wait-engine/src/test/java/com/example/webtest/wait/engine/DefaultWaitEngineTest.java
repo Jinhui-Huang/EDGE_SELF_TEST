@@ -173,6 +173,22 @@ class DefaultWaitEngineTest {
         }
 
         @Override
+        public String elementText(String by, String value, Integer index, ExecutionContext context) {
+            return null;
+        }
+
+        @Override
+        public String elementValue(String by, String value, Integer index, ExecutionContext context) {
+            return null;
+        }
+
+        @Override
+        public String elementAttribute(
+                String by, String value, Integer index, String attributeName, ExecutionContext context) {
+            return null;
+        }
+
+        @Override
         public void clickElement(String by, String value, Integer index, ExecutionContext context) {
         }
 

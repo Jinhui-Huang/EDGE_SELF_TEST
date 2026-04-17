@@ -126,4 +126,45 @@ class DefaultDslParserTest {
 
         assertThrows(BaseException.class, () -> parser.parseJson(json));
     }
+
+    @Test
+    void parseJsonRejectsElementAssertionWithoutRequiredFields() {
+        String json = """
+                {
+                  "id": "invalid-element-assertion",
+                  "steps": [
+                    {
+                      "action": "assert_text",
+                      "target": {
+                        "by": "css",
+                        "value": "#headline"
+                      }
+                    }
+                  ]
+                }
+                """;
+
+        assertThrows(BaseException.class, () -> parser.parseJson(json));
+    }
+
+    @Test
+    void parseJsonRejectsAttributeAssertionWithoutAttributeName() {
+        String json = """
+                {
+                  "id": "invalid-attribute-assertion",
+                  "steps": [
+                    {
+                      "action": "assert_attr",
+                      "target": {
+                        "by": "css",
+                        "value": "#search"
+                      },
+                      "expected": "Search"
+                    }
+                  ]
+                }
+                """;
+
+        assertThrows(BaseException.class, () -> parser.parseJson(json));
+    }
 }

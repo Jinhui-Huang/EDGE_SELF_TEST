@@ -81,6 +81,40 @@ public class DefaultPageController implements PageController {
     }
 
     @Override
+    public String elementText(String by, String value, Integer index, ExecutionContext context) {
+        JsonNode result = evaluate(locatorScript(by, value, index, "text", null));
+        boolean ok = result != null && result.path("ok").asBoolean(false);
+        if (!ok) {
+            String message = result == null ? "unknown error" : result.path("message").asText("unknown error");
+            throw new BaseException(ErrorCodes.ELEMENT_NOT_FOUND, "Failed to read element text: " + message);
+        }
+        return result.path("text").asText("");
+    }
+
+    @Override
+    public String elementValue(String by, String value, Integer index, ExecutionContext context) {
+        JsonNode result = evaluate(locatorScript(by, value, index, "value", null));
+        boolean ok = result != null && result.path("ok").asBoolean(false);
+        if (!ok) {
+            String message = result == null ? "unknown error" : result.path("message").asText("unknown error");
+            throw new BaseException(ErrorCodes.ELEMENT_NOT_FOUND, "Failed to read element value: " + message);
+        }
+        return result.path("value").asText("");
+    }
+
+    @Override
+    public String elementAttribute(String by, String value, Integer index, String attributeName, ExecutionContext context) {
+        JsonNode result = evaluate(locatorScript(by, value, index, "attribute", attributeName));
+        boolean ok = result != null && result.path("ok").asBoolean(false);
+        if (!ok) {
+            String message = result == null ? "unknown error" : result.path("message").asText("unknown error");
+            throw new BaseException(ErrorCodes.ELEMENT_NOT_FOUND, "Failed to read element attribute: " + message);
+        }
+        JsonNode attributeValue = result.get("value");
+        return attributeValue == null || attributeValue.isNull() ? null : attributeValue.asText();
+    }
+
+    @Override
     public void clickElement(String by, String value, Integer index, ExecutionContext context) {
         JsonNode result = evaluate(locatorScript(by, value, index, "click", null));
         assertDomActionSucceeded(result, "click");
@@ -170,6 +204,9 @@ public class DefaultPageController implements PageController {
                   const current = state(element);
                   if (operation === 'state') return current;
                   if (!current.found) return {ok: false, message: 'element not found'};
+                  if (operation === 'text') return {ok: true, text: element.innerText || element.textContent || ''};
+                  if (operation === 'value') return {ok: true, value: 'value' in element ? element.value : ''};
+                  if (operation === 'attribute') return {ok: true, value: element.getAttribute(fillValue)};
                   if (!current.actionable) return {ok: false, message: 'element is not actionable'};
                   element.scrollIntoView({block: 'center', inline: 'center'});
                   element.focus();

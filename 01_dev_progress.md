@@ -797,3 +797,551 @@
 - `01_dev_progress.md` 最新一节。
 - `enterprise_web_test_platform_phase2_implementation_design.md` 第 10 章等待模块设计、第 11 章断言模块设计。
 - `enterprise_web_test_platform_phase3_java_core_code_skeleton.md` 第 12 章 wait-engine 骨架、第 13 章 assertion-engine 骨架、第 22 章编排器接入示例。
+
+## 2026-04-16 assertion-engine 元素断言扩展记录
+
+## 本次任务
+- 继续扩展 `assertion-engine`，实现基于 `ElementResolver` / `PageController` 的 `ASSERT_TEXT` / `ASSERT_VISIBLE` / `ASSERT_NOT_VISIBLE`，并接入默认编排链路和真实 Edge DSL smoke。
+
+## 完成内容
+- `browser-core` 扩展 `PageController`，新增 `elementText(by, value, index, context)`，`DefaultPageController` 通过 CDP `Runtime.evaluate` 读取目标元素的 `innerText` / `textContent`。
+- `assertion-engine` 新增：
+  - `AssertTextHandler`：复用 `ElementResolver` 定位目标元素，再读取元素文本并与 DSL `expected` 精确比较。
+  - `AssertVisibleHandler`：复用 `ElementResolver` 的 `found` / `visible` 状态，支持 `ASSERT_VISIBLE` 和 `ASSERT_NOT_VISIBLE`。
+- `DefaultTestOrchestrator` 默认装配新增断言 handler，并把 `ASSERT_TEXT` / `ASSERT_VISIBLE` / `ASSERT_NOT_VISIBLE` 分发到 assertion 链路。
+- `DefaultDslValidator` 增加元素断言校验：
+  - `ASSERT_TEXT` 必须提供 `target` 和 `expected`。
+  - `ASSERT_VISIBLE` / `ASSERT_NOT_VISIBLE` 必须提供 `target`。
+- `config/smoke/core-platform-smoke.yml` 扩展真实 Edge smoke：
+  - data URL 页面新增 `#headline` 和隐藏的 `#hidden-panel`。
+  - 新增 `assert-headline-visible ASSERT_VISIBLE`。
+  - 新增 `assert-headline-text ASSERT_TEXT`。
+  - 新增 `assert-panel-hidden ASSERT_NOT_VISIBLE`。
+- 新增/扩展单元测试覆盖断言 handler 分发、文本断言失败、编排器断言分发、DSL 元素断言校验，以及 `PageController` 接口变更后的测试桩。
+
+## 修改文件
+- `libs/browser-core/src/main/java/com/example/webtest/browser/page/PageController.java`
+- `libs/browser-core/src/main/java/com/example/webtest/browser/page/DefaultPageController.java`
+- `libs/assertion-engine/pom.xml`
+- `libs/assertion-engine/src/main/java/com/example/webtest/assertion/handler/AssertTextHandler.java`
+- `libs/assertion-engine/src/main/java/com/example/webtest/assertion/handler/AssertVisibleHandler.java`
+- `libs/assertion-engine/src/test/java/com/example/webtest/assertion/engine/DefaultAssertionEngineTest.java`
+- `libs/execution-engine/src/main/java/com/example/webtest/execution/engine/orchestrator/DefaultTestOrchestrator.java`
+- `libs/execution-engine/src/test/java/com/example/webtest/execution/engine/orchestrator/DefaultTestOrchestratorTest.java`
+- `libs/dsl-parser/src/main/java/com/example/webtest/dsl/validator/DefaultDslValidator.java`
+- `libs/dsl-parser/src/test/java/com/example/webtest/dsl/parser/DefaultDslParserTest.java`
+- `libs/locator-engine/src/test/java/com/example/webtest/locator/resolver/DefaultElementResolverTest.java`
+- `libs/wait-engine/src/test/java/com/example/webtest/wait/engine/DefaultWaitEngineTest.java`
+- `config/smoke/core-platform-smoke.yml`
+- `memory.txt`
+- `01_dev_progress.md`
+
+## 当前状态
+- 受影响模块测试通过：`mvn "-Dmaven.repo.local=.m2/repository" -pl libs/browser-core,libs/locator-engine,libs/assertion-engine,libs/dsl-parser,libs/execution-engine,apps/core-platform -am test`
+- Maven 全量构建通过：`mvn "-Dmaven.repo.local=.m2/repository" -q package`
+- Maven 本地安装通过：`mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+- core-platform DSL smoke 通过。运行方式：
+  - 仓库根目录先执行 install。
+  - 再进入 `apps/core-platform` 执行 `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`
+- smoke 输出包含：
+  - `assert-headline-visible ASSERT_VISIBLE SUCCESS`
+  - `assert-headline-text ASSERT_TEXT SUCCESS`
+  - `assert-panel-hidden ASSERT_NOT_VISIBLE SUCCESS`
+  - `fill-search FILL SUCCESS`
+  - `click-submit CLICK SUCCESS`
+  - `assert-click-title ASSERT_TITLE SUCCESS`
+  - `capture-page SCREENSHOT SUCCESS artifact=D:\txt\edge_self_test\runs\dsl-smoke\capture-page.png`
+- 复查本项目 Edge 调试进程，无 `webtest-edge-*` 或 `remote-debugging-port` 残留。
+
+## 已知问题
+- `ASSERT_TEXT` / `ASSERT_TITLE` / `ASSERT_URL` 当前仍是精确字符串比较，尚未支持 contains、regex、glob、大小写/空白归一化或 URL 归一化。
+- `ASSERT_VISIBLE` / `ASSERT_NOT_VISIBLE` 当前直接依赖 `ElementResolver` 的一次性状态，不带等待语义；需要等待时仍应显式使用 `WAIT_FOR_VISIBLE` / `WAIT_FOR_HIDDEN`。
+- `ASSERT_VALUE` / `ASSERT_ATTR` / `ASSERT_ENABLED` / `ASSERT_DISABLED` / `ASSERT_DB` / `ASSERT_SCREENSHOT` 等仍未实现。
+- `DefaultPageController.elementText` 当前读取 `innerText || textContent || ""`，对表单 value 的断言应后续用独立 `ASSERT_VALUE`。
+- `DefaultTestOrchestrator` 仍内联处理 `GOTO`、`REFRESH`、`SCREENSHOT`；`SCREENSHOT` 尚未迁移到 `artifact-engine`。
+- 设计目标仍是 Java 21，但当前环境继续按既有决策使用 JDK 17 / `maven.compiler.release=17`。
+
+## 下一步
+- 优先实现 `ASSERT_VALUE` / `ASSERT_ATTR`，补齐常用 DOM 断言能力。
+- 或开始抽离 `artifact-engine`，把 `SCREENSHOT` 从 `DefaultTestOrchestrator` 迁移出去，减少编排器业务细节。
+- 后续可引入统一断言匹配策略对象，覆盖 exact / contains / regex / glob / normalized URL / normalized text。
+
+## 下次建议优先阅读
+- `01_dev_progress.md` 最新一节。
+- `enterprise_web_test_platform_phase2_implementation_design.md` 第 11 章断言模块设计、第 12 章 Artifact 模块设计。
+- `enterprise_web_test_platform_phase3_java_core_code_skeleton.md` 第 13 章 assertion-engine 骨架、第 14 章 artifact-engine 骨架、第 22 章编排器接入示例。
+
+## 2026-04-16 assertion-engine value/attribute 断言扩展记录
+
+## 本次任务
+- 继续扩展 `assertion-engine`，实现常用 DOM 断言 `ASSERT_VALUE` / `ASSERT_ATTR`，并接入默认编排链路和真实 Edge DSL smoke。
+
+## 完成内容
+- `browser-core` 扩展 `PageController`：新增 `elementValue` 和 `elementAttribute`，通过 CDP `Runtime.evaluate` 读取 DOM 元素 value 与 attribute。
+- `assertion-engine` 新增 `AssertValueHandler` 和 `AssertAttrHandler`：复用 `ElementResolver` 定位元素，再读取 DOM 值并与 DSL `expected` 精确比较。
+- `DefaultTestOrchestrator` 默认装配新增断言 handler，并把 `ASSERT_VALUE` / `ASSERT_ATTR` 分发到 assertion 链路。
+- `DefaultDslValidator` 增加 DOM 断言校验：`ASSERT_VALUE` 必须提供 `target` 和 `expected`；`ASSERT_ATTR` 必须提供 `target`、作为属性名的 `value` 和 `expected`。
+- `config/smoke/core-platform-smoke.yml` 扩展真实 Edge smoke：新增 `assert-search-value ASSERT_VALUE` 和 `assert-search-label ASSERT_ATTR`。
+- 新增/扩展单元测试覆盖 value/attribute handler 分发、编排器分发、DSL 属性断言校验，以及 `PageController` 接口变更后的测试桩。
+
+## 修改文件
+- `libs/browser-core/src/main/java/com/example/webtest/browser/page/PageController.java`
+- `libs/browser-core/src/main/java/com/example/webtest/browser/page/DefaultPageController.java`
+- `libs/assertion-engine/src/main/java/com/example/webtest/assertion/handler/AssertValueHandler.java`
+- `libs/assertion-engine/src/main/java/com/example/webtest/assertion/handler/AssertAttrHandler.java`
+- `libs/assertion-engine/src/test/java/com/example/webtest/assertion/engine/DefaultAssertionEngineTest.java`
+- `libs/execution-engine/src/main/java/com/example/webtest/execution/engine/orchestrator/DefaultTestOrchestrator.java`
+- `libs/execution-engine/src/test/java/com/example/webtest/execution/engine/orchestrator/DefaultTestOrchestratorTest.java`
+- `libs/dsl-parser/src/main/java/com/example/webtest/dsl/validator/DefaultDslValidator.java`
+- `libs/dsl-parser/src/test/java/com/example/webtest/dsl/parser/DefaultDslParserTest.java`
+- `libs/locator-engine/src/test/java/com/example/webtest/locator/resolver/DefaultElementResolverTest.java`
+- `libs/wait-engine/src/test/java/com/example/webtest/wait/engine/DefaultWaitEngineTest.java`
+- `config/smoke/core-platform-smoke.yml`
+- `memory.txt`
+- `01_dev_progress.md`
+
+## 当前状态
+- 受影响模块测试通过：`mvn "-Dmaven.repo.local=.m2/repository" -pl libs/browser-core,libs/locator-engine,libs/assertion-engine,libs/dsl-parser,libs/execution-engine,apps/core-platform -am test`
+- Maven 全量构建通过：`mvn "-Dmaven.repo.local=.m2/repository" -q package`
+- Maven 本地安装通过：`mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+- core-platform DSL smoke 通过。运行方式：
+  - 仓库根目录先执行 install。
+  - 再进入 `apps/core-platform` 执行 `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`
+- smoke 输出包含：
+  - `assert-search-value ASSERT_VALUE SUCCESS`
+  - `assert-search-label ASSERT_ATTR SUCCESS`
+  - `click-submit CLICK SUCCESS`
+  - `assert-click-title ASSERT_TITLE SUCCESS`
+  - `capture-page SCREENSHOT SUCCESS artifact=D:\txt\edge_self_test\runs\dsl-smoke\capture-page.png`
+- 复查本项目 Edge 调试进程，无 `webtest-edge-*` 或 `remote-debugging-port` 残留。
+
+## 已知问题
+- `ASSERT_TEXT` / `ASSERT_VALUE` / `ASSERT_ATTR` / `ASSERT_TITLE` / `ASSERT_URL` 当前仍是精确字符串比较，尚未支持 contains、regex、glob、大小写/空白归一化或 URL 归一化。
+- `ASSERT_ATTR` 当前约定 DSL `value` 字段表示属性名；后续如果 DSL 语义扩展，可迁移到更明确的 `extra.attribute` 或专用字段。
+- `ASSERT_ENABLED` / `ASSERT_DISABLED` / `ASSERT_DB` / `ASSERT_SCREENSHOT` 等仍未实现。
+- `DefaultTestOrchestrator` 仍内联处理 `GOTO`、`REFRESH`、`SCREENSHOT`；`SCREENSHOT` 尚未迁移到 `artifact-engine`。
+- 设计目标仍是 Java 21，但当前环境继续按既有决策使用 JDK 17 / `maven.compiler.release=17`。
+
+## 下一步
+- 优先开始抽离 `artifact-engine`，把 `SCREENSHOT` 从 `DefaultTestOrchestrator` 迁移出去，减少编排器业务细节。
+- 或继续补齐断言能力，优先实现 `ASSERT_ENABLED` / `ASSERT_DISABLED`。
+- 后续可引入统一断言匹配策略对象，覆盖 exact / contains / regex / glob / normalized URL / normalized text。
+
+## 下一次建议优先阅读
+- `01_dev_progress.md` 最新一节。
+- `enterprise_web_test_platform_phase2_implementation_design.md` 第 11 章断言模块设计、第 12 章 Artifact 模块设计。
+- `enterprise_web_test_platform_phase3_java_core_code_skeleton.md` 第 13 章 assertion-engine 骨架、第 14 章 artifact-engine 骨架、第 22 章编排器接入示例。
+## 2026-04-16 artifact-engine screenshot 抽离记录
+
+## 本次任务
+- 开始抽离 `artifact-engine`，把显式 `SCREENSHOT` 产物写入职责从 `DefaultTestOrchestrator` 迁移到 artifact 模块，减少编排器里的业务细节。
+
+## 完成内容
+- `artifact-engine` 新增最小产物模型与采集接口：
+  - `ArtifactRef`：记录产物类型、路径、content type 和创建时间。
+  - `ArtifactCollector`：提供 `captureScreenshot(outputDir, artifactName, context)`。
+  - `DefaultArtifactCollector`：通过 `PageController.screenshot` 截图，并写入 `${outputDir}/${artifactName}.png`。
+- `artifact-engine` 补充 `common-core` 与测试依赖，截图写入失败时统一抛出 `ACTION_EXECUTION_FAILED`。
+- `DefaultTestOrchestrator` 默认装配 `DefaultArtifactCollector`，`SCREENSHOT` 分支改为调用 artifact 链路并把返回的 `ArtifactRef.path` 写入 `StepExecutionRecord.artifactPath`。
+- 保持现有 DSL、step record 和 core-platform 输出行为不变：`capture-page SCREENSHOT SUCCESS artifact=...capture-page.png`。
+- 新增 `DefaultArtifactCollectorTest` 覆盖截图文件写入和 `ArtifactRef` 返回值。
+
+## 修改文件
+- `libs/artifact-engine/pom.xml`
+- `libs/artifact-engine/src/main/java/com/example/webtest/artifact/model/ArtifactRef.java`
+- `libs/artifact-engine/src/main/java/com/example/webtest/artifact/collector/ArtifactCollector.java`
+- `libs/artifact-engine/src/main/java/com/example/webtest/artifact/collector/DefaultArtifactCollector.java`
+- `libs/artifact-engine/src/test/java/com/example/webtest/artifact/collector/DefaultArtifactCollectorTest.java`
+- `libs/execution-engine/src/main/java/com/example/webtest/execution/engine/orchestrator/DefaultTestOrchestrator.java`
+
+## 当前状态
+- 受影响模块测试通过：`mvn "-Dmaven.repo.local=.m2/repository" -pl libs/artifact-engine,libs/execution-engine,apps/core-platform -am test`
+- Maven 全量构建通过：`mvn "-Dmaven.repo.local=.m2/repository" -q package`
+- Maven 本地安装通过：`mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+- core-platform DSL smoke 通过。运行方式：
+  - 仓库根目录先执行 install。
+  - 再进入 `apps/core-platform` 执行 `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`
+- smoke 输出包含：
+  - `assert-search-value ASSERT_VALUE SUCCESS`
+  - `assert-search-label ASSERT_ATTR SUCCESS`
+  - `click-submit CLICK SUCCESS`
+  - `assert-click-title ASSERT_TITLE SUCCESS`
+  - `capture-page SCREENSHOT SUCCESS artifact=D:\txt\edge_self_test\runs\dsl-smoke\capture-page.png`
+- 复查本项目 Edge 调试进程，无 `webtest-edge-*` 或 `remote-debugging-port` 残留。
+
+## 已知问题
+- `ArtifactCollector` 当前只覆盖显式 `SCREENSHOT`，尚未接入 before/after step、失败截图、DOM dump、console/network dump。
+- `ArtifactRef` 当前还没有接入 `StepExecutionRecord` 的多产物列表；执行结果仍沿用单个 `artifactPath` 字段。
+- 截图文件名仍沿用 step id 拼接 `${stepId}.png`，尚未引入统一 artifact 命名策略、目录分层或文件名安全归一化。
+- `DefaultTestOrchestrator` 仍内联处理 `GOTO` / `REFRESH`，后续可继续按模块边界抽离。
+
+## 下一步
+- 优先扩展 `artifact-engine` 的生命周期能力：失败时按 `ReportPolicy.screenshotOnFailure` 或 `FailurePolicy.SCREENSHOT_*` 采集失败截图。
+- 或补齐 `ArtifactRef` 到报告模型的多产物列表，为后续 HTML/JSON 报告打基础。
+- 也可以继续补齐断言能力，优先实现 `ASSERT_ENABLED` / `ASSERT_DISABLED`。
+
+## 下一次建议优先阅读
+- `01_dev_progress.md` 最新一节。
+- `enterprise_web_test_platform_phase2_implementation_design.md` 第 12 章 Artifact 与报告模块设计。
+- `enterprise_web_test_platform_phase3_java_core_code_skeleton.md` 第 14 章 artifact-engine 骨架、第 15 章 report-engine 骨架、第 22 章编排器接入示例。
+
+## 2026-04-17 report-engine 最小 JSON 报告接入记录
+
+## 本次任务
+- 按上一轮建议，优先实现最小 `report-engine`：读取执行步骤记录中的多产物列表，生成 JSON 报告清单，并保持现有 core-platform smoke 控制台输出不变。
+
+## 完成内容
+- `report-engine` 新增最小报告接口与实现：
+  - `ReportEngine`：提供 `generateRunReport(context, outputDir, stepRecords)`。
+  - `DefaultReportEngine`：写出 `${outputDir}/report.json`，包含 `runId`、`outputDir`、每个 step 的状态、消息、耗时、兼容 `artifactPath` 以及完整 `artifacts` 列表。
+  - `ReportStepRecord`：作为 report 模块内的 step DTO，避免 `report-engine` 反向依赖 `execution-engine` 造成 Maven 循环依赖。
+- `RunResult` 新增 `reportPath`，用于记录本次运行生成的报告文件。
+- `DefaultTestOrchestrator` 默认装配 `DefaultReportEngine`，run 结束后把 `StepExecutionRecord` 映射为 `ReportStepRecord` 并生成 `report.json`。
+- 保持现有 core-platform smoke 控制台逐步输出不变；报告文件新增写入 `runs/dsl-smoke/report.json`。
+- 新增 `DefaultReportEngineTest`，覆盖 JSON 报告写出、step 状态、耗时和 artifact 列表序列化。
+- 扩展 `DefaultTestOrchestratorTest`，覆盖 `RunResult.reportPath`，并让未显式设置输出目录的测试改用 JUnit 临时目录，避免测试生成 `libs/execution-engine/runs/`。
+
+## 修改文件
+- `libs/report-engine/pom.xml`
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/ReportEngine.java`
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/DefaultReportEngine.java`
+- `libs/report-engine/src/main/java/com/example/webtest/report/model/ReportStepRecord.java`
+- `libs/report-engine/src/test/java/com/example/webtest/report/engine/DefaultReportEngineTest.java`
+- `libs/execution-engine/src/main/java/com/example/webtest/execution/engine/result/RunResult.java`
+- `libs/execution-engine/src/main/java/com/example/webtest/execution/engine/orchestrator/DefaultTestOrchestrator.java`
+- `libs/execution-engine/src/test/java/com/example/webtest/execution/engine/orchestrator/DefaultTestOrchestratorTest.java`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## 当前状态
+- 受影响模块测试通过：`mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,libs/execution-engine,apps/core-platform -am test -q`
+- Maven 全量构建通过：`mvn "-Dmaven.repo.local=.m2/repository" -q package`
+- Maven 本地安装通过：`mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+- core-platform DSL smoke 通过。运行方式：
+  - 在仓库根目录先执行 install。
+  - 再进入 `apps/core-platform` 执行 `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`
+- smoke 控制台输出保持兼容，包含：
+  - `assert-search-value ASSERT_VALUE SUCCESS`
+  - `assert-search-label ASSERT_ATTR SUCCESS`
+  - `click-submit CLICK SUCCESS`
+  - `assert-click-title ASSERT_TITLE SUCCESS`
+  - `capture-page SCREENSHOT SUCCESS artifact=D:\txt\edge_self_test\runs\dsl-smoke\capture-page.png`
+- 新增报告文件：`D:\txt\edge_self_test\runs\dsl-smoke\report.json`，其中 `capture-page` step 的 `artifacts[0]` 指向截图产物。
+- 复查本项目 Edge 调试进程，无 `webtest-edge-*` 或 `remote-debugging-port` 残留。
+
+## 已知问题
+- 当前报告是最小 JSON 清单，尚未实现 HTML 报告、聚合摘要、失败高亮、相对路径、报告资源复制或 artifact 链接规范化。
+- `ReportStepRecord` 是 report 模块 DTO；执行引擎当前在 run 结束时做一次映射，后续如果抽出共享执行结果模型，可再减少重复字段。
+- `RunResult.reportPath` 已有，但 core-platform 控制台暂不打印该字段，以保持现有 smoke 输出不变。
+- `ArtifactRef` 仍只包含 type/path/contentType/createdAt，尚未包含 artifact 名称、生命周期阶段、step id、相对路径或错误信息等报告友好字段。
+
+## 下一步
+- 优先增强报告模型：生成 summary（total/passed/failed/skipped/duration）并在 JSON 中使用相对 artifact 路径，便于后续 HTML 报告和跨机器查看。
+- 或继续扩展 artifact 生命周期：DOM dump、console/network dump、before/after step 钩子。
+- 也可回到断言能力，补齐 `ASSERT_ENABLED` / `ASSERT_DISABLED`。
+
+## 下一次建议优先阅读
+- `01_dev_progress.md` 最新一节。
+- `enterprise_web_test_platform_phase2_implementation_design.md` 第 12 章 Artifact 与报告模块设计。
+- `enterprise_web_test_platform_phase3_java_core_code_skeleton.md` 第 15 章 report-engine 骨架、第 17/22 章执行结果与编排器接入示例。
+
+## 2026-04-17 run 生命周期时间与报告 duration 收尾记录
+
+## 本次任务
+- 按上一轮建议继续增强最小 `report-engine` 报告模型：引入 run startedAt/finishedAt，使 `summary.durationMs` 表达真实 run wall-clock 耗时，而不是 step duration 求和。
+
+## 完成内容
+- `RunResult` 新增 `startedAt` / `finishedAt`，记录执行引擎一次 run 的生命周期时间。
+- `DefaultTestOrchestrator` 在 step 执行前后记录 run 级时间，并将其写入 `RunResult`。
+- `ReportEngine` 扩展 `generateRunReport(context, outputDir, runStartedAt, runFinishedAt, stepRecords)`；保留旧签名 default 方法，避免已有调用方必须一次性迁移。
+- `DefaultReportEngine` 在 `report.json` 顶层写出 `startedAt` / `finishedAt`，并在二者可用时用 run wall-clock duration 填充 `summary.durationMs`；缺少 run 时间时仍回退到 step duration 求和。
+- 扩展 `DefaultReportEngineTest` 覆盖顶层 run 时间与 wall-clock summary duration。
+- 扩展 `DefaultTestOrchestratorTest` 覆盖 `RunResult.startedAt` / `RunResult.finishedAt`。
+
+## 修改文件
+- `libs/execution-engine/src/main/java/com/example/webtest/execution/engine/result/RunResult.java`
+- `libs/execution-engine/src/main/java/com/example/webtest/execution/engine/orchestrator/DefaultTestOrchestrator.java`
+- `libs/execution-engine/src/test/java/com/example/webtest/execution/engine/orchestrator/DefaultTestOrchestratorTest.java`
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/ReportEngine.java`
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/DefaultReportEngine.java`
+- `libs/report-engine/src/test/java/com/example/webtest/report/engine/DefaultReportEngineTest.java`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## 当前状态
+- 受影响模块测试通过：`mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,libs/execution-engine,apps/core-platform -am test -q`
+- Maven 全量构建通过：`mvn "-Dmaven.repo.local=.m2/repository" -q package`
+- Maven 本地安装通过：`mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+- core-platform DSL smoke 通过。运行方式：
+  - 在仓库根目录先执行 install。
+  - 再进入 `apps/core-platform` 执行 `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`
+- smoke 控制台输出保持兼容，包含：
+  - `open-smoke-page GOTO SUCCESS`
+  - `assert-headline-visible ASSERT_VISIBLE SUCCESS`
+  - `assert-search-value ASSERT_VALUE SUCCESS`
+  - `assert-search-label ASSERT_ATTR SUCCESS`
+  - `click-submit CLICK SUCCESS`
+  - `assert-click-title ASSERT_TITLE SUCCESS`
+  - `capture-page SCREENSHOT SUCCESS artifact=D:\txt\edge_self_test\runs\dsl-smoke\capture-page.png`
+- 新生成的 `runs/dsl-smoke/report.json` 顶层包含 `startedAt` / `finishedAt`，`summary.durationMs` 为 run wall-clock 耗时，`capture-page` step 的 `artifactPath` / `artifacts[0].path` 仍为 `capture-page.png`。
+- 复查本项目 Edge 调试进程，无 `webtest-edge-*` 或 `remote-debugging-port` 残留。
+
+## 已知问题
+- `summary.skipped` 已预留统计，但当前执行引擎尚未产生 `SKIPPED` 状态。
+- 报告仍是最小 JSON 清单，尚未实现 HTML 报告、失败高亮、资源复制、报告链接规范化或聚合摘要页面。
+- 相对路径只在 artifact 位于 `outputDir` 下时生效；跨目录 artifact 仍会保留原路径。
+
+## 下一步
+- 优先引入最小 HTML 报告，读取当前 `report.json` 已具备的 run 时间、summary、steps 与 artifacts。
+- 或继续扩展 artifact 生命周期：DOM dump、console/network dump、before/after step 钩子。
+- 也可回到断言能力，补齐 `ASSERT_ENABLED` / `ASSERT_DISABLED`。
+
+## 下一次建议优先阅读
+- `01_dev_progress.md` 最新一节。
+- `enterprise_web_test_platform_phase2_implementation_design.md` 第 12 章 Artifact 与报告模块设计。
+- `enterprise_web_test_platform_phase3_java_core_code_skeleton.md` 第 15 章 report-engine 骨架、第 17/22 章执行结果与编排器接入示例。
+
+## 2026-04-17 run 生命周期时间与报告 duration 修正记录
+
+## 本次任务
+- 按上一轮建议继续增强最小 `report-engine` 报告模型：引入 run startedAt/finishedAt，使 `summary.durationMs` 表达真实 run wall-clock 耗时，而不是 step duration 求和。
+
+## 完成内容
+- `RunResult` 新增 `startedAt` / `finishedAt`，记录执行引擎一次 run 的生命周期时间。
+- `DefaultTestOrchestrator` 在 step 执行前后记录 run 级时间，并将其写入 `RunResult`。
+- `ReportEngine` 扩展 `generateRunReport(context, outputDir, runStartedAt, runFinishedAt, stepRecords)`；保留旧签名 default 方法，避免已有调用方必须一次性迁移。
+- `DefaultReportEngine` 在 `report.json` 顶层写出 `startedAt` / `finishedAt`，并在二者可用时用 run wall-clock duration 填充 `summary.durationMs`；缺少 run 时间时仍回退到 step duration 求和。
+- 扩展 `DefaultReportEngineTest` 覆盖顶层 run 时间与 wall-clock summary duration。
+- 扩展 `DefaultTestOrchestratorTest` 覆盖 `RunResult.startedAt` / `RunResult.finishedAt`。
+
+## 修改文件
+- `libs/execution-engine/src/main/java/com/example/webtest/execution/engine/result/RunResult.java`
+- `libs/execution-engine/src/main/java/com/example/webtest/execution/engine/orchestrator/DefaultTestOrchestrator.java`
+- `libs/execution-engine/src/test/java/com/example/webtest/execution/engine/orchestrator/DefaultTestOrchestratorTest.java`
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/ReportEngine.java`
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/DefaultReportEngine.java`
+- `libs/report-engine/src/test/java/com/example/webtest/report/engine/DefaultReportEngineTest.java`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## 当前状态
+- 受影响模块测试通过：`mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,libs/execution-engine,apps/core-platform -am test -q`
+- 待本轮收尾继续执行全量 package / install 与 core-platform DSL smoke。
+
+## 已知问题
+- `summary.skipped` 已预留统计，但当前执行引擎尚未产生 `SKIPPED` 状态。
+- 报告仍是最小 JSON 清单，尚未实现 HTML 报告、失败高亮、资源复制、报告链接规范化或聚合摘要页面。
+- 相对路径只在 artifact 位于 `outputDir` 下时生效；跨目录 artifact 仍会保留原路径。
+
+## 下一步
+- 优先引入最小 HTML 报告，读取当前 `report.json` 已具备的 run 时间、summary、steps 与 artifacts。
+- 或继续扩展 artifact 生命周期：DOM dump、console/network dump、before/after step 钩子。
+- 也可回到断言能力，补齐 `ASSERT_ENABLED` / `ASSERT_DISABLED`。
+
+## 下一次建议优先阅读
+- `01_dev_progress.md` 最新一节。
+- `enterprise_web_test_platform_phase2_implementation_design.md` 第 12 章 Artifact 与报告模块设计。
+- `enterprise_web_test_platform_phase3_java_core_code_skeleton.md` 第 15 章 report-engine 骨架、第 17/22 章执行结果与编排器接入示例。
+
+## 2026-04-16 artifact-engine failure screenshot 生命周期记录
+
+## 本次任务
+- 继续扩展 `artifact-engine` 生命周期能力，在步骤失败时按 `ReportPolicy.screenshotOnFailure` 或单步 `FailurePolicy.SCREENSHOT_*` 采集失败截图。
+
+## 完成内容
+- `DefaultTestOrchestrator` 的失败分支已接入失败截图采集：失败时调用 `ArtifactCollector.captureScreenshot(outputDir, stepId + "-failure", context)`，并把返回的 `ArtifactRef.path` 写入 `StepExecutionRecord.artifactPath`。
+- 默认策略沿用 `ReportPolicy.screenshotOnFailure=true`：未配置 `reportPolicy` 时会采集失败截图；显式设置 `screenshotOnFailure=false` 时不采集。
+- 单步 `FailurePolicy.SCREENSHOT_AND_STOP` / `SCREENSHOT_AND_CONTINUE` 可强制采集失败截图；`CONTINUE` / `SCREENSHOT_AND_CONTINUE` 可覆盖默认停止行为，让主步骤继续执行。
+- 失败截图采集异常不会覆盖原始步骤失败原因，只会把截图采集失败信息追加到 `StepExecutionRecord.message`。
+- 扩展 `DefaultTestOrchestratorTest`，覆盖默认失败截图、全局关闭失败截图、单步 `SCREENSHOT_AND_CONTINUE` 强制截图并继续执行。
+
+## 修改文件
+- `libs/execution-engine/src/main/java/com/example/webtest/execution/engine/orchestrator/DefaultTestOrchestrator.java`
+- `libs/execution-engine/src/test/java/com/example/webtest/execution/engine/orchestrator/DefaultTestOrchestratorTest.java`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## 当前状态
+- 受影响模块测试通过：`mvn "-Dmaven.repo.local=.m2/repository" -pl libs/artifact-engine,libs/execution-engine,apps/core-platform -am test -q`
+- Maven 全量构建通过：`mvn "-Dmaven.repo.local=.m2/repository" -q package`
+- Maven 本地安装通过：`mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+- core-platform DSL smoke 通过。运行方式：
+  - 仓库根目录先执行 install。
+  - 再进入 `apps/core-platform` 执行 `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`
+- smoke 输出包含：
+  - `assert-search-value ASSERT_VALUE SUCCESS`
+  - `assert-search-label ASSERT_ATTR SUCCESS`
+  - `click-submit CLICK SUCCESS`
+  - `assert-click-title ASSERT_TITLE SUCCESS`
+  - `capture-page SCREENSHOT SUCCESS artifact=D:\txt\edge_self_test\runs\dsl-smoke\capture-page.png`
+- 复查本项目 Edge 调试进程，无 `webtest-edge-*` 或 `remote-debugging-port` 残留。
+
+## 已知问题
+- 当前仍使用 `StepExecutionRecord.artifactPath` 单字段记录产物；失败截图和显式截图不会同时存在于同一条记录的多产物列表中。
+- `ArtifactCollector` 仍只支持截图产物，尚未实现 DOM dump、console/network dump、before/after step 钩子。
+- 失败截图文件名当前约定为 `${stepId}-failure.png`，尚未引入统一 artifact 命名策略、目录分层或文件名安全归一化。
+- `DefaultTestOrchestrator` 仍内联处理 `GOTO` / `REFRESH`；后续可继续按模块边界抽离。
+
+## 下一步
+- 优先把 `ArtifactRef` 接入报告模型的多产物列表，为后续 HTML/JSON 报告打基础。
+- 或继续扩展 artifact 生命周期：DOM dump、console/network dump、before/after step 钩子。
+- 也可回到断言能力，补齐 `ASSERT_ENABLED` / `ASSERT_DISABLED`。
+
+## 下一次建议优先阅读
+- `01_dev_progress.md` 最新一节。
+- `enterprise_web_test_platform_phase2_implementation_design.md` 第 12 章 Artifact 与报告模块设计。
+- `enterprise_web_test_platform_phase3_java_core_code_skeleton.md` 第 14 章 artifact-engine 骨架、第 15 章 report-engine 骨架、第 22 章编排器接入示例。
+
+## 2026-04-17 ArtifactRef 多产物列表接入记录
+
+## 本次任务
+- 按上一轮建议，优先把 `ArtifactRef` 接入执行结果模型的多产物列表，为后续 HTML/JSON 报告和多 artifact 输出打基础。
+
+## 完成内容
+- `StepExecutionRecord` 新增 `List<ArtifactRef> artifacts`，并提供 `getArtifacts` / `setArtifacts` / `addArtifact`。
+- 保留旧的 `artifactPath` 字段作为兼容入口：新增 artifact 时会同步首个产物路径到 `artifactPath`，因此现有 core-platform 输出格式仍保持 `artifact=...`。
+- `DefaultTestOrchestrator` 的显式 `SCREENSHOT` 和失败截图分支改为记录完整 `ArtifactRef`，不再只写单个路径。
+- 扩展 `DefaultTestOrchestratorTest`，覆盖显式截图、默认失败截图、关闭失败截图、单步强制失败截图继续执行时的 `artifacts` 列表行为。
+
+## 修改文件
+- `libs/execution-engine/src/main/java/com/example/webtest/execution/engine/result/StepExecutionRecord.java`
+- `libs/execution-engine/src/main/java/com/example/webtest/execution/engine/orchestrator/DefaultTestOrchestrator.java`
+- `libs/execution-engine/src/test/java/com/example/webtest/execution/engine/orchestrator/DefaultTestOrchestratorTest.java`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## 当前状态
+- 受影响模块测试通过：`mvn "-Dmaven.repo.local=.m2/repository" -pl libs/artifact-engine,libs/execution-engine,apps/core-platform -am test -q`
+- Maven 全量构建通过：`mvn "-Dmaven.repo.local=.m2/repository" -q package`
+- Maven 本地安装通过：`mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+- core-platform DSL smoke 通过。运行方式：
+  - 在仓库根目录先执行 install。
+  - 再进入 `apps/core-platform` 执行 `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`
+- smoke 输出保持兼容，包含：
+  - `assert-search-value ASSERT_VALUE SUCCESS`
+  - `assert-search-label ASSERT_ATTR SUCCESS`
+  - `click-submit CLICK SUCCESS`
+  - `assert-click-title ASSERT_TITLE SUCCESS`
+  - `capture-page SCREENSHOT SUCCESS artifact=D:\txt\edge_self_test\runs\dsl-smoke\capture-page.png`
+- 复查本项目 Edge 调试进程，无 `webtest-edge-*` 或 `remote-debugging-port` 残留。
+
+## 已知问题
+- `artifactPath` 与 `artifacts` 当前是兼容并存模型；后续报告模块应优先读取 `artifacts`，`artifactPath` 只作为旧调用方兼容字段。
+- 当前一个步骤虽然已支持多个 `ArtifactRef`，但现有执行链路仍只会在显式截图或失败截图场景各追加一个截图产物；DOM dump、console/network dump、before/after step 钩子尚未实现。
+- `ArtifactRef` 仍只包含 type/path/contentType/createdAt，尚未包含 artifact 名称、生命周期阶段、step id、相对路径或错误信息等报告友好字段。
+- 截图文件名仍沿用 `${stepId}.png` 和 `${stepId}-failure.png`，尚未引入统一 artifact 命名策略、目录分层或文件名安全归一化。
+
+## 下一步
+- 优先实现最小 `report-engine`：读取 `RunResult.stepRecords[*].artifacts`，生成 JSON 或文本报告清单，并保持现有 smoke 输出不变。
+- 或继续扩展 artifact 生命周期：DOM dump、console/network dump、before/after step 钩子。
+- 也可回到断言能力，补齐 `ASSERT_ENABLED` / `ASSERT_DISABLED`。
+
+## 下一次建议优先阅读
+- `01_dev_progress.md` 最新一节。
+- `enterprise_web_test_platform_phase2_implementation_design.md` 第 12 章 Artifact 与报告模块设计。
+- `enterprise_web_test_platform_phase3_java_core_code_skeleton.md` 第 14 章 artifact-engine 骨架、第 15 章 report-engine 骨架、第 22 章编排器接入示例。
+## 2026-04-17 report-engine summary 与相对 artifact 路径记录
+
+## 本次任务
+- 按上一轮建议增强最小 `report-engine` JSON 报告：新增运行 summary，并将输出目录内的 artifact 路径写为相对路径，便于后续 HTML 报告和跨机器查看。
+
+## 完成内容
+- `DefaultReportEngine` 在 `report.json` 顶层新增 `summary`，包含 `total`、`passed`、`failed`、`skipped`、`durationMs`。
+- `summary.durationMs` 当前按已有 step 记录的 `startedAt` / `finishedAt` duration 求和，避免引入新的 run 生命周期字段。
+- `steps[*].artifactPath` 与 `steps[*].artifacts[*].path` 在 artifact 位于 `outputDir` 下时写为相对路径；不在输出目录下或无法 relativize 时保留原路径。
+- 保持 `outputDir` 与 core-platform 控制台输出不变；控制台仍按旧兼容字段打印绝对 `artifact=...`。
+- 扩展 `DefaultReportEngineTest`，覆盖 summary 统计、step duration 和相对 artifact 路径序列化。
+
+## 修改文件
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/DefaultReportEngine.java`
+- `libs/report-engine/src/test/java/com/example/webtest/report/engine/DefaultReportEngineTest.java`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## 当前状态
+- 受影响模块测试通过：`mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,libs/execution-engine,apps/core-platform -am test -q`
+- Maven 全量构建通过：`mvn "-Dmaven.repo.local=.m2/repository" -q package`
+- Maven 本地安装通过：`mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+- core-platform DSL smoke 通过。运行方式：
+  - 在仓库根目录先执行 install。
+  - 再进入 `apps/core-platform` 执行 `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`
+- smoke 控制台输出保持兼容，包含：
+  - `assert-search-value ASSERT_VALUE SUCCESS`
+  - `assert-search-label ASSERT_ATTR SUCCESS`
+  - `click-submit CLICK SUCCESS`
+  - `assert-click-title ASSERT_TITLE SUCCESS`
+  - `capture-page SCREENSHOT SUCCESS artifact=D:\txt\edge_self_test\runs\dsl-smoke\capture-page.png`
+- 新生成的 `runs/dsl-smoke/report.json` 顶层包含 `summary`，且 `capture-page` step 的 `artifactPath` / `artifacts[0].path` 均为 `capture-page.png`。
+- 复查本项目 Edge 调试进程，无 `webtest-edge-*` 或 `remote-debugging-port` 残留。
+
+## 已知问题
+- `summary.durationMs` 当前是 step duration 求和，不是 run wall-clock 总耗时；后续如需要真实运行总耗时，应在执行结果模型中记录 run startedAt/finishedAt。
+- `summary.skipped` 已预留统计，但当前执行引擎尚未产生 `SKIPPED` 状态。
+- 报告仍是最小 JSON 清单，尚未实现 HTML 报告、失败高亮、资源复制、报告链接规范化或聚合摘要页面。
+- 相对路径只在 artifact 位于 `outputDir` 下时生效；跨目录 artifact 仍会保留原路径。
+
+## 下一步
+- 优先继续增强报告模型：引入 HTML 报告或 run startedAt/finishedAt，使 summary duration 表达更准确。
+- 或继续扩展 artifact 生命周期：DOM dump、console/network dump、before/after step 钩子。
+- 也可回到断言能力，补齐 `ASSERT_ENABLED` / `ASSERT_DISABLED`。
+
+## 下一次建议优先阅读
+- `01_dev_progress.md` 最新一节。
+- `enterprise_web_test_platform_phase2_implementation_design.md` 第 12 章 Artifact 与报告模块设计。
+- `enterprise_web_test_platform_phase3_java_core_code_skeleton.md` 第 15 章 report-engine 骨架、第 17/22 章执行结果与编排器接入示例。
+
+## 2026-04-17 run 生命周期时间与报告 duration 最终收尾记录
+
+## 本次任务
+- 按上一轮建议继续增强最小 `report-engine` 报告模型：引入 run startedAt/finishedAt，使 `summary.durationMs` 表达真实 run wall-clock 耗时，而不是 step duration 求和。
+
+## 完成内容
+- `RunResult` 新增 `startedAt` / `finishedAt`，记录执行引擎一次 run 的生命周期时间。
+- `DefaultTestOrchestrator` 在 step 执行前后记录 run 级时间，并将其写入 `RunResult`。
+- `ReportEngine` 扩展 `generateRunReport(context, outputDir, runStartedAt, runFinishedAt, stepRecords)`；保留旧签名 default 方法，避免已有调用方必须一次性迁移。
+- `DefaultReportEngine` 在 `report.json` 顶层写出 `startedAt` / `finishedAt`，并在二者可用时用 run wall-clock duration 填充 `summary.durationMs`；缺少 run 时间时仍回退到 step duration 求和。
+- 扩展 `DefaultReportEngineTest` 覆盖顶层 run 时间与 wall-clock summary duration。
+- 扩展 `DefaultTestOrchestratorTest` 覆盖 `RunResult.startedAt` / `RunResult.finishedAt`。
+
+## 修改文件
+- `libs/execution-engine/src/main/java/com/example/webtest/execution/engine/result/RunResult.java`
+- `libs/execution-engine/src/main/java/com/example/webtest/execution/engine/orchestrator/DefaultTestOrchestrator.java`
+- `libs/execution-engine/src/test/java/com/example/webtest/execution/engine/orchestrator/DefaultTestOrchestratorTest.java`
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/ReportEngine.java`
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/DefaultReportEngine.java`
+- `libs/report-engine/src/test/java/com/example/webtest/report/engine/DefaultReportEngineTest.java`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## 当前状态
+- 受影响模块测试通过：`mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,libs/execution-engine,apps/core-platform -am test -q`
+- Maven 全量构建通过：`mvn "-Dmaven.repo.local=.m2/repository" -q package`
+- Maven 本地安装通过：`mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+- core-platform DSL smoke 通过。运行方式：
+  - 在仓库根目录先执行 install。
+  - 再进入 `apps/core-platform` 执行 `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`
+- smoke 控制台输出保持兼容，包含：
+  - `open-smoke-page GOTO SUCCESS`
+  - `assert-headline-visible ASSERT_VISIBLE SUCCESS`
+  - `assert-search-value ASSERT_VALUE SUCCESS`
+  - `assert-search-label ASSERT_ATTR SUCCESS`
+  - `click-submit CLICK SUCCESS`
+  - `assert-click-title ASSERT_TITLE SUCCESS`
+  - `capture-page SCREENSHOT SUCCESS artifact=D:\txt\edge_self_test\runs\dsl-smoke\capture-page.png`
+- 新生成的 `runs/dsl-smoke/report.json` 顶层包含 `startedAt` / `finishedAt`，`summary.durationMs` 为 run wall-clock 耗时，`capture-page` step 的 `artifactPath` / `artifacts[0].path` 仍为 `capture-page.png`。
+- 复查本项目 Edge 调试进程，无 `webtest-edge-*` 或 `remote-debugging-port` 残留。
+
+## 已知问题
+- `summary.skipped` 已预留统计，但当前执行引擎尚未产生 `SKIPPED` 状态。
+- 报告仍是最小 JSON 清单，尚未实现 HTML 报告、失败高亮、资源复制、报告链接规范化或聚合摘要页面。
+- 相对路径只在 artifact 位于 `outputDir` 下时生效；跨目录 artifact 仍会保留原路径。
+
+## 下一步
+- 优先引入最小 HTML 报告，读取当前 `report.json` 已具备的 run 时间、summary、steps 与 artifacts。
+- 或继续扩展 artifact 生命周期：DOM dump、console/network dump、before/after step 钩子。
+- 也可回到断言能力，补齐 `ASSERT_ENABLED` / `ASSERT_DISABLED`。
+
+## 下一次建议优先阅读
+- `01_dev_progress.md` 最新一节。
+- `enterprise_web_test_platform_phase2_implementation_design.md` 第 12 章 Artifact 与报告模块设计。
+- `enterprise_web_test_platform_phase3_java_core_code_skeleton.md` 第 15 章 report-engine 骨架、第 17/22 章执行结果与编排器接入示例。

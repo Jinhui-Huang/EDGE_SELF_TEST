@@ -25,6 +25,10 @@
         </dependency>
         <dependency>
             <groupId>com.example.webtest</groupId>
+            <artifactId>locator-engine</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.example.webtest</groupId>
             <artifactId>execution-context</artifactId>
         </dependency>
         <dependency>

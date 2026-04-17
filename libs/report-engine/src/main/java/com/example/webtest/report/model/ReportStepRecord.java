@@ -1,4 +1,4 @@
-package com.example.webtest.execution.engine.result;
+package com.example.webtest.report.model;
 
 import com.example.webtest.artifact.model.ArtifactRef;
 import java.nio.file.Path;
@@ -6,7 +6,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
-public class StepExecutionRecord {
+public class ReportStepRecord {
     private String stepId;
     private String stepName;
     private String action;
@@ -87,16 +87,5 @@ public class StepExecutionRecord {
 
     public void setArtifacts(List<ArtifactRef> artifacts) {
         this.artifacts = artifacts == null ? new ArrayList<>() : new ArrayList<>(artifacts);
-        this.artifactPath = this.artifacts.isEmpty() ? null : this.artifacts.get(0).getPath();
-    }
-
-    public void addArtifact(ArtifactRef artifact) {
-        if (artifact == null) {
-            return;
-        }
-        artifacts.add(artifact);
-        if (artifactPath == null) {
-            artifactPath = artifact.getPath();
-        }
     }
 }

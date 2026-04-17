@@ -2,12 +2,16 @@ package com.example.webtest.execution.engine.orchestrator;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.example.webtest.browser.page.ElementState;
 import com.example.webtest.browser.page.PageController;
 import com.example.webtest.browser.page.ScreenshotOptions;
 import com.example.webtest.dsl.model.ActionType;
+import com.example.webtest.dsl.model.FailurePolicy;
+import com.example.webtest.dsl.model.ReportPolicy;
 import com.example.webtest.dsl.model.StepDefinition;
 import com.example.webtest.dsl.model.TargetDefinition;
 import com.example.webtest.dsl.model.TestCaseDefinition;
@@ -46,10 +50,18 @@ class DefaultTestOrchestratorTest {
         RunResult result = new DefaultTestOrchestrator(pageController).execute(definition, options);
 
         assertEquals(RunStatus.SUCCESS, result.getStatus());
+        assertNotNull(result.getStartedAt());
+        assertNotNull(result.getFinishedAt());
+        assertTrue(!result.getFinishedAt().isBefore(result.getStartedAt()));
+        assertEquals(tempDir.resolve("report.json"), result.getReportPath());
+        assertTrue(Files.isRegularFile(result.getReportPath()));
         assertEquals(List.of("navigate:https://example.test/app/dashboard", "title", "screenshot"), pageController.calls);
         assertEquals(3, result.getStepRecords().size());
         assertArrayEquals(new byte[] {1, 2, 3}, Files.readAllBytes(tempDir.resolve("shot.png")));
         assertEquals(tempDir.resolve("shot.png"), result.getStepRecords().get(2).getArtifactPath());
+        assertEquals(1, result.getStepRecords().get(2).getArtifacts().size());
+        assertEquals("screenshot", result.getStepRecords().get(2).getArtifacts().get(0).getType());
+        assertEquals(tempDir.resolve("shot.png"), result.getStepRecords().get(2).getArtifacts().get(0).getPath());
     }
 
     @Test
@@ -60,14 +72,66 @@ class DefaultTestOrchestratorTest {
         definition.setSteps(List.of(
                 step("assert-title", ActionType.ASSERT_TITLE, null, "Expected"),
                 step("refresh", ActionType.REFRESH, null, null)));
+        RunOptions options = new RunOptions();
+        options.setOutputDir(tempDir);
 
-        RunResult result = new DefaultTestOrchestrator(pageController).execute(definition, new RunOptions());
+        RunResult result = new DefaultTestOrchestrator(pageController).execute(definition, options);
 
         assertEquals(RunStatus.FAILED, result.getStatus());
         assertEquals(1, result.getStepRecords().size());
         assertEquals(RunStatus.FAILED.name(), result.getStepRecords().get(0).getStatus());
         assertTrue(result.getStepRecords().get(0).getMessage().contains("Expected title"));
+        assertEquals(List.of("title", "screenshot"), pageController.calls);
+        assertEquals(tempDir.resolve("assert-title-failure.png"), result.getStepRecords().get(0).getArtifactPath());
+        assertEquals(1, result.getStepRecords().get(0).getArtifacts().size());
+        assertEquals(tempDir.resolve("assert-title-failure.png"), result.getStepRecords().get(0).getArtifacts().get(0).getPath());
+    }
+
+    @Test
+    void executeSkipsFailureScreenshotWhenReportPolicyDisablesIt() {
+        FakePageController pageController = new FakePageController();
+        pageController.title = "Actual";
+        ReportPolicy reportPolicy = new ReportPolicy();
+        reportPolicy.setScreenshotOnFailure(false);
+        TestCaseDefinition definition = new TestCaseDefinition();
+        definition.setReportPolicy(reportPolicy);
+        definition.setSteps(List.of(step("assert-title", ActionType.ASSERT_TITLE, null, "Expected")));
+        RunOptions options = new RunOptions();
+        options.setOutputDir(tempDir);
+
+        RunResult result = new DefaultTestOrchestrator(pageController).execute(definition, options);
+
+        assertEquals(RunStatus.FAILED, result.getStatus());
         assertEquals(List.of("title"), pageController.calls);
+        assertNull(result.getStepRecords().get(0).getArtifactPath());
+        assertTrue(result.getStepRecords().get(0).getArtifacts().isEmpty());
+    }
+
+    @Test
+    void executeStepFailurePolicyCanCaptureScreenshotAndContinue() {
+        FakePageController pageController = new FakePageController();
+        pageController.title = "Actual";
+        ReportPolicy reportPolicy = new ReportPolicy();
+        reportPolicy.setScreenshotOnFailure(false);
+        StepDefinition failingStep = step("assert-title", ActionType.ASSERT_TITLE, null, "Expected");
+        failingStep.setOnFailure(FailurePolicy.SCREENSHOT_AND_CONTINUE);
+        TestCaseDefinition definition = new TestCaseDefinition();
+        definition.setReportPolicy(reportPolicy);
+        definition.setSteps(List.of(
+                failingStep,
+                step("refresh", ActionType.REFRESH, null, null)));
+        RunOptions options = new RunOptions();
+        options.setOutputDir(tempDir);
+
+        RunResult result = new DefaultTestOrchestrator(pageController).execute(definition, options);
+
+        assertEquals(RunStatus.FAILED, result.getStatus());
+        assertEquals(2, result.getStepRecords().size());
+        assertEquals(RunStatus.FAILED.name(), result.getStepRecords().get(0).getStatus());
+        assertEquals(tempDir.resolve("assert-title-failure.png"), result.getStepRecords().get(0).getArtifactPath());
+        assertEquals(1, result.getStepRecords().get(0).getArtifacts().size());
+        assertEquals(RunStatus.SUCCESS.name(), result.getStepRecords().get(1).getStatus());
+        assertEquals(List.of("title", "screenshot", "reload"), pageController.calls);
     }
 
     @Test
@@ -90,7 +154,7 @@ class DefaultTestOrchestratorTest {
                 new DefaultDslParser(new DefaultDslValidator()),
                 new DefaultTestOrchestrator(pageController));
 
-        RunResult result = service.execute(dslFile, new RunOptions());
+        RunResult result = service.execute(dslFile, tempRunOptions());
 
         assertEquals(RunStatus.SUCCESS, result.getStatus());
         assertEquals(List.of("navigate:https://example.test"), pageController.calls);
@@ -104,7 +168,7 @@ class DefaultTestOrchestratorTest {
                 targetStep("fill-search", ActionType.FILL, "#search", "codex"),
                 targetStep("click-submit", ActionType.CLICK, "#submit", null)));
 
-        RunResult result = new DefaultTestOrchestrator(pageController).execute(definition, new RunOptions());
+        RunResult result = new DefaultTestOrchestrator(pageController).execute(definition, tempRunOptions());
 
         assertEquals(RunStatus.SUCCESS, result.getStatus());
         assertEquals(List.of(
@@ -126,7 +190,7 @@ class DefaultTestOrchestratorTest {
                 targetStep("wait-hidden", ActionType.WAIT_FOR_HIDDEN, "#hidden", null),
                 waitUrlStep("wait-url", "https://example.test/app/dashboard")));
 
-        RunResult result = new DefaultTestOrchestrator(pageController).execute(definition, new RunOptions());
+        RunResult result = new DefaultTestOrchestrator(pageController).execute(definition, tempRunOptions());
 
         assertEquals(RunStatus.SUCCESS, result.getStatus());
         assertEquals(List.of(
@@ -134,6 +198,31 @@ class DefaultTestOrchestratorTest {
                 "findElement:css:#submit:0",
                 "findElement:css:#hidden:0",
                 "currentUrl"), pageController.calls);
+    }
+
+    @Test
+    void executeRoutesElementAssertionsThroughAssertionEngine() {
+        FakePageController pageController = new FakePageController();
+        TestCaseDefinition definition = new TestCaseDefinition();
+        definition.setSteps(List.of(
+                targetAssertStep("assert-text", ActionType.ASSERT_TEXT, "#headline", "Hello"),
+                targetAssertStep("assert-value", ActionType.ASSERT_VALUE, "#search", "codex"),
+                attrAssertStep("assert-attr", "#search", "aria-label", "Search"),
+                targetAssertStep("assert-visible", ActionType.ASSERT_VISIBLE, "#headline", null),
+                targetAssertStep("assert-hidden", ActionType.ASSERT_NOT_VISIBLE, "#hidden", null)));
+
+        RunResult result = new DefaultTestOrchestrator(pageController).execute(definition, tempRunOptions());
+
+        assertEquals(RunStatus.SUCCESS, result.getStatus());
+        assertEquals(List.of(
+                "findElement:css:#headline:0",
+                "elementText:css:#headline:0",
+                "findElement:css:#search:0",
+                "elementValue:css:#search:0",
+                "findElement:css:#search:0",
+                "elementAttribute:css:#search:0:aria-label",
+                "findElement:css:#headline:0",
+                "findElement:css:#hidden:0"), pageController.calls);
     }
 
     private StepDefinition step(String id, ActionType action, String url, String expected) {
@@ -163,6 +252,24 @@ class DefaultTestOrchestratorTest {
         step.setAction(ActionType.WAIT_FOR_URL);
         step.setExpected(expectedUrl);
         return step;
+    }
+
+    private StepDefinition targetAssertStep(String id, ActionType action, String selector, String expected) {
+        StepDefinition step = targetStep(id, action, selector, null);
+        step.setExpected(expected);
+        return step;
+    }
+
+    private StepDefinition attrAssertStep(String id, String selector, String attributeName, String expected) {
+        StepDefinition step = targetAssertStep(id, ActionType.ASSERT_ATTR, selector, expected);
+        step.setValue(attributeName);
+        return step;
+    }
+
+    private RunOptions tempRunOptions() {
+        RunOptions options = new RunOptions();
+        options.setOutputDir(tempDir);
+        return options;
     }
 
     private static final class FakePageController implements PageController {
@@ -213,6 +320,25 @@ class DefaultTestOrchestratorTest {
             state.setVisible(!hidden);
             state.setActionable(!hidden);
             return state;
+        }
+
+        @Override
+        public String elementText(String by, String value, Integer index, ExecutionContext context) {
+            calls.add("elementText:" + by + ":" + value + ":" + index);
+            return "Hello";
+        }
+
+        @Override
+        public String elementValue(String by, String value, Integer index, ExecutionContext context) {
+            calls.add("elementValue:" + by + ":" + value + ":" + index);
+            return "codex";
+        }
+
+        @Override
+        public String elementAttribute(
+                String by, String value, Integer index, String attributeName, ExecutionContext context) {
+            calls.add("elementAttribute:" + by + ":" + value + ":" + index + ":" + attributeName);
+            return "Search";
         }
 
         @Override

@@ -4,7 +4,7 @@ steps:
   - id: open-smoke-page
     name: Open smoke page
     action: goto
-    url: "data:text/html;charset=utf-8;base64,PCFkb2N0eXBlIGh0bWw+CjxodG1sPgo8aGVhZD48dGl0bGU+RWRnZSBTZWxmIFRlc3QgRFNMIFNtb2tlPC90aXRsZT48L2hlYWQ+Cjxib2R5Pgo8bWFpbj4KPGgxPkVkZ2UgU2VsZiBUZXN0IERTTCBTbW9rZTwvaDE+CjxpbnB1dCBpZD0ic2VhcmNoIiBhcmlhLWxhYmVsPSJTZWFyY2giIC8+CjxidXR0b24gaWQ9InN1Ym1pdCIgb25jbGljaz0iZG9jdW1lbnQudGl0bGU9J0NsaWNrZWQ6ICcrZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ3NlYXJjaCcpLnZhbHVlIj5TdWJtaXQ8L2J1dHRvbj4KPC9tYWluPgo8L2JvZHk+CjwvaHRtbD4="
+    url: "data:text/html;charset=utf-8;base64,PCFkb2N0eXBlIGh0bWw+CjxodG1sPgo8aGVhZD48dGl0bGU+RWRnZSBTZWxmIFRlc3QgRFNMIFNtb2tlPC90aXRsZT48L2hlYWQ+Cjxib2R5Pgo8bWFpbj4KPGgxIGlkPSJoZWFkbGluZSI+RWRnZSBTZWxmIFRlc3QgRFNMIFNtb2tlPC9oMT4KPGlucHV0IGlkPSJzZWFyY2giIGFyaWEtbGFiZWw9IlNlYXJjaCIgLz4KPGRpdiBpZD0iaGlkZGVuLXBhbmVsIiBzdHlsZT0iZGlzcGxheTpub25lIj5IaWRkZW48L2Rpdj4KPGJ1dHRvbiBpZD0ic3VibWl0IiBvbmNsaWNrPSJkb2N1bWVudC50aXRsZT0nQ2xpY2tlZDogJytkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnc2VhcmNoJykudmFsdWUiPlN1Ym1pdDwvYnV0dG9uPgo8L21haW4+CjwvYm9keT4KPC9odG1sPg=="
   - id: assert-title
     name: Assert title
     action: assert_title
@@ -13,7 +13,20 @@ steps:
     name: Wait for smoke page URL
     action: wait_for_url
     timeoutMs: 3000
-    expected: "data:text/html;charset=utf-8;base64,PCFkb2N0eXBlIGh0bWw+CjxodG1sPgo8aGVhZD48dGl0bGU+RWRnZSBTZWxmIFRlc3QgRFNMIFNtb2tlPC90aXRsZT48L2hlYWQ+Cjxib2R5Pgo8bWFpbj4KPGgxPkVkZ2UgU2VsZiBUZXN0IERTTCBTbW9rZTwvaDE+CjxpbnB1dCBpZD0ic2VhcmNoIiBhcmlhLWxhYmVsPSJTZWFyY2giIC8+CjxidXR0b24gaWQ9InN1Ym1pdCIgb25jbGljaz0iZG9jdW1lbnQudGl0bGU9J0NsaWNrZWQ6ICcrZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ3NlYXJjaCcpLnZhbHVlIj5TdWJtaXQ8L2J1dHRvbj4KPC9tYWluPgo8L2JvZHk+CjwvaHRtbD4="
+    expected: "data:text/html;charset=utf-8;base64,PCFkb2N0eXBlIGh0bWw+CjxodG1sPgo8aGVhZD48dGl0bGU+RWRnZSBTZWxmIFRlc3QgRFNMIFNtb2tlPC90aXRsZT48L2hlYWQ+Cjxib2R5Pgo8bWFpbj4KPGgxIGlkPSJoZWFkbGluZSI+RWRnZSBTZWxmIFRlc3QgRFNMIFNtb2tlPC9oMT4KPGlucHV0IGlkPSJzZWFyY2giIGFyaWEtbGFiZWw9IlNlYXJjaCIgLz4KPGRpdiBpZD0iaGlkZGVuLXBhbmVsIiBzdHlsZT0iZGlzcGxheTpub25lIj5IaWRkZW48L2Rpdj4KPGJ1dHRvbiBpZD0ic3VibWl0IiBvbmNsaWNrPSJkb2N1bWVudC50aXRsZT0nQ2xpY2tlZDogJytkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnc2VhcmNoJykudmFsdWUiPlN1Ym1pdDwvYnV0dG9uPgo8L21haW4+CjwvYm9keT4KPC9odG1sPg=="
+  - id: assert-headline-visible
+    name: Assert headline visible
+    action: assert_visible
+    target:
+      by: css
+      value: "#headline"
+  - id: assert-headline-text
+    name: Assert headline text
+    action: assert_text
+    target:
+      by: css
+      value: "#headline"
+    expected: Edge Self Test DSL Smoke
   - id: wait-search
     name: Wait for search input
     action: wait_for_visible
@@ -22,12 +35,18 @@ steps:
       by: css
       value: "#search"
   - id: wait-absent
-    name: Wait for absent panel
+    name: Wait for hidden panel
     action: wait_for_hidden
     timeoutMs: 3000
     target:
       by: css
-      value: "#absent-panel"
+      value: "#hidden-panel"
+  - id: assert-panel-hidden
+    name: Assert panel hidden
+    action: assert_not_visible
+    target:
+      by: css
+      value: "#hidden-panel"
   - id: fill-search
     name: Fill search input
     action: fill
@@ -36,6 +55,21 @@ steps:
       by: css
       value: "#search"
     value: codex
+  - id: assert-search-value
+    name: Assert search value
+    action: assert_value
+    target:
+      by: css
+      value: "#search"
+    expected: codex
+  - id: assert-search-label
+    name: Assert search label
+    action: assert_attr
+    target:
+      by: css
+      value: "#search"
+    value: aria-label
+    expected: Search
   - id: click-submit
     name: Click submit button
     action: click

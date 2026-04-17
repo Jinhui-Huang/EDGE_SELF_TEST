@@ -48,6 +48,31 @@ public class DefaultDslValidator implements DslValidator {
                 && isBlank(step.getExpected())) {
             throw new BaseException(ErrorCodes.DSL_VALIDATION_FAILED, "Assertion step requires expected");
         }
+        if (step.getAction() == ActionType.ASSERT_TEXT && step.getTarget() == null) {
+            throw new BaseException(ErrorCodes.DSL_VALIDATION_FAILED, "Target is required for text assertion");
+        }
+        if (step.getAction() == ActionType.ASSERT_TEXT && isBlank(step.getExpected())) {
+            throw new BaseException(ErrorCodes.DSL_VALIDATION_FAILED, "Text assertion requires expected");
+        }
+        if (step.getAction() == ActionType.ASSERT_VALUE && step.getTarget() == null) {
+            throw new BaseException(ErrorCodes.DSL_VALIDATION_FAILED, "Target is required for value assertion");
+        }
+        if (step.getAction() == ActionType.ASSERT_VALUE && isBlank(step.getExpected())) {
+            throw new BaseException(ErrorCodes.DSL_VALIDATION_FAILED, "Value assertion requires expected");
+        }
+        if (step.getAction() == ActionType.ASSERT_ATTR && step.getTarget() == null) {
+            throw new BaseException(ErrorCodes.DSL_VALIDATION_FAILED, "Target is required for attribute assertion");
+        }
+        if (step.getAction() == ActionType.ASSERT_ATTR && step.getValue() == null) {
+            throw new BaseException(ErrorCodes.DSL_VALIDATION_FAILED, "Attribute assertion requires value");
+        }
+        if (step.getAction() == ActionType.ASSERT_ATTR && isBlank(step.getExpected())) {
+            throw new BaseException(ErrorCodes.DSL_VALIDATION_FAILED, "Attribute assertion requires expected");
+        }
+        if ((step.getAction() == ActionType.ASSERT_VISIBLE || step.getAction() == ActionType.ASSERT_NOT_VISIBLE)
+                && step.getTarget() == null) {
+            throw new BaseException(ErrorCodes.DSL_VALIDATION_FAILED, "Target is required for visibility assertion");
+        }
     }
 
     private boolean isBlank(String value) {
