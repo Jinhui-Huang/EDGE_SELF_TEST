@@ -256,3 +256,92 @@ G. 计划修改的文件列表
 - 最新 DSL smoke 通过，输出目录包含 `D:\txt\edge_self_test\runs\dsl-smoke\report.json`、`D:\txt\edge_self_test\runs\dsl-smoke\report.html` 和 `capture-page.png`。
 - 复查未发现带 `webtest-edge-*` 或 `remote-debugging-port` 的本项目 Edge 残留进程。
 - 下一步建议：增强 HTML 报告可读性和失败态呈现，例如失败高亮、artifact 预览、从 HTML 链接打开截图；或继续扩展 artifact 生命周期 DOM dump、console/network dump、before/after step 钩子；也可回到断言能力补 `ASSERT_ENABLED` / `ASSERT_DISABLED`。
+
+【最新接手记录 - 2026-04-17 进度同步】
+- 用户要求“更新修正进度和你的记忆，不要再忘记了”。
+- 当前最新事实以本条为准：`master` 已在 `f98b9c2 Add minimal HTML run report`，并与 `origin/master` 对齐；同步前工作区干净。
+- `01_dev_progress.md` 中已有 `2026-04-17 最小 HTML 报告记录`，但后面又追加了较早主题记录，导致只看文件尾部会误判；本轮已在 `01_dev_progress.md` 末尾追加“最新进度同步与接手提醒”。
+- 最新功能状态：`DefaultReportEngine` 同时生成 `report.json` 与 `report.html`；HTML 报告包含 runId、startedAt、finishedAt、summary、steps、状态、耗时、message 和 artifact 相对链接。
+- 兼容性状态：`generateRunReport(...)` 返回值仍是 `report.json`；`RunResult.reportPath` 仍指向 JSON；core-platform 控制台输出不额外打印 HTML 路径。
+- 已验证通过：report/execution/core-platform 相关测试、全量 `package`、本地 `install`、core-platform DSL smoke。
+- smoke 输出目录应包含 `D:\txt\edge_self_test\runs\dsl-smoke\report.json`、`D:\txt\edge_self_test\runs\dsl-smoke\report.html`、`capture-page.png`。
+- 下一步优先：增强 HTML 报告可读性和失败态呈现，例如失败高亮、artifact 图片预览、从 HTML 链接打开截图；备选是继续 artifact 生命周期 DOM dump、console/network dump、before/after step 钩子，或补 `ASSERT_ENABLED` / `ASSERT_DISABLED`。
+
+【最新接手记录 - 2026-04-17】
+- 本轮继续增强 `report-engine` 的 HTML 报告可读性，保持 `report.json`、`RunResult.reportPath` 和 core-platform 控制台输出兼容。
+- `DefaultReportEngine` 生成的 `report.html` 已新增失败态呈现：Failed summary 指标突出显示；存在失败步骤时在 summary 下方显示失败提示；`FAILED` step 行增加高亮 class。
+- artifact 列保留原有链接；当 artifact `contentType` 是 `image/*` 或路径扩展名是 `.png` / `.jpg` / `.jpeg` / `.gif` / `.webp` 时，会生成图片预览，截图链接仍可直接打开。
+- `DefaultReportEngineTest` 已覆盖失败指标样式、失败提示、失败行 class 和截图预览 HTML。
+- 当前验证通过：
+  1. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,libs/execution-engine,apps/core-platform -am test -q`
+  2. `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+  3. `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+  4. 在 `apps/core-platform` 执行 `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`
+- 最新 DSL smoke 通过，输出目录 `D:\txt\edge_self_test\runs\dsl-smoke` 包含 `report.json`、`report.html`、`capture-page.png`；`report.html` 中 `capture-page.png` 已生成图片预览。
+- 已知问题：HTML 报告仍是静态单页清单，尚未支持筛选、排序、折叠详情、失败步骤锚点导航或独立报告索引页；非图片 artifact 仍只显示链接；`RunResult.reportPath` 仍指向 `report.json`。
+- 下一步建议：继续增强 HTML 报告交互和可读性，优先做失败步骤快速跳转、按状态筛选、message 换行/截断、artifact 详情信息展示；备选是扩展 artifact 生命周期 DOM dump / console-network dump / before-after step 钩子，或补 `ASSERT_ENABLED` / `ASSERT_DISABLED`。
+【最新接手记录 - 2026-04-17】
+- 本轮继续增强 `report-engine` 的 HTML 报告交互和可读性，保持 `report.json`、`RunResult.reportPath` 和 core-platform 控制台输出兼容。
+- `DefaultReportEngine` 生成的 `report.html` 已新增状态筛选按钮：All / Success / Failed / Skipped，通过内联脚本按 `data-status` 过滤 step 行。
+- 失败提示区域现在会列出失败 step 的快速跳转链接；step 行新增 `step-N` 锚点，失败行继续保留高亮 class。
+- step message 改为 `<pre class="message">`，保留换行并支持长文本自动换行。
+- artifact 列现在展示 `type`、`contentType`、`createdAt` 元信息；图片 artifact 的链接和预览继续保留。
+- `DefaultReportEngineTest` 已覆盖状态筛选按钮、失败 step 锚点、message 展示、artifact 元信息和图片预览。
+- 当前验证通过：
+  1. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,libs/execution-engine,apps/core-platform -am test -q`
+  2. `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+  3. `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+  4. 在 `apps/core-platform` 执行 `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`
+- 最新 DSL smoke 通过，输出目录 `D:\txt\edge_self_test\runs\dsl-smoke` 包含 `report.json`、`report.html`、`capture-page.png`；`report.html` 已包含状态筛选按钮、artifact 元信息和截图预览。
+- 复查未发现带 `webtest-edge-*` 或 `remote-debugging-port` 的本项目 Edge 调试残留进程。
+- 已知问题：HTML 报告仍是单页静态报告，尚未支持排序、折叠详情、失败步骤键盘导航或独立报告索引页；非图片 artifact 尚无专门预览；`RunResult.reportPath` 仍指向 `report.json`。
+- 下一步建议：优先继续增强 HTML 报告的 step 详情折叠、失败步骤导航区、慢步骤高亮/排序；备选是扩展 artifact 生命周期 DOM dump / console-network dump / before-after step 钩子，或补齐 `ASSERT_ENABLED` / `ASSERT_DISABLED`。
+【最新接手记录 - 2026-04-17】
+- 本轮继续增强 `report-engine` 的 HTML 报告可读性，保持 `report.json`、`RunResult.reportPath` 和 core-platform 控制台输出兼容。
+- `DefaultReportEngine` 生成的 `report.html` 已新增 step `Details` 折叠区；详情包含 stepName、startedAt、finishedAt、message 和 artifact 展示，失败步骤默认展开。
+- step 行现在带 `data-index`、`data-duration`、`data-status`；工具区新增 `Original order` 和 `Slowest first`，支持按原始顺序或耗时倒序重排，并能与状态筛选组合使用。
+- 当前 run 中耗时最长且 duration 大于 0 的 step 会增加 `slow` class，用左侧强调线突出显示。
+- `DefaultReportEngineTest` 已覆盖折叠详情、失败详情默认展开、慢步骤 class、排序按钮与排序脚本。
+- 当前验证通过：
+  1. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine -am test -q`
+  2. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,libs/execution-engine,apps/core-platform -am test -q`
+  3. `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+  4. `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+  5. 在 `apps/core-platform` 执行 `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`
+- 最新 DSL smoke 通过，输出目录 `D:\txt\edge_self_test\runs\dsl-smoke` 包含 `report.json`、`report.html`、`capture-page.png`；`report.html` 已包含 `step-details`、`Slowest first`、`data-duration`、`detail-meta` 和截图预览。
+- 复查未发现带 `webtest-edge-*` 或 `remote-debugging-port` 的本项目 Edge 调试残留进程。
+- 已知问题：HTML 报告仍是单页静态报告；慢步骤高亮只标记本次 run 中耗时最长的正耗时 step；非图片 artifact 尚无专门预览；`RunResult.reportPath` 仍指向 `report.json`。
+- 下一步建议：继续增强 HTML 报告的失败步骤键盘导航、top N 慢步骤摘要、筛选计数或独立报告索引页；备选是扩展 artifact 生命周期 DOM dump / console-network dump / before-after step 钩子，或补齐 `ASSERT_ENABLED` / `ASSERT_DISABLED`。
+【最新接手记忆 - 2026-04-17】
+- 本轮按“继续下一步”继续增强 `report-engine` 的 HTML 报告可读性，保持 `report.json`、`RunResult.reportPath` 和 core-platform 控制台输出兼容。
+- `DefaultReportEngine` 生成的 `report.html` 新增 `Slowest steps` 摘要区：按 `durationMs` 倒序列出最多 3 个正耗时 step，并链接到对应 `step-N` 锚点。
+- 状态筛选按钮现在显示计数：`All (n)`、`Success (n)`、`Failed (n)`、`Skipped (n)`，原有浏览器端 `data-filter` 筛选逻辑继续使用。
+- 上一轮已有能力仍保留：失败 step 高亮、失败提示快速跳转、step details 折叠、artifact 元信息、图片 artifact 预览、原始顺序/慢步骤排序。
+- `DefaultReportEngineTest` 已覆盖筛选计数和慢步骤摘要链接。
+- 当前验证通过：
+  1. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine -am test -q`
+  2. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,libs/execution-engine,apps/core-platform -am test -q`
+  3. `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+  4. `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+  5. 在 `apps/core-platform` 执行 `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`
+- 最新 smoke 输出目录 `D:\txt\edge_self_test\runs\dsl-smoke` 包含 `report.json`、`report.html`、`capture-page.png`；`report.html` 已确认包含 `Slowest steps` 和状态筛选计数。
+- 复查未发现带 `webtest-edge-*` 或 `remote-debugging-port` 的本项目 Edge 调试进程残留。
+- 已知问题：HTML 报告仍是单页静态报告；慢步骤摘要固定最多 3 条；非图片 artifact 尚无专门预览；`RunResult.reportPath` 仍指向 `report.json`。
+- 下一步建议：继续增强 HTML 报告键盘导航和失败步骤导航区，或生成独立报告索引页；备选是 artifact 生命周期 DOM dump / console-network dump / before-after step 钩子，或补齐 `ASSERT_ENABLED` / `ASSERT_DISABLED`。
+
+【最新接手记忆 - 2026-04-17】
+- 本轮继续增强 `report-engine` 的 HTML 报告交互，保持 `report.json`、`RunResult.reportPath` 和 core-platform 控制台输出兼容。
+- `DefaultReportEngine` 生成的 `report.html` 新增键盘提示区：`f` 第一个失败 step，`n` 下一个失败 step，`p` 上一个失败 step，`s` 最慢 step。
+- 内联脚本新增失败 step 游标、慢 step 定位、详情自动展开、`history.replaceState` 锚点同步；step 行新增 `:target` 高亮。
+- 之前已有能力继续保留：失败高亮、失败快速链接、状态筛选计数、step details、artifact 元信息、图片 artifact 预览、原始顺序/慢步骤排序、Slowest steps top 3 摘要。
+- `DefaultReportEngineTest` 已覆盖键盘提示、失败导航脚本、慢步骤快捷跳转脚本。
+- 当前验证通过：
+  1. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine -am test -q`
+  2. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,libs/execution-engine,apps/core-platform -am test -q`
+  3. `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+  4. `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+  5. 在 `apps/core-platform` 执行 `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`
+- 最新 smoke 输出目录 `D:\txt\edge_self_test\runs\dsl-smoke` 包含 `report.json`、`report.html`、`capture-page.png`；`report.html` 已确认包含 `Keyboard:`、`Slowest steps` 和状态筛选计数。
+- 复查未发现带 `webtest-edge-*` 或 `remote-debugging-port` 的本项目 Edge 调试残留进程。
+- 已知问题：HTML 报告仍是单页静态报告；慢步骤摘要固定最多 3 条；非图片 artifact 尚无专门预览；`RunResult.reportPath` 仍指向 `report.json`。
+- 下一步建议：优先生成独立报告索引页；或扩展 artifact 生命周期 DOM dump / console-network dump / before-after step 钩子；也可补 `ASSERT_ENABLED` / `ASSERT_DISABLED`。
