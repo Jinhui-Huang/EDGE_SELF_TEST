@@ -241,3 +241,18 @@ G. 计划修改的文件列表
 - 最新 DSL smoke 通过，`runs/dsl-smoke/report.json` 顶层包含 `startedAt` / `finishedAt`，`summary.durationMs` 为 run wall-clock 耗时，`capture-page` 的 `artifactPath` 与 `artifacts[0].path` 均为 `capture-page.png`。
 - 复查未发现带 `webtest-edge-*` 或 `remote-debugging-port` 的本项目 Edge 残留进程。
 - 下一步建议：优先引入最小 HTML 报告，读取当前 `report.json` 已具备的 run 时间、summary、steps 与 artifacts；或继续扩展 artifact 生命周期 DOM dump、console/network dump、before/after step 钩子；也可回到断言能力补 `ASSERT_ENABLED` / `ASSERT_DISABLED`。
+
+【最新接手记录 - 2026-04-17】
+- 本轮先按用户要求提交并推送上一轮改动：`e6b37a5 Add assertion artifacts and reporting flow` 已推送到 `origin/master`。
+- 本轮随后实现最小 HTML 报告：`DefaultReportEngine` 现在在写出 `${outputDir}/report.json` 的同时写出 `${outputDir}/report.html`。
+- HTML 报告读取同一份内存 report 数据，包含 runId、startedAt、finishedAt、summary 指标、steps 表格、状态、耗时、message，以及 artifact 相对链接。
+- `generateRunReport(...)` 返回值保持为 `report.json` 路径，`RunResult.reportPath`、core-platform 控制台输出和既有 JSON 结构保持兼容。
+- `DefaultReportEngineTest` 已覆盖 `report.html` 存在、runId、summary、step/action 和 artifact 链接内容。
+- 当前验证通过：
+  1. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,libs/execution-engine,apps/core-platform -am test -q`
+  2. `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+  3. `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+  4. 在 `apps/core-platform` 执行 `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`
+- 最新 DSL smoke 通过，输出目录包含 `D:\txt\edge_self_test\runs\dsl-smoke\report.json`、`D:\txt\edge_self_test\runs\dsl-smoke\report.html` 和 `capture-page.png`。
+- 复查未发现带 `webtest-edge-*` 或 `remote-debugging-port` 的本项目 Edge 残留进程。
+- 下一步建议：增强 HTML 报告可读性和失败态呈现，例如失败高亮、artifact 预览、从 HTML 链接打开截图；或继续扩展 artifact 生命周期 DOM dump、console/network dump、before/after step 钩子；也可回到断言能力补 `ASSERT_ENABLED` / `ASSERT_DISABLED`。

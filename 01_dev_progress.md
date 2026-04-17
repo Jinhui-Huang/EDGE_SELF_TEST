@@ -1045,6 +1045,52 @@
 - `enterprise_web_test_platform_phase2_implementation_design.md` 第 12 章 Artifact 与报告模块设计。
 - `enterprise_web_test_platform_phase3_java_core_code_skeleton.md` 第 15 章 report-engine 骨架、第 17/22 章执行结果与编排器接入示例。
 
+## 2026-04-17 最小 HTML 报告记录
+
+## 本次任务
+- 先按用户要求提交并推送上一轮改动，然后继续下一步：基于现有 `report.json` 数据实现最小 HTML 报告。
+
+## 完成内容
+- 已提交并推送上一轮改动：`e6b37a5 Add assertion artifacts and reporting flow` -> `origin/master`。
+- `DefaultReportEngine` 现在在生成 `${outputDir}/report.json` 的同时生成 `${outputDir}/report.html`。
+- HTML 报告复用同一份 report 数据，展示 runId、startedAt、finishedAt、summary 指标、steps 表格、状态、耗时、message 和 artifact 链接。
+- `generateRunReport(...)` 返回值仍为 `report.json` 路径，保持 `RunResult.reportPath`、core-platform 控制台输出和既有 JSON 结构兼容。
+- 扩展 `DefaultReportEngineTest`，覆盖 `report.html` 文件存在、runId、summary、step/action 和 artifact 链接内容。
+
+## 修改文件
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/DefaultReportEngine.java`
+- `libs/report-engine/src/test/java/com/example/webtest/report/engine/DefaultReportEngineTest.java`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## 当前状态
+- 受影响模块测试通过：`mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,libs/execution-engine,apps/core-platform -am test -q`
+- Maven 全量构建通过：`mvn "-Dmaven.repo.local=.m2/repository" -q package`
+- Maven 本地安装通过：`mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+- core-platform DSL smoke 通过。运行方式：
+  - 在仓库根目录先执行 install。
+  - 再进入 `apps/core-platform` 执行 `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`
+- 最新 DSL smoke 输出目录包含：
+  - `D:\txt\edge_self_test\runs\dsl-smoke\report.json`
+  - `D:\txt\edge_self_test\runs\dsl-smoke\report.html`
+  - `D:\txt\edge_self_test\runs\dsl-smoke\capture-page.png`
+- 复查本项目 Edge 调试进程，无 `webtest-edge-*` 或 `remote-debugging-port` 残留。
+
+## 已知问题
+- HTML 报告仍是最小可读清单，尚未做 artifact 图片预览、失败步骤视觉高亮增强、资源复制、报告索引页或跨目录 artifact 链接规范化。
+- `summary.skipped` 已预留统计，但当前执行引擎尚未产生 `SKIPPED` 状态。
+- `RunResult.reportPath` 当前仍指向 `report.json`，HTML 路径暂未进入执行结果模型；调用方可按约定从 `outputDir/report.html` 获取。
+
+## 下一步
+- 优先增强 HTML 报告可读性：失败态呈现、artifact 截图预览、打开截图链接、基础样式整理。
+- 或继续扩展 artifact 生命周期：DOM dump、console/network dump、before/after step 钩子。
+- 也可回到断言能力，补齐 `ASSERT_ENABLED` / `ASSERT_DISABLED`。
+
+## 下一次建议优先阅读
+- `01_dev_progress.md` 最新一节。
+- `enterprise_web_test_platform_phase2_implementation_design.md` 第 12 章 Artifact 与报告模块设计。
+- `enterprise_web_test_platform_phase3_java_core_code_skeleton.md` 第 15 章 report-engine 骨架、第 17/22 章执行结果与编排器接入示例。
+
 ## 2026-04-17 run 生命周期时间与报告 duration 收尾记录
 
 ## 本次任务

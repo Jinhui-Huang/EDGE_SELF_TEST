@@ -69,5 +69,14 @@ class DefaultReportEngineTest {
         assertEquals("shot.png", report.get("steps").get(0).get("artifactPath").asText());
         assertEquals("screenshot", report.get("steps").get(0).get("artifacts").get(0).get("type").asText());
         assertEquals("shot.png", report.get("steps").get(0).get("artifacts").get(0).get("path").asText());
+
+        Path htmlReportPath = tempDir.resolve("report.html");
+        assertTrue(Files.isRegularFile(htmlReportPath));
+        String html = Files.readString(htmlReportPath);
+        assertTrue(html.contains("Run ID: run-1"));
+        assertTrue(html.contains("<strong>2</strong>"));
+        assertTrue(html.contains("capture-page"));
+        assertTrue(html.contains("ASSERT_TITLE"));
+        assertTrue(html.contains("href=\"shot.png\""));
     }
 }
