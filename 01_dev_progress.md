@@ -8,14 +8,15 @@
 # 1. 当前阶段
 
 ## 当前阶段
-- 当前阶段：Phase 0：架构底座
-- 当前阶段目标：初始化 Maven 多模块工程，逐步打通 Java 核心最小执行链路
-- 当前主线任务：仓库初始化、工程骨架初始化、Java 核心基础模块骨架落地
+- 当前阶段：Phase 2：稳定性增强
+- 当前阶段目标：在已打通 Java 核心最小闭环的基础上，增强等待、断言、产物采集、报告中心、Network/Console 观测与报告治理能力
+- 当前主线任务：继续完善报告中心与产物生命周期治理，同时保持 DSL smoke、HTML/JSON 报告和 CLI/API 清理能力可验证
 
 ## 阶段判断说明
-- 当前工作区此前只有设计文档，没有源码工程。
-- 因此不能判定为 Phase 1 或更高阶段。
-- 当前最接近 `enterprise_web_test_platform_tech_design.md` 中的 Phase 0：架构底座。
+- Phase 0 的 Maven 多模块工程、Edge/CDP 启动、基础截图和核心 Java 骨架已完成。
+- Phase 1 的 goto/fill/click/wait/assert/screenshot/失败截图/HTML 报告初版已基本打通，并通过 `dsl-smoke` 持续验证。
+- 当前已进入 Phase 2 稳定性增强：已完成 Console/Network 采集、Network body sidecar、报告索引、报告保留清理、artifact-only pruning、缺失/已裁剪 artifact 元数据标记等能力。
+- 尚未完整进入 Phase 3：项目管理、用例管理、套件执行、环境管理、数据集、失败重跑等平台化管理能力仍未落地。
 
 ---
 
@@ -26,18 +27,21 @@
 - [x] 初始化 git 仓库
 - [x] 初始化 Maven 多模块目录与根构建配置
 - [x] 完成 common-core、common-json、dsl-model、dsl-parser 基础 Java 骨架
+- [x] 打通 Edge/CDP 最小运行链路、DSL smoke、基础 DOM 交互、等待、断言、截图、失败截图
+- [x] 完成最小 JSON/HTML 报告、报告索引、失败/慢步骤导航、artifact 预览、Console/Network dump、Network body sidecar
+- [x] 完成报告保留治理：keep-latest、older-than、status、size quota、artifact-only pruning、缺失/已裁剪 artifact 元数据标记
 
 ## 进行中
 - [x] Java 核心基础模块代码骨架
 - [x] CDP Client 与 Browser Core 接口骨架
+- [x] Report Engine 稳定性增强与报告中心维护能力
 
 ## 未开始
-- [ ] 最小浏览器链路：启动 Edge、连接 CDP、打开页面、截图
-- [ ] DSL 执行链路
 - [ ] Native Messaging Host
 - [ ] Edge 插件 TypeScript 实现
 - [ ] DB 断言
 - [ ] Agent 辅助层
+- [ ] Phase 3 平台化管理能力：项目/用例/套件/环境/数据集/失败重跑
 
 ---
 
@@ -1023,6 +1027,7 @@
 ## 修改文件
 - `libs/report-engine/src/main/java/com/example/webtest/report/engine/DefaultReportEngine.java`
 - `libs/report-engine/src/test/java/com/example/webtest/report/engine/DefaultReportEngineTest.java`
+- `00_project_index.md`
 - `01_dev_progress.md`
 - `memory.txt`
 
@@ -2634,3 +2639,127 @@
 ## Next Step
 - Prefer adding in-report cleanup affordances or a small maintenance CLI/report command to re-mark legacy pruned reports.
 - Alternative: make the network body spool orphan grace period configurable.
+
+## 2026-04-17 legacy pruned artifact maintenance record
+
+## Task
+- Updated the current phase judgment from the stale Phase 0 entry to Phase 2 stability enhancement, then continued the documented next step by adding a maintenance command for legacy reports whose artifact files were pruned before metadata markers existed.
+
+## Completed
+- Added `ReportMaintenanceResult`.
+- Extended `ReportEngine` with `markMissingArtifactsPruned(reportRoot, dryRun)`.
+- `DefaultReportEngine` now scans first-level report run directories, detects unmarked artifact links whose files are missing, and can rewrite the run's `report.json` and `report.html` with the same pruned metadata used by artifact-only cleanup:
+  - artifact entries get `pruned: true` and `prunedAt`.
+  - legacy step-level `artifactPath` gets `artifactPruned: true` and `artifactPrunedAt`.
+  - regenerated HTML renders those artifacts as non-clickable removed labels instead of broken links.
+- Dry-run maintenance reports matching artifact paths without mutating report files.
+- Added `core-platform report-maintenance [reportRoot] --mark-missing-artifacts [--apply|--dry-run]`.
+- Updated the top-level current phase section in this file to reflect Phase 2 status and the remaining Phase 3 gap.
+
+## Modified Files
+- `apps/core-platform/src/main/java/com/example/webtest/platform/CorePlatformApp.java`
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/ReportEngine.java`
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/ReportMaintenanceResult.java`
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/DefaultReportEngine.java`
+- `libs/report-engine/src/test/java/com/example/webtest/report/engine/DefaultReportEngineTest.java`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,apps/core-platform -am test -q`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+- Passed from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=report-maintenance --help"`
+- Passed from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=report-maintenance ..\..\runs --mark-missing-artifacts --dry-run"`; output scanned 1 run, updated 0 runs, would mark 0 artifacts.
+- Passed from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`; latest DSL smoke remained successful with 16 successful steps.
+- Rechecked local Edge debug processes after smoke; no `msedge.exe` project `webtest-edge-*` / `remote-debugging-port` process remained.
+- Passed: `git diff --check` (line-ending warnings only)
+
+## Known Gaps
+- Maintenance only marks report-referenced artifact paths that are missing; it does not sweep unreferenced files.
+- Maintenance is CLI/API driven; there is still no in-report browser action.
+- Existing reports need the maintenance command to be run with `--apply` before their broken links are rewritten.
+
+## Next Step
+- Prefer adding in-report cleanup affordances for report cleanup/maintenance discovery, without attempting browser-side deletion.
+- Alternative: make the network body spool orphan grace period configurable.
+
+## 2026-04-17 in-report cleanup affordance record
+
+## Task
+- Continued from the legacy pruned artifact maintenance command by adding static report-page guidance for cleanup and maintenance discovery.
+
+## Completed
+- `runs/index.html` generation now includes a Report maintenance note with dry-run-first command examples:
+  - `report-cleanup runs --dry-run --keep-latest 20`
+  - `report-cleanup runs --dry-run --keep-latest 20 --prune-artifacts-only`
+  - `report-maintenance runs --mark-missing-artifacts --dry-run`
+- Individual `report.html` generation now includes an Artifacts note that points users to artifact pruning and missing-artifact marker commands.
+- The affordance is informational only; no browser-side deletion or mutation action was added.
+- Updated report-engine test assertions to cover the new index and run-report guidance.
+- Regenerated the current smoke report so `runs/index.html` and `runs/dsl-smoke/report.html` show the new guidance.
+
+## Modified Files
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/DefaultReportEngine.java`
+- `libs/report-engine/src/test/java/com/example/webtest/report/engine/DefaultReportEngineTest.java`
+- `runs/index.html`
+- `runs/dsl-smoke/report.html`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,apps/core-platform -am test -q`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+- Passed from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`; latest DSL smoke remained successful with 16 successful steps.
+- Confirmed generated `runs/index.html` contains the Report maintenance command note.
+- Confirmed generated `runs/dsl-smoke/report.html` contains the Artifacts maintenance command note.
+- Rechecked local Edge debug processes after smoke; no `msedge.exe` project `webtest-edge-*` / `remote-debugging-port` process remained.
+
+## Known Gaps
+- The in-report affordance is static guidance only; cleanup and maintenance still run through CLI/API.
+- Maintenance still only marks report-referenced missing artifacts and does not sweep unreferenced files.
+- Existing report HTML files need regeneration or maintenance cleanup to show the new guidance.
+
+## Next Step
+- Prefer making the network body spool orphan grace period configurable.
+- Alternative: add deeper report storage diagnostics such as artifact totals by type/run.
+
+## 2026-04-17 configurable network body spool cleanup record
+
+## Task
+- Continued from in-report cleanup affordances by making the orphaned network body spool startup cleanup grace period configurable.
+
+## Completed
+- `DefaultPageController` now keeps the existing default 1 hour orphan cleanup grace period, but exposes two configuration paths:
+  - JVM system property `webtest.networkBodySpool.orphanMinAgeSeconds`.
+  - constructor injection with `Duration` for programmatic/test wiring.
+- Startup cleanup still scans only `webtest-network-body-*.tmp` files in the configured temp directory and remains best-effort.
+- Invalid configured grace periods fail fast:
+  - negative durations are rejected.
+  - non-numeric system property values are rejected.
+- Added browser-core tests for custom grace-period cleanup and invalid system-property parsing.
+
+## Modified Files
+- `libs/browser-core/src/main/java/com/example/webtest/browser/page/DefaultPageController.java`
+- `libs/browser-core/src/test/java/com/example/webtest/browser/page/DefaultPageControllerTest.java`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/browser-core -am test -q`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/browser-core,libs/execution-engine,apps/core-platform -am test -q`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+- Passed from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`; latest DSL smoke remained successful with 16 successful steps.
+- Rechecked local Edge debug processes after smoke; no `msedge.exe` project `webtest-edge-*` / `remote-debugging-port` process remained.
+- Passed: `git diff --check` (line-ending warnings only)
+
+## Known Gaps
+- The setting is currently JVM/property/programmatic configuration only; there is no DSL field or CLI flag for it.
+- Startup cleanup still targets only network body spool temp files, not unrelated temp files or report artifacts.
+- CDP can still transiently allocate large response bodies before spooling.
+
+## Next Step
+- Prefer adding report storage diagnostics such as artifact totals by type/run.
+- Alternative: expose the network body spool grace period through DSL/run options if runtime scenario-level control becomes necessary.

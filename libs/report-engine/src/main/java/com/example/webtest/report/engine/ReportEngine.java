@@ -19,4 +19,6 @@ public interface ReportEngine {
             List<ReportStepRecord> stepRecords);
 
     ReportCleanupResult cleanupReportRuns(Path reportRoot, ReportCleanupOptions options);
+
+    ReportMaintenanceResult markMissingArtifactsPruned(Path reportRoot, boolean dryRun);
 }

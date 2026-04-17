@@ -27,13 +27,17 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 public class DefaultPageController implements PageController {
+    public static final String ORPHANED_NETWORK_BODY_SPOOL_MIN_AGE_SECONDS_PROPERTY =
+            "webtest.networkBodySpool.orphanMinAgeSeconds";
+
     private static final int MAX_CAPTURED_BODY_CHARS = 12_000;
     private static final String NETWORK_BODY_SPOOL_PREFIX = "webtest-network-body-";
     private static final String NETWORK_BODY_SPOOL_SUFFIX = ".tmp";
-    private static final Duration ORPHANED_NETWORK_BODY_SPOOL_MIN_AGE = Duration.ofHours(1);
+    private static final Duration DEFAULT_ORPHANED_NETWORK_BODY_SPOOL_MIN_AGE = Duration.ofHours(1);
 
     private final CdpClient cdpClient;
     private final Path tempDirectory;
+    private final Duration orphanedNetworkBodySpoolMinAge;
     private final List<ConsoleEvent> consoleEvents = new CopyOnWriteArrayList<>();
     private final List<NetworkEvent> networkEvents = new CopyOnWriteArrayList<>();
     private final CdpEventListener consoleListener = this::recordConsoleEvent;
@@ -45,12 +49,24 @@ public class DefaultPageController implements PageController {
     private volatile boolean networkCaptureStarted;
 
     public DefaultPageController(CdpClient cdpClient) {
-        this(cdpClient, Path.of(System.getProperty("java.io.tmpdir")));
+        this(cdpClient, configuredOrphanedNetworkBodySpoolMinAge());
+    }
+
+    public DefaultPageController(CdpClient cdpClient, Duration orphanedNetworkBodySpoolMinAge) {
+        this(cdpClient, Path.of(System.getProperty("java.io.tmpdir")), orphanedNetworkBodySpoolMinAge);
     }
 
     DefaultPageController(CdpClient cdpClient, Path tempDirectory) {
+        this(cdpClient, tempDirectory, DEFAULT_ORPHANED_NETWORK_BODY_SPOOL_MIN_AGE);
+    }
+
+    DefaultPageController(CdpClient cdpClient, Path tempDirectory, Duration orphanedNetworkBodySpoolMinAge) {
         this.cdpClient = cdpClient;
         this.tempDirectory = tempDirectory;
+        if (orphanedNetworkBodySpoolMinAge == null || orphanedNetworkBodySpoolMinAge.isNegative()) {
+            throw new IllegalArgumentException("Orphaned network body spool min age must be zero or greater");
+        }
+        this.orphanedNetworkBodySpoolMinAge = orphanedNetworkBodySpoolMinAge;
         cleanupOrphanedNetworkBodySpools();
     }
 
@@ -368,7 +384,7 @@ public class DefaultPageController implements PageController {
     }
 
     private void cleanupOrphanedNetworkBodySpools() {
-        Instant cutoff = Instant.now().minus(ORPHANED_NETWORK_BODY_SPOOL_MIN_AGE);
+        Instant cutoff = Instant.now().minus(orphanedNetworkBodySpoolMinAge);
         try (DirectoryStream<Path> paths = Files.newDirectoryStream(
                 tempDirectory,
                 NETWORK_BODY_SPOOL_PREFIX + "*" + NETWORK_BODY_SPOOL_SUFFIX)) {
@@ -379,6 +395,27 @@ public class DefaultPageController implements PageController {
             }
         } catch (IOException | SecurityException e) {
             // Startup cleanup is best-effort; normal run startup must continue.
+        }
+    }
+
+    private static Duration configuredOrphanedNetworkBodySpoolMinAge() {
+        String value = System.getProperty(ORPHANED_NETWORK_BODY_SPOOL_MIN_AGE_SECONDS_PROPERTY);
+        if (value == null || value.isBlank()) {
+            return DEFAULT_ORPHANED_NETWORK_BODY_SPOOL_MIN_AGE;
+        }
+        try {
+            long seconds = Long.parseLong(value.trim());
+            if (seconds < 0) {
+                throw new IllegalArgumentException(
+                        ORPHANED_NETWORK_BODY_SPOOL_MIN_AGE_SECONDS_PROPERTY
+                                + " must be greater than or equal to 0");
+            }
+            return Duration.ofSeconds(seconds);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(
+                    ORPHANED_NETWORK_BODY_SPOOL_MIN_AGE_SECONDS_PROPERTY
+                            + " must be a whole number of seconds",
+                    e);
         }
     }
 

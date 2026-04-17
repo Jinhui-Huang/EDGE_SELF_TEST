@@ -117,6 +117,9 @@ class DefaultReportEngineTest {
         assertTrue(html.contains("<button type=\"button\" data-filter=\"SKIPPED\">Skipped (0)</button>"));
         assertTrue(html.contains("<button type=\"button\" data-sort=\"DURATION_DESC\">Slowest first</button>"));
         assertTrue(html.contains("<strong>Keyboard:</strong> f first failed, n next failed, p previous failed, s slowest step."));
+        assertTrue(html.contains("<strong>Artifacts:</strong> use the report index commands to prune old artifacts or mark missing artifact links as removed."));
+        assertTrue(html.contains("<code>report-cleanup runs --dry-run --prune-artifacts-only</code>"));
+        assertTrue(html.contains("<code>report-maintenance runs --mark-missing-artifacts --dry-run</code>"));
         assertTrue(html.contains("<section class=\"slow-summary\"><h2>Slowest steps</h2><ol><li><a href=\"#step-2\">assert-title</a> 2000 ms</li><li><a href=\"#step-1\">capture-page</a> 1000 ms</li></ol></section>"));
         assertTrue(html.contains("<tr id=\"step-2\" data-index=\"1\" data-duration=\"2000\" data-status=\"FAILED\" class=\"failed slow\"><td>assert-title</td>"));
         assertTrue(html.contains("<details class=\"step-details\" open><summary>Open details</summary>"));
@@ -159,7 +162,10 @@ class DefaultReportEngineTest {
         assertTrue(index.contains("<button type=\"button\" data-page-prev>Previous page</button>"));
         assertTrue(index.contains("<button type=\"button\" data-page-next>Next page</button>"));
         assertTrue(index.contains("<div class=\"index-status\" data-index-status></div>"));
-        assertTrue(index.contains("Cleanup: delete a run directory from this folder and the next generated report index will omit it."));
+        assertTrue(index.contains("<strong>Report maintenance:</strong> run these commands from the core platform app, starting with dry-run."));
+        assertTrue(index.contains("<code>report-cleanup runs --dry-run --keep-latest 20</code>"));
+        assertTrue(index.contains("<code>report-cleanup runs --dry-run --keep-latest 20 --prune-artifacts-only</code>"));
+        assertTrue(index.contains("<code>report-maintenance runs --mark-missing-artifacts --dry-run</code>"));
         assertTrue(index.contains("<div class=\"meta\">Keyboard: / search, f first failed, n next failed, p previous failed.</div>"));
         assertTrue(index.contains("<tr id=\"run-1\" data-index=\"0\" data-status=\"FAILED\""));
         assertTrue(index.contains("data-started=\"2026-04-17T00:00:00Z\" data-finished=\"2026-04-17T00:00:05Z\""));
@@ -403,6 +409,52 @@ class DefaultReportEngineTest {
         assertTrue(result.dryRun());
         assertTrue(Files.isRegularFile(tempDir.resolve("old-run").resolve("artifact.txt")));
         assertTrue(Files.isRegularFile(tempDir.resolve("old-run").resolve("report.json")));
+    }
+
+    @Test
+    void markMissingArtifactsPrunedUpdatesLegacyReportsWithBrokenArtifactLinks() throws Exception {
+        DefaultReportEngine engine = new DefaultReportEngine();
+        writeRunWithArtifact(engine, "legacy-run", "2026-04-17T00:00:00Z", "2026-04-17T00:00:01Z");
+        Files.delete(tempDir.resolve("legacy-run").resolve("artifact.txt"));
+        Files.delete(tempDir.resolve("legacy-run").resolve("network").resolve("body.txt"));
+        Files.delete(tempDir.resolve("legacy-run").resolve("network"));
+
+        ReportMaintenanceResult result = engine.markMissingArtifactsPruned(tempDir, false);
+
+        Path artifact = tempDir.resolve("legacy-run").resolve("artifact.txt").toAbsolutePath().normalize();
+        Path nestedArtifact = tempDir.resolve("legacy-run").resolve("network").resolve("body.txt").toAbsolutePath().normalize();
+        assertEquals(1, result.scannedRuns());
+        assertEquals(1, result.updatedRuns());
+        assertEquals(List.of(artifact, nestedArtifact), result.markedArtifactPaths());
+        assertFalse(result.dryRun());
+
+        JsonNode report = new ObjectMapper().readTree(tempDir.resolve("legacy-run").resolve("report.json").toFile());
+        JsonNode step = report.get("steps").get(0);
+        assertTrue(step.get("artifactPruned").asBoolean());
+        assertTrue(step.hasNonNull("artifactPrunedAt"));
+        assertTrue(step.get("artifacts").get(0).get("pruned").asBoolean());
+        assertTrue(step.get("artifacts").get(1).get("pruned").asBoolean());
+
+        String html = Files.readString(tempDir.resolve("legacy-run").resolve("report.html"));
+        assertTrue(html.contains("artifact.txt (removed by cleanup at "));
+        assertTrue(html.contains("status: pruned"));
+        assertFalse(html.contains("<a href=\"artifact.txt\">artifact.txt</a>"));
+    }
+
+    @Test
+    void markMissingArtifactsPrunedDryRunDoesNotMutateReports() throws Exception {
+        DefaultReportEngine engine = new DefaultReportEngine();
+        writeRunWithArtifact(engine, "legacy-run", "2026-04-17T00:00:00Z", "2026-04-17T00:00:01Z");
+        Files.delete(tempDir.resolve("legacy-run").resolve("artifact.txt"));
+        String originalReport = Files.readString(tempDir.resolve("legacy-run").resolve("report.json"));
+
+        ReportMaintenanceResult result = engine.markMissingArtifactsPruned(tempDir, true);
+
+        assertEquals(1, result.scannedRuns());
+        assertEquals(1, result.updatedRuns());
+        assertEquals(1, result.markedArtifactPaths().size());
+        assertTrue(result.dryRun());
+        assertEquals(originalReport, Files.readString(tempDir.resolve("legacy-run").resolve("report.json")));
     }
 
     private void writeRun(DefaultReportEngine engine, String runId, String startedAt, String finishedAt) {

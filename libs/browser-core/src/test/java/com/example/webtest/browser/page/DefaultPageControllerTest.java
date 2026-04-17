@@ -3,6 +3,7 @@ package com.example.webtest.browser.page;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.example.webtest.browser.observer.ConsoleEvent;
@@ -18,6 +19,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -185,6 +187,35 @@ class DefaultPageControllerTest {
         assertFalse(Files.exists(staleSpool));
         assertTrue(Files.exists(recentSpool));
         assertTrue(Files.exists(unrelated));
+    }
+
+    @Test
+    void startupSweepUsesConfiguredOrphanNetworkBodySpoolMinAge() throws IOException {
+        Path staleSpool = Files.writeString(tempDir.resolve("webtest-network-body-stale.tmp"), "old");
+        Path recentSpool = Files.writeString(tempDir.resolve("webtest-network-body-recent.tmp"), "new");
+        Files.setLastModifiedTime(staleSpool, FileTime.from(Instant.now().minus(10, ChronoUnit.MINUTES)));
+        Files.setLastModifiedTime(recentSpool, FileTime.from(Instant.now().minus(2, ChronoUnit.MINUTES)));
+
+        new DefaultPageController(new FakeCdpClient(), tempDir, Duration.ofMinutes(5));
+
+        assertFalse(Files.exists(staleSpool));
+        assertTrue(Files.exists(recentSpool));
+    }
+
+    @Test
+    void startupSweepRejectsInvalidSystemPropertyMinAge() {
+        String property = DefaultPageController.ORPHANED_NETWORK_BODY_SPOOL_MIN_AGE_SECONDS_PROPERTY;
+        String original = System.getProperty(property);
+        System.setProperty(property, "not-a-number");
+        try {
+            assertThrows(IllegalArgumentException.class, () -> new DefaultPageController(new FakeCdpClient()));
+        } finally {
+            if (original == null) {
+                System.clearProperty(property);
+            } else {
+                System.setProperty(property, original);
+            }
+        }
     }
 
     private static final class FakeCdpClient implements CdpClient {

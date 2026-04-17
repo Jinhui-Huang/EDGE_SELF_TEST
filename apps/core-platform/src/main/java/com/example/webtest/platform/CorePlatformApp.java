@@ -22,6 +22,7 @@ import com.example.webtest.execution.engine.service.DslRunService;
 import com.example.webtest.report.engine.DefaultReportEngine;
 import com.example.webtest.report.engine.ReportCleanupOptions;
 import com.example.webtest.report.engine.ReportCleanupResult;
+import com.example.webtest.report.engine.ReportMaintenanceResult;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -42,6 +43,10 @@ public final class CorePlatformApp {
     public static void main(String[] args) throws Exception {
         if (args.length > 0 && "report-cleanup".equals(args[0])) {
             runReportCleanup(args);
+            return;
+        }
+        if (args.length > 0 && "report-maintenance".equals(args[0])) {
+            runReportMaintenance(args);
             return;
         }
         if (args.length > 0 && "dsl-smoke".equals(args[0])) {
@@ -118,6 +123,52 @@ public final class CorePlatformApp {
         System.out.println("""
                 Usage: report-cleanup [reportRoot] [--keep-latest N] [--older-than-days N] [--status OK|FAILED[,..]] [--max-total-mb N] [--prune-artifacts-only] [--apply|--dry-run]
                 Defaults: reportRoot=./runs, keepLatest=20, dry-run.
+                """);
+    }
+
+    private static void runReportMaintenance(String[] args) {
+        Path reportRoot = workspaceRoot().resolve("runs");
+        boolean dryRun = true;
+        boolean markMissingArtifacts = false;
+
+        for (int index = 1; index < args.length; index++) {
+            String arg = args[index];
+            if ("--help".equals(arg) || "-h".equals(arg)) {
+                printReportMaintenanceUsage();
+                return;
+            } else if ("--apply".equals(arg)) {
+                dryRun = false;
+            } else if ("--dry-run".equals(arg)) {
+                dryRun = true;
+            } else if ("--mark-missing-artifacts".equals(arg)) {
+                markMissingArtifacts = true;
+            } else if (!arg.startsWith("--")) {
+                reportRoot = Path.of(arg);
+            } else {
+                throw new IllegalArgumentException("Unknown report-maintenance option: " + arg);
+            }
+        }
+
+        if (!markMissingArtifacts) {
+            throw new IllegalArgumentException("No maintenance action selected. Use --mark-missing-artifacts.");
+        }
+
+        ReportMaintenanceResult result = new DefaultReportEngine().markMissingArtifactsPruned(reportRoot, dryRun);
+        System.out.println("Report maintenance root: " + result.reportRoot());
+        System.out.println("Mode: " + (result.dryRun() ? "dry-run" : "apply"));
+        System.out.println("Scanned runs: " + result.scannedRuns());
+        System.out.println("Updated runs: " + result.updatedRuns());
+        System.out.println((result.dryRun() ? "Would mark" : "Marked") + " artifacts: "
+                + result.markedArtifactPaths().size());
+        for (Path artifact : result.markedArtifactPaths()) {
+            System.out.println(artifact);
+        }
+    }
+
+    private static void printReportMaintenanceUsage() {
+        System.out.println("""
+                Usage: report-maintenance [reportRoot] --mark-missing-artifacts [--apply|--dry-run]
+                Defaults: reportRoot=./runs, dry-run.
                 """);
     }
 

@@ -91,6 +91,42 @@ public class DefaultReportEngine implements ReportEngine {
         }
     }
 
+    @Override
+    public ReportMaintenanceResult markMissingArtifactsPruned(Path reportRoot, boolean dryRun) {
+        if (reportRoot == null) {
+            throw new BaseException(ErrorCodes.REPORT_GENERATION_FAILED, "Report root is required for maintenance");
+        }
+        Path normalizedReportRoot = reportRoot.toAbsolutePath().normalize();
+        if (!Files.isDirectory(normalizedReportRoot)) {
+            throw new BaseException(
+                    ErrorCodes.REPORT_GENERATION_FAILED,
+                    "Report root does not exist or is not a directory: " + normalizedReportRoot);
+        }
+        try {
+            List<ReportIndexEntry> entries = reportIndexEntries(normalizedReportRoot, null, null);
+            List<Path> markedArtifacts = new ArrayList<>();
+            int updatedRuns = 0;
+            for (ReportIndexEntry entry : entries) {
+                List<Path> missingArtifacts = markMissingArtifactsPrunedInRun(entry.directory(), dryRun);
+                if (!missingArtifacts.isEmpty()) {
+                    updatedRuns++;
+                    markedArtifacts.addAll(missingArtifacts);
+                }
+            }
+            return new ReportMaintenanceResult(
+                    normalizedReportRoot,
+                    entries.size(),
+                    updatedRuns,
+                    List.copyOf(markedArtifacts),
+                    dryRun);
+        } catch (IOException e) {
+            throw new BaseException(
+                    ErrorCodes.REPORT_GENERATION_FAILED,
+                    "Failed to maintain report runs under: " + normalizedReportRoot,
+                    e);
+        }
+    }
+
     private Map<String, Object> report(
             ExecutionContext context,
             Path outputDir,
@@ -476,6 +512,63 @@ public class DefaultReportEngine implements ReportEngine {
         }
     }
 
+    private List<Path> markMissingArtifactsPrunedInRun(Path runDirectory, boolean dryRun) throws IOException {
+        Map<String, Object> report = readReportJson(runDirectory.resolve("report.json"));
+        if (report == null) {
+            return List.of();
+        }
+        List<Path> missingArtifacts = missingUnmarkedArtifactPaths(runDirectory, report);
+        if (!dryRun && !missingArtifacts.isEmpty()) {
+            markPrunedArtifacts(runDirectory, report, missingArtifacts);
+            Files.writeString(runDirectory.resolve("report.json"), Jsons.writeValueAsString(report),
+                    StandardCharsets.UTF_8);
+            Files.writeString(runDirectory.resolve("report.html"), htmlReport(report), StandardCharsets.UTF_8);
+        }
+        return missingArtifacts;
+    }
+
+    private List<Path> missingUnmarkedArtifactPaths(Path runDirectory, Map<String, Object> report) {
+        Set<Path> paths = new LinkedHashSet<>();
+        Path normalizedRunDirectory = runDirectory.toAbsolutePath().normalize();
+        for (Object value : list(report.get("steps"))) {
+            Map<?, ?> step = map(value);
+            addMissingArtifactPath(
+                    paths,
+                    normalizedRunDirectory,
+                    step.get("artifactPath"),
+                    booleanValue(step.get("artifactPruned")));
+            for (Object artifactValue : list(step.get("artifacts"))) {
+                Map<?, ?> artifact = map(artifactValue);
+                addMissingArtifactPath(
+                        paths,
+                        normalizedRunDirectory,
+                        artifact.get("path"),
+                        booleanValue(artifact.get("pruned")));
+            }
+        }
+        return List.copyOf(paths);
+    }
+
+    private void addMissingArtifactPath(Set<Path> paths, Path runDirectory, Object value, boolean alreadyPruned) {
+        if (alreadyPruned) {
+            return;
+        }
+        String pathText = text(value);
+        if (pathText.isBlank()) {
+            return;
+        }
+        Path path = Path.of(pathText);
+        Path normalized = path.isAbsolute()
+                ? path.toAbsolutePath().normalize()
+                : runDirectory.resolve(path).normalize();
+        if (normalized.startsWith(runDirectory)
+                && !normalized.equals(runDirectory.resolve("report.json"))
+                && !normalized.equals(runDirectory.resolve("report.html"))
+                && !Files.exists(normalized)) {
+            paths.add(normalized);
+        }
+    }
+
     private Path normalizedArtifactPath(Path runDirectory, Object value) {
         String pathText = text(value);
         if (pathText.isBlank()) {
@@ -568,7 +661,9 @@ public class DefaultReportEngine implements ReportEngine {
                       .toolbar button.active { border-color: #1769aa; background: #e6f0f8; font-weight: 700; }
                       .toolbar button:disabled { color: #9aa5b1; cursor: default; }
                       .index-status { color: #52616b; margin: 8px 0 16px; }
-                      .cleanup-note { margin: 0 0 12px; padding: 12px; border: 1px solid #d9e2ec; border-radius: 8px; background: #ffffff; color: #52616b; }
+                      .maintenance-note { margin: 0 0 12px; padding: 12px; border: 1px solid #d9e2ec; border-radius: 8px; background: #ffffff; color: #52616b; }
+                      .maintenance-note strong { color: #1f2933; }
+                      .maintenance-note code { display: block; margin-top: 6px; padding: 8px; background: #edf2f7; border-radius: 8px; color: #1f2933; overflow-wrap: anywhere; }
                       .quick-links { margin: 0 0 12px; padding: 12px; border: 1px solid #d9e2ec; border-radius: 8px; background: #ffffff; }
                       .quick-links.failed { border-color: #d92d20; background: #fff4f2; color: #912018; font-weight: 700; }
                       .quick-links a { margin-right: 8px; }
@@ -787,7 +882,12 @@ public class DefaultReportEngine implements ReportEngine {
                   <button type="button" data-page-next>Next page</button>
                 </div>
                 <div class="index-status" data-index-status></div>
-                <div class="cleanup-note">Cleanup: delete a run directory from this folder and the next generated report index will omit it.</div>
+                <div class="maintenance-note">
+                  <strong>Report maintenance:</strong> run these commands from the core platform app, starting with dry-run.
+                  <code>report-cleanup runs --dry-run --keep-latest 20</code>
+                  <code>report-cleanup runs --dry-run --keep-latest 20 --prune-artifacts-only</code>
+                  <code>report-maintenance runs --mark-missing-artifacts --dry-run</code>
+                </div>
                 <div class="meta">Keyboard: / search, f first failed, n next failed, p previous failed.</div>
                 """.formatted(entries.size(), failedRuns, okRuns);
     }
@@ -847,6 +947,9 @@ public class DefaultReportEngine implements ReportEngine {
                       .alert a { color: #912018; }
                       .keyboard-help { margin: 18px 0 0; padding: 12px; border: 1px solid #d9e2ec; border-radius: 8px; background: #ffffff; color: #52616b; }
                       .keyboard-help strong { color: #1f2933; }
+                      .maintenance-note { margin: 18px 0 0; padding: 12px; border: 1px solid #d9e2ec; border-radius: 8px; background: #ffffff; color: #52616b; }
+                      .maintenance-note strong { color: #1f2933; }
+                      .maintenance-note code { display: block; margin-top: 6px; padding: 8px; background: #edf2f7; border-radius: 8px; color: #1f2933; overflow-wrap: anywhere; }
                       .slow-summary { margin: 18px 0 0; padding: 12px; border: 1px solid #d9e2ec; border-radius: 8px; background: #ffffff; }
                       .slow-summary h2 { margin: 0 0 8px; font-size: 16px; }
                       .slow-summary ol { margin: 0; padding-left: 22px; }
@@ -900,6 +1003,7 @@ public class DefaultReportEngine implements ReportEngine {
         }
         html.append(slowStepSummary(steps, 3));
         html.append(keyboardHelp());
+        html.append(reportMaintenanceNote());
         html.append("<h2>Steps</h2>\n");
         html.append(stepToolbar(steps));
         Long slowestDurationMs = slowestDurationMs(steps);
@@ -1004,6 +1108,16 @@ public class DefaultReportEngine implements ReportEngine {
         return """
                 <div class="keyboard-help">
                   <strong>Keyboard:</strong> f first failed, n next failed, p previous failed, s slowest step.
+                </div>
+                """;
+    }
+
+    private String reportMaintenanceNote() {
+        return """
+                <div class="maintenance-note">
+                  <strong>Artifacts:</strong> use the report index commands to prune old artifacts or mark missing artifact links as removed.
+                  <code>report-cleanup runs --dry-run --prune-artifacts-only</code>
+                  <code>report-maintenance runs --mark-missing-artifacts --dry-run</code>
                 </div>
                 """;
     }
