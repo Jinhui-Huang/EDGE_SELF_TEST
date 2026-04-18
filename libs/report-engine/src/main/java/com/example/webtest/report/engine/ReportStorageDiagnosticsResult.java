@@ -8,10 +8,14 @@ public record ReportStorageDiagnosticsResult(
         int scannedRuns,
         long totalRunBytes,
         long referencedArtifactBytes,
+        long unreferencedFileBytes,
         int referencedArtifactCount,
+        int unreferencedFileCount,
         int missingArtifactCount,
         int prunedArtifactCount,
         List<ArtifactTypeSummary> artifactTypes,
+        List<UnreferencedFileTypeSummary> unreferencedFileTypes,
+        UnreferencedFileAgeSummary unreferencedFileAgeSummary,
         List<RunStorageSummary> runs) {
 
     public record ArtifactTypeSummary(
@@ -29,8 +33,25 @@ public record ReportStorageDiagnosticsResult(
             String finishedAt,
             long runBytes,
             long referencedArtifactBytes,
+            long unreferencedFileBytes,
             int referencedArtifactCount,
+            int unreferencedFileCount,
             int missingArtifactCount,
-            int prunedArtifactCount) {
+            int prunedArtifactCount,
+            List<UnreferencedFileTypeSummary> unreferencedFileTypes,
+            UnreferencedFileAgeSummary unreferencedFileAgeSummary) {
+    }
+
+    public record UnreferencedFileTypeSummary(
+            String type,
+            int count,
+            long bytes) {
+    }
+
+    public record UnreferencedFileAgeSummary(
+            String oldestLastModifiedAt,
+            long oldestAgeSeconds,
+            String newestLastModifiedAt,
+            long newestAgeSeconds) {
     }
 }

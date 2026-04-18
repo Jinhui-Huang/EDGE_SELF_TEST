@@ -23,6 +23,13 @@ import java.util.Set;
 import java.util.stream.Stream;
 
 public class DefaultReportEngine implements ReportEngine {
+    private static final List<RetentionBucketDefinition> RETENTION_BUCKETS = List.of(
+            new RetentionBucketDefinition("fresh", "fresh <1h", 0L, 3_599L),
+            new RetentionBucketDefinition("recent", "recent 1h-24h", 3_600L, 86_399L),
+            new RetentionBucketDefinition("stale", "stale 1d-7d", 86_400L, 604_799L),
+            new RetentionBucketDefinition("old", "old 7d-30d", 604_800L, 2_591_999L),
+            new RetentionBucketDefinition("ancient", "ancient >=30d", 2_592_000L, Long.MAX_VALUE));
+
     @Override
     public Path generateRunReport(
             ExecutionContext context,
@@ -60,6 +67,11 @@ public class DefaultReportEngine implements ReportEngine {
             throw new BaseException(ErrorCodes.REPORT_GENERATION_FAILED, "Report root is required for cleanup");
         }
         ReportCleanupOptions safeOptions = options == null ? new ReportCleanupOptions() : options;
+        if (safeOptions.isPruneArtifactsOnly() && safeOptions.isPruneUnreferencedFilesOnly()) {
+            throw new BaseException(
+                    ErrorCodes.REPORT_GENERATION_FAILED,
+                    "Artifact-only cleanup and unreferenced-file cleanup cannot be combined");
+        }
         Path normalizedReportRoot = reportRoot.toAbsolutePath().normalize();
         if (!Files.isDirectory(normalizedReportRoot)) {
             throw new BaseException(
@@ -71,6 +83,7 @@ public class DefaultReportEngine implements ReportEngine {
             CleanupOutcome cleanup = cleanupEntries(entries, safeOptions);
             if (!safeOptions.isDryRun()) {
                 List<ReportIndexEntry> remaining = safeOptions.isPruneArtifactsOnly()
+                        || safeOptions.isPruneUnreferencedFilesOnly()
                         ? reportIndexEntries(normalizedReportRoot, null, null)
                         : remainingEntries(entries, cleanup.deletedRunDirectories());
                 Files.writeString(normalizedReportRoot.resolve("index.html"), reportIndex(remaining),
@@ -82,6 +95,11 @@ public class DefaultReportEngine implements ReportEngine {
                     entries.size() - cleanup.deletedRunDirectories().size(),
                     List.copyOf(cleanup.deletedRunDirectories()),
                     List.copyOf(cleanup.deletedArtifactPaths()),
+                    List.copyOf(cleanup.deletedUnreferencedFilePaths()),
+                    List.copyOf(cleanup.deletedUnreferencedFileTypes()),
+                    cleanup.deletedUnreferencedFileAgeSummary(),
+                    List.copyOf(cleanup.deletedUnreferencedFileRetentionHints()),
+                    cleanup.unreferencedCleanupPlan(),
                     safeOptions.isDryRun());
         } catch (IOException e) {
             throw new BaseException(
@@ -140,63 +158,7 @@ public class DefaultReportEngine implements ReportEngine {
         }
         try {
             List<ReportIndexEntry> entries = reportIndexEntries(normalizedReportRoot, null, null);
-            List<ReportStorageDiagnosticsResult.RunStorageSummary> runs = new ArrayList<>();
-            Map<String, ArtifactTypeTotals> artifactTypeTotals = new LinkedHashMap<>();
-            long totalRunBytes = 0L;
-            long referencedArtifactBytes = 0L;
-            int referencedArtifactCount = 0;
-            int missingArtifactCount = 0;
-            int prunedArtifactCount = 0;
-            for (ReportIndexEntry entry : entries) {
-                Map<String, Object> report = readReportJson(entry.directory().resolve("report.json"));
-                List<ArtifactDiagnostic> artifacts = report == null
-                        ? List.of()
-                        : artifactDiagnostics(entry.directory(), report);
-                long runArtifactBytes = 0L;
-                int runMissingArtifacts = 0;
-                int runPrunedArtifacts = 0;
-                for (ArtifactDiagnostic artifact : artifacts) {
-                    runArtifactBytes = saturatedAdd(runArtifactBytes, artifact.bytes());
-                    if (artifact.missing()) {
-                        runMissingArtifacts++;
-                    }
-                    if (artifact.pruned()) {
-                        runPrunedArtifacts++;
-                    }
-                    artifactTypeTotals
-                            .computeIfAbsent(artifact.type(), ignored -> new ArtifactTypeTotals())
-                            .add(artifact);
-                }
-                totalRunBytes = saturatedAdd(totalRunBytes, entry.sizeBytes());
-                referencedArtifactBytes = saturatedAdd(referencedArtifactBytes, runArtifactBytes);
-                referencedArtifactCount += artifacts.size();
-                missingArtifactCount += runMissingArtifacts;
-                prunedArtifactCount += runPrunedArtifacts;
-                runs.add(new ReportStorageDiagnosticsResult.RunStorageSummary(
-                        entry.runId(),
-                        entry.directory(),
-                        entry.status(),
-                        entry.finishedAt(),
-                        entry.sizeBytes(),
-                        runArtifactBytes,
-                        artifacts.size(),
-                        runMissingArtifacts,
-                        runPrunedArtifacts));
-            }
-            List<ReportStorageDiagnosticsResult.ArtifactTypeSummary> artifactTypes = artifactTypeTotals.entrySet()
-                    .stream()
-                    .map(entry -> entry.getValue().summary(entry.getKey()))
-                    .toList();
-            return new ReportStorageDiagnosticsResult(
-                    normalizedReportRoot,
-                    entries.size(),
-                    totalRunBytes,
-                    referencedArtifactBytes,
-                    referencedArtifactCount,
-                    missingArtifactCount,
-                    prunedArtifactCount,
-                    List.copyOf(artifactTypes),
-                    List.copyOf(runs));
+            return diagnosticsForEntries(normalizedReportRoot, entries);
         } catch (IOException e) {
             throw new BaseException(
                     ErrorCodes.REPORT_GENERATION_FAILED,
@@ -422,9 +384,44 @@ public class DefaultReportEngine implements ReportEngine {
         Set<Path> quotaDeleted = quotaDeletedDirectories(entries, options);
         List<Path> deletedRunDirectories = new ArrayList<>();
         List<Path> deletedArtifactPaths = new ArrayList<>();
+        List<Path> deletedUnreferencedFilePaths = new ArrayList<>();
+        List<UnreferencedFileInfo> deletedUnreferencedFiles = new ArrayList<>();
+        Map<String, FileTypeTotals> deletedUnreferencedFileTypeTotals = new LinkedHashMap<>();
+        UnreferencedCleanupPlanTotals unreferencedCleanupPlan = new UnreferencedCleanupPlanTotals();
+        Instant measuredAt = Instant.now();
         for (int index = 0; index < entries.size(); index++) {
             ReportIndexEntry entry = entries.get(index);
-            if (!shouldDelete(entry, index, options, quotaDeleted)) {
+            boolean selectedRun = shouldDelete(entry, index, options, quotaDeleted);
+            if (options.isPruneUnreferencedFilesOnly()) {
+                UnreferencedFileDiagnostic unreferencedFiles = unreferencedFileDiagnostic(entry.directory());
+                UnreferencedCleanupRunPlanTotals runPlan =
+                        unreferencedCleanupPlan.addRun(
+                                entry,
+                                selectedRun,
+                                unreferencedFiles.files(),
+                                options.isVerboseUnreferencedCleanupPlan());
+                if (!selectedRun) {
+                    unreferencedCleanupPlan.addRetained(runPlan,
+                            "run-retained-by-cleanup-selectors",
+                            unreferencedFiles.files());
+                    continue;
+                }
+                UnreferencedFileSelection selection =
+                        selectUnreferencedFiles(unreferencedFiles.files(), options, measuredAt);
+                unreferencedCleanupPlan.addSelected(runPlan, selection.selected());
+                unreferencedCleanupPlan.addRetained(runPlan, "younger-than-min-age", selection.retainedByMinAge());
+                unreferencedCleanupPlan.addRetained(runPlan, "outside-selected-age-buckets", selection.retainedByBucket());
+                deletedUnreferencedFilePaths.addAll(selection.selected().stream()
+                        .map(UnreferencedFileInfo::path)
+                        .toList());
+                deletedUnreferencedFiles.addAll(selection.selected());
+                addUnreferencedFileTypeTotals(deletedUnreferencedFileTypeTotals, selection.selected());
+                if (!options.isDryRun()) {
+                    deleteUnreferencedFiles(entry.directory(), selection.selected());
+                }
+                continue;
+            }
+            if (!selectedRun) {
                 continue;
             }
             if (options.isPruneArtifactsOnly()) {
@@ -432,11 +429,25 @@ public class DefaultReportEngine implements ReportEngine {
             } else {
                 deletedRunDirectories.add(entry.directory());
             }
-            if (!options.isDryRun() && !options.isPruneArtifactsOnly()) {
+            if (!options.isDryRun()
+                    && !options.isPruneArtifactsOnly()
+                    && !options.isPruneUnreferencedFilesOnly()) {
                 deleteDirectory(entry.directory());
             }
         }
-        return new CleanupOutcome(deletedRunDirectories, deletedArtifactPaths);
+        List<ReportStorageDiagnosticsResult.UnreferencedFileTypeSummary> deletedUnreferencedFileTypes =
+                deletedUnreferencedFileTypeTotals.entrySet()
+                        .stream()
+                        .map(entry -> entry.getValue().summary(entry.getKey()))
+                        .toList();
+        return new CleanupOutcome(
+                deletedRunDirectories,
+                deletedArtifactPaths,
+                deletedUnreferencedFilePaths,
+                deletedUnreferencedFileTypes,
+                unreferencedFileAgeSummary(deletedUnreferencedFiles, measuredAt),
+                unreferencedFileRetentionHints(deletedUnreferencedFiles, measuredAt),
+                unreferencedCleanupPlan.summary());
     }
 
     private Set<Path> quotaDeletedDirectories(List<ReportIndexEntry> entries, ReportCleanupOptions options) {
@@ -565,6 +576,51 @@ public class DefaultReportEngine implements ReportEngine {
             }
         }
         return deleted;
+    }
+
+    private UnreferencedFileDiagnostic unreferencedFileDiagnostic(Path runDirectory) throws IOException {
+        Map<String, Object> report = readReportJson(runDirectory.resolve("report.json"));
+        if (report == null) {
+            return new UnreferencedFileDiagnostic(0, 0L, List.of());
+        }
+        List<ArtifactDiagnostic> artifacts = artifactDiagnostics(runDirectory, report);
+        return unreferencedFiles(runDirectory, artifacts);
+    }
+
+    private UnreferencedFileSelection selectUnreferencedFiles(
+            List<UnreferencedFileInfo> unreferencedFiles,
+            ReportCleanupOptions options,
+            Instant measuredAt) {
+        List<UnreferencedFileInfo> selected = new ArrayList<>();
+        List<UnreferencedFileInfo> retainedByMinAge = new ArrayList<>();
+        List<UnreferencedFileInfo> retainedByBucket = new ArrayList<>();
+        for (UnreferencedFileInfo file : unreferencedFiles) {
+            long fileAgeSeconds = ageSeconds(file.lastModifiedAt(), measuredAt);
+            Long minAgeSeconds = options.getUnreferencedFileMinAgeSeconds();
+            if (minAgeSeconds != null && fileAgeSeconds < minAgeSeconds) {
+                retainedByMinAge.add(file);
+                continue;
+            }
+            if (!options.getUnreferencedFileAgeBuckets().isEmpty()
+                    && !options.getUnreferencedFileAgeBuckets().contains(retentionBucket(fileAgeSeconds).key())) {
+                retainedByBucket.add(file);
+                continue;
+            }
+            selected.add(file);
+        }
+        return new UnreferencedFileSelection(
+                List.copyOf(selected),
+                List.copyOf(retainedByMinAge),
+                List.copyOf(retainedByBucket));
+    }
+
+    private void deleteUnreferencedFiles(Path runDirectory, List<UnreferencedFileInfo> files) throws IOException {
+        for (UnreferencedFileInfo file : files) {
+            Files.deleteIfExists(file.path());
+        }
+        if (!files.isEmpty()) {
+            deleteEmptyArtifactDirectories(runDirectory);
+        }
     }
 
     private void markPrunedArtifacts(Path runDirectory, Map<String, Object> report, List<Path> deletedArtifacts) {
@@ -791,6 +847,9 @@ public class DefaultReportEngine implements ReportEngine {
     private String reportIndex(List<ReportIndexEntry> entries) {
         StringBuilder html = new StringBuilder();
         int failedRuns = failedRunCount(entries);
+        ReportStorageDiagnosticsResult diagnostics = reportIndexDiagnostics(entries);
+        Map<Path, ReportStorageDiagnosticsResult.RunStorageSummary> storageByDirectory =
+                storageByDirectory(diagnostics);
         html.append("""
                 <!doctype html>
                 <html lang="en">
@@ -811,6 +870,13 @@ public class DefaultReportEngine implements ReportEngine {
                       .maintenance-note { margin: 0 0 12px; padding: 12px; border: 1px solid #d9e2ec; border-radius: 8px; background: #ffffff; color: #52616b; }
                       .maintenance-note strong { color: #1f2933; }
                       .maintenance-note code { display: block; margin-top: 6px; padding: 8px; background: #edf2f7; border-radius: 8px; color: #1f2933; overflow-wrap: anywhere; }
+                      .storage-diagnostics { margin: 0 0 16px; padding: 12px; border: 1px solid #d9e2ec; border-radius: 8px; background: #ffffff; }
+                      .storage-diagnostics h2 { margin: 0 0 10px; font-size: 18px; }
+                      .storage-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 12px; }
+                      .storage-metric { border: 1px solid #d9e2ec; border-radius: 8px; padding: 10px; color: #52616b; }
+                      .storage-metric strong { display: block; margin-top: 4px; color: #1f2933; font-size: 18px; }
+                      .storage-table { margin-top: 8px; }
+                      .storage-table th, .storage-table td { padding: 8px; font-size: 13px; }
                       .quick-links { margin: 0 0 12px; padding: 12px; border: 1px solid #d9e2ec; border-radius: 8px; background: #ffffff; }
                       .quick-links.failed { border-color: #d92d20; background: #fff4f2; color: #912018; font-weight: 700; }
                       .quick-links a { margin-right: 8px; }
@@ -830,12 +896,15 @@ public class DefaultReportEngine implements ReportEngine {
                 """);
         html.append("<div class=\"meta\">Runs: ").append(entries.size()).append("</div>\n");
         html.append(reportIndexQuickLinks(entries, failedRuns));
-        html.append(reportIndexToolbar(entries, failedRuns));
-        html.append("<table><thead><tr><th>Run</th><th>Status</th><th>Summary</th><th>Started</th><th>Finished</th><th>Links</th></tr></thead><tbody>\n");
+        html.append(reportIndexToolbar(entries, failedRuns, diagnostics));
+        html.append(reportIndexStorageDiagnostics(diagnostics));
+        html.append("<table><thead><tr><th>Run</th><th>Status</th><th>Summary</th><th>Storage</th><th>Started</th><th>Finished</th><th>Links</th></tr></thead><tbody>\n");
         for (int index = 0; index < entries.size(); index++) {
             ReportIndexEntry entry = entries.get(index);
             boolean failed = entry.failed() > 0;
             String status = failed ? "FAILED" : "OK";
+            ReportStorageDiagnosticsResult.RunStorageSummary storage =
+                    storageByDirectory.get(entry.directory().toAbsolutePath().normalize());
             String searchText = String.join(" ",
                     entry.runId(),
                     status,
@@ -861,6 +930,7 @@ public class DefaultReportEngine implements ReportEngine {
                     .append(", Skipped ").append(entry.skipped())
                     .append(", Duration ").append(entry.durationMs() == null ? "" : entry.durationMs())
                     .append(" ms</td>");
+            html.append("<td>").append(reportIndexRunStorage(entry, storage)).append("</td>");
             html.append("<td>").append(escape(entry.startedAt())).append("</td>");
             html.append("<td>").append(escape(entry.finishedAt())).append("</td>");
             html.append("<td><a href=\"").append(escape(entry.htmlPath())).append("\">HTML</a> ")
@@ -991,6 +1061,447 @@ public class DefaultReportEngine implements ReportEngine {
         return html.toString();
     }
 
+    private ReportStorageDiagnosticsResult reportIndexDiagnostics(List<ReportIndexEntry> entries) {
+        if (entries.isEmpty()) {
+            return new ReportStorageDiagnosticsResult(
+                    Path.of(""),
+                    0,
+                    0L,
+                    0L,
+                    0L,
+                    0,
+                    0,
+                    0,
+                    0,
+                    List.of(),
+                    List.of(),
+                    null,
+                    List.of());
+        }
+        Path reportRoot = entries.get(0).directory().toAbsolutePath().normalize().getParent();
+        if (reportRoot == null) {
+            reportRoot = Path.of("");
+        }
+        try {
+            return diagnosticsForEntries(reportRoot, entries);
+        } catch (IOException e) {
+            long totalRunBytes = 0L;
+            for (ReportIndexEntry entry : entries) {
+                totalRunBytes = saturatedAdd(totalRunBytes, entry.sizeBytes());
+            }
+            return new ReportStorageDiagnosticsResult(
+                    reportRoot,
+                    entries.size(),
+                    totalRunBytes,
+                    0L,
+                    0L,
+                    0,
+                    0,
+                    0,
+                    0,
+                    List.of(),
+                    List.of(),
+                    null,
+                    List.of());
+        }
+    }
+
+    private ReportStorageDiagnosticsResult diagnosticsForEntries(Path reportRoot, List<ReportIndexEntry> entries)
+            throws IOException {
+        List<ReportStorageDiagnosticsResult.RunStorageSummary> runs = new ArrayList<>();
+        Map<String, ArtifactTypeTotals> artifactTypeTotals = new LinkedHashMap<>();
+        Map<String, FileTypeTotals> unreferencedFileTypeTotals = new LinkedHashMap<>();
+        List<UnreferencedFileInfo> allUnreferencedFiles = new ArrayList<>();
+        Instant diagnosedAt = Instant.now();
+        long totalRunBytes = 0L;
+        long referencedArtifactBytes = 0L;
+        long unreferencedFileBytes = 0L;
+        int referencedArtifactCount = 0;
+        int unreferencedFileCount = 0;
+        int missingArtifactCount = 0;
+        int prunedArtifactCount = 0;
+        for (ReportIndexEntry entry : entries) {
+            Map<String, Object> report = readReportJson(entry.directory().resolve("report.json"));
+            List<ArtifactDiagnostic> artifacts = report == null
+                    ? List.of()
+                    : artifactDiagnostics(entry.directory(), report);
+            UnreferencedFileDiagnostic unreferencedFiles = unreferencedFiles(entry.directory(), artifacts);
+            List<ReportStorageDiagnosticsResult.UnreferencedFileTypeSummary> runUnreferencedFileTypes =
+                    unreferencedFileTypes(unreferencedFiles.files());
+            ReportStorageDiagnosticsResult.UnreferencedFileAgeSummary runUnreferencedFileAgeSummary =
+                    unreferencedFileAgeSummary(unreferencedFiles.files(), diagnosedAt);
+            long runArtifactBytes = 0L;
+            int runMissingArtifacts = 0;
+            int runPrunedArtifacts = 0;
+            for (ArtifactDiagnostic artifact : artifacts) {
+                runArtifactBytes = saturatedAdd(runArtifactBytes, artifact.bytes());
+                if (artifact.missing()) {
+                    runMissingArtifacts++;
+                }
+                if (artifact.pruned()) {
+                    runPrunedArtifacts++;
+                }
+                artifactTypeTotals
+                        .computeIfAbsent(artifact.type(), ignored -> new ArtifactTypeTotals())
+                        .add(artifact);
+            }
+            totalRunBytes = saturatedAdd(totalRunBytes, entry.sizeBytes());
+            referencedArtifactBytes = saturatedAdd(referencedArtifactBytes, runArtifactBytes);
+            unreferencedFileBytes = saturatedAdd(unreferencedFileBytes, unreferencedFiles.bytes());
+            referencedArtifactCount += artifacts.size();
+            unreferencedFileCount += unreferencedFiles.count();
+            missingArtifactCount += runMissingArtifacts;
+            prunedArtifactCount += runPrunedArtifacts;
+            addUnreferencedFileTypeTotals(unreferencedFileTypeTotals, unreferencedFiles.files());
+            allUnreferencedFiles.addAll(unreferencedFiles.files());
+            runs.add(new ReportStorageDiagnosticsResult.RunStorageSummary(
+                    entry.runId(),
+                    entry.directory(),
+                    entry.status(),
+                    entry.finishedAt(),
+                    entry.sizeBytes(),
+                    runArtifactBytes,
+                    unreferencedFiles.bytes(),
+                    artifacts.size(),
+                    unreferencedFiles.count(),
+                    runMissingArtifacts,
+                    runPrunedArtifacts,
+                    runUnreferencedFileTypes,
+                    runUnreferencedFileAgeSummary));
+        }
+        List<ReportStorageDiagnosticsResult.ArtifactTypeSummary> artifactTypes = artifactTypeTotals.entrySet()
+                .stream()
+                .map(entry -> entry.getValue().summary(entry.getKey()))
+                .toList();
+        List<ReportStorageDiagnosticsResult.UnreferencedFileTypeSummary> unreferencedFileTypes =
+                unreferencedFileTypeTotals.entrySet()
+                        .stream()
+                        .map(entry -> entry.getValue().summary(entry.getKey()))
+                        .toList();
+        return new ReportStorageDiagnosticsResult(
+                reportRoot,
+                entries.size(),
+                totalRunBytes,
+                referencedArtifactBytes,
+                unreferencedFileBytes,
+                referencedArtifactCount,
+                unreferencedFileCount,
+                missingArtifactCount,
+                prunedArtifactCount,
+                List.copyOf(artifactTypes),
+                List.copyOf(unreferencedFileTypes),
+                unreferencedFileAgeSummary(allUnreferencedFiles, diagnosedAt),
+                List.copyOf(runs));
+    }
+
+    private UnreferencedFileDiagnostic unreferencedFiles(Path runDirectory, List<ArtifactDiagnostic> artifacts)
+            throws IOException {
+        long bytes = 0L;
+        List<UnreferencedFileInfo> files = new ArrayList<>();
+        for (Path path : unreferencedFilePaths(runDirectory, artifacts)) {
+            long fileBytes = Files.size(path);
+            Instant lastModifiedAt = Files.getLastModifiedTime(path).toInstant();
+            files.add(new UnreferencedFileInfo(path, unreferencedFileType(path), fileBytes, lastModifiedAt));
+            bytes = saturatedAdd(bytes, fileBytes);
+        }
+        return new UnreferencedFileDiagnostic(files.size(), bytes, List.copyOf(files));
+    }
+
+    private ReportStorageDiagnosticsResult.UnreferencedFileAgeSummary unreferencedFileAgeSummary(
+            List<UnreferencedFileInfo> files,
+            Instant measuredAt) {
+        if (files.isEmpty()) {
+            return null;
+        }
+        Instant oldest = files.get(0).lastModifiedAt();
+        Instant newest = oldest;
+        for (UnreferencedFileInfo file : files) {
+            Instant lastModifiedAt = file.lastModifiedAt();
+            if (lastModifiedAt.isBefore(oldest)) {
+                oldest = lastModifiedAt;
+            }
+            if (lastModifiedAt.isAfter(newest)) {
+                newest = lastModifiedAt;
+            }
+        }
+        return new ReportStorageDiagnosticsResult.UnreferencedFileAgeSummary(
+                oldest.toString(),
+                ageSeconds(oldest, measuredAt),
+                newest.toString(),
+                ageSeconds(newest, measuredAt));
+    }
+
+    private long ageSeconds(Instant lastModifiedAt, Instant measuredAt) {
+        return Math.max(0L, Duration.between(lastModifiedAt, measuredAt).toSeconds());
+    }
+
+    private List<ReportCleanupResult.UnreferencedFileRetentionHint> unreferencedFileRetentionHints(
+            List<UnreferencedFileInfo> files,
+            Instant measuredAt) {
+        List<RetentionBucketTotals> buckets = RETENTION_BUCKETS.stream()
+                .map(RetentionBucketTotals::new)
+                .toList();
+        for (UnreferencedFileInfo file : files) {
+            long ageSeconds = ageSeconds(file.lastModifiedAt(), measuredAt);
+            for (RetentionBucketTotals bucket : buckets) {
+                if (bucket.accepts(ageSeconds)) {
+                    bucket.add(file);
+                    break;
+                }
+            }
+        }
+        return buckets.stream()
+                .filter(RetentionBucketTotals::hasFiles)
+                .map(RetentionBucketTotals::summary)
+                .toList();
+    }
+
+    private RetentionBucketDefinition retentionBucket(long ageSeconds) {
+        for (RetentionBucketDefinition bucket : RETENTION_BUCKETS) {
+            if (bucket.accepts(ageSeconds)) {
+                return bucket;
+            }
+        }
+        return RETENTION_BUCKETS.get(RETENTION_BUCKETS.size() - 1);
+    }
+
+    private void addUnreferencedFileTypeTotals(Map<String, FileTypeTotals> totals, List<UnreferencedFileInfo> files) {
+        for (UnreferencedFileInfo file : files) {
+            totals.computeIfAbsent(file.type(), ignored -> new FileTypeTotals()).add(file);
+        }
+    }
+
+    private List<ReportStorageDiagnosticsResult.UnreferencedFileTypeSummary> unreferencedFileTypes(
+            List<UnreferencedFileInfo> files) {
+        Map<String, FileTypeTotals> totals = new LinkedHashMap<>();
+        addUnreferencedFileTypeTotals(totals, files);
+        return totals.entrySet()
+                .stream()
+                .map(entry -> entry.getValue().summary(entry.getKey()))
+                .toList();
+    }
+
+    private String unreferencedFileType(Path file) {
+        String name = file.getFileName() == null ? "" : file.getFileName().toString().toLowerCase();
+        if (name.endsWith(".log")) {
+            return "log";
+        }
+        if (name.endsWith(".tmp")
+                || name.endsWith(".temp")
+                || name.endsWith(".bak")
+                || name.endsWith(".swp")
+                || name.endsWith("~")) {
+            return "temp";
+        }
+        if (name.endsWith(".txt")
+                || name.endsWith(".json")
+                || name.endsWith(".xml")
+                || name.endsWith(".csv")
+                || name.endsWith(".yaml")
+                || name.endsWith(".yml")) {
+            return "text";
+        }
+        if (name.endsWith(".html") || name.endsWith(".htm")) {
+            return "html";
+        }
+        if (name.endsWith(".png")
+                || name.endsWith(".jpg")
+                || name.endsWith(".jpeg")
+                || name.endsWith(".gif")
+                || name.endsWith(".webp")
+                || name.endsWith(".svg")) {
+            return "image";
+        }
+        if (name.endsWith(".zip")
+                || name.endsWith(".gz")
+                || name.endsWith(".tgz")
+                || name.endsWith(".tar")
+                || name.endsWith(".7z")) {
+            return "archive";
+        }
+        return "other";
+    }
+
+    private List<Path> unreferencedFilePaths(Path runDirectory, List<ArtifactDiagnostic> artifacts)
+            throws IOException {
+        Path normalizedRunDirectory = runDirectory.toAbsolutePath().normalize();
+        Set<Path> referencedPaths = new LinkedHashSet<>();
+        for (ArtifactDiagnostic artifact : artifacts) {
+            referencedPaths.add(artifact.path().toAbsolutePath().normalize());
+        }
+        List<Path> unreferencedFiles = new ArrayList<>();
+        try (Stream<Path> paths = Files.walk(normalizedRunDirectory)) {
+            for (Path path : paths.filter(Files::isRegularFile).toList()) {
+                Path normalized = path.toAbsolutePath().normalize();
+                if (isReportMetadataFile(normalizedRunDirectory, normalized)
+                        || isReferencedArtifactFile(normalized, referencedPaths)) {
+                    continue;
+                }
+                unreferencedFiles.add(normalized);
+            }
+        }
+        return List.copyOf(unreferencedFiles);
+    }
+
+    private boolean isReportMetadataFile(Path runDirectory, Path file) {
+        return file.equals(runDirectory.resolve("report.json"))
+                || file.equals(runDirectory.resolve("report.html"));
+    }
+
+    private boolean isReferencedArtifactFile(Path file, Set<Path> referencedPaths) {
+        for (Path referencedPath : referencedPaths) {
+            if (file.equals(referencedPath) || file.startsWith(referencedPath)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private Map<Path, ReportStorageDiagnosticsResult.RunStorageSummary> storageByDirectory(
+            ReportStorageDiagnosticsResult diagnostics) {
+        Map<Path, ReportStorageDiagnosticsResult.RunStorageSummary> byDirectory = new LinkedHashMap<>();
+        for (ReportStorageDiagnosticsResult.RunStorageSummary run : diagnostics.runs()) {
+            byDirectory.put(run.directory().toAbsolutePath().normalize(), run);
+        }
+        return byDirectory;
+    }
+
+    private String reportIndexStorageDiagnostics(ReportStorageDiagnosticsResult diagnostics) {
+        StringBuilder html = new StringBuilder();
+        html.append("<section class=\"storage-diagnostics\"><h2>Storage diagnostics</h2>\n");
+        html.append("<div class=\"storage-grid\">");
+        storageMetric(html, "Run storage", formatBytes(diagnostics.totalRunBytes()));
+        storageMetric(html, "Referenced artifacts", formatBytes(diagnostics.referencedArtifactBytes()));
+        storageMetric(html, "Unreferenced files", formatBytes(diagnostics.unreferencedFileBytes()));
+        storageMetric(html, "Artifact files", diagnostics.referencedArtifactCount());
+        storageMetric(html, "Unreferenced count", diagnostics.unreferencedFileCount());
+        storageMetric(html, "Oldest unreferenced", formatUnreferencedLastModified(
+                diagnostics.unreferencedFileAgeSummary(), true));
+        storageMetric(html, "Newest unreferenced", formatUnreferencedLastModified(
+                diagnostics.unreferencedFileAgeSummary(), false));
+        storageMetric(html, "Missing links", diagnostics.missingArtifactCount());
+        storageMetric(html, "Pruned links", diagnostics.prunedArtifactCount());
+        html.append("</div>\n");
+        if (diagnostics.artifactTypes().isEmpty()) {
+            html.append("<div class=\"meta\">No referenced artifacts found in scanned reports.</div>\n");
+        } else {
+            html.append("<table class=\"storage-table\"><thead><tr><th>Artifact type</th><th>Count</th><th>Bytes</th><th>Missing</th><th>Pruned</th></tr></thead><tbody>\n");
+            for (ReportStorageDiagnosticsResult.ArtifactTypeSummary type : diagnostics.artifactTypes()) {
+                html.append("<tr><td>").append(escape(type.type())).append("</td>")
+                        .append("<td>").append(type.count()).append("</td>")
+                        .append("<td>").append(formatBytes(type.bytes())).append("</td>")
+                        .append("<td>").append(type.missingCount()).append("</td>")
+                        .append("<td>").append(type.prunedCount()).append("</td></tr>\n");
+            }
+            html.append("</tbody></table>\n");
+        }
+        if (diagnostics.unreferencedFileTypes().isEmpty()) {
+            html.append("<div class=\"meta\">No unreferenced files found in scanned reports.</div>\n");
+        } else {
+            html.append("<table class=\"storage-table\"><thead><tr><th>Unreferenced type</th><th>Count</th><th>Bytes</th></tr></thead><tbody>\n");
+            for (ReportStorageDiagnosticsResult.UnreferencedFileTypeSummary type : diagnostics.unreferencedFileTypes()) {
+                html.append("<tr><td>").append(escape(type.type())).append("</td>")
+                        .append("<td>").append(type.count()).append("</td>")
+                        .append("<td>").append(formatBytes(type.bytes())).append("</td></tr>\n");
+            }
+            html.append("</tbody></table>\n");
+        }
+        html.append("</section>\n");
+        return html.toString();
+    }
+
+    private void storageMetric(StringBuilder html, String label, Object value) {
+        html.append("<div class=\"storage-metric\">").append(escape(label)).append("<strong>")
+                .append(escape(value)).append("</strong></div>");
+    }
+
+    private String reportIndexRunStorage(
+            ReportIndexEntry entry,
+            ReportStorageDiagnosticsResult.RunStorageSummary storage) {
+        long runBytes = storage == null ? entry.sizeBytes() : storage.runBytes();
+        long artifactBytes = storage == null ? 0L : storage.referencedArtifactBytes();
+        long unreferencedBytes = storage == null ? 0L : storage.unreferencedFileBytes();
+        int artifactCount = storage == null ? 0 : storage.referencedArtifactCount();
+        int unreferencedCount = storage == null ? 0 : storage.unreferencedFileCount();
+        int missingCount = storage == null ? 0 : storage.missingArtifactCount();
+        int prunedCount = storage == null ? 0 : storage.prunedArtifactCount();
+        String typeSummary = storage == null || storage.unreferencedFileTypes().isEmpty()
+                ? ""
+                : "<br>Types " + reportIndexUnreferencedTypeSummary(storage.unreferencedFileTypes());
+        String ageSummary = storage == null || storage.unreferencedFileAgeSummary() == null
+                ? ""
+                : "<br>Oldest " + escape(formatUnreferencedLastModified(
+                        storage.unreferencedFileAgeSummary(), true));
+        return "Run " + escape(formatBytes(runBytes))
+                + "<br>Artifacts " + escape(formatBytes(artifactBytes))
+                + " (" + artifactCount + ")"
+                + "<br>Unreferenced " + escape(formatBytes(unreferencedBytes))
+                + " (" + unreferencedCount + ")"
+                + typeSummary
+                + ageSummary
+                + "<br>Missing " + missingCount
+                + ", Pruned " + prunedCount;
+    }
+
+    private String formatUnreferencedLastModified(
+            ReportStorageDiagnosticsResult.UnreferencedFileAgeSummary ageSummary,
+            boolean oldest) {
+        if (ageSummary == null) {
+            return "(none)";
+        }
+        String lastModifiedAt = oldest ? ageSummary.oldestLastModifiedAt() : ageSummary.newestLastModifiedAt();
+        long ageSeconds = oldest ? ageSummary.oldestAgeSeconds() : ageSummary.newestAgeSeconds();
+        return lastModifiedAt + " (" + formatDuration(ageSeconds) + " old)";
+    }
+
+    private String formatDuration(long seconds) {
+        long days = seconds / 86_400L;
+        long hours = (seconds % 86_400L) / 3_600L;
+        long minutes = (seconds % 3_600L) / 60L;
+        if (days > 0) {
+            return days + "d " + hours + "h";
+        }
+        if (hours > 0) {
+            return hours + "h " + minutes + "m";
+        }
+        if (minutes > 0) {
+            return minutes + "m";
+        }
+        return seconds + "s";
+    }
+
+    private String reportIndexUnreferencedTypeSummary(
+            List<ReportStorageDiagnosticsResult.UnreferencedFileTypeSummary> types) {
+        StringBuilder summary = new StringBuilder();
+        for (int index = 0; index < types.size(); index++) {
+            ReportStorageDiagnosticsResult.UnreferencedFileTypeSummary type = types.get(index);
+            if (index > 0) {
+                summary.append(", ");
+            }
+            summary.append(escape(type.type()))
+                    .append(" ")
+                    .append(type.count())
+                    .append(" (")
+                    .append(escape(formatBytes(type.bytes())))
+                    .append(")");
+        }
+        return summary.toString();
+    }
+
+    private String formatBytes(long bytes) {
+        if (bytes < 1024L) {
+            return bytes + " B";
+        }
+        long kib = bytes / 1024L;
+        long remainder = bytes % 1024L;
+        if (kib < 1024L) {
+            return remainder == 0L ? kib + " KiB" : kib + "." + ((remainder * 10L) / 1024L) + " KiB";
+        }
+        long mib = kib / 1024L;
+        long kibRemainder = kib % 1024L;
+        return kibRemainder == 0L ? mib + " MiB" : mib + "." + ((kibRemainder * 10L) / 1024L) + " MiB";
+    }
+
     private String reportIndexQuickLinks(List<ReportIndexEntry> entries, int failedRuns) {
         if (failedRuns == 0) {
             return "<div class=\"quick-links\">No failed runs.</div>\n";
@@ -1009,7 +1520,10 @@ public class DefaultReportEngine implements ReportEngine {
         return links.toString();
     }
 
-    private String reportIndexToolbar(List<ReportIndexEntry> entries, int failedRuns) {
+    private String reportIndexToolbar(
+            List<ReportIndexEntry> entries,
+            int failedRuns,
+            ReportStorageDiagnosticsResult diagnostics) {
         int okRuns = entries.size() - failedRuns;
         return """
                 <div class="toolbar" aria-label="Run tools">
@@ -1029,15 +1543,56 @@ public class DefaultReportEngine implements ReportEngine {
                   <button type="button" data-page-next>Next page</button>
                 </div>
                 <div class="index-status" data-index-status></div>
-                <div class="maintenance-note">
-                  <strong>Report maintenance:</strong> run these commands from the core platform app, starting with dry-run.
-                  <code>report-cleanup runs --dry-run --keep-latest 20</code>
-                  <code>report-cleanup runs --dry-run --keep-latest 20 --prune-artifacts-only</code>
-                  <code>report-maintenance runs --mark-missing-artifacts --dry-run</code>
-                  <code>report-diagnostics runs</code>
-                </div>
+                %s
                 <div class="meta">Keyboard: / search, f first failed, n next failed, p previous failed.</div>
-                """.formatted(entries.size(), failedRuns, okRuns);
+                """.formatted(entries.size(), failedRuns, okRuns, reportIndexMaintenanceNote(diagnostics));
+    }
+
+    private String reportIndexMaintenanceNote(ReportStorageDiagnosticsResult diagnostics) {
+        List<String> commands = new ArrayList<>();
+        commands.add("report-cleanup runs --dry-run --keep-latest 20");
+        commands.add("report-cleanup runs --dry-run --keep-latest 20 --prune-artifacts-only");
+        if (diagnostics.unreferencedFileCount() > 0) {
+            String buckets = reportIndexUnreferencedCleanupBuckets(diagnostics.unreferencedFileAgeSummary());
+            commands.add("report-cleanup runs --dry-run --keep-latest 0 --prune-unreferenced-files-only"
+                    + " --unreferenced-age-bucket " + buckets);
+            commands.add("report-cleanup runs --dry-run --keep-latest 0 --prune-unreferenced-files-only"
+                    + " --unreferenced-age-bucket " + buckets + " --verbose-unreferenced-cleanup");
+        }
+        if (diagnostics.missingArtifactCount() > 0) {
+            commands.add("report-maintenance runs --mark-missing-artifacts --dry-run");
+        }
+        commands.add("report-diagnostics runs");
+
+        StringBuilder html = new StringBuilder();
+        html.append("<div class=\"maintenance-note\">\n")
+                .append("  <strong>Report maintenance:</strong> commands are based on current storage diagnostics; start with dry-run.\n");
+        for (String command : commands) {
+            html.append("  <code>").append(escape(command)).append("</code>\n");
+        }
+        html.append("</div>");
+        return html.toString();
+    }
+
+    private String reportIndexUnreferencedCleanupBuckets(
+            ReportStorageDiagnosticsResult.UnreferencedFileAgeSummary ageSummary) {
+        if (ageSummary == null) {
+            return "fresh,recent,stale,old,ancient";
+        }
+        long oldestAgeSeconds = ageSummary.oldestAgeSeconds();
+        if (oldestAgeSeconds >= 2_592_000L) {
+            return "ancient";
+        }
+        if (oldestAgeSeconds >= 604_800L) {
+            return "old,ancient";
+        }
+        if (oldestAgeSeconds >= 86_400L) {
+            return "stale,old,ancient";
+        }
+        if (oldestAgeSeconds >= 3_600L) {
+            return "recent,stale,old,ancient";
+        }
+        return "fresh,recent,stale,old,ancient";
     }
 
     private int failedRunCount(List<ReportIndexEntry> entries) {
@@ -1327,7 +1882,14 @@ public class DefaultReportEngine implements ReportEngine {
     private record SlowStep(int index, Map<?, ?> step, long durationMs) {
     }
 
-    private record CleanupOutcome(List<Path> deletedRunDirectories, List<Path> deletedArtifactPaths) {
+    private record CleanupOutcome(
+            List<Path> deletedRunDirectories,
+            List<Path> deletedArtifactPaths,
+            List<Path> deletedUnreferencedFilePaths,
+            List<ReportStorageDiagnosticsResult.UnreferencedFileTypeSummary> deletedUnreferencedFileTypes,
+            ReportStorageDiagnosticsResult.UnreferencedFileAgeSummary deletedUnreferencedFileAgeSummary,
+            List<ReportCleanupResult.UnreferencedFileRetentionHint> deletedUnreferencedFileRetentionHints,
+            ReportCleanupResult.UnreferencedCleanupPlan unreferencedCleanupPlan) {
     }
 
     private record ArtifactDiagnostic(
@@ -1336,6 +1898,18 @@ public class DefaultReportEngine implements ReportEngine {
             long bytes,
             boolean missing,
             boolean pruned) {
+    }
+
+    private record UnreferencedFileDiagnostic(int count, long bytes, List<UnreferencedFileInfo> files) {
+    }
+
+    private record UnreferencedFileInfo(Path path, String type, long bytes, Instant lastModifiedAt) {
+    }
+
+    private record UnreferencedFileSelection(
+            List<UnreferencedFileInfo> selected,
+            List<UnreferencedFileInfo> retainedByMinAge,
+            List<UnreferencedFileInfo> retainedByBucket) {
     }
 
     private static final class ArtifactTypeTotals {
@@ -1361,6 +1935,244 @@ public class DefaultReportEngine implements ReportEngine {
                     count,
                     missingCount,
                     prunedCount,
+                    bytes);
+        }
+    }
+
+    private static final class FileTypeTotals {
+        private int count;
+        private long bytes;
+
+        private void add(UnreferencedFileInfo file) {
+            count++;
+            bytes = saturatedAddStatic(bytes, file.bytes());
+        }
+
+        private ReportStorageDiagnosticsResult.UnreferencedFileTypeSummary summary(String type) {
+            return new ReportStorageDiagnosticsResult.UnreferencedFileTypeSummary(type, count, bytes);
+        }
+    }
+
+    private static final class UnreferencedCleanupPlanTotals {
+        private int selectedRuns;
+        private int retainedRuns;
+        private int scannedUnreferencedFiles;
+        private long scannedUnreferencedBytes;
+        private int selectedUnreferencedFiles;
+        private long selectedUnreferencedBytes;
+        private int retainedUnreferencedFiles;
+        private long retainedUnreferencedBytes;
+        private final Map<String, FileTypeTotals> retentionReasons = new LinkedHashMap<>();
+        private final List<UnreferencedCleanupRunPlanTotals> runs = new ArrayList<>();
+
+        private UnreferencedCleanupRunPlanTotals addRun(
+                ReportIndexEntry entry,
+                boolean selectedRun,
+                List<UnreferencedFileInfo> files,
+                boolean includeFileDetails) {
+            if (selectedRun) {
+                selectedRuns++;
+            } else {
+                retainedRuns++;
+            }
+            scannedUnreferencedFiles += files.size();
+            long fileBytes = bytes(files);
+            scannedUnreferencedBytes = saturatedAddStatic(scannedUnreferencedBytes, fileBytes);
+            UnreferencedCleanupRunPlanTotals run = new UnreferencedCleanupRunPlanTotals(
+                    entry.runId(),
+                    entry.directory(),
+                    selectedRun,
+                    files.size(),
+                    fileBytes,
+                    includeFileDetails);
+            runs.add(run);
+            return run;
+        }
+
+        private void addSelected(UnreferencedCleanupRunPlanTotals run, List<UnreferencedFileInfo> files) {
+            selectedUnreferencedFiles += files.size();
+            long fileBytes = bytes(files);
+            selectedUnreferencedBytes = saturatedAddStatic(selectedUnreferencedBytes, fileBytes);
+            run.addSelected(files);
+        }
+
+        private void addRetained(
+                UnreferencedCleanupRunPlanTotals run,
+                String reason,
+                List<UnreferencedFileInfo> files) {
+            if (files.isEmpty()) {
+                return;
+            }
+            retainedUnreferencedFiles += files.size();
+            long fileBytes = bytes(files);
+            retainedUnreferencedBytes = saturatedAddStatic(retainedUnreferencedBytes, fileBytes);
+            addRetentionReason(retentionReasons, reason, files);
+            run.addRetained(reason, files.size(), fileBytes, files);
+        }
+
+        private static void addRetentionReason(
+                Map<String, FileTypeTotals> reasons,
+                String reason,
+                List<UnreferencedFileInfo> files) {
+            FileTypeTotals totals = reasons.computeIfAbsent(reason, ignored -> new FileTypeTotals());
+            for (UnreferencedFileInfo file : files) {
+                totals.add(file);
+            }
+        }
+
+        private ReportCleanupResult.UnreferencedCleanupPlan summary() {
+            List<ReportCleanupResult.UnreferencedCleanupRetentionReason> reasons = retentionReasons.entrySet()
+                    .stream()
+                    .map(entry -> new ReportCleanupResult.UnreferencedCleanupRetentionReason(
+                            entry.getKey(),
+                            entry.getValue().count,
+                            entry.getValue().bytes))
+                    .toList();
+            List<ReportCleanupResult.UnreferencedCleanupRunPlan> runSummaries = runs.stream()
+                    .map(UnreferencedCleanupRunPlanTotals::summary)
+                    .toList();
+            return new ReportCleanupResult.UnreferencedCleanupPlan(
+                    selectedRuns,
+                    retainedRuns,
+                    scannedUnreferencedFiles,
+                    scannedUnreferencedBytes,
+                    selectedUnreferencedFiles,
+                    selectedUnreferencedBytes,
+                    retainedUnreferencedFiles,
+                    retainedUnreferencedBytes,
+                    List.copyOf(reasons),
+                    List.copyOf(runSummaries));
+        }
+
+        private static long bytes(List<UnreferencedFileInfo> files) {
+            long total = 0L;
+            for (UnreferencedFileInfo file : files) {
+                total = saturatedAddStatic(total, file.bytes());
+            }
+            return total;
+        }
+    }
+
+    private static final class UnreferencedCleanupRunPlanTotals {
+        private final String runId;
+        private final Path directory;
+        private final boolean selectedByCleanupSelectors;
+        private final int scannedUnreferencedFiles;
+        private final long scannedUnreferencedBytes;
+        private final boolean includeFileDetails;
+        private int selectedUnreferencedFiles;
+        private long selectedUnreferencedBytes;
+        private int retainedUnreferencedFiles;
+        private long retainedUnreferencedBytes;
+        private final Map<String, FileTypeTotals> retentionReasons = new LinkedHashMap<>();
+        private final List<ReportCleanupResult.UnreferencedCleanupFilePlan> files = new ArrayList<>();
+
+        private UnreferencedCleanupRunPlanTotals(
+                String runId,
+                Path directory,
+                boolean selectedByCleanupSelectors,
+                int scannedUnreferencedFiles,
+                long scannedUnreferencedBytes,
+                boolean includeFileDetails) {
+            this.runId = runId;
+            this.directory = directory;
+            this.selectedByCleanupSelectors = selectedByCleanupSelectors;
+            this.scannedUnreferencedFiles = scannedUnreferencedFiles;
+            this.scannedUnreferencedBytes = scannedUnreferencedBytes;
+            this.includeFileDetails = includeFileDetails;
+        }
+
+        private void addSelected(List<UnreferencedFileInfo> selectedFiles) {
+            selectedUnreferencedFiles += selectedFiles.size();
+            selectedUnreferencedBytes = saturatedAddStatic(
+                    selectedUnreferencedBytes,
+                    UnreferencedCleanupPlanTotals.bytes(selectedFiles));
+            addFileDetails("selected", "matched-cleanup-selectors", selectedFiles);
+        }
+
+        private void addRetained(String reason, int count, long bytes, List<UnreferencedFileInfo> files) {
+            retainedUnreferencedFiles += count;
+            retainedUnreferencedBytes = saturatedAddStatic(retainedUnreferencedBytes, bytes);
+            UnreferencedCleanupPlanTotals.addRetentionReason(retentionReasons, reason, files);
+            addFileDetails("retained", reason, files);
+        }
+
+        private void addFileDetails(String decision, String reason, List<UnreferencedFileInfo> details) {
+            if (!includeFileDetails) {
+                return;
+            }
+            for (UnreferencedFileInfo file : details) {
+                files.add(new ReportCleanupResult.UnreferencedCleanupFilePlan(
+                        file.path(),
+                        decision,
+                        reason,
+                        file.type(),
+                        file.bytes(),
+                        file.lastModifiedAt().toString()));
+            }
+        }
+
+        private ReportCleanupResult.UnreferencedCleanupRunPlan summary() {
+            List<ReportCleanupResult.UnreferencedCleanupRetentionReason> reasons = retentionReasons.entrySet()
+                    .stream()
+                    .map(entry -> new ReportCleanupResult.UnreferencedCleanupRetentionReason(
+                            entry.getKey(),
+                            entry.getValue().count,
+                            entry.getValue().bytes))
+                    .toList();
+            return new ReportCleanupResult.UnreferencedCleanupRunPlan(
+                    runId,
+                    directory,
+                    selectedByCleanupSelectors,
+                    scannedUnreferencedFiles,
+                    scannedUnreferencedBytes,
+                    selectedUnreferencedFiles,
+                    selectedUnreferencedBytes,
+                    retainedUnreferencedFiles,
+                    retainedUnreferencedBytes,
+                    List.copyOf(reasons),
+                    List.copyOf(files));
+        }
+    }
+
+    private record RetentionBucketDefinition(
+            String key,
+            String label,
+            long minAgeSeconds,
+            long maxAgeSeconds) {
+        private boolean accepts(long ageSeconds) {
+            return ageSeconds >= minAgeSeconds && ageSeconds <= maxAgeSeconds;
+        }
+    }
+
+    private static final class RetentionBucketTotals {
+        private final RetentionBucketDefinition definition;
+        private int count;
+        private long bytes;
+
+        private RetentionBucketTotals(RetentionBucketDefinition definition) {
+            this.definition = definition;
+        }
+
+        private boolean accepts(long ageSeconds) {
+            return definition.accepts(ageSeconds);
+        }
+
+        private void add(UnreferencedFileInfo file) {
+            count++;
+            bytes = saturatedAddStatic(bytes, file.bytes());
+        }
+
+        private boolean hasFiles() {
+            return count > 0;
+        }
+
+        private ReportCleanupResult.UnreferencedFileRetentionHint summary() {
+            return new ReportCleanupResult.UnreferencedFileRetentionHint(
+                    definition.label(),
+                    definition.minAgeSeconds(),
+                    definition.maxAgeSeconds(),
+                    count,
                     bytes);
         }
     }

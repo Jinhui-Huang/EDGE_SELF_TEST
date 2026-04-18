@@ -17,13 +17,14 @@
 - Phase 1 的 goto/fill/click/wait/assert/screenshot/失败截图/HTML 报告初版已基本打通，并通过 `dsl-smoke` 持续验证。
 - 当前已进入 Phase 2 稳定性增强：已完成 Console/Network 采集、Network body sidecar、报告索引、报告保留清理、artifact-only pruning、缺失/已裁剪 artifact 元数据标记等能力。
 - 尚未完整进入 Phase 3：项目管理、用例管理、套件执行、环境管理、数据集、失败重跑等平台化管理能力仍未落地。
+- Phase 3 进入门禁：在正式进入 Phase 3 平台化管理能力开发之前必须停下，不得直接开始 Phase 3；等待用户补充相关文档并明确确认后，才能更新阶段状态并继续。
 
 ---
 
 # 2. 当前总体状态
 
 ## 已完成
-- [x] 阅读项目入口、技术方案、Phase2 落地文档、Phase3 Java 骨架文档、CDP 文档、Native Messaging 文档、Edge TS 文档
+- [x] 阅读项目入口、技术方案、落地文档、Java 骨架文档、CDP 文档、Native Messaging 文档、Edge TS 文档
 - [x] 初始化 git 仓库
 - [x] 初始化 Maven 多模块目录与根构建配置
 - [x] 完成 common-core、common-json、dsl-model、dsl-parser 基础 Java 骨架
@@ -41,7 +42,7 @@
 - [ ] Edge 插件 TypeScript 实现
 - [ ] DB 断言
 - [ ] Agent 辅助层
-- [ ] Phase 3 平台化管理能力：项目/用例/套件/环境/数据集/失败重跑
+- [ ] Phase 3 平台化管理能力：项目/用例/套件/环境/数据集/失败重跑（进入前必须暂停，等待用户补充文档并确认）
 
 ---
 
@@ -50,45 +51,45 @@
 ## Java 核心平台
 - 模块名：Maven 多模块工程骨架
   - 状态：已初始化
-  - 说明：创建 apps 与 libs 模块，并按 Phase2 文档建立模块依赖边界；已根据当前开发要求从 Gradle 切换为 Maven
+  - 说明：创建 apps 与 libs 模块，并按 文档建立模块依赖边界；已根据当前开发要求从 Gradle 切换为 Maven
   - 对应文件：`pom.xml`、各模块 `pom.xml`
-  - 对应文档：`enterprise_web_test_platform_phase2_implementation_design.md`
+  - 对应文档：`enterprise_web_test_platform_implementation_design.md`
 
 - 模块名：common-core
   - 状态：基础骨架已完成
   - 说明：提供基础异常、错误码、ID 工具、通用 Result
   - 对应文件：`libs/common-core/src/main/java/com/example/webtest/common/**`
-  - 对应文档：`enterprise_web_test_platform_phase3_java_core_code_skeleton.md`
+  - 对应文档：`enterprise_web_test_platform_java_core_code_skeleton.md`
 
 - 模块名：common-json
   - 状态：基础实现已完成
   - 说明：提供 `Jsons` 门面，已接入 Jackson JSON/YAML；未知字段忽略，枚举大小写不敏感
   - 对应文件：`libs/common-json/src/main/java/com/example/webtest/json/Jsons.java`
-  - 对应文档：`enterprise_web_test_platform_phase3_java_core_code_skeleton.md`
+  - 对应文档：`enterprise_web_test_platform_java_core_code_skeleton.md`
 
 - 模块名：dsl-model / dsl-parser
   - 状态：基础骨架已完成
   - 说明：提供 DSL 模型、解析接口和基础校验器
   - 对应文件：`libs/dsl-model/src/main/java/com/example/webtest/dsl/model/**`、`libs/dsl-parser/src/main/java/com/example/webtest/dsl/**`
-  - 对应文档：`enterprise_web_test_platform_phase3_java_core_code_skeleton.md`
+  - 对应文档：`enterprise_web_test_platform_java_core_code_skeleton.md`
 
 - 模块名：execution-context
   - 状态：基础骨架已完成
   - 说明：提供运行 ID、Session ID 与变量上下文
   - 对应文件：`libs/execution-context/src/main/java/com/example/webtest/execution/context/ExecutionContext.java`
-  - 对应文档：`enterprise_web_test_platform_phase3_java_core_code_skeleton.md`
+  - 对应文档：`enterprise_web_test_platform_java_core_code_skeleton.md`
 
 - 模块名：browser-core
   - 状态：基础实现已完成，尚未真实联调
   - 说明：提供 Session 管理、Edge 启动、Page target DevTools endpoint 查询、PageController 基础 CDP 调用、截图选项、Console/Network 事件模型
   - 对应文件：`libs/browser-core/src/main/java/com/example/webtest/browser/**`
-  - 对应文档：`enterprise_web_test_platform_phase3_java_core_code_skeleton.md`、`cdp_domain_encapsulation_detailed_design.md`
+  - 对应文档：`enterprise_web_test_platform_java_core_code_skeleton.md`、`cdp_domain_encapsulation_detailed_design.md`
 
 - 模块名：apps/core-platform smoke 入口
   - 状态：已添加，尚未运行真实 Edge smoke
   - 说明：提供 `CorePlatformApp`，目标链路为启动 headless Edge、导航 data URL、截图到 `runs/smoke/screenshot.png`
   - 对应文件：`apps/core-platform/src/main/java/com/example/webtest/platform/CorePlatformApp.java`
-  - 对应文档：`enterprise_web_test_platform_tech_design.md` 附录 A、`enterprise_web_test_platform_phase3_java_core_code_skeleton.md` 附录 A
+  - 对应文档：`enterprise_web_test_platform_tech_design.md` 附录 A、`enterprise_web_test_platform_java_core_code_skeleton.md` 附录 A
 
 ## CDP 域封装
 - 域名：Raw CDP Client
@@ -153,7 +154,7 @@
 - `00_project_index.md`
 - `enterprise_web_test_platform_tech_design.md`
 - `enterprise_web_test_platform_phase2_implementation_design.md`
-- `enterprise_web_test_platform_phase3_java_core_code_skeleton.md`
+- `enterprise_web_test_platform_java_core_code_skeleton.md`
 
 ## 当前结果
 - [x] 已完成并可运行
@@ -324,9 +325,9 @@
 
 为减少 token 消耗，下次若继续 Java 核心骨架开发，优先阅读：
 - `01_dev_progress.md`
-- `enterprise_web_test_platform_phase3_java_core_code_skeleton.md` 第 8-9、20-21 章
+- `enterprise_web_test_platform_java_core_code_skeleton.md` 第 8-9、20-21 章
 - `cdp_domain_encapsulation_detailed_design.md` 第 4-8、19-21 章
-- 如继续 DSL/编排，再读 `enterprise_web_test_platform_phase3_java_core_code_skeleton.md` 第 6-7、17 章
+- 如继续 DSL/编排，再读 `enterprise_web_test_platform_java_core_code_skeleton.md` 第 6-7、17 章
 
 ## 下次接手关键记忆
 - 构建工具已从 Gradle 切换为 Maven；不要再恢复 Gradle。
@@ -597,7 +598,7 @@
 
 ## 下次建议优先阅读
 - `01_dev_progress.md` 最新一节。
-- `enterprise_web_test_platform_phase3_java_core_code_skeleton.md` 第 12 章 wait-engine 骨架，以及第 22 章编排器接入示例。
+- `enterprise_web_test_platform_java_core_code_skeleton.md` 第 12 章 wait-engine 骨架，以及第 22 章编排器接入示例。
 - `enterprise_web_test_platform_phase2_implementation_design.md` 第 10 章等待模块设计。
 
 ## 2026-04-16 wait-engine 最小等待链路开发记录
@@ -661,7 +662,7 @@
 ## 下次建议优先阅读
 - `01_dev_progress.md` 最新一节。
 - `enterprise_web_test_platform_phase2_implementation_design.md` 第 10 章等待模块设计、第 11 章断言模块设计。
-- `enterprise_web_test_platform_phase3_java_core_code_skeleton.md` 第 12 章 wait-engine 骨架、第 13 章 assertion-engine 骨架、第 22 章编排器接入示例。
+- `enterprise_web_test_platform_java_core_code_skeleton.md` 第 12 章 wait-engine 骨架、第 13 章 assertion-engine 骨架、第 22 章编排器接入示例。
 
 ## 2026-04-16 assertion-engine 标题与 URL 断言抽离记录
 ## 本次任务
@@ -735,7 +736,7 @@
 ## 下次建议优先阅读
 - `01_dev_progress.md` 最新一节。
 - `enterprise_web_test_platform_phase2_implementation_design.md` 第 11 章断言模块设计、第 12 章产物模块设计。
-- `enterprise_web_test_platform_phase3_java_core_code_skeleton.md` 第 13 章 assertion-engine 骨架、第 14 章 artifact-engine 骨架、第 22 章编排器接入示例。
+- `enterprise_web_test_platform_java_core_code_skeleton.md` 第 13 章 assertion-engine 骨架、第 14 章 artifact-engine 骨架、第 22 章编排器接入示例。
 
 ## 2026-04-16 wait-engine 隐藏与 URL 等待扩展记录
 ## 本次任务
@@ -800,7 +801,7 @@
 ## 下次建议优先阅读
 - `01_dev_progress.md` 最新一节。
 - `enterprise_web_test_platform_phase2_implementation_design.md` 第 10 章等待模块设计、第 11 章断言模块设计。
-- `enterprise_web_test_platform_phase3_java_core_code_skeleton.md` 第 12 章 wait-engine 骨架、第 13 章 assertion-engine 骨架、第 22 章编排器接入示例。
+- `enterprise_web_test_platform_java_core_code_skeleton.md` 第 12 章 wait-engine 骨架、第 13 章 assertion-engine 骨架、第 22 章编排器接入示例。
 
 ## 2026-04-16 assertion-engine 元素断言扩展记录
 
@@ -873,7 +874,7 @@
 ## 下次建议优先阅读
 - `01_dev_progress.md` 最新一节。
 - `enterprise_web_test_platform_phase2_implementation_design.md` 第 11 章断言模块设计、第 12 章 Artifact 模块设计。
-- `enterprise_web_test_platform_phase3_java_core_code_skeleton.md` 第 13 章 assertion-engine 骨架、第 14 章 artifact-engine 骨架、第 22 章编排器接入示例。
+- `enterprise_web_test_platform_java_core_code_skeleton.md` 第 13 章 assertion-engine 骨架、第 14 章 artifact-engine 骨架、第 22 章编排器接入示例。
 
 ## 2026-04-16 assertion-engine value/attribute 断言扩展记录
 
@@ -934,7 +935,7 @@
 ## 下一次建议优先阅读
 - `01_dev_progress.md` 最新一节。
 - `enterprise_web_test_platform_phase2_implementation_design.md` 第 11 章断言模块设计、第 12 章 Artifact 模块设计。
-- `enterprise_web_test_platform_phase3_java_core_code_skeleton.md` 第 13 章 assertion-engine 骨架、第 14 章 artifact-engine 骨架、第 22 章编排器接入示例。
+- `enterprise_web_test_platform_java_core_code_skeleton.md` 第 13 章 assertion-engine 骨架、第 14 章 artifact-engine 骨架、第 22 章编排器接入示例。
 ## 2026-04-16 artifact-engine screenshot 抽离记录
 
 ## 本次任务
@@ -987,7 +988,7 @@
 ## 下一次建议优先阅读
 - `01_dev_progress.md` 最新一节。
 - `enterprise_web_test_platform_phase2_implementation_design.md` 第 12 章 Artifact 与报告模块设计。
-- `enterprise_web_test_platform_phase3_java_core_code_skeleton.md` 第 14 章 artifact-engine 骨架、第 15 章 report-engine 骨架、第 22 章编排器接入示例。
+- `enterprise_web_test_platform_java_core_code_skeleton.md` 第 14 章 artifact-engine 骨架、第 15 章 report-engine 骨架、第 22 章编排器接入示例。
 
 ## 2026-04-17 report-engine 最小 JSON 报告接入记录
 
@@ -1090,7 +1091,7 @@
 ## 下一次建议优先阅读
 - `01_dev_progress.md` 最新一节。
 - `enterprise_web_test_platform_phase2_implementation_design.md` 第 12 章 Artifact 与报告模块设计。
-- `enterprise_web_test_platform_phase3_java_core_code_skeleton.md` 第 15 章 report-engine 骨架、第 17/22 章执行结果与编排器接入示例。
+- `enterprise_web_test_platform_java_core_code_skeleton.md` 第 15 章 report-engine 骨架、第 17/22 章执行结果与编排器接入示例。
 
 
 ## 2026-04-17 最小 HTML 报告记录
@@ -1174,7 +1175,7 @@
 ## 下一次建议优先阅读
 - `01_dev_progress.md` 最新一节。
 - `enterprise_web_test_platform_phase2_implementation_design.md` 第 12 章 Artifact 与报告模块设计。
-- `enterprise_web_test_platform_phase3_java_core_code_skeleton.md` 第 15 章 report-engine 骨架、第 17/22 章执行结果与编排器接入示例。
+- `enterprise_web_test_platform_java_core_code_skeleton.md` 第 15 章 report-engine 骨架、第 17/22 章执行结果与编排器接入示例。
 
 ## 2026-04-17 run 生命周期时间与报告 duration 收尾记录
 
@@ -1230,7 +1231,7 @@
 ## 下一次建议优先阅读
 - `01_dev_progress.md` 最新一节。
 - `enterprise_web_test_platform_phase2_implementation_design.md` 第 12 章 Artifact 与报告模块设计。
-- `enterprise_web_test_platform_phase3_java_core_code_skeleton.md` 第 15 章 report-engine 骨架、第 17/22 章执行结果与编排器接入示例。
+- `enterprise_web_test_platform_java_core_code_skeleton.md` 第 15 章 report-engine 骨架、第 17/22 章执行结果与编排器接入示例。
 
 
 ## 2026-04-17 run 生命周期时间与报告 duration 修正记录
@@ -1273,7 +1274,7 @@
 ## 下一次建议优先阅读
 - `01_dev_progress.md` 最新一节。
 - `enterprise_web_test_platform_phase2_implementation_design.md` 第 12 章 Artifact 与报告模块设计。
-- `enterprise_web_test_platform_phase3_java_core_code_skeleton.md` 第 15 章 report-engine 骨架、第 17/22 章执行结果与编排器接入示例。
+- `enterprise_web_test_platform_java_core_code_skeleton.md` 第 15 章 report-engine 骨架、第 17/22 章执行结果与编排器接入示例。
 
 ## 2026-04-16 artifact-engine failure screenshot 生命周期记录
 
@@ -1322,7 +1323,7 @@
 ## 下一次建议优先阅读
 - `01_dev_progress.md` 最新一节。
 - `enterprise_web_test_platform_phase2_implementation_design.md` 第 12 章 Artifact 与报告模块设计。
-- `enterprise_web_test_platform_phase3_java_core_code_skeleton.md` 第 14 章 artifact-engine 骨架、第 15 章 report-engine 骨架、第 22 章编排器接入示例。
+- `enterprise_web_test_platform_java_core_code_skeleton.md` 第 14 章 artifact-engine 骨架、第 15 章 report-engine 骨架、第 22 章编排器接入示例。
 
 ## 2026-04-17 ArtifactRef 多产物列表接入记录
 
@@ -1371,7 +1372,7 @@
 ## 下一次建议优先阅读
 - `01_dev_progress.md` 最新一节。
 - `enterprise_web_test_platform_phase2_implementation_design.md` 第 12 章 Artifact 与报告模块设计。
-- `enterprise_web_test_platform_phase3_java_core_code_skeleton.md` 第 14 章 artifact-engine 骨架、第 15 章 report-engine 骨架、第 22 章编排器接入示例。
+- `enterprise_web_test_platform_java_core_code_skeleton.md` 第 14 章 artifact-engine 骨架、第 15 章 report-engine 骨架、第 22 章编排器接入示例。
 ## 2026-04-17 report-engine summary 与相对 artifact 路径记录
 
 ## 本次任务
@@ -1420,7 +1421,7 @@
 ## 下一次建议优先阅读
 - `01_dev_progress.md` 最新一节。
 - `enterprise_web_test_platform_phase2_implementation_design.md` 第 12 章 Artifact 与报告模块设计。
-- `enterprise_web_test_platform_phase3_java_core_code_skeleton.md` 第 15 章 report-engine 骨架、第 17/22 章执行结果与编排器接入示例。
+- `enterprise_web_test_platform_java_core_code_skeleton.md` 第 15 章 report-engine 骨架、第 17/22 章执行结果与编排器接入示例。
 
 ## 2026-04-17 run 生命周期时间与报告 duration 最终收尾记录
 
@@ -1476,7 +1477,7 @@
 ## 下一次建议优先阅读
 - `01_dev_progress.md` 最新一节。
 - `enterprise_web_test_platform_phase2_implementation_design.md` 第 12 章 Artifact 与报告模块设计。
-- `enterprise_web_test_platform_phase3_java_core_code_skeleton.md` 第 15 章 report-engine 骨架、第 17/22 章执行结果与编排器接入示例。
+- `enterprise_web_test_platform_java_core_code_skeleton.md` 第 15 章 report-engine 骨架、第 17/22 章执行结果与编排器接入示例。
 
 ## 2026-04-17 最新进度同步与接手提醒
 
@@ -2807,4 +2808,655 @@
 
 ## Next Step
 - Prefer rendering storage diagnostics in `runs/index.html` so report size/artifact totals are visible without running CLI.
+- Alternative: expose the network body spool grace period through DSL/run options if scenario-level runtime control becomes necessary.
+
+## 2026-04-18 report index storage diagnostics record
+
+## Task
+- Continued after read-only report storage diagnostics by rendering the diagnostics directly in `runs/index.html`.
+
+## Completed
+- `DefaultReportEngine` now reuses the same report storage diagnostic accounting for report index generation.
+- `runs/index.html` now shows a Storage diagnostics panel with:
+  - total run storage bytes.
+  - referenced artifact bytes.
+  - referenced artifact count.
+  - missing artifact links.
+  - pruned artifact links.
+  - artifact totals by type.
+- The run table now includes a Storage column with per-run directory size, referenced artifact size/count, missing link count, and pruned link count.
+- The diagnostics panel remains read-only and does not add browser-side cleanup or mutation actions.
+- Added report-engine HTML assertions for the new index storage panel and per-run storage column.
+- Regenerated `runs/index.html` through `dsl-smoke`; the generated index now contains `Storage diagnostics` and the `Storage` column.
+
+## Modified Files
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/DefaultReportEngine.java`
+- `libs/report-engine/src/test/java/com/example/webtest/report/engine/DefaultReportEngineTest.java`
+- `runs/index.html`
+- `runs/dsl-smoke/report.json`
+- `runs/dsl-smoke/report.html`
+- `runs/dsl-smoke/capture-page.png`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine -am test -q`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,apps/core-platform -am test -q`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+- Passed from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`; latest DSL smoke stayed successful with 16 successful steps.
+- Confirmed generated `runs/index.html` contains `Storage diagnostics`, `Artifact files`, `Missing links`, `Pruned links`, and the `Storage` table column.
+- Rechecked local Edge debug processes after smoke; no `msedge.exe` project `webtest-edge-*` / `remote-debugging-port` process remained.
+- Passed: `git diff --check` (line-ending warnings only).
+
+## Known Gaps
+- Diagnostics still count only report-referenced artifacts; unreferenced files are included in run bytes but not artifact totals.
+- The storage panel is generated when the index is regenerated; older static index files need regeneration before showing the panel.
+- Report cleanup and maintenance remain CLI/API driven; no browser-side cleanup action was added.
+
+## Next Step
+- Prefer adding report storage diagnostics for unreferenced files under each run directory.
+- Alternative: expose the network body spool grace period through DSL/run options if scenario-level runtime control becomes necessary.
+
+## 2026-04-18 unreferenced report file diagnostics record
+
+## Task
+- Continued after report index storage diagnostics by adding read-only accounting for files under each report run directory that are not referenced by `report.json`.
+
+## Completed
+- `ReportStorageDiagnosticsResult` now reports global and per-run unreferenced file counts and bytes.
+- `DefaultReportEngine.diagnoseReportStorage(...)` now scans each run directory's regular files and excludes:
+  - `report.json` and `report.html`;
+  - files referenced by legacy `artifactPath`;
+  - files referenced by structured `artifacts[*].path`;
+  - files under a referenced artifact directory.
+- `runs/index.html` storage diagnostics now includes `Unreferenced files` and `Unreferenced count`.
+- The run table Storage column now includes per-run unreferenced bytes and count.
+- `core-platform report-diagnostics` CLI output now prints unreferenced bytes/count globally and per run.
+- Added report-engine test coverage for API diagnostics and generated index HTML.
+- Regenerated the current DSL smoke report index; current `runs` diagnostics show 0 unreferenced files.
+
+## Modified Files
+- `apps/core-platform/src/main/java/com/example/webtest/platform/CorePlatformApp.java`
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/ReportStorageDiagnosticsResult.java`
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/DefaultReportEngine.java`
+- `libs/report-engine/src/test/java/com/example/webtest/report/engine/DefaultReportEngineTest.java`
+- `runs/index.html` (generated, ignored by git)
+- `runs/dsl-smoke/report.json` (generated, ignored by git)
+- `runs/dsl-smoke/report.html` (generated, ignored by git)
+- `runs/dsl-smoke/capture-page.png` (generated, ignored by git)
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,apps/core-platform -am test -q`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+- Passed from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=report-diagnostics ..\..\runs"`; output scanned 1 run, 29225 total run bytes, 9296 referenced artifact bytes, 0 unreferenced file bytes, 1 referenced artifact, 0 unreferenced files, 0 missing, 0 pruned.
+- Passed from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`; latest DSL smoke stayed successful with 16 successful steps.
+- Confirmed generated `runs/index.html` contains `Unreferenced files`, `Unreferenced count`, and per-run `Unreferenced 0 B (0)`.
+- Rechecked local Edge debug processes after smoke; no `msedge.exe` project `webtest-edge-*` / `remote-debugging-port` process remained.
+- Passed: `git diff --check` (line-ending warnings only).
+
+## Known Gaps
+- Diagnostics are still read-only; unreferenced files are reported but not deleted.
+- The report index only reflects these metrics after regeneration.
+- The unreferenced scan intentionally excludes report metadata and referenced artifact paths, but it does not classify unreferenced files by type.
+
+## Next Step
+- Prefer adding a dry-run/apply cleanup mode for unreferenced files under report run directories, using the new diagnostics as the selection basis.
+- Alternative: expose the network body spool grace period through DSL/run options if scenario-level runtime control becomes necessary.
+
+## 2026-04-18 unreferenced report file cleanup record
+
+## Task
+- Continued after unreferenced report file diagnostics by adding dry-run/apply cleanup support for unreferenced files under report run directories.
+
+## Completed
+- Added `ReportCleanupOptions.pruneUnreferencedFilesOnly`.
+- Added `ReportCleanupResult.deletedUnreferencedFilePaths`.
+- `DefaultReportEngine.cleanupReportRuns(...)` now supports pruning only unreferenced files for selected runs.
+- Unreferenced-file pruning uses the same report diagnostics selection basis:
+  - keeps `report.json` and `report.html`;
+  - keeps legacy `artifactPath` references;
+  - keeps structured `artifacts[*].path` references;
+  - keeps files under referenced artifact directories.
+- Apply mode deletes only the selected unreferenced files and then removes empty directories under the run directory.
+- Dry-run mode returns the files that would be deleted without mutating disk.
+- `report-cleanup` CLI now accepts `--prune-unreferenced-files-only` and prints the would-delete/deleted unreferenced file list.
+- Report index maintenance guidance now includes:
+  - `report-cleanup runs --dry-run --keep-latest 0 --prune-unreferenced-files-only`
+- Added report-engine tests for:
+  - apply-mode unreferenced-file pruning while preserving referenced artifacts and protected runs;
+  - dry-run unreferenced-file pruning without deleting files.
+- Fixed a cleanup control-flow bug found by the new test: unreferenced-file-only mode no longer falls through to deleting the selected run directory.
+- Regenerated the current DSL smoke report index; current `runs` diagnostics show 0 unreferenced files.
+
+## Modified Files
+- `apps/core-platform/src/main/java/com/example/webtest/platform/CorePlatformApp.java`
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/ReportCleanupOptions.java`
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/ReportCleanupResult.java`
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/DefaultReportEngine.java`
+- `libs/report-engine/src/test/java/com/example/webtest/report/engine/DefaultReportEngineTest.java`
+- `runs/index.html` (generated, ignored by git)
+- `runs/dsl-smoke/report.json` (generated, ignored by git)
+- `runs/dsl-smoke/report.html` (generated, ignored by git)
+- `runs/dsl-smoke/capture-page.png` (generated, ignored by git)
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine -Dtest=DefaultReportEngineTest#cleanupReportRunsPrunesUnreferencedFilesOnlyForMatchingRuns test -q`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,apps/core-platform -am test -q`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+- Passed from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=report-cleanup --help"`
+- Passed from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=report-cleanup ..\..\runs --dry-run --keep-latest 0 --prune-unreferenced-files-only"`; output scanned 1 run and would delete 0 unreferenced files.
+- Passed from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`; latest DSL smoke stayed successful with 16 successful steps.
+- Confirmed generated `runs/index.html` contains `--prune-unreferenced-files-only`, `Unreferenced files`, and `Unreferenced count`.
+- Rechecked local Edge debug processes after smoke; no `msedge.exe` project `webtest-edge-*` / `remote-debugging-port` process remained.
+- Passed: `git diff --check` (line-ending warnings only).
+
+## Known Gaps
+- Unreferenced cleanup is still CLI/API driven; no browser-side cleanup action was added.
+- The cleanup action follows normal report-cleanup run selection rules, so pruning all runs should be invoked with an explicit selector such as `--keep-latest 0`.
+- Unreferenced files are not yet classified by type or age.
+
+## Next Step
+- Prefer adding optional unreferenced-file classification to diagnostics and cleanup output so users can distinguish logs, temp files, and other leftovers before applying deletion.
+- Alternative: expose the network body spool grace period through DSL/run options if scenario-level runtime control becomes necessary.
+
+## 2026-04-18 unreferenced report file classification record
+
+## Task
+- Continued after unreferenced-file cleanup by adding type classification for unreferenced report files in diagnostics, generated index HTML, and cleanup output.
+
+## Completed
+- `ReportStorageDiagnosticsResult` now includes `UnreferencedFileTypeSummary` totals for unreferenced files.
+- `DefaultReportEngine.diagnoseReportStorage(...)` now classifies unreferenced files by extension into `log`, `temp`, `text`, `html`, `image`, `archive`, or `other`.
+- `runs/index.html` storage diagnostics now includes an unreferenced-file type summary table when leftovers exist, or an explicit no-unreferenced-files note when none exist.
+- `ReportCleanupResult` now returns type totals for the unreferenced files selected by dry-run/apply cleanup.
+- `report-cleanup` CLI now prints unreferenced file type totals before listing selected file paths.
+- `report-diagnostics` CLI now prints global unreferenced file type totals.
+- Added/updated report-engine tests for:
+  - no-unreferenced-file index messaging;
+  - diagnostic classification of `.log` and `.tmp` unreferenced files;
+  - cleanup dry-run/apply type totals with preserved byte counts.
+- Regenerated the current DSL smoke report index; current `runs` diagnostics still show 0 unreferenced files.
+
+## Modified Files
+- `apps/core-platform/src/main/java/com/example/webtest/platform/CorePlatformApp.java`
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/ReportCleanupResult.java`
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/ReportStorageDiagnosticsResult.java`
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/DefaultReportEngine.java`
+- `libs/report-engine/src/test/java/com/example/webtest/report/engine/DefaultReportEngineTest.java`
+- `runs/index.html` (generated, ignored by git)
+- `runs/dsl-smoke/report.json` (generated, ignored by git)
+- `runs/dsl-smoke/report.html` (generated, ignored by git)
+- `runs/dsl-smoke/capture-page.png` (generated, ignored by git)
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine -am test -q`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,apps/core-platform -am test -q`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+- Passed from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=report-diagnostics ..\..\runs"`; output scanned 1 run, 29190 total run bytes before smoke regeneration, 9296 referenced artifact bytes, 0 unreferenced files, and printed the new `Unreferenced file types:` section.
+- Passed from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=report-cleanup ..\..\runs --dry-run --keep-latest 0 --prune-unreferenced-files-only"`; output scanned 1 run, would delete 0 unreferenced files, and printed the new `Unreferenced file types:` section.
+- Passed from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`; latest DSL smoke stayed successful with 16 successful steps.
+- Confirmed generated `runs/index.html` contains `Unreferenced count` and `No unreferenced files found in scanned reports.`
+- Rechecked local Edge debug processes after smoke with CIM; no `msedge.exe` project `webtest-edge-*` / `remote-debugging-port` process remained.
+- Passed: `git diff --check` (line-ending warnings only).
+
+## Known Gaps
+- Classification is extension-based and intentionally coarse; it does not inspect file contents.
+- Per-run summaries still expose aggregate unreferenced bytes/count only; type breakdown is global for diagnostics/index and selected-file scoped for cleanup output.
+- Browser-side cleanup remains out of scope; cleanup is still CLI/API driven.
+
+## Next Step
+- Prefer adding per-run unreferenced-file type breakdowns to diagnostics and index rows if operators need to identify which specific run owns log/temp/other leftovers.
+- Alternative: expose the network body spool grace period through DSL/run options if scenario-level runtime control becomes necessary.
+
+## 2026-04-18 per-run unreferenced file classification record
+
+## Task
+- Continued after global unreferenced-file classification by adding per-run unreferenced-file type breakdowns to storage diagnostics, generated index rows, and CLI diagnostics output.
+
+## Completed
+- `ReportStorageDiagnosticsResult.RunStorageSummary` now includes per-run `unreferencedFileTypes`.
+- `DefaultReportEngine.diagnoseReportStorage(...)` now computes type totals per run while preserving the existing global type totals.
+- Generated `runs/index.html` Storage cells now include a `Types ...` line when a run owns unreferenced files.
+- `report-diagnostics` CLI now prints indented per-run `unreferencedTypes` sections for runs that have unreferenced files.
+- Added test coverage for per-run `log` and `temp` type summaries and index row type rendering.
+- Regenerated the current DSL smoke report index; current `runs` diagnostics still show 0 unreferenced files.
+
+## Modified Files
+- `apps/core-platform/src/main/java/com/example/webtest/platform/CorePlatformApp.java`
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/ReportStorageDiagnosticsResult.java`
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/DefaultReportEngine.java`
+- `libs/report-engine/src/test/java/com/example/webtest/report/engine/DefaultReportEngineTest.java`
+- `runs/index.html` (generated, ignored by git)
+- `runs/dsl-smoke/report.json` (generated, ignored by git)
+- `runs/dsl-smoke/report.html` (generated, ignored by git)
+- `runs/dsl-smoke/capture-page.png` (generated, ignored by git)
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine -am test -q`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,apps/core-platform -am test -q`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+- Passed from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=report-diagnostics ..\..\runs"`; output scanned 1 run, 0 unreferenced files, and kept per-run metrics visible.
+- Passed from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=report-cleanup ..\..\runs --dry-run --keep-latest 0 --prune-unreferenced-files-only"`; output would delete 0 unreferenced files.
+- Passed from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`; latest DSL smoke stayed successful with 16 successful steps.
+- Confirmed generated `runs/index.html` contains `Unreferenced count` and `No unreferenced files found in scanned reports.`
+- Rechecked local Edge debug processes after smoke; no `msedge.exe` project `webtest-edge-*` / `remote-debugging-port` process remained.
+- Passed: `git diff --check` (line-ending warnings only).
+
+## Known Gaps
+- Per-run type breakdowns are still extension-based and coarse.
+- Index rows only render per-run type details when unreferenced files exist; the current generated smoke index has none to display.
+- Browser-side cleanup remains out of scope; cleanup is still CLI/API driven.
+
+## Next Step
+- Prefer adding optional age/last-modified reporting for unreferenced files so cleanup decisions can distinguish fresh scratch files from stale leftovers.
+- Alternative: expose the network body spool grace period through DSL/run options if scenario-level runtime control becomes necessary.
+
+## 2026-04-18 unreferenced report file age summary record
+
+## Task
+- Continued after per-run unreferenced-file type classification by adding last-modified/age summaries for unreferenced report files in diagnostics, generated index HTML, and cleanup dry-run/apply output.
+
+## Completed
+- `ReportStorageDiagnosticsResult` now includes nullable `UnreferencedFileAgeSummary` totals for global diagnostics and each run summary.
+- `ReportCleanupResult` now includes nullable age summary data for the unreferenced files selected by cleanup.
+- `DefaultReportEngine.diagnoseReportStorage(...)` now captures last-modified timestamps for unreferenced files and reports oldest/newest last-modified timestamps plus age seconds.
+- Generated `runs/index.html` Storage diagnostics now includes `Oldest unreferenced` and `Newest unreferenced` metrics, using `(none)` when no unreferenced files exist.
+- Per-run Storage cells now include an `Oldest ...` line when that run owns unreferenced files.
+- `report-diagnostics` CLI now prints global and per-run unreferenced file age summaries.
+- `report-cleanup` CLI now prints age summaries for the unreferenced files selected by dry-run/apply cleanup.
+- Added/updated report-engine tests for:
+  - no-unreferenced-file index age messaging;
+  - diagnostic oldest/newest last-modified summaries;
+  - cleanup selected-file age summaries in apply and dry-run modes;
+  - index rendering of oldest/newest unreferenced metrics and per-run oldest lines.
+- Regenerated the current DSL smoke report index; current `runs` diagnostics still show 0 unreferenced files.
+
+## Modified Files
+- `apps/core-platform/src/main/java/com/example/webtest/platform/CorePlatformApp.java`
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/ReportCleanupResult.java`
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/ReportStorageDiagnosticsResult.java`
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/DefaultReportEngine.java`
+- `libs/report-engine/src/test/java/com/example/webtest/report/engine/DefaultReportEngineTest.java`
+- `runs/index.html` (generated, ignored by git)
+- `runs/dsl-smoke/report.json` (generated, ignored by git)
+- `runs/dsl-smoke/report.html` (generated, ignored by git)
+- `runs/dsl-smoke/capture-page.png` (generated, ignored by git)
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine -am test -q`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,apps/core-platform -am test -q`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+- Passed from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=report-diagnostics ..\..\runs"`; output scanned 1 run, 0 unreferenced files, and printed `Unreferenced file age: (none)` plus per-run `(none)`.
+- Passed from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=report-cleanup ..\..\runs --dry-run --keep-latest 0 --prune-unreferenced-files-only"`; output would delete 0 unreferenced files and printed `Unreferenced file age: (none)`.
+- Passed from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`; latest DSL smoke stayed successful with 16 successful steps.
+- Confirmed generated `runs/index.html` contains `Oldest unreferenced`, `Newest unreferenced`, `Unreferenced count`, and `No unreferenced files found in scanned reports.`
+- Rechecked local Edge debug processes after smoke; no `msedge.exe` project `webtest-edge-*` / `remote-debugging-port` process remained.
+- Passed: `git diff --check` (line-ending warnings only).
+
+## Known Gaps
+- Age is summarized by filesystem last-modified time only; no file content inspection or retention recommendation is inferred.
+- Age summaries are aggregate oldest/newest values, not per-file listings.
+- Browser-side cleanup remains out of scope; cleanup is still CLI/API driven.
+
+## Next Step
+- Prefer adding retention policy hints for unreferenced cleanup dry-runs, such as grouping stale leftovers by age bucket before deletion.
+- Alternative: expose the network body spool grace period through DSL/run options if scenario-level runtime control becomes necessary.
+
+## 2026-04-18 unreferenced cleanup retention hints record
+
+## Task
+- Continued after unreferenced-file age summaries by adding retention policy hints for unreferenced-file cleanup output.
+
+## Completed
+- `ReportCleanupResult` now includes `deletedUnreferencedFileRetentionHints`.
+- `DefaultReportEngine.cleanupReportRuns(...)` now groups selected unreferenced files by age bucket before deletion/dry-run:
+  - `fresh <1h`
+  - `recent 1h-24h`
+  - `stale 1d-7d`
+  - `old 7d-30d`
+  - `ancient >=30d`
+- `report-cleanup` CLI now prints an `Unreferenced retention hints:` section with count, bytes, and age bounds for each populated bucket.
+- Added test coverage for dry-run bucket grouping while preserving referenced artifacts and files on disk.
+
+## Modified Files
+- `apps/core-platform/src/main/java/com/example/webtest/platform/CorePlatformApp.java`
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/DefaultReportEngine.java`
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/ReportCleanupResult.java`
+- `libs/report-engine/src/test/java/com/example/webtest/report/engine/DefaultReportEngineTest.java`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine -Dtest=DefaultReportEngineTest#cleanupReportRunsGroupsUnreferencedFilesByRetentionAgeBucket test -q`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine -am test -q`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,apps/core-platform -am test -q`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+- Passed from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=report-cleanup ..\..\runs --dry-run --keep-latest 0 --prune-unreferenced-files-only"`; output scanned 1 run, would delete 0 unreferenced files, and printed `Unreferenced retention hints:` with `(none)`.
+
+## Known Gaps
+- Retention hints are advisory bucket summaries only; no bucket-specific deletion selector is implemented.
+- Buckets are fixed in code and based on filesystem last-modified age.
+- Browser-side cleanup remains out of scope; cleanup is still CLI/API driven.
+
+## Next Step
+- Prefer adding a bucket/age-threshold selector for unreferenced cleanup, such as pruning only files older than N hours/days.
+- Alternative: expose the network body spool grace period through DSL/run options if scenario-level runtime control becomes necessary.
+
+## 2026-04-18 unreferenced cleanup age-threshold selector record
+
+## Task
+- Continued after retention bucket hints by adding an age-threshold selector for unreferenced-file cleanup.
+
+## Completed
+- `ReportCleanupOptions` now includes `unreferencedFileMinAgeSeconds`.
+- `DefaultReportEngine.cleanupReportRuns(...)` now filters unreferenced cleanup selections by filesystem last-modified age when the threshold is set.
+- `report-cleanup` CLI now accepts:
+  - `--unreferenced-older-than-hours N`
+  - `--unreferenced-older-than-days N`
+- CLI dry-run/apply output now prints `Unreferenced min age seconds`.
+- Generated report index maintenance hints now include a safer dry-run example:
+  - `report-cleanup runs --dry-run --keep-latest 0 --prune-unreferenced-files-only --unreferenced-older-than-days 1`
+- Added test coverage proving young unreferenced files are retained while older unreferenced files are selected and deleted.
+
+## Modified Files
+- `apps/core-platform/src/main/java/com/example/webtest/platform/CorePlatformApp.java`
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/DefaultReportEngine.java`
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/ReportCleanupOptions.java`
+- `libs/report-engine/src/test/java/com/example/webtest/report/engine/DefaultReportEngineTest.java`
+- `runs/index.html` (generated, ignored by git)
+- `runs/dsl-smoke/report.json` (generated, ignored by git)
+- `runs/dsl-smoke/report.html` (generated, ignored by git)
+- `runs/dsl-smoke/capture-page.png` (generated, ignored by git)
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine -Dtest=DefaultReportEngineTest#cleanupReportRunsPrunesOnlyUnreferencedFilesOlderThanThreshold test -q`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine -am test -q`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,apps/core-platform -am test -q`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+- Passed from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=report-cleanup ..\..\runs --dry-run --keep-latest 0 --prune-unreferenced-files-only --unreferenced-older-than-days 1"`; output printed `Unreferenced min age seconds: 86400` and found 0 unreferenced files in current runs.
+- Passed from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`; DSL smoke succeeded with 16 successful steps.
+- Confirmed generated `runs/index.html` contains `--unreferenced-older-than-days 1`, `Unreferenced count`, and `No unreferenced files found in scanned reports.`
+- Rechecked local Edge debug processes after smoke; no `msedge.exe` project `webtest-edge-*` / `remote-debugging-port` process remained.
+- Passed: `git diff --check` (line-ending warnings only).
+
+## Known Gaps
+- The selector is threshold-based only; it does not accept bucket names like `stale` or `ancient`.
+- Age is still based on filesystem last-modified time only.
+- Cleanup remains CLI/API driven; there is no browser-side cleanup UI.
+
+## Next Step
+- Prefer adding optional bucket-name selectors for unreferenced cleanup, such as `--unreferenced-age-bucket stale,old,ancient`.
+- Alternative: expose the network body spool grace period through DSL/run options if scenario-level runtime control becomes necessary.
+
+## 2026-04-18 unreferenced cleanup age-bucket selector record
+
+## Task
+- Continued after age-threshold cleanup by adding bucket-name selectors for unreferenced-file cleanup.
+
+## Completed
+- `ReportCleanupOptions` now includes validated unreferenced-file age bucket selectors: `fresh`, `recent`, `stale`, `old`, and `ancient`.
+- `DefaultReportEngine.cleanupReportRuns(...)` now filters unreferenced cleanup selections by both minimum age and selected age buckets when provided.
+- Bucket definitions are shared between cleanup filtering and retention hint summaries to keep labels/ranges consistent:
+  - `fresh <1h`
+  - `recent 1h-24h`
+  - `stale 1d-7d`
+  - `old 7d-30d`
+  - `ancient >=30d`
+- `report-cleanup` CLI now accepts:
+  - `--unreferenced-age-bucket stale,old,ancient`
+  - `--unreferenced-age-bucket=stale,old,ancient`
+- CLI dry-run/apply output now prints selected `Unreferenced age buckets`.
+- Generated report index maintenance hints now include:
+  - `report-cleanup runs --dry-run --keep-latest 0 --prune-unreferenced-files-only --unreferenced-age-bucket stale,old,ancient`
+- Added test coverage proving only selected bucket files are deleted while newer bucket files remain.
+
+## Modified Files
+- `apps/core-platform/src/main/java/com/example/webtest/platform/CorePlatformApp.java`
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/DefaultReportEngine.java`
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/ReportCleanupOptions.java`
+- `libs/report-engine/src/test/java/com/example/webtest/report/engine/DefaultReportEngineTest.java`
+- `runs/index.html` (generated, ignored by git)
+- `runs/dsl-smoke/report.json` (generated, ignored by git)
+- `runs/dsl-smoke/report.html` (generated, ignored by git)
+- `runs/dsl-smoke/capture-page.png` (generated, ignored by git)
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine -Dtest=DefaultReportEngineTest#cleanupReportRunsPrunesOnlySelectedUnreferencedFileAgeBuckets test -q`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine -am test -q`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl apps/core-platform -am test -q`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+- Passed from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=report-cleanup --help"`; usage includes `--unreferenced-age-bucket fresh,recent,stale,old,ancient`.
+- Passed from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=report-cleanup ..\..\runs --dry-run --keep-latest 0 --prune-unreferenced-files-only --unreferenced-age-bucket stale,old,ancient"`; output printed `Unreferenced age buckets: [stale, old, ancient]` and found 0 unreferenced files in current runs.
+- Passed from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`; DSL smoke succeeded with 16 successful steps.
+- Confirmed generated `runs/index.html` contains `--unreferenced-age-bucket stale,old,ancient`, `Unreferenced count`, and `No unreferenced files found in scanned reports.`
+- Rechecked local Edge debug processes after smoke; no `msedge.exe` project `webtest-edge-*` / `remote-debugging-port` process remained.
+- Passed: `git diff --check` (line-ending warnings only).
+
+## Known Gaps
+- Bucket names are fixed and based on filesystem last-modified age.
+- Bucket selection is only implemented for unreferenced-file cleanup mode.
+- Cleanup remains CLI/API driven; there is no browser-side cleanup UI.
+
+## Next Step
+- Prefer adding a cleanup plan summary to dry-runs that explains which selectors matched and why files were retained.
+- Alternative: expose the network body spool grace period through DSL/run options if scenario-level runtime control becomes necessary.
+
+## 2026-04-18 unreferenced cleanup plan summary record
+
+## Task
+- Continued after unreferenced age-bucket selectors by adding an aggregate cleanup plan summary for unreferenced-file cleanup.
+
+## Completed
+- `ReportCleanupResult` now includes `UnreferencedCleanupPlan` with selected/retained run counts, scanned/selected/retained unreferenced file counts, byte totals, and retained-reason summaries.
+- `DefaultReportEngine.cleanupReportRuns(...)` now evaluates unreferenced files across both selected and retained runs when `--prune-unreferenced-files-only` is used, so dry-runs can explain why files are selected or retained.
+- Retention reasons currently reported:
+  - `run-retained-by-cleanup-selectors`
+  - `younger-than-min-age`
+  - `outside-selected-age-buckets`
+- `report-cleanup` CLI now prints `Unreferenced cleanup plan:` before deletion details.
+- Added test coverage proving the plan distinguishes files selected for cleanup from files retained by run selectors, minimum age, and bucket selectors.
+
+## Modified Files
+- `apps/core-platform/src/main/java/com/example/webtest/platform/CorePlatformApp.java`
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/DefaultReportEngine.java`
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/ReportCleanupResult.java`
+- `libs/report-engine/src/test/java/com/example/webtest/report/engine/DefaultReportEngineTest.java`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine -Dtest=DefaultReportEngineTest#cleanupReportRunsSummarizesUnreferencedCleanupPlan test -q`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine -am test -q`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,apps/core-platform -am test -q`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+- Passed from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=report-cleanup ..\..\runs --dry-run --keep-latest 0 --prune-unreferenced-files-only --unreferenced-age-bucket stale,old,ancient"`; output printed `Unreferenced cleanup plan:` with selected/retained counts.
+- Passed: `git diff --check` (line-ending warnings only).
+
+## Known Gaps
+- Plan details are aggregate-only; it does not list every retained file.
+- Retained reason priority is first-match: min-age retention is reported before bucket retention when both would retain the same file.
+- Cleanup remains CLI/API driven; there is no browser-side cleanup UI.
+
+## Next Step
+- Prefer adding per-run cleanup plan summaries to show which run retained or selected each aggregate group.
+- Alternative: expose the network body spool grace period through DSL/run options if scenario-level runtime control becomes necessary.
+
+## 2026-04-18 per-run unreferenced cleanup plan record
+
+## Task
+- Continued after aggregate unreferenced cleanup plan summaries by adding per-run cleanup plan breakdowns.
+
+## Completed
+- `ReportCleanupResult.UnreferencedCleanupPlan` now carries `runs`, a per-run cleanup plan list.
+- Added `UnreferencedCleanupRunPlan` with run id, directory, selector-selected state, scanned/selected/retained unreferenced file counts and bytes, plus per-run retained reasons.
+- `DefaultReportEngine.cleanupReportRuns(...)` now records each run's unreferenced-file cleanup classification while preserving the existing global aggregate plan.
+- `report-cleanup` CLI now prints a `runs:` section under `Unreferenced cleanup plan:` so dry-runs can show which runs were selected or retained and why.
+- Extended `DefaultReportEngineTest.cleanupReportRunsSummarizesUnreferencedCleanupPlan` to assert both selected-run and retained-run plan details.
+
+## Modified Files
+- `apps/core-platform/src/main/java/com/example/webtest/platform/CorePlatformApp.java`
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/DefaultReportEngine.java`
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/ReportCleanupResult.java`
+- `libs/report-engine/src/test/java/com/example/webtest/report/engine/DefaultReportEngineTest.java`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine -Dtest=DefaultReportEngineTest#cleanupReportRunsSummarizesUnreferencedCleanupPlan test -q`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,apps/core-platform -am test -q`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+- Passed from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=report-cleanup ..\..\runs --dry-run --keep-latest 0 --prune-unreferenced-files-only --unreferenced-age-bucket stale,old,ancient"`; output printed `Unreferenced cleanup plan:` with the new `runs:` section.
+
+## Known Gaps
+- Per-run plan data is still aggregate per run; it does not list every retained or selected file.
+- Retained reason priority is still first-match: min-age retention is reported before bucket retention when both would retain the same file.
+- Cleanup remains CLI/API driven; there is no browser-side cleanup UI.
+
+## Next Step
+- Prefer adding an optional verbose cleanup dry-run mode that can list individual retained/selected unreferenced file paths for investigation.
+- Alternative: expose the network body spool grace period through DSL/run options if scenario-level runtime control becomes necessary.
+
+## 2026-04-18 verbose unreferenced cleanup plan record
+
+## Task
+- Continued after per-run unreferenced cleanup plan summaries by adding optional verbose file-level cleanup plan details.
+
+## Completed
+- `ReportCleanupOptions` now exposes `verboseUnreferencedCleanupPlan`.
+- `ReportCleanupResult.UnreferencedCleanupRunPlan` now includes optional file-level details with path, decision, reason, type, bytes, and last-modified timestamp.
+- `DefaultReportEngine.cleanupReportRuns(...)` populates file details only when verbose mode is enabled, keeping default plan output aggregate-only.
+- `report-cleanup` CLI now accepts `--verbose-unreferenced-cleanup`, prints the verbose state, and shows per-run `files:` entries when verbose details are present.
+- Added test coverage for selected unreferenced files and files retained by run selectors, min-age selectors, and bucket selectors.
+
+## Modified Files
+- `apps/core-platform/src/main/java/com/example/webtest/platform/CorePlatformApp.java`
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/DefaultReportEngine.java`
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/ReportCleanupOptions.java`
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/ReportCleanupResult.java`
+- `libs/report-engine/src/test/java/com/example/webtest/report/engine/DefaultReportEngineTest.java`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine -Dtest=DefaultReportEngineTest#cleanupReportRunsIncludesVerboseUnreferencedFilePlanDetailsWhenRequested test -q`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine -am test -q`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,apps/core-platform -am test -q`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+- Passed from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=report-cleanup --help"`; usage includes `--verbose-unreferenced-cleanup`.
+- Passed from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=report-cleanup ..\..\runs --dry-run --keep-latest 0 --prune-unreferenced-files-only --unreferenced-age-bucket stale,old,ancient --verbose-unreferenced-cleanup"`; output printed `Verbose unreferenced cleanup: true` and current run-level plan details.
+
+## Known Gaps
+- Verbose details are path-level only and do not include a full predicate trace for every selector.
+- Retained reason priority remains first-match: min-age retention is reported before bucket retention when both would retain the same file.
+- Cleanup remains CLI/API driven; there is no browser-side cleanup UI.
+
+## Next Step
+- Prefer adding report-index maintenance help text for `--verbose-unreferenced-cleanup`.
+- Alternative: expose the network body spool grace period through DSL/run options if scenario-level runtime control becomes necessary.
+
+## 2026-04-18 report-index verbose cleanup help record
+
+## Task
+- Continued after verbose unreferenced cleanup plan details by adding report-index maintenance help text for the verbose cleanup investigation option.
+
+## Completed
+- Generated report index maintenance hints now include:
+  - `report-cleanup runs --dry-run --keep-latest 0 --prune-unreferenced-files-only --unreferenced-age-bucket stale,old,ancient --verbose-unreferenced-cleanup`
+- Extended report-engine test coverage so the generated index page asserts the verbose cleanup command is present.
+- Regenerated the current DSL smoke report index; `runs/index.html` now contains the verbose unreferenced cleanup dry-run example.
+
+## Modified Files
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/DefaultReportEngine.java`
+- `libs/report-engine/src/test/java/com/example/webtest/report/engine/DefaultReportEngineTest.java`
+- `01_dev_progress.md`
+- `memory.txt`
+- `runs/dsl-smoke/report.json` (generated, ignored by git)
+- `runs/dsl-smoke/report.html` (generated, ignored by git)
+
+## Verification
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine -Dtest=DefaultReportEngineTest test -q`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,apps/core-platform -am test -q`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+- Passed from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`; DSL smoke succeeded with 16 successful steps and regenerated `runs/index.html`.
+- Confirmed generated `runs/index.html` contains `--verbose-unreferenced-cleanup`.
+- Confirmed no local Edge debug process with `webtest-edge-*` / `remote-debugging-port` remained after smoke.
+- Passed: `git diff --check` (line-ending warnings only).
+
+## Known Gaps
+- Report-index maintenance hints are static examples; they do not inspect current diagnostics to recommend a specific cleanup command.
+- Verbose cleanup details remain CLI/API driven; there is no browser-side cleanup UI.
+
+## Next Step
+- Prefer adding adaptive report-index maintenance hints based on current storage diagnostics, for example showing verbose unreferenced cleanup only when unreferenced files exist or surfacing the dominant stale bucket.
+- Alternative: expose the network body spool grace period through DSL/run options if scenario-level runtime control becomes necessary.
+
+## 2026-04-18 adaptive report-index maintenance hints record
+
+## Task
+- Continued after static report-index verbose cleanup help by making generated maintenance hints depend on current storage diagnostics.
+
+## Completed
+- `DefaultReportEngine` now builds the report-index maintenance note from `ReportStorageDiagnosticsResult`.
+- Generated index pages always include baseline dry-run cleanup and diagnostics commands.
+- Unreferenced-file cleanup commands, including `--verbose-unreferenced-cleanup`, are now shown only when diagnostics find unreferenced files.
+- The unreferenced cleanup command chooses age buckets from the oldest unreferenced file:
+  - `fresh,recent,stale,old,ancient` for fresh files
+  - `recent,stale,old,ancient` for recent files
+  - `stale,old,ancient` for stale files
+  - `old,ancient` for old files
+  - `ancient` for ancient files
+- Missing-artifact maintenance is now shown only when diagnostics find missing artifact links.
+- Added report-engine test coverage for both no-unreferenced and stale-unreferenced index states.
+- Regenerated the current DSL smoke report index; because the current run has no unreferenced files or missing artifact links, `runs/index.html` omits unreferenced cleanup and mark-missing commands.
+
+## Modified Files
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/DefaultReportEngine.java`
+- `libs/report-engine/src/test/java/com/example/webtest/report/engine/DefaultReportEngineTest.java`
+- `01_dev_progress.md`
+- `memory.txt`
+- `runs/dsl-smoke/report.json` (generated, ignored by git)
+- `runs/dsl-smoke/report.html` (generated, ignored by git)
+
+## Verification
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine -Dtest=DefaultReportEngineTest test -q`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,apps/core-platform -am test -q`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+- Passed from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`; DSL smoke succeeded with 16 successful steps.
+- Confirmed generated `runs/index.html` contains the adaptive maintenance note and `Unreferenced count<strong>0</strong>`.
+- Confirmed generated `runs/index.html` does not contain `--verbose-unreferenced-cleanup` or `--prune-unreferenced-files-only` for the current clean smoke run.
+- Confirmed no local Edge debug process with `webtest-edge-*` / `remote-debugging-port` remained after smoke.
+- Passed: `git diff --check` (line-ending warnings only).
+
+## Known Gaps
+- Bucket recommendation is based on the oldest unreferenced file age, not a full per-bucket dominance calculation.
+- Maintenance hints are still static command strings after page generation; they do not update client-side as files change on disk.
+- Cleanup remains CLI/API driven; there is no browser-side cleanup UI.
+
+## Next Step
+- Prefer adding per-bucket unreferenced diagnostics to the index so maintenance hints can surface the dominant bucket and counts directly.
 - Alternative: expose the network body spool grace period through DSL/run options if scenario-level runtime control becomes necessary.

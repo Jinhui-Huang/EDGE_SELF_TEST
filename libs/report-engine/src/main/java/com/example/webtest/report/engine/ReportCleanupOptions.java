@@ -9,8 +9,12 @@ public class ReportCleanupOptions {
     private Integer keepLatest;
     private Instant deleteFinishedBefore;
     private Set<String> deleteStatuses = new LinkedHashSet<>();
+    private Set<String> unreferencedFileAgeBuckets = new LinkedHashSet<>();
     private Long maxTotalBytes;
+    private Long unreferencedFileMinAgeSeconds;
     private boolean pruneArtifactsOnly;
+    private boolean pruneUnreferencedFilesOnly;
+    private boolean verboseUnreferencedCleanupPlan;
     private boolean dryRun;
 
     public Integer getKeepLatest() {
@@ -57,6 +61,35 @@ public class ReportCleanupOptions {
         deleteStatuses.add(normalized);
     }
 
+    public Set<String> getUnreferencedFileAgeBuckets() {
+        return Collections.unmodifiableSet(unreferencedFileAgeBuckets);
+    }
+
+    public void setUnreferencedFileAgeBuckets(Set<String> unreferencedFileAgeBuckets) {
+        this.unreferencedFileAgeBuckets = new LinkedHashSet<>();
+        if (unreferencedFileAgeBuckets == null) {
+            return;
+        }
+        for (String bucket : unreferencedFileAgeBuckets) {
+            addUnreferencedFileAgeBucket(bucket);
+        }
+    }
+
+    public void addUnreferencedFileAgeBucket(String bucket) {
+        String normalized = normalizeBucket(bucket);
+        if (normalized.isBlank()) {
+            throw new IllegalArgumentException("unreferenced file age bucket must not be blank");
+        }
+        if (!"fresh".equals(normalized)
+                && !"recent".equals(normalized)
+                && !"stale".equals(normalized)
+                && !"old".equals(normalized)
+                && !"ancient".equals(normalized)) {
+            throw new IllegalArgumentException("unreferenced file age bucket must be fresh, recent, stale, old, or ancient: " + bucket);
+        }
+        unreferencedFileAgeBuckets.add(normalized);
+    }
+
     public Long getMaxTotalBytes() {
         return maxTotalBytes;
     }
@@ -68,12 +101,39 @@ public class ReportCleanupOptions {
         this.maxTotalBytes = maxTotalBytes;
     }
 
+    public Long getUnreferencedFileMinAgeSeconds() {
+        return unreferencedFileMinAgeSeconds;
+    }
+
+    public void setUnreferencedFileMinAgeSeconds(Long unreferencedFileMinAgeSeconds) {
+        if (unreferencedFileMinAgeSeconds != null && unreferencedFileMinAgeSeconds < 0) {
+            throw new IllegalArgumentException("unreferencedFileMinAgeSeconds must be greater than or equal to 0");
+        }
+        this.unreferencedFileMinAgeSeconds = unreferencedFileMinAgeSeconds;
+    }
+
     public boolean isPruneArtifactsOnly() {
         return pruneArtifactsOnly;
     }
 
     public void setPruneArtifactsOnly(boolean pruneArtifactsOnly) {
         this.pruneArtifactsOnly = pruneArtifactsOnly;
+    }
+
+    public boolean isPruneUnreferencedFilesOnly() {
+        return pruneUnreferencedFilesOnly;
+    }
+
+    public void setPruneUnreferencedFilesOnly(boolean pruneUnreferencedFilesOnly) {
+        this.pruneUnreferencedFilesOnly = pruneUnreferencedFilesOnly;
+    }
+
+    public boolean isVerboseUnreferencedCleanupPlan() {
+        return verboseUnreferencedCleanupPlan;
+    }
+
+    public void setVerboseUnreferencedCleanupPlan(boolean verboseUnreferencedCleanupPlan) {
+        this.verboseUnreferencedCleanupPlan = verboseUnreferencedCleanupPlan;
     }
 
     public boolean isDryRun() {
@@ -86,5 +146,9 @@ public class ReportCleanupOptions {
 
     private String normalizeStatus(String status) {
         return status == null ? "" : status.trim().toUpperCase();
+    }
+
+    private String normalizeBucket(String bucket) {
+        return bucket == null ? "" : bucket.trim().toLowerCase();
     }
 }

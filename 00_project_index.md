@@ -102,9 +102,9 @@
 1. `00_project_index.md`
 2. `01_dev_progress.md`
 3. `enterprise_web_test_platform_tech_design.md`
-4. `enterprise_web_test_platform_phase2_implementation_design.md`
+4. `enterprise_web_test_platform_implementation_design.md`
 5. 与本次任务直接相关的专项文档：
-   - Java 核心开发 → `enterprise_web_test_platform_phase3_java_core_code_skeleton.md`
+   - Java 核心开发 → `enterprise_web_test_platform_java_core_code_skeleton.md`
    - CDP 相关 → `cdp_domain_encapsulation_detailed_design.md`
    - Edge 插件通信 → `edge_extension_native_messaging_protocol_detailed_design.md`
    - Edge TS 实现 → `edge_extension_typescript_protocol_and_code_skeleton.md`
@@ -163,6 +163,9 @@
 
 ## 当前阶段说明
 当前以 `01_dev_progress.md` 最新记录为准：Phase 0/1 的 Java 核心最小闭环、DSL smoke、浏览器/CDP、等待、断言、产物和 HTML 报告已基本打通；当前主线是 Phase 2 稳定性增强，重点在观测、报告中心、产物生命周期和清理维护能力。尚未完整进入 Phase 3，因为项目/用例/套件/环境/数据集/失败重跑等平台化管理能力未落地。
+
+## Phase 3 进入门禁
+正式进入 Phase 3 平台化能力开发之前必须停下，不得直接开始 Phase 3；需要等待用户补充相关文档并明确确认后，才能更新阶段状态并继续。
 
 ---
 
