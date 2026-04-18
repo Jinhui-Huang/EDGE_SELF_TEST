@@ -32,6 +32,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
@@ -326,6 +327,7 @@ public final class CorePlatformApp {
                     + " bytes=" + type.bytes());
         }
         printUnreferencedAgeSummary("Unreferenced file age:", result.unreferencedFileAgeSummary());
+        printUnreferencedAgeBuckets("Unreferenced age buckets:", result.unreferencedFileAgeBuckets(), "  ");
         System.out.println("Runs:");
         for (ReportStorageDiagnosticsResult.RunStorageSummary run : result.runs()) {
             System.out.println("  " + run.runId()
@@ -347,6 +349,7 @@ public final class CorePlatformApp {
                 }
             }
             printUnreferencedAgeSummary("    unreferencedAge:", run.unreferencedFileAgeSummary());
+            printUnreferencedAgeBuckets("    unreferencedAgeBuckets:", run.unreferencedFileAgeBuckets(), "      ");
         }
     }
 
@@ -362,6 +365,25 @@ public final class CorePlatformApp {
                 + " oldestAgeSeconds=" + ageSummary.oldestAgeSeconds());
         System.out.println("  newestLastModifiedAt=" + ageSummary.newestLastModifiedAt()
                 + " newestAgeSeconds=" + ageSummary.newestAgeSeconds());
+    }
+
+    private static void printUnreferencedAgeBuckets(
+            String label,
+            List<ReportStorageDiagnosticsResult.UnreferencedFileAgeBucketSummary> buckets,
+            String indent) {
+        if (buckets.isEmpty()) {
+            System.out.println(label + " (none)");
+            return;
+        }
+        System.out.println(label);
+        for (ReportStorageDiagnosticsResult.UnreferencedFileAgeBucketSummary bucket : buckets) {
+            System.out.println(indent + bucket.key()
+                    + " label=\"" + bucket.label() + "\""
+                    + " minAgeSeconds=" + bucket.minAgeSeconds()
+                    + " maxAgeSeconds=" + bucket.maxAgeSeconds()
+                    + " count=" + bucket.count()
+                    + " bytes=" + bucket.bytes());
+        }
     }
 
     private static void printReportDiagnosticsUsage() {

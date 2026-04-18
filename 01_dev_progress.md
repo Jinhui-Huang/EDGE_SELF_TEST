@@ -3460,3 +3460,51 @@
 ## Next Step
 - Prefer adding per-bucket unreferenced diagnostics to the index so maintenance hints can surface the dominant bucket and counts directly.
 - Alternative: expose the network body spool grace period through DSL/run options if scenario-level runtime control becomes necessary.
+
+## 2026-04-18 per-bucket unreferenced diagnostics record
+
+## Task
+- Continued after adaptive report-index maintenance hints by surfacing per-bucket unreferenced-file diagnostics.
+
+## Completed
+- `ReportStorageDiagnosticsResult` now includes global and per-run unreferenced age bucket summaries.
+- Age bucket summaries reuse the existing cleanup bucket definitions:
+  - `fresh <1h`
+  - `recent 1h-24h`
+  - `stale 1d-7d`
+  - `old 7d-30d`
+  - `ancient >=30d`
+- Generated `runs/index.html` now renders an `Unreferenced age bucket` table when unreferenced files exist.
+- Each run's Storage column now includes per-run bucket summaries when that run has unreferenced files.
+- `core-platform report-diagnostics` CLI now prints global and per-run unreferenced age bucket summaries.
+- Added report-engine assertions for diagnostics API bucket data and generated index bucket output.
+- Regenerated the current DSL smoke report index; current `runs` still have 0 unreferenced files, so no bucket table is shown for the clean smoke run.
+
+## Modified Files
+- `apps/core-platform/src/main/java/com/example/webtest/platform/CorePlatformApp.java`
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/DefaultReportEngine.java`
+- `libs/report-engine/src/main/java/com/example/webtest/report/engine/ReportStorageDiagnosticsResult.java`
+- `libs/report-engine/src/test/java/com/example/webtest/report/engine/DefaultReportEngineTest.java`
+- `01_dev_progress.md`
+- `memory.txt`
+- `runs/dsl-smoke/report.json` (generated, ignored by git)
+- `runs/dsl-smoke/report.html` (generated, ignored by git)
+- `runs/dsl-smoke/capture-page.png` (generated, ignored by git)
+
+## Verification
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine -Dtest=DefaultReportEngineTest test -q`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,apps/core-platform -am test -q`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+- Passed from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=report-diagnostics ..\..\runs"`; output includes `Unreferenced age buckets: (none)` and per-run `unreferencedAgeBuckets: (none)` for the current clean run.
+- Passed from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`; DSL smoke succeeded with 16 successful steps.
+- Confirmed no local Edge debug process with `webtest-edge-*` / `remote-debugging-port` remained after smoke.
+
+## Known Gaps
+- Adaptive cleanup bucket recommendation still uses the oldest unreferenced file age, not the dominant bucket by count or bytes.
+- Bucket diagnostics are generated statically with the index and do not update client-side after files change on disk.
+- Cleanup remains CLI/API driven; there is no browser-side cleanup UI.
+
+## Next Step
+- Prefer using per-bucket diagnostics to choose and display the dominant cleanup bucket recommendation in report-index maintenance hints.
+- Alternative: expose the network body spool grace period through DSL/run options if scenario-level runtime control becomes necessary.

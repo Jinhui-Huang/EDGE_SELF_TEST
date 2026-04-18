@@ -16,6 +16,7 @@ public record ReportStorageDiagnosticsResult(
         List<ArtifactTypeSummary> artifactTypes,
         List<UnreferencedFileTypeSummary> unreferencedFileTypes,
         UnreferencedFileAgeSummary unreferencedFileAgeSummary,
+        List<UnreferencedFileAgeBucketSummary> unreferencedFileAgeBuckets,
         List<RunStorageSummary> runs) {
 
     public record ArtifactTypeSummary(
@@ -39,7 +40,8 @@ public record ReportStorageDiagnosticsResult(
             int missingArtifactCount,
             int prunedArtifactCount,
             List<UnreferencedFileTypeSummary> unreferencedFileTypes,
-            UnreferencedFileAgeSummary unreferencedFileAgeSummary) {
+            UnreferencedFileAgeSummary unreferencedFileAgeSummary,
+            List<UnreferencedFileAgeBucketSummary> unreferencedFileAgeBuckets) {
     }
 
     public record UnreferencedFileTypeSummary(
@@ -53,5 +55,14 @@ public record ReportStorageDiagnosticsResult(
             long oldestAgeSeconds,
             String newestLastModifiedAt,
             long newestAgeSeconds) {
+    }
+
+    public record UnreferencedFileAgeBucketSummary(
+            String key,
+            String label,
+            long minAgeSeconds,
+            long maxAgeSeconds,
+            int count,
+            long bytes) {
     }
 }

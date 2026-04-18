@@ -862,6 +862,13 @@ class DefaultReportEngineTest {
         assertEquals("2026-04-17T00:02:10Z", result.unreferencedFileAgeSummary().newestLastModifiedAt());
         assertTrue(result.unreferencedFileAgeSummary().oldestAgeSeconds()
                 >= result.unreferencedFileAgeSummary().newestAgeSeconds());
+        assertEquals(1, result.unreferencedFileAgeBuckets().size());
+        ReportStorageDiagnosticsResult.UnreferencedFileAgeBucketSummary staleBucket =
+                result.unreferencedFileAgeBuckets().get(0);
+        assertEquals("stale", staleBucket.key());
+        assertEquals("stale 1d-7d", staleBucket.label());
+        assertEquals(2, staleBucket.count());
+        assertEquals(missingOrphanBytes + newOrphanBytes, staleBucket.bytes());
 
         ReportStorageDiagnosticsResult.ArtifactTypeSummary textType = result.artifactTypes().stream()
                 .filter(type -> "text".equals(type.type()))
@@ -897,6 +904,10 @@ class DefaultReportEngineTest {
         assertEquals(1, missingRun.unreferencedFileTypes().get(0).count());
         assertEquals(missingOrphanBytes, missingRun.unreferencedFileTypes().get(0).bytes());
         assertEquals("2026-04-17T00:01:10Z", missingRun.unreferencedFileAgeSummary().oldestLastModifiedAt());
+        assertEquals(1, missingRun.unreferencedFileAgeBuckets().size());
+        assertEquals("stale", missingRun.unreferencedFileAgeBuckets().get(0).key());
+        assertEquals(1, missingRun.unreferencedFileAgeBuckets().get(0).count());
+        assertEquals(missingOrphanBytes, missingRun.unreferencedFileAgeBuckets().get(0).bytes());
 
         ReportStorageDiagnosticsResult.RunStorageSummary newRun = result.runs().stream()
                 .filter(run -> "new-run".equals(run.runId()))
@@ -906,12 +917,19 @@ class DefaultReportEngineTest {
         assertEquals("temp", newRun.unreferencedFileTypes().get(0).type());
         assertEquals(1, newRun.unreferencedFileTypes().get(0).count());
         assertEquals(newOrphanBytes, newRun.unreferencedFileTypes().get(0).bytes());
+        assertEquals(1, newRun.unreferencedFileAgeBuckets().size());
+        assertEquals("stale", newRun.unreferencedFileAgeBuckets().get(0).key());
+        assertEquals(1, newRun.unreferencedFileAgeBuckets().get(0).count());
+        assertEquals(newOrphanBytes, newRun.unreferencedFileAgeBuckets().get(0).bytes());
 
         String index = Files.readString(tempDir.resolve("index.html"));
         assertTrue(index.contains("<br>Types log 1 ("));
         assertTrue(index.contains("<br>Types temp 1 ("));
         assertTrue(index.contains("<div class=\"storage-metric\">Oldest unreferenced<strong>2026-04-17T00:01:10Z ("));
         assertTrue(index.contains("<div class=\"storage-metric\">Newest unreferenced<strong>2026-04-17T00:02:10Z ("));
+        assertTrue(index.contains("<th>Unreferenced age bucket</th>"));
+        assertTrue(index.contains("<td>stale 1d-7d</td><td>2</td><td>"));
+        assertTrue(index.contains("<br>Buckets stale 1d-7d 1 ("));
         assertTrue(index.contains("<br>Oldest 2026-04-17T00:01:10Z ("));
     }
 

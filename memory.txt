@@ -1164,3 +1164,22 @@ Hand-off note - 2026-04-18:
   8. `git diff --check` passed with line-ending warnings only.
 - Known gaps: bucket recommendation is based on oldest unreferenced file age rather than per-bucket dominance; generated hints do not update client-side as files change; cleanup remains CLI/API driven.
 - Next recommended step: add per-bucket unreferenced diagnostics to the index so maintenance hints can surface dominant bucket counts directly. Alternative: expose the network body spool grace period through DSL/run options if scenario-level runtime control becomes necessary.
+
+Hand-off note - 2026-04-18:
+- Continued after adaptive report-index maintenance hints by adding per-bucket unreferenced diagnostics.
+- `ReportStorageDiagnosticsResult` now carries global and per-run `UnreferencedFileAgeBucketSummary` values with key, label, age bounds, count, and bytes.
+- `DefaultReportEngine` reuses the existing cleanup retention bucket definitions for diagnostics buckets: `fresh`, `recent`, `stale`, `old`, and `ancient`.
+- Generated report indexes now render an `Unreferenced age bucket` table when unreferenced files exist, and each run's Storage column includes a per-run `Buckets ...` summary when applicable.
+- `core-platform report-diagnostics` now prints global `Unreferenced age buckets:` and per-run `unreferencedAgeBuckets:` output.
+- `DefaultReportEngineTest.diagnoseReportStorageSummarizesArtifactsByRunAndType` now asserts global bucket totals, per-run bucket totals, and generated index bucket HTML.
+- Regenerated the current DSL smoke report index. Current `runs` has 0 unreferenced files, so the live index does not show a bucket table.
+- Verified:
+  1. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine -Dtest=DefaultReportEngineTest test -q`
+  2. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,apps/core-platform -am test -q`
+  3. `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+  4. `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+  5. from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=report-diagnostics ..\..\runs"`; output includes global and per-run age bucket sections, currently `(none)`.
+  6. from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`; DSL smoke succeeded with 16 successful steps.
+  7. no local Edge debug process with `webtest-edge-*` / `remote-debugging-port` remained after smoke.
+- Known gaps: maintenance hint bucket recommendation still uses oldest unreferenced file age instead of dominant bucket count/bytes; generated diagnostics remain static; cleanup remains CLI/API driven.
+- Next recommended step: use per-bucket diagnostics to choose and display the dominant cleanup bucket recommendation in report-index maintenance hints. Alternative: expose the network body spool grace period through DSL/run options if scenario-level runtime control becomes necessary.

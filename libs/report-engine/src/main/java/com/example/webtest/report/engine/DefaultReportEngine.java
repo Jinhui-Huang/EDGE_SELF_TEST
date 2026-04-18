@@ -1076,6 +1076,7 @@ public class DefaultReportEngine implements ReportEngine {
                     List.of(),
                     List.of(),
                     null,
+                    List.of(),
                     List.of());
         }
         Path reportRoot = entries.get(0).directory().toAbsolutePath().normalize().getParent();
@@ -1102,6 +1103,7 @@ public class DefaultReportEngine implements ReportEngine {
                     List.of(),
                     List.of(),
                     null,
+                    List.of(),
                     List.of());
         }
     }
@@ -1130,6 +1132,8 @@ public class DefaultReportEngine implements ReportEngine {
                     unreferencedFileTypes(unreferencedFiles.files());
             ReportStorageDiagnosticsResult.UnreferencedFileAgeSummary runUnreferencedFileAgeSummary =
                     unreferencedFileAgeSummary(unreferencedFiles.files(), diagnosedAt);
+            List<ReportStorageDiagnosticsResult.UnreferencedFileAgeBucketSummary> runUnreferencedFileAgeBuckets =
+                    unreferencedFileAgeBuckets(unreferencedFiles.files(), diagnosedAt);
             long runArtifactBytes = 0L;
             int runMissingArtifacts = 0;
             int runPrunedArtifacts = 0;
@@ -1167,7 +1171,8 @@ public class DefaultReportEngine implements ReportEngine {
                     runMissingArtifacts,
                     runPrunedArtifacts,
                     runUnreferencedFileTypes,
-                    runUnreferencedFileAgeSummary));
+                    runUnreferencedFileAgeSummary,
+                    runUnreferencedFileAgeBuckets));
         }
         List<ReportStorageDiagnosticsResult.ArtifactTypeSummary> artifactTypes = artifactTypeTotals.entrySet()
                 .stream()
@@ -1191,6 +1196,7 @@ public class DefaultReportEngine implements ReportEngine {
                 List.copyOf(artifactTypes),
                 List.copyOf(unreferencedFileTypes),
                 unreferencedFileAgeSummary(allUnreferencedFiles, diagnosedAt),
+                unreferencedFileAgeBuckets(allUnreferencedFiles, diagnosedAt),
                 List.copyOf(runs));
     }
 
@@ -1253,6 +1259,27 @@ public class DefaultReportEngine implements ReportEngine {
         return buckets.stream()
                 .filter(RetentionBucketTotals::hasFiles)
                 .map(RetentionBucketTotals::summary)
+                .toList();
+    }
+
+    private List<ReportStorageDiagnosticsResult.UnreferencedFileAgeBucketSummary> unreferencedFileAgeBuckets(
+            List<UnreferencedFileInfo> files,
+            Instant measuredAt) {
+        List<RetentionBucketTotals> buckets = RETENTION_BUCKETS.stream()
+                .map(RetentionBucketTotals::new)
+                .toList();
+        for (UnreferencedFileInfo file : files) {
+            long ageSeconds = ageSeconds(file.lastModifiedAt(), measuredAt);
+            for (RetentionBucketTotals bucket : buckets) {
+                if (bucket.accepts(ageSeconds)) {
+                    bucket.add(file);
+                    break;
+                }
+            }
+        }
+        return buckets.stream()
+                .filter(RetentionBucketTotals::hasFiles)
+                .map(RetentionBucketTotals::diagnosticsSummary)
                 .toList();
     }
 
@@ -1406,6 +1433,16 @@ public class DefaultReportEngine implements ReportEngine {
             }
             html.append("</tbody></table>\n");
         }
+        if (!diagnostics.unreferencedFileAgeBuckets().isEmpty()) {
+            html.append("<table class=\"storage-table\"><thead><tr><th>Unreferenced age bucket</th><th>Count</th><th>Bytes</th></tr></thead><tbody>\n");
+            for (ReportStorageDiagnosticsResult.UnreferencedFileAgeBucketSummary bucket
+                    : diagnostics.unreferencedFileAgeBuckets()) {
+                html.append("<tr><td>").append(escape(bucket.label())).append("</td>")
+                        .append("<td>").append(bucket.count()).append("</td>")
+                        .append("<td>").append(formatBytes(bucket.bytes())).append("</td></tr>\n");
+            }
+            html.append("</tbody></table>\n");
+        }
         html.append("</section>\n");
         return html.toString();
     }
@@ -1432,6 +1469,9 @@ public class DefaultReportEngine implements ReportEngine {
                 ? ""
                 : "<br>Oldest " + escape(formatUnreferencedLastModified(
                         storage.unreferencedFileAgeSummary(), true));
+        String bucketSummary = storage == null || storage.unreferencedFileAgeBuckets().isEmpty()
+                ? ""
+                : "<br>Buckets " + reportIndexUnreferencedAgeBucketSummary(storage.unreferencedFileAgeBuckets());
         return "Run " + escape(formatBytes(runBytes))
                 + "<br>Artifacts " + escape(formatBytes(artifactBytes))
                 + " (" + artifactCount + ")"
@@ -1439,6 +1479,7 @@ public class DefaultReportEngine implements ReportEngine {
                 + " (" + unreferencedCount + ")"
                 + typeSummary
                 + ageSummary
+                + bucketSummary
                 + "<br>Missing " + missingCount
                 + ", Pruned " + prunedCount;
     }
@@ -1483,6 +1524,24 @@ public class DefaultReportEngine implements ReportEngine {
                     .append(type.count())
                     .append(" (")
                     .append(escape(formatBytes(type.bytes())))
+                    .append(")");
+        }
+        return summary.toString();
+    }
+
+    private String reportIndexUnreferencedAgeBucketSummary(
+            List<ReportStorageDiagnosticsResult.UnreferencedFileAgeBucketSummary> buckets) {
+        StringBuilder summary = new StringBuilder();
+        for (int index = 0; index < buckets.size(); index++) {
+            ReportStorageDiagnosticsResult.UnreferencedFileAgeBucketSummary bucket = buckets.get(index);
+            if (index > 0) {
+                summary.append(", ");
+            }
+            summary.append(escape(bucket.label()))
+                    .append(" ")
+                    .append(bucket.count())
+                    .append(" (")
+                    .append(escape(formatBytes(bucket.bytes())))
                     .append(")");
         }
         return summary.toString();
@@ -2169,6 +2228,16 @@ public class DefaultReportEngine implements ReportEngine {
 
         private ReportCleanupResult.UnreferencedFileRetentionHint summary() {
             return new ReportCleanupResult.UnreferencedFileRetentionHint(
+                    definition.label(),
+                    definition.minAgeSeconds(),
+                    definition.maxAgeSeconds(),
+                    count,
+                    bytes);
+        }
+
+        private ReportStorageDiagnosticsResult.UnreferencedFileAgeBucketSummary diagnosticsSummary() {
+            return new ReportStorageDiagnosticsResult.UnreferencedFileAgeBucketSummary(
+                    definition.key(),
                     definition.label(),
                     definition.minAgeSeconds(),
                     definition.maxAgeSeconds(),
