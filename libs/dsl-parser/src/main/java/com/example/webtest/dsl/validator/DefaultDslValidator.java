@@ -45,6 +45,12 @@ public class DefaultDslValidator implements DslValidator {
                     ErrorCodes.DSL_VALIDATION_FAILED,
                     "reportPolicy.retentionMaxTotalMb must be greater than or equal to 0");
         }
+        Long networkBodySpoolCleanupGraceSeconds = reportPolicy.getNetworkBodySpoolCleanupGraceSeconds();
+        if (networkBodySpoolCleanupGraceSeconds != null && networkBodySpoolCleanupGraceSeconds < 0) {
+            throw new BaseException(
+                    ErrorCodes.DSL_VALIDATION_FAILED,
+                    "reportPolicy.networkBodySpoolCleanupGraceSeconds must be greater than or equal to 0");
+        }
         for (String status : reportPolicy.getRetentionDeleteStatuses()) {
             String normalizedStatus = status == null ? "" : status.trim().toUpperCase();
             if (!"OK".equals(normalizedStatus) && !"FAILED".equals(normalizedStatus)) {

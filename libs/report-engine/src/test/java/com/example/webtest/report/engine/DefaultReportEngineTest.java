@@ -165,6 +165,8 @@ class DefaultReportEngineTest {
         assertTrue(index.contains("<button type=\"button\" data-page-next>Next page</button>"));
         assertTrue(index.contains("<div class=\"index-status\" data-index-status></div>"));
         assertTrue(index.contains("<strong>Report maintenance:</strong> commands are based on current storage diagnostics; start with dry-run."));
+        assertTrue(index.contains("<div class=\"meta\">Cleanup selector summary: keep-latest 20 protects 1 run and selects 0 older runs.</div>"));
+        assertFalse(index.contains("Latest cleanup dry-run:"));
         assertTrue(index.contains("<code>report-cleanup runs --dry-run --keep-latest 20</code>"));
         assertTrue(index.contains("<code>report-cleanup runs --dry-run --keep-latest 20 --prune-artifacts-only</code>"));
         assertFalse(index.contains("--prune-unreferenced-files-only"));
@@ -220,15 +222,73 @@ class DefaultReportEngineTest {
         Path orphan = tempDir.resolve("old-run").resolve("orphan.log");
         Files.writeString(orphan, "orphaned log");
         Files.setLastModifiedTime(orphan, FileTime.from(Instant.now().minus(Duration.ofDays(2))));
+        Path secondStaleOrphan = tempDir.resolve("old-run").resolve("orphan-2.log");
+        Files.writeString(secondStaleOrphan, "second orphaned log");
+        Files.setLastModifiedTime(secondStaleOrphan, FileTime.from(Instant.now().minus(Duration.ofDays(3))));
+        Path ancientOrphan = tempDir.resolve("old-run").resolve("ancient.log");
+        Files.writeString(ancientOrphan, "ancient orphaned log");
+        Files.setLastModifiedTime(ancientOrphan, FileTime.from(Instant.now().minus(Duration.ofDays(31))));
 
         writeRun(engine, "refresh-run", "2026-04-17T00:01:00Z", "2026-04-17T00:01:01Z", "SUCCESS");
 
         String index = Files.readString(tempDir.resolve("index.html"));
-        assertTrue(index.contains("<div class=\"storage-metric\">Unreferenced count<strong>1</strong></div>"));
-        assertTrue(index.contains("<tr><td>log</td><td>1</td>"));
+        assertTrue(index.contains("<div class=\"storage-metric\">Unreferenced count<strong>3</strong></div>"));
+        assertTrue(index.contains("<tr><td>log</td><td>3</td>"));
+        assertTrue(index.contains("<td>stale 1d-7d</td><td>2</td>"));
+        assertTrue(index.contains("<td>ancient &gt;=30d</td><td>1</td>"));
+        assertTrue(index.contains("Cleanup selector summary: keep-latest 20 protects 2 runs and selects 0 older runs."
+                + " Unreferenced selector keep-latest 0 selects 2 runs; buckets stale,old,ancient match 3 files, "));
+        assertTrue(index.contains("<div class=\"meta\">Dominant unreferenced bucket: stale 1d-7d, 2 files, "));
         assertTrue(index.contains("<code>report-cleanup runs --dry-run --keep-latest 0 --prune-unreferenced-files-only --unreferenced-age-bucket stale,old,ancient</code>"));
         assertTrue(index.contains("<code>report-cleanup runs --dry-run --keep-latest 0 --prune-unreferenced-files-only --unreferenced-age-bucket stale,old,ancient --verbose-unreferenced-cleanup</code>"));
+        assertFalse(index.contains("--unreferenced-age-bucket ancient</code>"));
         assertFalse(index.contains("<code>report-maintenance runs --mark-missing-artifacts --dry-run</code>"));
+    }
+
+    @Test
+    void generatedReportIndexLinksExistingCleanupDryRunArtifact() throws Exception {
+        DefaultReportEngine engine = new DefaultReportEngine();
+        writeRunWithArtifact(engine, "old-run", "2026-04-17T00:00:00Z", "2026-04-17T00:00:01Z");
+
+        ReportCleanupOptions options = new ReportCleanupOptions();
+        options.setDryRun(true);
+        options.setKeepLatest(0);
+        ReportCleanupResult cleanup = engine.cleanupReportRuns(tempDir, options);
+        assertEquals(tempDir.resolve("cleanup-dry-run.html").toAbsolutePath().normalize(), cleanup.dryRunHtmlPath());
+        assertTrue(Files.isRegularFile(cleanup.dryRunHtmlPath()));
+
+        String immediateIndex = Files.readString(tempDir.resolve("index.html"));
+        assertTrue(immediateIndex.contains(
+                "<div class=\"meta\">Latest cleanup dry-run: <a href=\"cleanup-dry-run.html\">cleanup-dry-run.html</a></div>"));
+
+        writeRun(engine, "refresh-run", "2026-04-17T00:01:00Z", "2026-04-17T00:01:01Z", "SUCCESS");
+
+        String index = Files.readString(tempDir.resolve("index.html"));
+        assertTrue(index.contains(
+                "<div class=\"meta\">Latest cleanup dry-run: <a href=\"cleanup-dry-run.html\">cleanup-dry-run.html</a></div>"));
+    }
+
+    @Test
+    void cleanupReportRunsSupportsCustomDryRunHtmlArtifactPath() throws Exception {
+        DefaultReportEngine engine = new DefaultReportEngine();
+        writeRunWithArtifact(engine, "old-run", "2026-04-17T00:00:00Z", "2026-04-17T00:00:01Z");
+
+        ReportCleanupOptions options = new ReportCleanupOptions();
+        options.setDryRun(true);
+        options.setKeepLatest(0);
+        options.setDryRunHtmlPath(Path.of("maintenance", "cleanup-review.html"));
+
+        ReportCleanupResult cleanup = engine.cleanupReportRuns(tempDir, options);
+
+        Path expectedPath = tempDir.resolve(Path.of("maintenance", "cleanup-review.html"))
+                .toAbsolutePath()
+                .normalize();
+        assertEquals(expectedPath, cleanup.dryRunHtmlPath());
+        assertTrue(Files.isRegularFile(expectedPath));
+        assertFalse(Files.exists(tempDir.resolve("cleanup-dry-run.html")));
+        String immediateIndex = Files.readString(tempDir.resolve("index.html"));
+        assertTrue(immediateIndex.contains(
+                "<div class=\"meta\">Latest cleanup dry-run: <a href=\"maintenance/cleanup-review.html\">maintenance/cleanup-review.html</a></div>"));
     }
 
     @Test
@@ -676,6 +736,16 @@ class DefaultReportEngineTest {
         assertEquals(2, plan.runs().size());
         ReportCleanupResult.UnreferencedCleanupRunPlan oldRunPlan = cleanupRunPlan(plan, "old-run");
         assertTrue(oldRunPlan.selectedByCleanupSelectors());
+        assertEquals(1, oldRunPlan.selectorPlan().sortedIndex());
+        assertEquals(1, oldRunPlan.selectorPlan().configuredKeepLatest());
+        assertFalse(oldRunPlan.selectorPlan().protectedByKeepLatest());
+        assertTrue(oldRunPlan.selectorPlan().selectedByKeepLatest());
+        assertFalse(oldRunPlan.selectorPlan().selectedByCutoff());
+        assertFalse(oldRunPlan.selectorPlan().selectedByStatus());
+        assertFalse(oldRunPlan.selectorPlan().selectedByQuota());
+        assertEquals(
+                "Run matched cleanup selector(s): keep-latest.",
+                oldRunPlan.selectorPlan().explanation());
         assertEquals(3, oldRunPlan.scannedUnreferencedFiles());
         assertEquals(1, oldRunPlan.selectedUnreferencedFiles());
         assertEquals(2, oldRunPlan.retainedUnreferencedFiles());
@@ -683,6 +753,11 @@ class DefaultReportEngineTest {
         assertCleanupRunPlanReason(oldRunPlan, "outside-selected-age-buckets", 1, Files.size(bucketRetainedOrphan));
         ReportCleanupResult.UnreferencedCleanupRunPlan newRunPlan = cleanupRunPlan(plan, "new-run");
         assertFalse(newRunPlan.selectedByCleanupSelectors());
+        assertEquals(0, newRunPlan.selectorPlan().sortedIndex());
+        assertEquals(1, newRunPlan.selectorPlan().configuredKeepLatest());
+        assertTrue(newRunPlan.selectorPlan().protectedByKeepLatest());
+        assertFalse(newRunPlan.selectorPlan().selectedByKeepLatest());
+        assertEquals("Run is protected by the keep-latest selector.", newRunPlan.selectorPlan().explanation());
         assertEquals(1, newRunPlan.scannedUnreferencedFiles());
         assertEquals(0, newRunPlan.selectedUnreferencedFiles());
         assertEquals(1, newRunPlan.retainedUnreferencedFiles());
@@ -694,6 +769,64 @@ class DefaultReportEngineTest {
         assertTrue(Files.isRegularFile(tooYoungOrphan));
         assertTrue(Files.isRegularFile(bucketRetainedOrphan));
         assertTrue(Files.isRegularFile(runRetainedOrphan));
+    }
+
+    @Test
+    void cleanupReportRunsIncludesRunSelectorDetailsForCutoffStatusAndQuota() throws Exception {
+        DefaultReportEngine engine = new DefaultReportEngine();
+        writeRunWithArtifact(engine, "cutoff-run", "2026-04-17T00:00:00Z", "2026-04-17T00:00:01Z");
+        writeRunWithArtifact(engine, "status-run", "2026-04-17T00:02:00Z", "2026-04-17T00:02:01Z", "FAILED");
+        writeRunWithArtifact(engine, "quota-run", "2026-04-17T00:04:00Z", "2026-04-17T00:04:01Z");
+        Path cutoffOrphan = tempDir.resolve("cutoff-run").resolve("cutoff.log");
+        Path statusOrphan = tempDir.resolve("status-run").resolve("status.log");
+        Path quotaOrphan = tempDir.resolve("quota-run").resolve("quota.log");
+        Files.writeString(cutoffOrphan, "cutoff");
+        Files.writeString(statusOrphan, "status");
+        Files.writeString(quotaOrphan, "quota");
+
+        ReportCleanupOptions options = new ReportCleanupOptions();
+        options.setPruneUnreferencedFilesOnly(true);
+        options.setDryRun(true);
+        options.setDeleteFinishedBefore(Instant.parse("2026-04-17T00:01:00Z"));
+        options.addDeleteStatus("FAILED");
+        options.setMaxTotalBytes(Math.max(0L, directorySize(tempDir.resolve("quota-run")) - 1L));
+
+        ReportCleanupResult result = engine.cleanupReportRuns(tempDir, options);
+
+        ReportCleanupResult.UnreferencedCleanupPlan plan = result.unreferencedCleanupPlan();
+        assertEquals(3, plan.selectedRuns());
+        ReportCleanupResult.UnreferencedCleanupRunPlan quotaRun = cleanupRunPlan(plan, "quota-run");
+        assertTrue(quotaRun.selectedByCleanupSelectors());
+        assertFalse(quotaRun.selectorPlan().selectedByKeepLatest());
+        assertFalse(quotaRun.selectorPlan().selectedByCutoff());
+        assertFalse(quotaRun.selectorPlan().selectedByStatus());
+        assertTrue(quotaRun.selectorPlan().selectedByQuota());
+        assertEquals("OK", quotaRun.selectorPlan().status());
+        assertEquals("2026-04-17T00:04:01Z", quotaRun.selectorPlan().finishedAt());
+        assertEquals(options.getMaxTotalBytes(), quotaRun.selectorPlan().configuredMaxTotalBytes());
+        assertEquals(true, quotaRun.selectorPlan().quotaEligible());
+        assertEquals(quotaRun.selectorPlan().runBytes(), quotaRun.selectorPlan().quotaRetainedBytesBefore());
+        assertEquals(0L, quotaRun.selectorPlan().quotaRetainedBytesAfter());
+        assertEquals(quotaRun.selectorPlan().runBytes(), quotaRun.selectorPlan().quotaFreedBytes());
+        assertEquals("Run matched cleanup selector(s): quota.", quotaRun.selectorPlan().explanation());
+
+        ReportCleanupResult.UnreferencedCleanupRunPlan statusRun = cleanupRunPlan(plan, "status-run");
+        assertTrue(statusRun.selectorPlan().selectedByStatus());
+        assertEquals(List.of("FAILED"), statusRun.selectorPlan().configuredDeleteStatuses());
+        assertEquals(false, statusRun.selectorPlan().quotaEligible());
+        assertEquals(quotaRun.selectorPlan().runBytes(), statusRun.selectorPlan().quotaRetainedBytesBefore());
+        assertEquals(quotaRun.selectorPlan().runBytes(), statusRun.selectorPlan().quotaRetainedBytesAfter());
+        assertEquals(0L, statusRun.selectorPlan().quotaFreedBytes());
+        assertEquals("Run matched cleanup selector(s): status.", statusRun.selectorPlan().explanation());
+
+        ReportCleanupResult.UnreferencedCleanupRunPlan cutoffRun = cleanupRunPlan(plan, "cutoff-run");
+        assertTrue(cutoffRun.selectorPlan().selectedByCutoff());
+        assertEquals("2026-04-17T00:01:00Z", cutoffRun.selectorPlan().configuredDeleteFinishedBefore());
+        assertEquals(false, cutoffRun.selectorPlan().quotaEligible());
+        assertEquals(quotaRun.selectorPlan().runBytes(), cutoffRun.selectorPlan().quotaRetainedBytesBefore());
+        assertEquals(quotaRun.selectorPlan().runBytes(), cutoffRun.selectorPlan().quotaRetainedBytesAfter());
+        assertEquals(0L, cutoffRun.selectorPlan().quotaFreedBytes());
+        assertEquals("Run matched cleanup selector(s): cutoff.", cutoffRun.selectorPlan().explanation());
     }
 
     @Test
@@ -733,6 +866,10 @@ class DefaultReportEngineTest {
                 selectedOrphan,
                 "selected",
                 "matched-cleanup-selectors",
+                "Run matched cleanup selectors; file passed min-age and age-bucket predicates.",
+                "stale",
+                Duration.ofDays(1).toSeconds(),
+                List.of("stale"),
                 "log",
                 Files.size(selectedOrphan));
         assertCleanupFilePlan(
@@ -740,6 +877,10 @@ class DefaultReportEngineTest {
                 tooYoungOrphan,
                 "retained",
                 "younger-than-min-age",
+                "Run matched cleanup selectors, but file age is below the configured minimum.",
+                "recent",
+                Duration.ofDays(1).toSeconds(),
+                List.of("stale"),
                 "temp",
                 Files.size(tooYoungOrphan));
         assertCleanupFilePlan(
@@ -747,6 +888,10 @@ class DefaultReportEngineTest {
                 bucketRetainedOrphan,
                 "retained",
                 "outside-selected-age-buckets",
+                "Run matched cleanup selectors, but file age bucket is outside the selected buckets.",
+                "ancient",
+                Duration.ofDays(1).toSeconds(),
+                List.of("stale"),
                 "text",
                 Files.size(bucketRetainedOrphan));
         ReportCleanupResult.UnreferencedCleanupRunPlan newRunPlan = cleanupRunPlan(plan, "new-run");
@@ -756,8 +901,53 @@ class DefaultReportEngineTest {
                 runRetainedOrphan,
                 "retained",
                 "run-retained-by-cleanup-selectors",
+                "Run did not match cleanup selectors, so file predicates were not applied.",
+                "stale",
+                Duration.ofDays(1).toSeconds(),
+                List.of("stale"),
                 "log",
                 Files.size(runRetainedOrphan));
+    }
+
+    @Test
+    void cleanupReportRunsWritesDryRunHtmlArtifactWithVerboseUnreferencedPlan() throws Exception {
+        DefaultReportEngine engine = new DefaultReportEngine();
+        writeRunWithArtifact(engine, "old-run", "2026-04-17T00:00:00Z", "2026-04-17T00:00:01Z");
+        writeRunWithArtifact(engine, "new-run", "2026-04-17T00:02:00Z", "2026-04-17T00:02:01Z");
+        Path selectedOrphan = tempDir.resolve("old-run").resolve("stale.log");
+        Path retainedOrphan = tempDir.resolve("new-run").resolve("stale.log");
+        Files.writeString(selectedOrphan, "selected");
+        Files.writeString(retainedOrphan, "retained");
+        Instant measuredNear = Instant.now();
+        Files.setLastModifiedTime(selectedOrphan, FileTime.from(measuredNear.minus(Duration.ofDays(2))));
+        Files.setLastModifiedTime(retainedOrphan, FileTime.from(measuredNear.minus(Duration.ofDays(2))));
+
+        ReportCleanupOptions options = new ReportCleanupOptions();
+        options.setKeepLatest(1);
+        options.setPruneUnreferencedFilesOnly(true);
+        options.setDryRun(true);
+        options.setVerboseUnreferencedCleanupPlan(true);
+        options.addUnreferencedFileAgeBucket("stale");
+
+        ReportCleanupResult result = engine.cleanupReportRuns(tempDir, options);
+
+        Path dryRunHtml = tempDir.resolve("cleanup-dry-run.html").toAbsolutePath().normalize();
+        assertEquals(dryRunHtml, result.dryRunHtmlPath());
+        assertTrue(Files.isRegularFile(dryRunHtml));
+        String html = Files.readString(dryRunHtml);
+        assertTrue(html.contains("<h1>Cleanup Dry Run</h1>"));
+        assertTrue(html.contains("<div class=\"metric\">Selected runs<strong>1</strong></div>"));
+        assertTrue(html.contains("<div class=\"metric\">Retained runs<strong>1</strong></div>"));
+        assertTrue(html.contains("Run matched cleanup selector(s): keep-latest."));
+        assertTrue(html.contains("Run is protected by the keep-latest selector."));
+        assertTrue(html.contains("ageSeconds "));
+        assertTrue(html.contains("bucket stale"));
+        assertTrue(html.contains("selectedBuckets [stale]"));
+        assertTrue(html.contains(escapeForHtml(selectedOrphan.toAbsolutePath().normalize().toString())));
+        assertFalse(html.contains("Run with <code>--verbose-unreferenced-cleanup</code>"));
+        String index = Files.readString(tempDir.resolve("index.html"));
+        assertTrue(index.contains(
+                "<div class=\"meta\">Latest cleanup dry-run: <a href=\"cleanup-dry-run.html\">cleanup-dry-run.html</a></div>"));
     }
 
     @Test
@@ -980,6 +1170,10 @@ class DefaultReportEngineTest {
             Path path,
             String decision,
             String reason,
+            String explanation,
+            String ageBucket,
+            long configuredMinAgeSeconds,
+            List<String> selectedAgeBuckets,
             String type,
             long bytes) {
         ReportCleanupResult.UnreferencedCleanupFilePlan match = plan.files()
@@ -989,9 +1183,21 @@ class DefaultReportEngineTest {
                 .orElseThrow();
         assertEquals(decision, match.decision());
         assertEquals(reason, match.reason());
+        assertEquals(explanation, match.explanation());
+        assertTrue(match.ageSeconds() >= 0L);
+        assertEquals(ageBucket, match.ageBucket());
+        assertEquals(configuredMinAgeSeconds, match.configuredMinAgeSeconds());
+        assertEquals(selectedAgeBuckets, match.selectedAgeBuckets());
         assertEquals(type, match.type());
         assertEquals(bytes, match.bytes());
         assertFalse(match.lastModifiedAt().isBlank());
+    }
+
+    private String escapeForHtml(String value) {
+        return value.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;");
     }
 
     private void writeRun(DefaultReportEngine engine, String runId, String startedAt, String finishedAt, String status) {
@@ -1012,6 +1218,15 @@ class DefaultReportEngineTest {
 
     private void writeRunWithArtifact(DefaultReportEngine engine, String runId, String startedAt, String finishedAt)
             throws Exception {
+        writeRunWithArtifact(engine, runId, startedAt, finishedAt, "SUCCESS");
+    }
+
+    private void writeRunWithArtifact(
+            DefaultReportEngine engine,
+            String runId,
+            String startedAt,
+            String finishedAt,
+            String status) throws Exception {
         Path runDir = tempDir.resolve(runId);
         Path artifactPath = runDir.resolve("artifact.txt");
         Path nestedArtifactPath = runDir.resolve("network").resolve("body.txt");
@@ -1034,7 +1249,7 @@ class DefaultReportEngineTest {
         ReportStepRecord step = new ReportStepRecord();
         step.setStepId(runId + "-step");
         step.setAction("ASSERT_TITLE");
-        step.setStatus("SUCCESS");
+        step.setStatus(status);
         step.setStartedAt(Instant.parse(startedAt));
         step.setFinishedAt(Instant.parse(finishedAt));
         step.setArtifactPath(artifactPath);

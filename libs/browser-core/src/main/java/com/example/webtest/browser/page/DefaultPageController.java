@@ -37,7 +37,7 @@ public class DefaultPageController implements PageController {
 
     private final CdpClient cdpClient;
     private final Path tempDirectory;
-    private final Duration orphanedNetworkBodySpoolMinAge;
+    private volatile Duration orphanedNetworkBodySpoolMinAge;
     private final List<ConsoleEvent> consoleEvents = new CopyOnWriteArrayList<>();
     private final List<NetworkEvent> networkEvents = new CopyOnWriteArrayList<>();
     private final CdpEventListener consoleListener = this::recordConsoleEvent;
@@ -119,6 +119,18 @@ public class DefaultPageController implements PageController {
             cleanupSpoolPath(event.getResponseBodySpoolPath());
             event.setResponseBodySpoolPath(null);
         }
+    }
+
+    @Override
+    public void configureNetworkBodySpoolCleanupGrace(ExecutionContext context, Duration gracePeriod) {
+        if (gracePeriod == null) {
+            return;
+        }
+        if (gracePeriod.isNegative()) {
+            throw new IllegalArgumentException("Network body spool cleanup grace period must be zero or greater");
+        }
+        orphanedNetworkBodySpoolMinAge = gracePeriod;
+        cleanupOrphanedNetworkBodySpools();
     }
 
     @Override

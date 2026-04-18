@@ -1,5 +1,6 @@
 package com.example.webtest.report.engine;
 
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.LinkedHashSet;
@@ -12,6 +13,7 @@ public class ReportCleanupOptions {
     private Set<String> unreferencedFileAgeBuckets = new LinkedHashSet<>();
     private Long maxTotalBytes;
     private Long unreferencedFileMinAgeSeconds;
+    private Path dryRunHtmlPath;
     private boolean pruneArtifactsOnly;
     private boolean pruneUnreferencedFilesOnly;
     private boolean verboseUnreferencedCleanupPlan;
@@ -110,6 +112,14 @@ public class ReportCleanupOptions {
             throw new IllegalArgumentException("unreferencedFileMinAgeSeconds must be greater than or equal to 0");
         }
         this.unreferencedFileMinAgeSeconds = unreferencedFileMinAgeSeconds;
+    }
+
+    public Path getDryRunHtmlPath() {
+        return dryRunHtmlPath;
+    }
+
+    public void setDryRunHtmlPath(Path dryRunHtmlPath) {
+        this.dryRunHtmlPath = dryRunHtmlPath;
     }
 
     public boolean isPruneArtifactsOnly() {

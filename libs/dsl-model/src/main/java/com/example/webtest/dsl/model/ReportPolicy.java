@@ -16,6 +16,7 @@ public class ReportPolicy {
     private boolean saveConsoleAfterStep;
     private boolean saveNetworkBeforeStep;
     private boolean saveNetworkAfterStep;
+    private Long networkBodySpoolCleanupGraceSeconds;
     private boolean retentionCleanupOnRun;
     private Integer retentionKeepLatest;
     private Integer retentionOlderThanDays;
@@ -117,6 +118,14 @@ public class ReportPolicy {
 
     public void setSaveNetworkAfterStep(boolean saveNetworkAfterStep) {
         this.saveNetworkAfterStep = saveNetworkAfterStep;
+    }
+
+    public Long getNetworkBodySpoolCleanupGraceSeconds() {
+        return networkBodySpoolCleanupGraceSeconds;
+    }
+
+    public void setNetworkBodySpoolCleanupGraceSeconds(Long networkBodySpoolCleanupGraceSeconds) {
+        this.networkBodySpoolCleanupGraceSeconds = networkBodySpoolCleanupGraceSeconds;
     }
 
     public boolean isRetentionCleanupOnRun() {

@@ -14,6 +14,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -86,10 +87,11 @@ public class DefaultReportEngine implements ReportEngine {
                         || safeOptions.isPruneUnreferencedFilesOnly()
                         ? reportIndexEntries(normalizedReportRoot, null, null)
                         : remainingEntries(entries, cleanup.deletedRunDirectories());
-                Files.writeString(normalizedReportRoot.resolve("index.html"), reportIndex(remaining),
+                Files.writeString(normalizedReportRoot.resolve("index.html"), reportIndex(normalizedReportRoot, remaining),
                         StandardCharsets.UTF_8);
             }
-            return new ReportCleanupResult(
+            Path dryRunHtmlPath = dryRunHtmlPath(normalizedReportRoot, safeOptions);
+            ReportCleanupResult result = new ReportCleanupResult(
                     normalizedReportRoot,
                     entries.size(),
                     entries.size() - cleanup.deletedRunDirectories().size(),
@@ -100,13 +102,37 @@ public class DefaultReportEngine implements ReportEngine {
                     cleanup.deletedUnreferencedFileAgeSummary(),
                     List.copyOf(cleanup.deletedUnreferencedFileRetentionHints()),
                     cleanup.unreferencedCleanupPlan(),
+                    dryRunHtmlPath,
                     safeOptions.isDryRun());
+            if (dryRunHtmlPath != null) {
+                Files.createDirectories(dryRunHtmlPath.getParent());
+                Files.writeString(dryRunHtmlPath, cleanupDryRunHtml(result), StandardCharsets.UTF_8);
+                List<ReportIndexEntry> refreshedEntries = reportIndexEntries(normalizedReportRoot, null, null);
+                Files.writeString(normalizedReportRoot.resolve("index.html"),
+                        reportIndex(normalizedReportRoot, refreshedEntries, dryRunHtmlPath),
+                        StandardCharsets.UTF_8);
+            }
+            return result;
         } catch (IOException e) {
             throw new BaseException(
                     ErrorCodes.REPORT_GENERATION_FAILED,
                     "Failed to clean report runs under: " + normalizedReportRoot,
                     e);
         }
+    }
+
+    private Path dryRunHtmlPath(Path reportRoot, ReportCleanupOptions options) {
+        if (!options.isDryRun()) {
+            return null;
+        }
+        Path configuredPath = options.getDryRunHtmlPath();
+        Path dryRunHtmlPath = configuredPath == null
+                ? reportRoot.resolve("cleanup-dry-run.html")
+                : configuredPath;
+        if (!dryRunHtmlPath.isAbsolute()) {
+            dryRunHtmlPath = reportRoot.resolve(dryRunHtmlPath);
+        }
+        return dryRunHtmlPath.toAbsolutePath().normalize();
     }
 
     @Override
@@ -319,7 +345,7 @@ public class DefaultReportEngine implements ReportEngine {
             return;
         }
         List<ReportIndexEntry> entries = reportIndexEntries(reportRoot, outputDir, currentReport);
-        Files.writeString(reportRoot.resolve("index.html"), reportIndex(entries), StandardCharsets.UTF_8);
+        Files.writeString(reportRoot.resolve("index.html"), reportIndex(reportRoot, entries), StandardCharsets.UTF_8);
     }
 
     private List<ReportIndexEntry> reportIndexEntries(
@@ -381,7 +407,7 @@ public class DefaultReportEngine implements ReportEngine {
     }
 
     private CleanupOutcome cleanupEntries(List<ReportIndexEntry> entries, ReportCleanupOptions options) throws IOException {
-        Set<Path> quotaDeleted = quotaDeletedDirectories(entries, options);
+        QuotaCleanupPlan quotaPlan = quotaCleanupPlan(entries, options);
         List<Path> deletedRunDirectories = new ArrayList<>();
         List<Path> deletedArtifactPaths = new ArrayList<>();
         List<Path> deletedUnreferencedFilePaths = new ArrayList<>();
@@ -391,15 +417,20 @@ public class DefaultReportEngine implements ReportEngine {
         Instant measuredAt = Instant.now();
         for (int index = 0; index < entries.size(); index++) {
             ReportIndexEntry entry = entries.get(index);
-            boolean selectedRun = shouldDelete(entry, index, options, quotaDeleted);
+            boolean selectedRun = shouldDelete(entry, index, options, quotaPlan);
             if (options.isPruneUnreferencedFilesOnly()) {
                 UnreferencedFileDiagnostic unreferencedFiles = unreferencedFileDiagnostic(entry.directory());
+                ReportCleanupResult.UnreferencedCleanupRunSelectorPlan selectorPlan =
+                        cleanupRunSelectorPlan(entry, index, options, quotaPlan);
                 UnreferencedCleanupRunPlanTotals runPlan =
                         unreferencedCleanupPlan.addRun(
                                 entry,
                                 selectedRun,
                                 unreferencedFiles.files(),
-                                options.isVerboseUnreferencedCleanupPlan());
+                                options.isVerboseUnreferencedCleanupPlan(),
+                                selectorPlan,
+                                options,
+                                measuredAt);
                 if (!selectedRun) {
                     unreferencedCleanupPlan.addRetained(runPlan,
                             "run-retained-by-cleanup-selectors",
@@ -450,12 +481,13 @@ public class DefaultReportEngine implements ReportEngine {
                 unreferencedCleanupPlan.summary());
     }
 
-    private Set<Path> quotaDeletedDirectories(List<ReportIndexEntry> entries, ReportCleanupOptions options) {
+    private QuotaCleanupPlan quotaCleanupPlan(List<ReportIndexEntry> entries, ReportCleanupOptions options) {
         Long maxTotalBytes = options.getMaxTotalBytes();
         if (maxTotalBytes == null) {
-            return Set.of();
+            return QuotaCleanupPlan.empty();
         }
-        Set<Path> deleted = new HashSet<>();
+        Set<Path> selected = new HashSet<>();
+        Map<Path, QuotaTraversalStep> steps = new HashMap<>();
         long retainedBytes = 0L;
         for (int index = 0; index < entries.size(); index++) {
             ReportIndexEntry entry = entries.get(index);
@@ -463,26 +495,35 @@ public class DefaultReportEngine implements ReportEngine {
                 retainedBytes = saturatedAdd(retainedBytes, entry.sizeBytes());
             }
         }
-        if (retainedBytes <= maxTotalBytes) {
-            return Set.of();
-        }
-        for (int index = entries.size() - 1; index >= 0 && retainedBytes > maxTotalBytes; index--) {
+        for (int index = entries.size() - 1; index >= 0; index--) {
             ReportIndexEntry entry = entries.get(index);
-            if (isProtectedByLatest(index, options) || shouldDeleteWithoutQuota(entry, index, options)) {
-                continue;
+            boolean quotaEligible = !isProtectedByLatest(index, options)
+                    && !shouldDeleteWithoutQuota(entry, index, options);
+            long retainedBytesBefore = retainedBytes;
+            long freedBytes = 0L;
+            boolean selectedByQuota = false;
+            if (quotaEligible && retainedBytes > maxTotalBytes) {
+                selectedByQuota = true;
+                selected.add(entry.directory());
+                freedBytes = entry.sizeBytes();
+                retainedBytes = Math.max(0L, retainedBytes - entry.sizeBytes());
             }
-            deleted.add(entry.directory());
-            retainedBytes = Math.max(0L, retainedBytes - entry.sizeBytes());
+            steps.put(entry.directory(), new QuotaTraversalStep(
+                    retainedBytesBefore,
+                    retainedBytes,
+                    freedBytes,
+                    quotaEligible,
+                    selectedByQuota));
         }
-        return deleted;
+        return new QuotaCleanupPlan(selected, steps);
     }
 
     private boolean shouldDelete(
             ReportIndexEntry entry,
             int sortedIndex,
             ReportCleanupOptions options,
-            Set<Path> quotaDeleted) {
-        return shouldDeleteWithoutQuota(entry, sortedIndex, options) || quotaDeleted.contains(entry.directory());
+            QuotaCleanupPlan quotaPlan) {
+        return shouldDeleteWithoutQuota(entry, sortedIndex, options) || quotaPlan.selected(entry.directory());
     }
 
     private boolean shouldDeleteWithoutQuota(ReportIndexEntry entry, int sortedIndex, ReportCleanupOptions options) {
@@ -496,9 +537,100 @@ public class DefaultReportEngine implements ReportEngine {
         return deleteByKeepLatest || deleteByCutoff || deleteByStatus;
     }
 
+    private ReportCleanupResult.UnreferencedCleanupRunSelectorPlan cleanupRunSelectorPlan(
+            ReportIndexEntry entry,
+            int sortedIndex,
+            ReportCleanupOptions options,
+            QuotaCleanupPlan quotaPlan) {
+        boolean protectedByKeepLatest = isProtectedByLatest(sortedIndex, options);
+        boolean selectedByKeepLatest = !protectedByKeepLatest
+                && options.getKeepLatest() != null
+                && sortedIndex >= options.getKeepLatest();
+        boolean selectedByCutoff = !protectedByKeepLatest
+                && isFinishedBefore(entry.finishedAt(), options.getDeleteFinishedBefore());
+        boolean selectedByStatus = !protectedByKeepLatest
+                && options.getDeleteStatuses().contains(entry.status());
+        QuotaTraversalStep quotaStep = quotaPlan.step(entry.directory());
+        boolean selectedByQuota = quotaStep != null && quotaStep.selectedByQuota();
+        return new ReportCleanupResult.UnreferencedCleanupRunSelectorPlan(
+                sortedIndex,
+                entry.status(),
+                entry.finishedAt(),
+                entry.sizeBytes(),
+                options.getKeepLatest(),
+                protectedByKeepLatest,
+                selectedByKeepLatest,
+                options.getDeleteFinishedBefore() == null ? null : options.getDeleteFinishedBefore().toString(),
+                selectedByCutoff,
+                List.copyOf(options.getDeleteStatuses()),
+                selectedByStatus,
+                options.getMaxTotalBytes(),
+                quotaStep == null ? null : quotaStep.retainedBytesBefore(),
+                quotaStep == null ? null : quotaStep.retainedBytesAfter(),
+                quotaStep == null ? null : quotaStep.freedBytes(),
+                quotaStep == null ? null : quotaStep.eligible(),
+                selectedByQuota,
+                cleanupRunSelectorExplanation(
+                        protectedByKeepLatest,
+                        selectedByKeepLatest,
+                        selectedByCutoff,
+                        selectedByStatus,
+                        selectedByQuota));
+    }
+
+    private String cleanupRunSelectorExplanation(
+            boolean protectedByKeepLatest,
+            boolean selectedByKeepLatest,
+            boolean selectedByCutoff,
+            boolean selectedByStatus,
+            boolean selectedByQuota) {
+        if (protectedByKeepLatest) {
+            return "Run is protected by the keep-latest selector.";
+        }
+        List<String> selectors = new ArrayList<>();
+        if (selectedByKeepLatest) {
+            selectors.add("keep-latest");
+        }
+        if (selectedByCutoff) {
+            selectors.add("cutoff");
+        }
+        if (selectedByStatus) {
+            selectors.add("status");
+        }
+        if (selectedByQuota) {
+            selectors.add("quota");
+        }
+        if (selectors.isEmpty()) {
+            return "Run did not match keep-latest, cutoff, status, or quota cleanup selectors.";
+        }
+        return "Run matched cleanup selector(s): " + String.join(", ", selectors) + ".";
+    }
+
     private boolean isProtectedByLatest(int sortedIndex, ReportCleanupOptions options) {
         Integer keepLatest = options.getKeepLatest();
         return keepLatest != null && sortedIndex < keepLatest;
+    }
+
+    private record QuotaCleanupPlan(Set<Path> selected, Map<Path, QuotaTraversalStep> steps) {
+        private static QuotaCleanupPlan empty() {
+            return new QuotaCleanupPlan(Set.of(), Map.of());
+        }
+
+        private boolean selected(Path directory) {
+            return selected.contains(directory);
+        }
+
+        private QuotaTraversalStep step(Path directory) {
+            return steps.get(directory);
+        }
+    }
+
+    private record QuotaTraversalStep(
+            long retainedBytesBefore,
+            long retainedBytesAfter,
+            long freedBytes,
+            boolean eligible,
+            boolean selectedByQuota) {
     }
 
     private long saturatedAdd(long left, long right) {
@@ -844,7 +976,199 @@ public class DefaultReportEngine implements ReportEngine {
         return remaining;
     }
 
-    private String reportIndex(List<ReportIndexEntry> entries) {
+    private String cleanupDryRunHtml(ReportCleanupResult result) {
+        StringBuilder html = new StringBuilder();
+        html.append("""
+                <!doctype html>
+                <html lang="en">
+                  <head>
+                    <meta charset="utf-8">
+                    <title>Cleanup Dry Run</title>
+                    <style>
+                      body { font-family: Arial, sans-serif; margin: 24px; color: #1f2933; background: #f7f9fb; }
+                      h1 { margin: 0 0 8px; font-size: 28px; }
+                      h2 { margin: 20px 0 10px; font-size: 18px; }
+                      .meta { color: #52616b; margin-bottom: 16px; overflow-wrap: anywhere; }
+                      .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 14px 0; }
+                      .metric { border: 1px solid #d9e2ec; border-radius: 8px; padding: 10px; background: #ffffff; color: #52616b; }
+                      .metric strong { display: block; margin-top: 4px; color: #1f2933; font-size: 18px; }
+                      .notice { margin: 12px 0; padding: 12px; border: 1px solid #d9e2ec; border-radius: 8px; background: #ffffff; color: #52616b; }
+                      table { width: 100%; border-collapse: collapse; background: #ffffff; border: 1px solid #d9e2ec; margin-bottom: 16px; }
+                      th, td { text-align: left; border-bottom: 1px solid #d9e2ec; padding: 8px; vertical-align: top; font-size: 13px; }
+                      th { background: #edf2f7; }
+                      .selected { color: #0f7b3f; font-weight: 700; }
+                      .retained { color: #7c5e10; font-weight: 700; }
+                      code { background: #edf2f7; border-radius: 8px; padding: 2px 5px; overflow-wrap: anywhere; }
+                    </style>
+                  </head>
+                  <body>
+                    <h1>Cleanup Dry Run</h1>
+                """);
+        html.append("<div class=\"meta\">Report root: ").append(escape(result.reportRoot()))
+                .append("<br>Artifact: ").append(escape(result.dryRunHtmlPath()))
+                .append("</div>\n");
+        html.append("<section class=\"summary\">");
+        cleanupMetric(html, "Scanned runs", result.scannedRuns());
+        cleanupMetric(html, "Kept runs", result.keptRuns());
+        cleanupMetric(html, "Would delete runs", result.deletedRunDirectories().size());
+        cleanupMetric(html, "Would delete artifacts", result.deletedArtifactPaths().size());
+        cleanupMetric(html, "Would delete unreferenced", result.deletedUnreferencedFilePaths().size());
+        cleanupMetric(html, "Selected bytes", cleanupSelectedUnreferencedBytes(result));
+        html.append("</section>\n");
+        cleanupDryRunPaths(html, "Runs", result.deletedRunDirectories());
+        cleanupDryRunPaths(html, "Artifacts", result.deletedArtifactPaths());
+        cleanupDryRunPaths(html, "Unreferenced Files", result.deletedUnreferencedFilePaths());
+        cleanupDryRunUnreferencedPlan(html, result.unreferencedCleanupPlan());
+        html.append("</body></html>\n");
+        return html.toString();
+    }
+
+    private String cleanupSelectedUnreferencedBytes(ReportCleanupResult result) {
+        ReportCleanupResult.UnreferencedCleanupPlan plan = result.unreferencedCleanupPlan();
+        if (plan != null) {
+            return formatBytes(plan.selectedUnreferencedBytes());
+        }
+        return formatBytes(result.deletedUnreferencedFileRetentionHints()
+                .stream()
+                .mapToLong(ReportCleanupResult.UnreferencedFileRetentionHint::bytes)
+                .reduce(0L, DefaultReportEngine::saturatedAddStatic));
+    }
+
+    private void cleanupMetric(StringBuilder html, String label, Object value) {
+        html.append("<div class=\"metric\">").append(escape(label)).append("<strong>")
+                .append(escape(value)).append("</strong></div>");
+    }
+
+    private void cleanupDryRunPaths(StringBuilder html, String title, List<Path> paths) {
+        html.append("<h2>").append(escape(title)).append("</h2>\n");
+        if (paths.isEmpty()) {
+            html.append("<div class=\"notice\">No matching paths.</div>\n");
+            return;
+        }
+        html.append("<table><thead><tr><th>Path</th></tr></thead><tbody>\n");
+        for (Path path : paths) {
+            html.append("<tr><td><code>").append(escape(path)).append("</code></td></tr>\n");
+        }
+        html.append("</tbody></table>\n");
+    }
+
+    private void cleanupDryRunUnreferencedPlan(
+            StringBuilder html,
+            ReportCleanupResult.UnreferencedCleanupPlan plan) {
+        html.append("<h2>Unreferenced Cleanup Plan</h2>\n");
+        if (plan == null) {
+            html.append("<div class=\"notice\">No unreferenced-file cleanup plan was requested.</div>\n");
+            return;
+        }
+        html.append("<section class=\"summary\">");
+        cleanupMetric(html, "Selected runs", plan.selectedRuns());
+        cleanupMetric(html, "Retained runs", plan.retainedRuns());
+        cleanupMetric(html, "Scanned files", plan.scannedUnreferencedFiles());
+        cleanupMetric(html, "Selected files", plan.selectedUnreferencedFiles());
+        cleanupMetric(html, "Retained files", plan.retainedUnreferencedFiles());
+        cleanupMetric(html, "Selected bytes", formatBytes(plan.selectedUnreferencedBytes()));
+        html.append("</section>\n");
+        if (!plan.retentionReasons().isEmpty()) {
+            html.append("<table><thead><tr><th>Retention reason</th><th>Count</th><th>Bytes</th></tr></thead><tbody>\n");
+            for (ReportCleanupResult.UnreferencedCleanupRetentionReason reason : plan.retentionReasons()) {
+                html.append("<tr><td>").append(escape(reason.reason())).append("</td><td>")
+                        .append(reason.count()).append("</td><td>")
+                        .append(escape(formatBytes(reason.bytes()))).append("</td></tr>\n");
+            }
+            html.append("</tbody></table>\n");
+        }
+        cleanupDryRunSelectorRows(html, plan);
+        cleanupDryRunFileRows(html, plan);
+    }
+
+    private void cleanupDryRunSelectorRows(
+            StringBuilder html,
+            ReportCleanupResult.UnreferencedCleanupPlan plan) {
+        html.append("<table><thead><tr><th>Run</th><th>Decision</th><th>Selectors</th><th>Explanation</th><th>Bytes</th></tr></thead><tbody>\n");
+        for (ReportCleanupResult.UnreferencedCleanupRunPlan run : plan.runs()) {
+            ReportCleanupResult.UnreferencedCleanupRunSelectorPlan selector = run.selectorPlan();
+            html.append("<tr><td>").append(escape(run.runId())).append("<br><code>")
+                    .append(escape(run.directory())).append("</code></td><td class=\"")
+                    .append(run.selectedByCleanupSelectors() ? "selected" : "retained")
+                    .append("\">")
+                    .append(run.selectedByCleanupSelectors() ? "selected" : "retained")
+                    .append("</td><td>")
+                    .append(cleanupDryRunSelectorSummary(selector))
+                    .append("</td><td>")
+                    .append(escape(selector == null ? "" : selector.explanation()))
+                    .append("</td><td>")
+                    .append(escape(formatBytes(run.scannedUnreferencedBytes())))
+                    .append("</td></tr>\n");
+        }
+        html.append("</tbody></table>\n");
+    }
+
+    private String cleanupDryRunSelectorSummary(
+            ReportCleanupResult.UnreferencedCleanupRunSelectorPlan selector) {
+        if (selector == null) {
+            return "";
+        }
+        return "index " + selector.sortedIndex()
+                + ", keep-latest " + escape(selector.configuredKeepLatest() == null
+                        ? "(none)"
+                        : selector.configuredKeepLatest())
+                + ", protected " + selector.protectedByKeepLatest()
+                + ", keep-latest match " + selector.selectedByKeepLatest()
+                + ", cutoff match " + selector.selectedByCutoff()
+                + ", status match " + selector.selectedByStatus()
+                + ", quota eligible " + (selector.quotaEligible() == null ? "(none)" : selector.quotaEligible())
+                + ", quota before " + escape(selector.quotaRetainedBytesBefore() == null
+                        ? "(none)"
+                        : formatBytes(selector.quotaRetainedBytesBefore()))
+                + ", quota after " + escape(selector.quotaRetainedBytesAfter() == null
+                        ? "(none)"
+                        : formatBytes(selector.quotaRetainedBytesAfter()))
+                + ", quota freed " + escape(selector.quotaFreedBytes() == null
+                        ? "(none)"
+                        : formatBytes(selector.quotaFreedBytes()))
+                + ", quota match " + selector.selectedByQuota();
+    }
+
+    private void cleanupDryRunFileRows(
+            StringBuilder html,
+            ReportCleanupResult.UnreferencedCleanupPlan plan) {
+        boolean hasFiles = plan.runs().stream().anyMatch(run -> !run.files().isEmpty());
+        if (!hasFiles) {
+            html.append("<div class=\"notice\">Run with <code>--verbose-unreferenced-cleanup</code> to include per-file predicate rows.</div>\n");
+            return;
+        }
+        html.append("<table><thead><tr><th>Run</th><th>Decision</th><th>Reason</th><th>Predicates</th><th>File</th></tr></thead><tbody>\n");
+        for (ReportCleanupResult.UnreferencedCleanupRunPlan run : plan.runs()) {
+            for (ReportCleanupResult.UnreferencedCleanupFilePlan file : run.files()) {
+                html.append("<tr><td>").append(escape(run.runId())).append("</td><td class=\"")
+                        .append(escape(file.decision())).append("\">").append(escape(file.decision()))
+                        .append("</td><td>").append(escape(file.reason())).append("<br>")
+                        .append(escape(file.explanation())).append("</td><td>")
+                        .append("ageSeconds ").append(file.ageSeconds())
+                        .append(", bucket ").append(escape(file.ageBucket()))
+                        .append(", minAge ").append(escape(file.configuredMinAgeSeconds() == null
+                                ? "(none)"
+                                : file.configuredMinAgeSeconds()))
+                        .append(", selectedBuckets ").append(escape(file.selectedAgeBuckets().isEmpty()
+                                ? "(none)"
+                                : file.selectedAgeBuckets()))
+                        .append("</td><td><code>").append(escape(file.path())).append("</code><br>")
+                        .append(escape(file.type())).append(", ")
+                        .append(escape(formatBytes(file.bytes()))).append(", modified ")
+                        .append(escape(file.lastModifiedAt())).append("</td></tr>\n");
+            }
+        }
+        html.append("</tbody></table>\n");
+    }
+
+    private String reportIndex(Path reportRoot, List<ReportIndexEntry> entries) {
+        return reportIndex(reportRoot, entries, null);
+    }
+
+    private String reportIndex(
+            Path reportRoot,
+            List<ReportIndexEntry> entries,
+            Path latestDryRunHtmlPath) {
         StringBuilder html = new StringBuilder();
         int failedRuns = failedRunCount(entries);
         ReportStorageDiagnosticsResult diagnostics = reportIndexDiagnostics(entries);
@@ -896,7 +1220,7 @@ public class DefaultReportEngine implements ReportEngine {
                 """);
         html.append("<div class=\"meta\">Runs: ").append(entries.size()).append("</div>\n");
         html.append(reportIndexQuickLinks(entries, failedRuns));
-        html.append(reportIndexToolbar(entries, failedRuns, diagnostics));
+        html.append(reportIndexToolbar(reportRoot, entries, failedRuns, diagnostics, latestDryRunHtmlPath));
         html.append(reportIndexStorageDiagnostics(diagnostics));
         html.append("<table><thead><tr><th>Run</th><th>Status</th><th>Summary</th><th>Storage</th><th>Started</th><th>Finished</th><th>Links</th></tr></thead><tbody>\n");
         for (int index = 0; index < entries.size(); index++) {
@@ -1238,6 +1562,10 @@ public class DefaultReportEngine implements ReportEngine {
     }
 
     private long ageSeconds(Instant lastModifiedAt, Instant measuredAt) {
+        return ageSecondsStatic(lastModifiedAt, measuredAt);
+    }
+
+    private static long ageSecondsStatic(Instant lastModifiedAt, Instant measuredAt) {
         return Math.max(0L, Duration.between(lastModifiedAt, measuredAt).toSeconds());
     }
 
@@ -1284,6 +1612,10 @@ public class DefaultReportEngine implements ReportEngine {
     }
 
     private RetentionBucketDefinition retentionBucket(long ageSeconds) {
+        return retentionBucketStatic(ageSeconds);
+    }
+
+    private static RetentionBucketDefinition retentionBucketStatic(long ageSeconds) {
         for (RetentionBucketDefinition bucket : RETENTION_BUCKETS) {
             if (bucket.accepts(ageSeconds)) {
                 return bucket;
@@ -1580,9 +1912,11 @@ public class DefaultReportEngine implements ReportEngine {
     }
 
     private String reportIndexToolbar(
+            Path reportRoot,
             List<ReportIndexEntry> entries,
             int failedRuns,
-            ReportStorageDiagnosticsResult diagnostics) {
+            ReportStorageDiagnosticsResult diagnostics,
+            Path latestDryRunHtmlPath) {
         int okRuns = entries.size() - failedRuns;
         return """
                 <div class="toolbar" aria-label="Run tools">
@@ -1604,15 +1938,34 @@ public class DefaultReportEngine implements ReportEngine {
                 <div class="index-status" data-index-status></div>
                 %s
                 <div class="meta">Keyboard: / search, f first failed, n next failed, p previous failed.</div>
-                """.formatted(entries.size(), failedRuns, okRuns, reportIndexMaintenanceNote(diagnostics));
+                """.formatted(
+                        entries.size(),
+                        failedRuns,
+                        okRuns,
+                        reportIndexMaintenanceNote(reportRoot, diagnostics, latestDryRunHtmlPath));
     }
 
-    private String reportIndexMaintenanceNote(ReportStorageDiagnosticsResult diagnostics) {
+    private String reportIndexMaintenanceNote(
+            Path reportRoot,
+            ReportStorageDiagnosticsResult diagnostics,
+            Path latestDryRunHtmlPath) {
         List<String> commands = new ArrayList<>();
         commands.add("report-cleanup runs --dry-run --keep-latest 20");
         commands.add("report-cleanup runs --dry-run --keep-latest 20 --prune-artifacts-only");
+        String bucketRecommendation = "";
+        String unreferencedCleanupBuckets = null;
         if (diagnostics.unreferencedFileCount() > 0) {
-            String buckets = reportIndexUnreferencedCleanupBuckets(diagnostics.unreferencedFileAgeSummary());
+            ReportStorageDiagnosticsResult.UnreferencedFileAgeBucketSummary dominantBucket =
+                    reportIndexDominantUnreferencedAgeBucket(diagnostics.unreferencedFileAgeBuckets());
+            String buckets = reportIndexUnreferencedCleanupBuckets(dominantBucket);
+            unreferencedCleanupBuckets = buckets;
+            if (dominantBucket != null) {
+                bucketRecommendation = "  <div class=\"meta\">Dominant unreferenced bucket: "
+                        + escape(dominantBucket.label())
+                        + ", " + dominantBucket.count()
+                        + " files, " + escape(formatBytes(dominantBucket.bytes()))
+                        + ".</div>\n";
+            }
             commands.add("report-cleanup runs --dry-run --keep-latest 0 --prune-unreferenced-files-only"
                     + " --unreferenced-age-bucket " + buckets);
             commands.add("report-cleanup runs --dry-run --keep-latest 0 --prune-unreferenced-files-only"
@@ -1626,6 +1979,9 @@ public class DefaultReportEngine implements ReportEngine {
         StringBuilder html = new StringBuilder();
         html.append("<div class=\"maintenance-note\">\n")
                 .append("  <strong>Report maintenance:</strong> commands are based on current storage diagnostics; start with dry-run.\n");
+        html.append(reportIndexCleanupSelectorSummary(diagnostics, unreferencedCleanupBuckets));
+        html.append(reportIndexDryRunArtifactLink(reportRoot, latestDryRunHtmlPath));
+        html.append(bucketRecommendation);
         for (String command : commands) {
             html.append("  <code>").append(escape(command)).append("</code>\n");
         }
@@ -1633,22 +1989,124 @@ public class DefaultReportEngine implements ReportEngine {
         return html.toString();
     }
 
+    private String reportIndexDryRunArtifactLink(Path reportRoot, Path latestDryRunHtmlPath) {
+        Path normalizedReportRoot = reportRoot.toAbsolutePath().normalize();
+        Path dryRunHtmlPath = latestDryRunHtmlPath == null
+                ? normalizedReportRoot.resolve("cleanup-dry-run.html")
+                : latestDryRunHtmlPath.toAbsolutePath().normalize();
+        if (!Files.isRegularFile(dryRunHtmlPath)) {
+            return "";
+        }
+        String href;
+        String label;
+        if (dryRunHtmlPath.startsWith(normalizedReportRoot)) {
+            Path relativePath = normalizedReportRoot.relativize(dryRunHtmlPath);
+            href = htmlPath(relativePath);
+            label = href;
+        } else {
+            href = dryRunHtmlPath.toUri().toString();
+            label = dryRunHtmlPath.toString();
+        }
+        return "  <div class=\"meta\">Latest cleanup dry-run: <a href=\""
+                + escape(href)
+                + "\">"
+                + escape(label)
+                + "</a></div>\n";
+    }
+
+    private String htmlPath(Path path) {
+        return path.toString().replace('\\', '/');
+    }
+
+    private String reportIndexCleanupSelectorSummary(
+            ReportStorageDiagnosticsResult diagnostics,
+            String unreferencedCleanupBuckets) {
+        int protectedRuns = Math.min(diagnostics.scannedRuns(), 20);
+        int selectedRuns = Math.max(0, diagnostics.scannedRuns() - protectedRuns);
+        StringBuilder summary = new StringBuilder("  <div class=\"meta\">Cleanup selector summary: keep-latest 20 protects ")
+                .append(protectedRuns)
+                .append(" run")
+                .append(protectedRuns == 1 ? "" : "s")
+                .append(" and selects ")
+                .append(selectedRuns)
+                .append(" older run")
+                .append(selectedRuns == 1 ? "" : "s")
+                .append(".");
+        if (unreferencedCleanupBuckets != null) {
+            BucketMatch bucketMatch = reportIndexUnreferencedBucketMatch(
+                    diagnostics.unreferencedFileAgeBuckets(),
+                    unreferencedCleanupBuckets);
+            summary.append(" Unreferenced selector keep-latest 0 selects ")
+                    .append(diagnostics.scannedRuns())
+                    .append(" run")
+                    .append(diagnostics.scannedRuns() == 1 ? "" : "s")
+                    .append("; buckets ")
+                    .append(escape(unreferencedCleanupBuckets))
+                    .append(" match ")
+                    .append(bucketMatch.count())
+                    .append(" file")
+                    .append(bucketMatch.count() == 1 ? "" : "s")
+                    .append(", ")
+                    .append(escape(formatBytes(bucketMatch.bytes())))
+                    .append(".");
+        }
+        summary.append("</div>\n");
+        return summary.toString();
+    }
+
+    private BucketMatch reportIndexUnreferencedBucketMatch(
+            List<ReportStorageDiagnosticsResult.UnreferencedFileAgeBucketSummary> buckets,
+            String selectedBuckets) {
+        Set<String> selected = new LinkedHashSet<>();
+        for (String bucket : selectedBuckets.split(",")) {
+            String normalized = bucket.trim();
+            if (!normalized.isBlank()) {
+                selected.add(normalized);
+            }
+        }
+        int count = 0;
+        long bytes = 0L;
+        for (ReportStorageDiagnosticsResult.UnreferencedFileAgeBucketSummary bucket : buckets) {
+            if (selected.contains(bucket.key())) {
+                count += bucket.count();
+                bytes = saturatedAdd(bytes, bucket.bytes());
+            }
+        }
+        return new BucketMatch(count, bytes);
+    }
+
+    private ReportStorageDiagnosticsResult.UnreferencedFileAgeBucketSummary reportIndexDominantUnreferencedAgeBucket(
+            List<ReportStorageDiagnosticsResult.UnreferencedFileAgeBucketSummary> buckets) {
+        ReportStorageDiagnosticsResult.UnreferencedFileAgeBucketSummary dominant = null;
+        for (ReportStorageDiagnosticsResult.UnreferencedFileAgeBucketSummary bucket : buckets) {
+            if (dominant == null
+                    || bucket.count() > dominant.count()
+                    || (bucket.count() == dominant.count() && bucket.bytes() > dominant.bytes())
+                    || (bucket.count() == dominant.count()
+                            && bucket.bytes() == dominant.bytes()
+                            && bucket.minAgeSeconds() > dominant.minAgeSeconds())) {
+                dominant = bucket;
+            }
+        }
+        return dominant;
+    }
+
     private String reportIndexUnreferencedCleanupBuckets(
-            ReportStorageDiagnosticsResult.UnreferencedFileAgeSummary ageSummary) {
-        if (ageSummary == null) {
+            ReportStorageDiagnosticsResult.UnreferencedFileAgeBucketSummary bucket) {
+        if (bucket == null) {
             return "fresh,recent,stale,old,ancient";
         }
-        long oldestAgeSeconds = ageSummary.oldestAgeSeconds();
-        if (oldestAgeSeconds >= 2_592_000L) {
+        long bucketMinAgeSeconds = bucket.minAgeSeconds();
+        if (bucketMinAgeSeconds >= 2_592_000L) {
             return "ancient";
         }
-        if (oldestAgeSeconds >= 604_800L) {
+        if (bucketMinAgeSeconds >= 604_800L) {
             return "old,ancient";
         }
-        if (oldestAgeSeconds >= 86_400L) {
+        if (bucketMinAgeSeconds >= 86_400L) {
             return "stale,old,ancient";
         }
-        if (oldestAgeSeconds >= 3_600L) {
+        if (bucketMinAgeSeconds >= 3_600L) {
             return "recent,stale,old,ancient";
         }
         return "fresh,recent,stale,old,ancient";
@@ -1971,6 +2429,9 @@ public class DefaultReportEngine implements ReportEngine {
             List<UnreferencedFileInfo> retainedByBucket) {
     }
 
+    private record BucketMatch(int count, long bytes) {
+    }
+
     private static final class ArtifactTypeTotals {
         private int count;
         private int missingCount;
@@ -2028,7 +2489,10 @@ public class DefaultReportEngine implements ReportEngine {
                 ReportIndexEntry entry,
                 boolean selectedRun,
                 List<UnreferencedFileInfo> files,
-                boolean includeFileDetails) {
+                boolean includeFileDetails,
+                ReportCleanupResult.UnreferencedCleanupRunSelectorPlan selectorPlan,
+                ReportCleanupOptions options,
+                Instant measuredAt) {
             if (selectedRun) {
                 selectedRuns++;
             } else {
@@ -2043,7 +2507,10 @@ public class DefaultReportEngine implements ReportEngine {
                     selectedRun,
                     files.size(),
                     fileBytes,
-                    includeFileDetails);
+                    includeFileDetails,
+                    selectorPlan,
+                    options,
+                    measuredAt);
             runs.add(run);
             return run;
         }
@@ -2119,6 +2586,10 @@ public class DefaultReportEngine implements ReportEngine {
         private final int scannedUnreferencedFiles;
         private final long scannedUnreferencedBytes;
         private final boolean includeFileDetails;
+        private final ReportCleanupResult.UnreferencedCleanupRunSelectorPlan selectorPlan;
+        private final Long configuredMinAgeSeconds;
+        private final List<String> selectedAgeBuckets;
+        private final Instant measuredAt;
         private int selectedUnreferencedFiles;
         private long selectedUnreferencedBytes;
         private int retainedUnreferencedFiles;
@@ -2132,13 +2603,20 @@ public class DefaultReportEngine implements ReportEngine {
                 boolean selectedByCleanupSelectors,
                 int scannedUnreferencedFiles,
                 long scannedUnreferencedBytes,
-                boolean includeFileDetails) {
+                boolean includeFileDetails,
+                ReportCleanupResult.UnreferencedCleanupRunSelectorPlan selectorPlan,
+                ReportCleanupOptions options,
+                Instant measuredAt) {
             this.runId = runId;
             this.directory = directory;
             this.selectedByCleanupSelectors = selectedByCleanupSelectors;
             this.scannedUnreferencedFiles = scannedUnreferencedFiles;
             this.scannedUnreferencedBytes = scannedUnreferencedBytes;
             this.includeFileDetails = includeFileDetails;
+            this.selectorPlan = selectorPlan;
+            this.configuredMinAgeSeconds = options.getUnreferencedFileMinAgeSeconds();
+            this.selectedAgeBuckets = List.copyOf(options.getUnreferencedFileAgeBuckets());
+            this.measuredAt = measuredAt;
         }
 
         private void addSelected(List<UnreferencedFileInfo> selectedFiles) {
@@ -2161,14 +2639,35 @@ public class DefaultReportEngine implements ReportEngine {
                 return;
             }
             for (UnreferencedFileInfo file : details) {
+                long fileAgeSeconds = ageSecondsStatic(file.lastModifiedAt(), measuredAt);
+                RetentionBucketDefinition bucket = retentionBucketStatic(fileAgeSeconds);
                 files.add(new ReportCleanupResult.UnreferencedCleanupFilePlan(
                         file.path(),
                         decision,
                         reason,
+                        cleanupFileExplanation(reason),
+                        fileAgeSeconds,
+                        bucket.key(),
+                        configuredMinAgeSeconds,
+                        selectedAgeBuckets,
                         file.type(),
                         file.bytes(),
                         file.lastModifiedAt().toString()));
             }
+        }
+
+        private String cleanupFileExplanation(String reason) {
+            return switch (reason) {
+                case "matched-cleanup-selectors" ->
+                        "Run matched cleanup selectors; file passed min-age and age-bucket predicates.";
+                case "run-retained-by-cleanup-selectors" ->
+                        "Run did not match cleanup selectors, so file predicates were not applied.";
+                case "younger-than-min-age" ->
+                        "Run matched cleanup selectors, but file age is below the configured minimum.";
+                case "outside-selected-age-buckets" ->
+                        "Run matched cleanup selectors, but file age bucket is outside the selected buckets.";
+                default -> "Cleanup decision came from predicate: " + reason + ".";
+            };
         }
 
         private ReportCleanupResult.UnreferencedCleanupRunPlan summary() {
@@ -2189,6 +2688,7 @@ public class DefaultReportEngine implements ReportEngine {
                     selectedUnreferencedBytes,
                     retainedUnreferencedFiles,
                     retainedUnreferencedBytes,
+                    selectorPlan,
                     List.copyOf(reasons),
                     List.copyOf(files));
         }

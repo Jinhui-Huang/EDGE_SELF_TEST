@@ -61,6 +61,7 @@ class DefaultDslParserTest {
                 id: case-yaml
                 name: YAML parser smoke
                 reportPolicy:
+                  networkBodySpoolCleanupGraceSeconds: 120
                   retentionCleanupOnRun: true
                   retentionKeepLatest: 20
                   retentionOlderThanDays: 30
@@ -86,6 +87,7 @@ class DefaultDslParserTest {
         assertEquals(2, definition.getSteps().size());
         assertEquals(ActionType.FILL, definition.getSteps().get(1).getAction());
         assertEquals("codex", definition.getSteps().get(1).getValue());
+        assertEquals(120L, definition.getReportPolicy().getNetworkBodySpoolCleanupGraceSeconds());
         assertEquals(true, definition.getReportPolicy().isRetentionCleanupOnRun());
         assertEquals(20, definition.getReportPolicy().getRetentionKeepLatest());
         assertEquals(30, definition.getReportPolicy().getRetentionOlderThanDays());
@@ -249,6 +251,26 @@ class DefaultDslParserTest {
                   "reportPolicy": {
                     "retentionCleanupOnRun": true,
                     "retentionMaxTotalMb": -1
+                  },
+                  "steps": [
+                    {
+                      "action": "goto",
+                      "url": "https://example.test"
+                    }
+                  ]
+                }
+                """;
+
+        assertThrows(BaseException.class, () -> parser.parseJson(json));
+    }
+
+    @Test
+    void parseJsonRejectsInvalidNetworkBodySpoolCleanupGrace() {
+        String json = """
+                {
+                  "id": "invalid-network-body-spool-grace",
+                  "reportPolicy": {
+                    "networkBodySpoolCleanupGraceSeconds": -1
                   },
                   "steps": [
                     {

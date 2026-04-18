@@ -5,6 +5,7 @@ import com.example.webtest.browser.observer.ConsoleEvent;
 import com.example.webtest.browser.observer.EventCheckpoint;
 import com.example.webtest.browser.observer.EventDelta;
 import com.example.webtest.browser.observer.NetworkEvent;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -40,6 +41,9 @@ public interface PageController {
     }
 
     default void cleanupNetworkBodySpools(ExecutionContext context) {
+    }
+
+    default void configureNetworkBodySpoolCleanupGrace(ExecutionContext context, Duration gracePeriod) {
     }
 
     void navigate(String url, ExecutionContext context);

@@ -203,6 +203,20 @@ class DefaultPageControllerTest {
     }
 
     @Test
+    void runtimeConfigurationUpdatesOrphanNetworkBodySpoolMinAge() throws IOException {
+        Path staleSpool = Files.writeString(tempDir.resolve("webtest-network-body-stale.tmp"), "old");
+        Path recentSpool = Files.writeString(tempDir.resolve("webtest-network-body-recent.tmp"), "new");
+        Files.setLastModifiedTime(staleSpool, FileTime.from(Instant.now().minus(10, ChronoUnit.MINUTES)));
+        Files.setLastModifiedTime(recentSpool, FileTime.from(Instant.now().minus(2, ChronoUnit.MINUTES)));
+        DefaultPageController controller = new DefaultPageController(new FakeCdpClient(), tempDir, Duration.ofHours(1));
+
+        controller.configureNetworkBodySpoolCleanupGrace(new ExecutionContext("run-1"), Duration.ofMinutes(5));
+
+        assertFalse(Files.exists(staleSpool));
+        assertTrue(Files.exists(recentSpool));
+    }
+
+    @Test
     void startupSweepRejectsInvalidSystemPropertyMinAge() {
         String property = DefaultPageController.ORPHANED_NETWORK_BODY_SPOOL_MIN_AGE_SECONDS_PROPERTY;
         String original = System.getProperty(property);

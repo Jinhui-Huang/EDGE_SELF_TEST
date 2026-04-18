@@ -1183,3 +1183,221 @@ Hand-off note - 2026-04-18:
   7. no local Edge debug process with `webtest-edge-*` / `remote-debugging-port` remained after smoke.
 - Known gaps: maintenance hint bucket recommendation still uses oldest unreferenced file age instead of dominant bucket count/bytes; generated diagnostics remain static; cleanup remains CLI/API driven.
 - Next recommended step: use per-bucket diagnostics to choose and display the dominant cleanup bucket recommendation in report-index maintenance hints. Alternative: expose the network body spool grace period through DSL/run options if scenario-level runtime control becomes necessary.
+
+Hand-off note - 2026-04-18:
+- Continued after per-bucket unreferenced diagnostics by using those buckets for report-index cleanup recommendations.
+- `DefaultReportEngine` now selects the dominant unreferenced age bucket by count, then bytes, then older bucket when still tied.
+- Report-index maintenance hints now derive `--unreferenced-age-bucket` from the dominant bucket instead of the oldest unreferenced file.
+- Maintenance hints now show `Dominant unreferenced bucket: ...` with the bucket label, file count, and bytes when unreferenced files exist.
+- Clean indexes still omit unreferenced cleanup commands and the dominant bucket note when diagnostics find no unreferenced files.
+- Extended `DefaultReportEngineTest.generatedReportIndexAdaptsMaintenanceHintsToUnreferencedFiles` with mixed stale and ancient unreferenced files; stale wins by count even though ancient is oldest.
+- Regenerated the current DSL smoke report index. Current `runs` has 0 unreferenced files, so `runs/index.html` does not show the dominant bucket note or `--prune-unreferenced-files-only`.
+- Verified:
+  1. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine -Dtest=DefaultReportEngineTest#generatedReportIndexAdaptsMaintenanceHintsToUnreferencedFiles test -q`
+  2. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine test -q`
+  3. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,apps/core-platform -am test -q`
+  4. `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+  5. `mvn "-Dmaven.repo.local=.m2/repository" -q -DskipTests install`
+  6. from `apps/core-platform`: `mvn "-Dmaven.repo.local=..\..\.m2\repository" -q exec:java "-Dexec.mainClass=com.example.webtest.platform.CorePlatformApp" "-Dexec.args=dsl-smoke ..\..\config\smoke\core-platform-smoke.yml"`; DSL smoke succeeded with 16 successful steps.
+  7. generated `runs/index.html` contains `Unreferenced count<strong>0</strong>` and omits `Dominant unreferenced bucket` / `--prune-unreferenced-files-only`.
+  8. no local Edge debug process with `webtest-edge-*` / `remote-debugging-port` remained after smoke.
+  9. `git diff --check` passed with line-ending warnings only.
+- Known gaps: dominance is global and aggregate-only; index hints remain static after generation; cleanup remains CLI/API driven.
+- Next recommended step: add a short predicate explanation to verbose cleanup file details so retained/selected files show the selector decisions that led to the outcome. Alternative: expose the network body spool grace period through DSL/run options if scenario-level runtime control becomes necessary.
+
+Hand-off note - 2026-04-18:
+- Continued after dominant cleanup bucket recommendations by adding short predicate explanations to verbose unreferenced cleanup file details.
+- `ReportCleanupResult.UnreferencedCleanupFilePlan` now includes an `explanation` field.
+- `DefaultReportEngine` populates explanations for:
+  1. selected files: run matched cleanup selectors and file passed min-age / age-bucket predicates;
+  2. `younger-than-min-age`: run matched selectors but file age is below minimum;
+  3. `outside-selected-age-buckets`: run matched selectors but file age bucket is outside selected buckets;
+  4. `run-retained-by-cleanup-selectors`: run did not match cleanup selectors, so file predicates were not applied.
+- `core-platform report-cleanup --verbose-unreferenced-cleanup` now prints `explanation="..."` for each verbose file row.
+- `DefaultReportEngineTest.cleanupReportRunsIncludesVerboseUnreferencedFilePlanDetailsWhenRequested` now asserts the explanation for each file-level decision path.
+- Verified:
+  1. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine -Dtest=DefaultReportEngineTest#cleanupReportRunsIncludesVerboseUnreferencedFilePlanDetailsWhenRequested test -q`
+  2. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine test -q`
+  3. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,apps/core-platform -am test -q`
+  4. `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+  5. `git diff --check` passed with line-ending warnings only
+- Known gaps: explanations are categorical and do not yet include computed age seconds, exact age bucket, configured min age, or selected bucket list; verbose cleanup remains CLI/API driven.
+- Next recommended step: add concrete predicate values to verbose cleanup file details, or expose the network body spool grace period through DSL/run options if scenario-level runtime control becomes necessary.
+
+Hand-off note - 2026-04-18:
+- Continued after verbose cleanup predicate explanations by adding concrete predicate values to verbose unreferenced cleanup file details.
+- `ReportCleanupResult.UnreferencedCleanupFilePlan` now includes `ageSeconds`, `ageBucket`, `configuredMinAgeSeconds`, and `selectedAgeBuckets`.
+- `DefaultReportEngine` captures the cleanup options and shared measurement timestamp in the unreferenced cleanup plan totals, then emits those predicate values for selected files, min-age retained files, age-bucket retained files, and files retained because the run was not selected.
+- `core-platform report-cleanup --verbose-unreferenced-cleanup` now prints the concrete predicate values alongside `decision`, `reason`, and `explanation`.
+- `DefaultReportEngineTest.cleanupReportRunsIncludesVerboseUnreferencedFilePlanDetailsWhenRequested` now asserts expected buckets and configured predicates for each verbose file decision path.
+- Verified:
+  1. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine -Dtest=DefaultReportEngineTest#cleanupReportRunsIncludesVerboseUnreferencedFilePlanDetailsWhenRequested test -q`
+  2. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine test -q`
+  3. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,apps/core-platform -am test -q`
+- Known gaps: run-level selector predicate values are not yet exposed; verbose cleanup remains CLI/API driven; predicate values are measured at command execution time.
+- Next recommended step: add run-level selector details to unreferenced cleanup plans, or expose the network body spool grace period through DSL/run options if scenario-level runtime control becomes necessary.
+
+Hand-off note - 2026-04-18:
+- Continued after verbose cleanup predicate values by adding run-level selector details to unreferenced cleanup plans.
+- `ReportCleanupResult.UnreferencedCleanupRunPlan` now includes `selectorPlan`.
+- `selectorPlan` records sorted index, status, finishedAt, runBytes, configured keep-latest / cutoff / statuses / max bytes, whether keep-latest protected the run, whether keep-latest / cutoff / status / quota selected it, and a short explanation.
+- `DefaultReportEngine` computes selector details from the same cleanup selection inputs used by `shouldDelete`, including quota-selected directories.
+- `core-platform report-cleanup --verbose-unreferenced-cleanup` prints each run's selector details before retained reasons and verbose file rows.
+- `DefaultReportEngineTest` now asserts keep-latest selected/protected details and a dedicated cutoff/status/quota selector scenario.
+- Verified:
+  1. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine "-Dtest=DefaultReportEngineTest#cleanupReportRunsSummarizesUnreferencedCleanupPlan,DefaultReportEngineTest#cleanupReportRunsIncludesRunSelectorDetailsForCutoffStatusAndQuota,DefaultReportEngineTest#cleanupReportRunsIncludesVerboseUnreferencedFilePlanDetailsWhenRequested" test -q`
+  2. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine test -q`
+  3. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,apps/core-platform -am test -q`
+  4. `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+  5. `git diff --check` passed with line-ending warnings only
+- Known gaps: selector details are CLI/API cleanup-plan only; quota details do not include the full retained-byte traversal; cleanup predicate values are command-time snapshots.
+- Next recommended step: add a compact cleanup selector summary to report-index maintenance diagnostics or a dedicated cleanup dry-run HTML artifact. Alternative: expose the network body spool grace period through DSL/run options if scenario-level runtime control becomes necessary.
+
+Hand-off note - 2026-04-18:
+- Continued after run-level cleanup selector details by adding a compact cleanup selector summary to report-index maintenance diagnostics.
+- `DefaultReportEngine` report index maintenance notes now show how many runs `keep-latest 20` protects and how many older runs it selects.
+- When unreferenced files exist, the index summary also shows that the recommended unreferenced cleanup uses `keep-latest 0`, which age buckets are selected, and how many unreferenced files/bytes those buckets currently match.
+- The dominant unreferenced bucket recommendation and dry-run cleanup commands remain in the maintenance note.
+- `DefaultReportEngineTest.generateRunReportWritesJsonHtmlAndIndex` now asserts the clean-index selector summary.
+- `DefaultReportEngineTest.generatedReportIndexAdaptsMaintenanceHintsToUnreferencedFiles` now asserts the unreferenced selector summary alongside the dominant bucket recommendation.
+- Verified:
+  1. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine '-Dtest=DefaultReportEngineTest#generateRunReportWritesJsonHtmlAndIndex,DefaultReportEngineTest#generatedReportIndexAdaptsMaintenanceHintsToUnreferencedFiles' test -q`
+  2. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine test -q`
+  3. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,apps/core-platform -am test -q`
+  4. `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+  5. `git diff --check` passed with line-ending warnings only
+- Known gaps: full per-run selector traces are still CLI/API-only; index summary is static at generation time; quota details still omit the full retained-byte walk.
+- Next recommended step: add a dedicated cleanup dry-run HTML artifact if browser-side review of full per-run selector traces becomes necessary. Alternative: expose the network body spool grace period through DSL/run options if scenario-level runtime control becomes necessary.
+
+Hand-off note - 2026-04-18:
+- Continued after report-index cleanup selector summaries by adding a dedicated cleanup dry-run HTML artifact.
+- `ReportCleanupResult` now has `dryRunHtmlPath`; it is set to `<reportRoot>/cleanup-dry-run.html` for dry-run cleanup results and null for apply mode.
+- `DefaultReportEngine.cleanupReportRuns` now writes `cleanup-dry-run.html` whenever cleanup runs with `dryRun=true`.
+- The generated HTML summarizes scanned/kept/would-delete counts, candidate run/artifact/unreferenced paths, unreferenced cleanup plan totals, per-run selector traces, and per-file predicate rows when `--verbose-unreferenced-cleanup` is enabled.
+- Non-verbose unreferenced dry-run HTML tells the operator to rerun with `--verbose-unreferenced-cleanup` for per-file predicate rows.
+- `core-platform report-cleanup` prints `Dry-run HTML: ...` when the result includes the artifact path.
+- Added `DefaultReportEngineTest.cleanupReportRunsWritesDryRunHtmlArtifactWithVerboseUnreferencedPlan` to assert the artifact path, HTML creation, selected/retained run selector explanations, and verbose file predicate values.
+- Verified:
+  1. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine "-Dtest=DefaultReportEngineTest#cleanupReportRunsWritesDryRunHtmlArtifactWithVerboseUnreferencedPlan,DefaultReportEngineTest#cleanupReportRunsIncludesVerboseUnreferencedFilePlanDetailsWhenRequested,DefaultReportEngineTest#cleanupReportRunsIncludesRunSelectorDetailsForCutoffStatusAndQuota" test -q`
+  2. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine test -q`
+  3. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,apps/core-platform -am test -q`
+- Known gaps: the report index does not automatically link the latest dry-run artifact; per-file rows still require verbose mode; quota details still omit the full retained-byte traversal.
+- Next recommended step: link an existing `cleanup-dry-run.html` from report-index maintenance diagnostics, or add a CLI flag to choose the dry-run artifact path. Alternative: expose the network body spool grace period through DSL/run options if scenario-level runtime control becomes necessary.
+
+Hand-off note - 2026-04-18:
+- Continued after the cleanup dry-run HTML artifact by linking an existing dry-run artifact from report-index maintenance diagnostics.
+- `DefaultReportEngine` now passes the report root into report-index rendering so the maintenance note can check for `<reportRoot>/cleanup-dry-run.html`.
+- When that artifact exists, the report index maintenance note includes `Latest cleanup dry-run: cleanup-dry-run.html` with a relative HTML link.
+- When the artifact does not exist, the link is omitted; `DefaultReportEngineTest.generateRunReportWritesSummaryAndRelativeStepArtifacts` now asserts this absent-link path.
+- Added `DefaultReportEngineTest.generatedReportIndexLinksExistingCleanupDryRunArtifact` to cover creating a dry-run cleanup artifact and regenerating the index with the link.
+- Verified:
+  1. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine "-Dtest=DefaultReportEngineTest#generatedReportIndexLinksExistingCleanupDryRunArtifact,DefaultReportEngineTest#generateRunReportWritesSummaryAndRelativeStepArtifacts,DefaultReportEngineTest#generatedReportIndexAdaptsMaintenanceHintsToUnreferencedFiles" test -q`
+  2. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine test -q`
+  3. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,apps/core-platform -am test -q`
+- Known gaps: cleanup dry-runs still do not refresh the index automatically; the dry-run artifact path is fixed to `<reportRoot>/cleanup-dry-run.html`; quota details still omit the retained-byte traversal.
+- Next recommended step: refresh the report index after dry-run cleanup writes `cleanup-dry-run.html`, or add a CLI flag to choose the dry-run artifact path if deterministic artifact names become an issue. Alternative: expose the network body spool grace period through DSL/run options if scenario-level runtime control becomes necessary.
+
+Hand-off note - 2026-04-18:
+- Continued after linking existing cleanup dry-run artifacts by refreshing the report index immediately after dry-run cleanup writes the artifact.
+- `DefaultReportEngine.cleanupReportRuns` now writes `<reportRoot>/cleanup-dry-run.html` and then rewrites `<reportRoot>/index.html` in dry-run mode.
+- The refreshed index immediately includes `Latest cleanup dry-run: cleanup-dry-run.html`; no later report generation pass is needed to surface the link.
+- `DefaultReportEngineTest.generatedReportIndexLinksExistingCleanupDryRunArtifact` now asserts the immediate post-cleanup index link as well as the later regenerated-index link.
+- `DefaultReportEngineTest.cleanupReportRunsWritesDryRunHtmlArtifactWithVerboseUnreferencedPlan` now also asserts the refreshed index link.
+- Verified:
+  1. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine "-Dtest=DefaultReportEngineTest#generatedReportIndexLinksExistingCleanupDryRunArtifact,DefaultReportEngineTest#cleanupReportRunsWritesDryRunHtmlArtifactWithVerboseUnreferencedPlan" test -q`
+  2. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine test -q`
+  3. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,apps/core-platform -am test -q`
+  4. `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+  5. `git diff --check` passed with line-ending warnings only
+- Known gaps: the dry-run artifact path is fixed to `<reportRoot>/cleanup-dry-run.html`; quota selector details still omit retained-byte traversal; dry-run HTML is generated only when cleanup is run.
+- Next recommended step: add an optional CLI flag for dry-run artifact output path if deterministic artifact names become an issue, or add quota retained-byte traversal details to the run selector plan. Do not start Phase 3 platform-management work until the user supplies and confirms the missing Phase 3 documents.
+
+Hand-off note - 2026-04-18:
+- Continued after cleanup dry-run index refresh by adding a configurable dry-run HTML artifact path.
+- `ReportCleanupOptions` now has `dryRunHtmlPath`; null keeps the default `<reportRoot>/cleanup-dry-run.html`.
+- `DefaultReportEngine.cleanupReportRuns` resolves relative custom paths under the report root, creates parent directories, writes the dry-run HTML there, and refreshes `<reportRoot>/index.html` with a link to the actual artifact from this cleanup run.
+- The default index discovery path remains unchanged: later normal report index generation links `<reportRoot>/cleanup-dry-run.html` when that default artifact exists.
+- `core-platform report-cleanup` now accepts `--dry-run-html PATH` and prints both the configured option value and the resolved `Dry-run HTML: ...` result path.
+- Added `DefaultReportEngineTest.cleanupReportRunsSupportsCustomDryRunHtmlArtifactPath`; it verifies a nested relative artifact path, absence of the default artifact, and the refreshed index link `maintenance/cleanup-review.html`.
+- Verified:
+  1. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine "-Dtest=DefaultReportEngineTest#cleanupReportRunsSupportsCustomDryRunHtmlArtifactPath,DefaultReportEngineTest#generatedReportIndexLinksExistingCleanupDryRunArtifact,DefaultReportEngineTest#cleanupReportRunsWritesDryRunHtmlArtifactWithVerboseUnreferencedPlan" test -q`
+  2. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine test -q`
+  3. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,apps/core-platform -am test -q`
+  4. `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+  5. `git diff --check` passed with line-ending warnings only
+- Known gaps: later report-index regeneration only auto-discovers the default cleanup dry-run artifact; custom artifact links are immediate-refresh only. Quota selector details still omit retained-byte traversal.
+- Next recommended step: add quota retained-byte traversal details to the run selector plan. Alternative: expose the network body spool grace period through DSL/run options if scenario-level runtime control becomes necessary. Do not start Phase 3 platform-management work until the user supplies and confirms the missing Phase 3 documents.
+
+Hand-off note - 2026-04-18:
+- Continued after configurable cleanup dry-run artifact paths by adding quota retained-byte traversal details to run selector plans.
+- `ReportCleanupResult.UnreferencedCleanupRunSelectorPlan` now includes `quotaRetainedBytesBefore`, `quotaRetainedBytesAfter`, `quotaFreedBytes`, and `quotaEligible`.
+- `DefaultReportEngine` now computes quota cleanup through a `QuotaCleanupPlan` that records the retained-byte walk for every run when `maxTotalBytes` is configured, while preserving the existing selection behavior.
+- `core-platform report-cleanup --verbose-unreferenced-cleanup` prints quota traversal fields alongside the selector booleans.
+- Cleanup dry-run HTML selector summaries now include quota eligibility, before/after retained bytes, freed bytes, and quota match state.
+- `DefaultReportEngineTest.cleanupReportRunsIncludesRunSelectorDetailsForCutoffStatusAndQuota` now asserts traversal values for quota-selected, status-selected, and cutoff-selected runs.
+- Verified:
+  1. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine "-Dtest=DefaultReportEngineTest#cleanupReportRunsIncludesRunSelectorDetailsForCutoffStatusAndQuota,DefaultReportEngineTest#cleanupReportRunsWritesDryRunHtmlArtifactWithVerboseUnreferencedPlan" test -q`
+  2. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine test -q`
+  3. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,apps/core-platform -am test -q`
+  4. `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+- Known gaps: quota traversal details are not shown in compact report-index maintenance hints; custom dry-run artifact links are immediate-refresh only; dry-run HTML is generated only when cleanup is run.
+- Next recommended step: exercise `report-cleanup` against current `runs` with dry-run HTML and verbose unreferenced cleanup to validate operator-facing output. Alternative: expose the network body spool grace period through DSL/run options if scenario-level runtime control becomes necessary. Do not start Phase 3 platform-management work until the user supplies and confirms the missing Phase 3 documents.
+
+Hand-off note - 2026-04-18:
+- Continued after quota retained-byte traversal details by exercising `report-cleanup` against the current local `runs` directory.
+- Rebuilt relevant modules with `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,apps/core-platform -am package -q`.
+- Installed the updated `report-engine` into the local repo with `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine -am install -q` because direct `exec:java` from `apps/core-platform` initially loaded a stale `ReportCleanupOptions` class and failed with `NoSuchMethodError: setDryRunHtmlPath(Path)`.
+- Generated a module classpath with `mvn "-Dmaven.repo.local=../../.m2/repository" dependency:build-classpath "-Dmdep.outputFile=target/classpath.txt" -q` and ran the app directly with `java -cp "target/classes;$cp" com.example.webtest.platform.CorePlatformApp report-cleanup ../../runs --dry-run --prune-unreferenced-files-only --verbose-unreferenced-cleanup --dry-run-html maintenance/current-runs-cleanup-dry-run.html`.
+- The dry-run succeeded and wrote `runs/maintenance/current-runs-cleanup-dry-run.html`.
+- CLI output reported `Scanned runs: 1`, `Kept runs: 1`, `selectedRuns=0`, `retainedRuns=1`, and a verbose selector row for `dsl-smoke-run` protected by keep-latest 20.
+- `runs/index.html` now links `maintenance/current-runs-cleanup-dry-run.html` as the latest cleanup dry-run artifact.
+- The current `runs/smoke` directory is not counted by cleanup scanning because it lacks report metadata; only `runs/dsl-smoke` is report-indexed.
+- Verified the generated index and dry-run HTML with `Select-String` checks for the cleanup link, `Cleanup Dry Run`, selected/retained metrics, selector explanation, and quota placeholder fields.
+- Known gaps: generated `runs` outputs are git-ignored local validation artifacts; quota traversal values are `(none)` in this run because no `--max-total-mb` was configured.
+- Next recommended step: run a quota-constrained dry-run against synthetic/current runs with `--max-total-mb` to validate non-empty operator-facing quota traversal output. Alternative: expose the network body spool grace period through DSL/run options if scenario-level runtime control becomes necessary. Do not start Phase 3 platform-management work until the user supplies and confirms the missing Phase 3 documents.
+
+Hand-off note - 2026-04-18:
+- Continued after current-runs cleanup dry-run validation by running a quota-constrained dry-run and fixing the CLI path for quota-only selection.
+- Initial validation with `--keep-latest 0 --max-total-mb 0` showed that the run was selected by keep-latest, not quota, so quota traversal stayed operator-visible but not quota-selected.
+- Added `core-platform report-cleanup --no-keep-latest` to clear the default `keepLatest=20` CLI selector when an operator needs quota to be the deciding selector.
+- Updated `report-cleanup --help` usage to show `--keep-latest N|--no-keep-latest`.
+- Re-ran the real CLI path with `--dry-run --no-keep-latest --max-total-mb 0 --prune-unreferenced-files-only --verbose-unreferenced-cleanup --dry-run-html maintenance/quota-cleanup-dry-run.html`.
+- The CLI output now reports `configuredKeepLatest=(none)`, `quotaEligible=true`, `quotaRetainedBytesBefore=29225`, `quotaRetainedBytesAfter=0`, `quotaFreedBytes=29225`, and `selectedByQuota=true` for `dsl-smoke-run`.
+- Confirmed `runs/maintenance/quota-cleanup-dry-run.html` contains the quota selector explanation and formatted quota traversal values.
+- Confirmed `runs/index.html` links `maintenance/quota-cleanup-dry-run.html` as the latest cleanup dry-run artifact.
+- Verified:
+  1. `mvn "-Dmaven.repo.local=.m2/repository" -pl apps/core-platform -am test -q`
+  2. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine -am test -q`
+  3. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine,apps/core-platform -am package -q`
+  4. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/report-engine -am install -q`
+  5. `java -cp "target/classes;$cp" com.example.webtest.platform.CorePlatformApp report-cleanup ../../runs --dry-run --no-keep-latest --max-total-mb 0 --prune-unreferenced-files-only --verbose-unreferenced-cleanup --dry-run-html maintenance/quota-cleanup-dry-run.html`
+  6. `Select-String -Path runs\maintenance\quota-cleanup-dry-run.html -Pattern "Cleanup Dry Run|Run matched cleanup selector\(s\): quota|quota eligible true|quota before|quota after|quota freed|quota match true"`
+  7. `Select-String -Path runs\index.html -Pattern "Latest cleanup dry-run|quota-cleanup-dry-run"`
+  8. `java -cp "target/classes;$cp" com.example.webtest.platform.CorePlatformApp report-cleanup --help`
+- Known gaps: generated `runs` artifacts are ignored local validation outputs; quota-only CLI validation now requires explicit `--no-keep-latest`; custom dry-run artifact links are still immediate-refresh only.
+- Next recommended step: expose the network body spool grace period through DSL/run options if scenario-level runtime control becomes necessary, or add compact quota traversal hints to report-index maintenance diagnostics. Do not start Phase 3 platform-management work until the user supplies and confirms the missing Phase 3 documents.
+
+Hand-off note - 2026-04-18:
+- Continued after quota-constrained cleanup dry-run validation by exposing orphaned network body spool cleanup grace through DSL and run options.
+- `RunOptions` now has `networkBodySpoolCleanupGracePeriod`; negative durations are rejected at setter time.
+- `ReportPolicy` now has `networkBodySpoolCleanupGraceSeconds`, and `DefaultDslValidator` rejects negative values.
+- `PageController` now has a default no-op `configureNetworkBodySpoolCleanupGrace(ExecutionContext, Duration)` hook.
+- `DefaultPageController` implements the hook by updating the orphaned spool min-age threshold and immediately running the orphaned spool sweep with the new grace period.
+- `DefaultTestOrchestrator` applies the cleanup grace before artifact capture starts; programmatic `RunOptions` overrides DSL `reportPolicy`.
+- Added coverage:
+  1. `DefaultPageControllerTest.runtimeConfigurationUpdatesOrphanNetworkBodySpoolMinAge`
+  2. `DefaultDslParserTest.parseYamlReadsYamlInput` now reads `networkBodySpoolCleanupGraceSeconds`
+  3. `DefaultDslParserTest.parseJsonRejectsInvalidNetworkBodySpoolCleanupGrace`
+  4. `DefaultTestOrchestratorTest.executeConfiguresNetworkBodySpoolCleanupGraceFromReportPolicy`
+  5. `DefaultTestOrchestratorTest.executeRunOptionsOverrideReportPolicyNetworkBodySpoolCleanupGrace`
+- Verified:
+  1. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/browser-core "-Dtest=DefaultPageControllerTest" test -q`
+  2. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/dsl-parser -am "-Dtest=DefaultDslParserTest" "-Dsurefire.failIfNoSpecifiedTests=false" test -q`
+  3. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/execution-engine -am "-Dtest=DefaultTestOrchestratorTest" "-Dsurefire.failIfNoSpecifiedTests=false" test -q`
+  4. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/browser-core test -q`
+  5. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/dsl-parser -am test -q`
+  6. `mvn "-Dmaven.repo.local=.m2/repository" -pl libs/execution-engine -am test -q`
+  7. `mvn "-Dmaven.repo.local=.m2/repository" -q package`
+  8. `git diff --check` passed with line-ending warnings only
+- Known gaps: `core-platform dsl-smoke` has no dedicated CLI flag for the run-option override; DSL users can use `reportPolicy.networkBodySpoolCleanupGraceSeconds`, and embedded callers can set `RunOptions.networkBodySpoolCleanupGracePeriod`. The JVM system property remains the construction-time default. Custom cleanup dry-run artifact links are still immediate-refresh only.
+- Next recommended step: add compact quota traversal hints to report-index maintenance diagnostics if operators need quota reasoning without opening dry-run HTML. Alternative: add a `core-platform dsl-smoke` CLI flag for network body spool cleanup grace if command-line override is needed. Do not start Phase 3 platform-management work until the user supplies and confirms the missing Phase 3 documents.

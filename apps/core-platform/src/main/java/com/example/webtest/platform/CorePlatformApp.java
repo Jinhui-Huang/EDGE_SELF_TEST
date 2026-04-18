@@ -84,6 +84,8 @@ public final class CorePlatformApp {
                 options.setKeepLatest(Integer.parseInt(requiredValue(args, ++index, arg)));
             } else if (arg.startsWith("--keep-latest=")) {
                 options.setKeepLatest(Integer.parseInt(arg.substring("--keep-latest=".length())));
+            } else if ("--no-keep-latest".equals(arg)) {
+                options.setKeepLatest(null);
             } else if ("--older-than-days".equals(arg)) {
                 options.setDeleteFinishedBefore(daysCutoff(requiredValue(args, ++index, arg)));
             } else if (arg.startsWith("--older-than-days=")) {
@@ -118,6 +120,10 @@ public final class CorePlatformApp {
                 addUnreferencedAgeBuckets(options, arg.substring("--unreferenced-age-bucket=".length()));
             } else if ("--verbose-unreferenced-cleanup".equals(arg)) {
                 options.setVerboseUnreferencedCleanupPlan(true);
+            } else if ("--dry-run-html".equals(arg)) {
+                options.setDryRunHtmlPath(Path.of(requiredValue(args, ++index, arg)));
+            } else if (arg.startsWith("--dry-run-html=")) {
+                options.setDryRunHtmlPath(Path.of(arg.substring("--dry-run-html=".length())));
             } else if (!arg.startsWith("--")) {
                 reportRoot = Path.of(arg);
             } else {
@@ -128,6 +134,9 @@ public final class CorePlatformApp {
         ReportCleanupResult result = new DefaultReportEngine().cleanupReportRuns(reportRoot, options);
         System.out.println("Report cleanup root: " + result.reportRoot());
         System.out.println("Mode: " + (result.dryRun() ? "dry-run" : "apply"));
+        if (result.dryRunHtmlPath() != null) {
+            System.out.println("Dry-run HTML: " + result.dryRunHtmlPath());
+        }
         System.out.println("Scanned runs: " + result.scannedRuns());
         System.out.println("Kept runs: " + result.keptRuns());
         System.out.println("Delete statuses: " + (options.getDeleteStatuses().isEmpty() ? "(none)" : options.getDeleteStatuses()));
@@ -139,6 +148,8 @@ public final class CorePlatformApp {
         System.out.println("Unreferenced age buckets: "
                 + (options.getUnreferencedFileAgeBuckets().isEmpty() ? "(none)" : options.getUnreferencedFileAgeBuckets()));
         System.out.println("Verbose unreferenced cleanup: " + options.isVerboseUnreferencedCleanupPlan());
+        System.out.println("Dry-run HTML path: "
+                + (options.getDryRunHtmlPath() == null ? "(default)" : options.getDryRunHtmlPath()));
         printUnreferencedCleanupPlan(result.unreferencedCleanupPlan());
         System.out.println((result.dryRun() ? "Would delete" : "Deleted") + " runs: "
                 + result.deletedRunDirectories().size());
@@ -211,6 +222,48 @@ public final class CorePlatformApp {
                         + " retainedFiles=" + run.retainedUnreferencedFiles()
                         + " retainedBytes=" + run.retainedUnreferencedBytes()
                         + " dir=" + run.directory());
+                ReportCleanupResult.UnreferencedCleanupRunSelectorPlan selector = run.selectorPlan();
+                if (selector != null) {
+                    System.out.println("      selectors:"
+                            + " explanation=\"" + selector.explanation() + "\""
+                            + " sortedIndex=" + selector.sortedIndex()
+                            + " status=" + selector.status()
+                            + " finishedAt=" + selector.finishedAt()
+                            + " runBytes=" + selector.runBytes()
+                            + " configuredKeepLatest="
+                            + (selector.configuredKeepLatest() == null
+                                    ? "(none)"
+                                    : selector.configuredKeepLatest())
+                            + " protectedByKeepLatest=" + selector.protectedByKeepLatest()
+                            + " selectedByKeepLatest=" + selector.selectedByKeepLatest()
+                            + " configuredDeleteFinishedBefore="
+                            + (selector.configuredDeleteFinishedBefore() == null
+                                    ? "(none)"
+                                    : selector.configuredDeleteFinishedBefore())
+                            + " selectedByCutoff=" + selector.selectedByCutoff()
+                            + " configuredDeleteStatuses="
+                            + (selector.configuredDeleteStatuses().isEmpty()
+                                    ? "(none)"
+                                    : selector.configuredDeleteStatuses())
+                            + " selectedByStatus=" + selector.selectedByStatus()
+                            + " configuredMaxTotalBytes="
+                            + (selector.configuredMaxTotalBytes() == null
+                                    ? "(none)"
+                                    : selector.configuredMaxTotalBytes())
+                            + " quotaEligible="
+                            + (selector.quotaEligible() == null ? "(none)" : selector.quotaEligible())
+                            + " quotaRetainedBytesBefore="
+                            + (selector.quotaRetainedBytesBefore() == null
+                                    ? "(none)"
+                                    : selector.quotaRetainedBytesBefore())
+                            + " quotaRetainedBytesAfter="
+                            + (selector.quotaRetainedBytesAfter() == null
+                                    ? "(none)"
+                                    : selector.quotaRetainedBytesAfter())
+                            + " quotaFreedBytes="
+                            + (selector.quotaFreedBytes() == null ? "(none)" : selector.quotaFreedBytes())
+                            + " selectedByQuota=" + selector.selectedByQuota());
+                }
                 if (!run.retentionReasons().isEmpty()) {
                     System.out.println("      retainedReasons:");
                     for (ReportCleanupResult.UnreferencedCleanupRetentionReason reason : run.retentionReasons()) {
@@ -224,6 +277,17 @@ public final class CorePlatformApp {
                     for (ReportCleanupResult.UnreferencedCleanupFilePlan file : run.files()) {
                         System.out.println("        " + file.decision()
                                 + " reason=" + file.reason()
+                                + " explanation=\"" + file.explanation() + "\""
+                                + " ageSeconds=" + file.ageSeconds()
+                                + " ageBucket=" + file.ageBucket()
+                                + " configuredMinAgeSeconds="
+                                + (file.configuredMinAgeSeconds() == null
+                                        ? "(none)"
+                                        : file.configuredMinAgeSeconds())
+                                + " selectedAgeBuckets="
+                                + (file.selectedAgeBuckets().isEmpty()
+                                        ? "(none)"
+                                        : file.selectedAgeBuckets())
                                 + " type=" + file.type()
                                 + " bytes=" + file.bytes()
                                 + " lastModifiedAt=" + file.lastModifiedAt()
@@ -236,7 +300,7 @@ public final class CorePlatformApp {
 
     private static void printReportCleanupUsage() {
         System.out.println("""
-                Usage: report-cleanup [reportRoot] [--keep-latest N] [--older-than-days N] [--status OK|FAILED[,..]] [--max-total-mb N] [--prune-artifacts-only|--prune-unreferenced-files-only] [--unreferenced-older-than-hours N|--unreferenced-older-than-days N] [--unreferenced-age-bucket fresh,recent,stale,old,ancient] [--verbose-unreferenced-cleanup] [--apply|--dry-run]
+                Usage: report-cleanup [reportRoot] [--keep-latest N|--no-keep-latest] [--older-than-days N] [--status OK|FAILED[,..]] [--max-total-mb N] [--prune-artifacts-only|--prune-unreferenced-files-only] [--unreferenced-older-than-hours N|--unreferenced-older-than-days N] [--unreferenced-age-bucket fresh,recent,stale,old,ancient] [--verbose-unreferenced-cleanup] [--dry-run-html PATH] [--apply|--dry-run]
                 Defaults: reportRoot=./runs, keepLatest=20, dry-run.
                 """);
     }

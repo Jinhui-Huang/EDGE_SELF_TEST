@@ -30,6 +30,7 @@ import com.example.webtest.report.model.ReportStepRecord;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -80,6 +81,38 @@ class DefaultTestOrchestratorTest {
 
         assertEquals(RunStatus.SUCCESS, result.getStatus());
         assertEquals(1, pageController.cleanupNetworkBodySpoolsCalls);
+    }
+
+    @Test
+    void executeConfiguresNetworkBodySpoolCleanupGraceFromReportPolicy() {
+        FakePageController pageController = new FakePageController();
+        ReportPolicy reportPolicy = new ReportPolicy();
+        reportPolicy.setNetworkBodySpoolCleanupGraceSeconds(120L);
+        TestCaseDefinition definition = new TestCaseDefinition();
+        definition.setReportPolicy(reportPolicy);
+        definition.setSteps(List.of(step("open", ActionType.GOTO, "https://example.test", null)));
+
+        RunResult result = new DefaultTestOrchestrator(pageController).execute(definition, tempRunOptions());
+
+        assertEquals(RunStatus.SUCCESS, result.getStatus());
+        assertEquals(List.of(Duration.ofSeconds(120L)), pageController.configuredNetworkBodySpoolCleanupGracePeriods);
+    }
+
+    @Test
+    void executeRunOptionsOverrideReportPolicyNetworkBodySpoolCleanupGrace() {
+        FakePageController pageController = new FakePageController();
+        ReportPolicy reportPolicy = new ReportPolicy();
+        reportPolicy.setNetworkBodySpoolCleanupGraceSeconds(120L);
+        TestCaseDefinition definition = new TestCaseDefinition();
+        definition.setReportPolicy(reportPolicy);
+        definition.setSteps(List.of(step("open", ActionType.GOTO, "https://example.test", null)));
+        RunOptions options = tempRunOptions();
+        options.setNetworkBodySpoolCleanupGracePeriod(Duration.ofSeconds(5L));
+
+        RunResult result = new DefaultTestOrchestrator(pageController).execute(definition, options);
+
+        assertEquals(RunStatus.SUCCESS, result.getStatus());
+        assertEquals(List.of(Duration.ofSeconds(5L)), pageController.configuredNetworkBodySpoolCleanupGracePeriods);
     }
 
     @Test
@@ -552,6 +585,7 @@ class DefaultTestOrchestratorTest {
         private final List<String> calls = new ArrayList<>();
         private final List<ConsoleEvent> consoleEvents = new ArrayList<>();
         private final List<NetworkEvent> networkEvents = new ArrayList<>();
+        private final List<Duration> configuredNetworkBodySpoolCleanupGracePeriods = new ArrayList<>();
         private int cleanupNetworkBodySpoolsCalls;
         private String title = "Dashboard";
 
@@ -592,6 +626,11 @@ class DefaultTestOrchestratorTest {
         @Override
         public void cleanupNetworkBodySpools(ExecutionContext context) {
             cleanupNetworkBodySpoolsCalls++;
+        }
+
+        @Override
+        public void configureNetworkBodySpoolCleanupGrace(ExecutionContext context, Duration gracePeriod) {
+            configuredNetworkBodySpoolCleanupGracePeriods.add(gracePeriod);
         }
 
         @Override

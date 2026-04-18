@@ -134,6 +134,7 @@ public class DefaultTestOrchestrator implements TestOrchestrator {
             Instant runStartedAt = Instant.now();
             List<StepExecutionRecord> records = new ArrayList<>();
             boolean failed = false;
+            configureNetworkBodySpoolCleanupGrace(definition, safeOptions, context);
             startArtifactCapture(definition, context);
 
             failed = executeSteps(definition.getBeforeAll(), definition, context, outputDir, safeOptions, records, false);
@@ -518,6 +519,25 @@ public class DefaultTestOrchestrator implements TestOrchestrator {
             } catch (Exception e) {
                 // Artifact collection must not block the primary run.
             }
+        }
+    }
+
+    private void configureNetworkBodySpoolCleanupGrace(
+            TestCaseDefinition definition,
+            RunOptions options,
+            ExecutionContext context) {
+        Duration gracePeriod = options.getNetworkBodySpoolCleanupGracePeriod();
+        if (gracePeriod == null && definition.getReportPolicy() != null
+                && definition.getReportPolicy().getNetworkBodySpoolCleanupGraceSeconds() != null) {
+            gracePeriod = Duration.ofSeconds(definition.getReportPolicy().getNetworkBodySpoolCleanupGraceSeconds());
+        }
+        if (gracePeriod == null) {
+            return;
+        }
+        try {
+            pageController.configureNetworkBodySpoolCleanupGrace(context, gracePeriod);
+        } catch (Exception e) {
+            // Artifact cleanup tuning must not block the primary run.
         }
     }
 
