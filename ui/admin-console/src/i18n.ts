@@ -56,7 +56,7 @@ export const sharedCopy = {
     ja: "ローカルケースカタログを保存しています..."
   },
   launchQueued: {
-    en: "Queued {runId} for {environment}.",
+    en: "Prepared {runId} for pre-execution in {environment}.",
     zh: "已将 {runId} 加入 {environment} 队列。",
     ja: "{runId} を {environment} 向けキューに追加しました。"
   },
@@ -124,6 +124,16 @@ export const sharedCopy = {
     en: "Recording...",
     zh: "记录中...",
     ja: "記録中..."
+  },
+  executionStarted: {
+    en: "Execution started for {runId}.",
+    zh: "已正式执行 {runId}。",
+    ja: "{runId} の実行を開始しました。"
+  },
+  executing: {
+    en: "Executing...",
+    zh: "执行中...",
+    ja: "実行中..."
   },
   allProjects: {
     en: "All projects",

@@ -1095,3 +1095,39 @@
 
 ## Next Step
 - Add explicit archive/delete semantics to the local-admin-api contracts when backend work becomes acceptable, or continue deepening the migrated Phase 3 operator screens such as document parse, AI generate, and execution monitor.
+
+## 2026-04-19 Cases / Doc Parse Decoupling
+- Fixed the `Cases` detail action so it no longer jumps into `Doc Parse`; it now only opens the inline Cases detail canvas.
+- Removed the extra `Detail opened` and `Candidate` texts from the `Doc Parse -> Parse result` case rows.
+- Removed the transient App-level Cases -> Doc Parse focus bridge from `ui/admin-console/src/App.tsx`.
+- Updated `ui/admin-console/src/screens/CasesScreen.tsx` so the row action stays local to the Cases module.
+- Rebuilt `ui/admin-console/src/screens/DocParseScreen.tsx` into a clean standalone implementation because the previous file contained broken localized string encoding that blocked safe edits and tests.
+- Added regression coverage in `ui/admin-console/src/App.test.tsx` for ¡°Cases detail stays in Cases¡±.
+
+## Verification
+- Passed: `npm test` in `ui/admin-console`
+
+## 2026-04-19 Cases / Execution Pre-execution UI Refactor
+- Reworked the Phase 3 admin-console flow so `Cases` detail now treats `Run` as a front-end-only `Pre-execution` action, with no backend logic changes.
+- Added App-level prepared-case UI state in `ui/admin-console/src/App.tsx` and kept it constrained to the existing front-end shell flow.
+- Rebuilt `ui/admin-console/src/screens/CasesScreen.tsx` into a clean, compilable screen because the previous file contained broken localized strings that were no longer safe to patch incrementally.
+- Reworked `ui/admin-console/src/screens/ExecutionScreen.tsx` so `Project` is selected from a dropdown and the right-hand panel shows prepared-case count and prepared-case rows for the selected project.
+- Extended `ui/admin-console/src/styles.css` for the new prepared-case summary panel and responsive execution layout.
+- Added regression coverage in `ui/admin-console/src/App.test.tsx` for the prepared-case count flow and the formal execution flow after pre-execution.
+
+## Modified Files
+- `ui/admin-console/src/App.tsx`
+- `ui/admin-console/src/App.test.tsx`
+- `ui/admin-console/src/screens/CasesScreen.tsx`
+- `ui/admin-console/src/screens/ExecutionScreen.tsx`
+- `ui/admin-console/src/styles.css`
+- `ui/admin-console/src/types.ts`
+- `memory.txt`
+
+## Verification
+- Passed: `npm test -- --run` in `ui/admin-console`
+- Passed: `npm run build` in `ui/admin-console`
+
+## Constraint
+- This round stayed in front-end UI refactor scope only.
+- No backend logic or backend contract was modified for this change.

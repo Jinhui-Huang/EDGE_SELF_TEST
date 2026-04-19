@@ -70,7 +70,68 @@ export type SchedulerMutationForm = {
   projectKey: string;
   owner: string;
   environment: string;
+  targetUrl: string;
+  executionModel: string;
   detail: string;
+};
+
+export type ModelProvider = {
+  id: string;
+  name: string;
+  displayName: string;
+  model: string;
+  endpoint: string;
+  apiKey: string;
+  modality: string;
+  contextWindow: string;
+  maxOutputTokens: string;
+  temperature: string;
+  timeoutMs: string;
+  status: "active" | "fallback" | "disabled";
+  role: "primary" | "secondary" | "fallback";
+  region: string;
+  notes: string;
+  usage: string;
+  latency: string;
+  cost: string;
+  accent: "accent" | "accent2" | "accent3" | "accent4";
+};
+
+export type ModelRoutingRule = {
+  id: string;
+  task: string;
+  primary: string;
+  fallback: string[];
+  reason: string;
+};
+
+export type PreparedCaseItem = {
+  id: string;
+  projectKey: string;
+  name: string;
+  status: string;
+  tags: string[];
+  updatedAt: string;
+};
+
+export type DataTemplateItem = {
+  id: string;
+  name: string;
+  type: "sql" | "service" | "composite";
+  envAllowed: string;
+  risk: "low" | "medium" | "high";
+  uses: number;
+  rollback: "snapshot" | "sql" | "api" | "manual";
+  projectKey: string;
+  steps: string[];
+  guards: string[];
+  params: Array<{
+    key: string;
+    type: string;
+    required?: boolean;
+    value?: string;
+  }>;
+  compareSummary: string;
 };
 
 export type MutationState = {

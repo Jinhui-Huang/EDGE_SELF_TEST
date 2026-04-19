@@ -481,6 +481,7 @@ class LocalAdminApiServerTest {
             String persistedRequests = Files.readString(schedulerRequestsFile, StandardCharsets.UTF_8);
             String persistedEvents = Files.readString(schedulerEventsFile, StandardCharsets.UTF_8);
             assertTrue(persistedRequests.contains("\"checkout-web-smoke\""));
+            assertTrue(persistedRequests.contains("\"PRE_EXECUTION\""));
             assertTrue(persistedRequests.contains("\"local-phase3-scheduler\""));
             assertTrue(persistedEvents.contains("\"STARTED\""));
             assertTrue(persistedEvents.contains("\"2026-04-18T11:00:00Z\""));

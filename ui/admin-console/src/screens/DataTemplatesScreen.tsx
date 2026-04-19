@@ -1,78 +1,156 @@
+import { useMemo, useState } from "react";
 import { translate } from "../i18n";
-import { AdminConsoleSnapshot, Locale } from "../types";
+import { AdminConsoleSnapshot, DataTemplateItem, Locale } from "../types";
 
 type DataTemplatesScreenProps = {
   snapshot: AdminConsoleSnapshot;
   title: string;
   locale: Locale;
+  dataTemplates: DataTemplateItem[];
 };
 
-export function DataTemplatesScreen({ snapshot, title, locale }: DataTemplatesScreenProps) {
-  const t = (value: { en: string; zh: string; ja: string }) => translate(locale, value);
+type Copy = {
+  en: string;
+  zh: string;
+  ja: string;
+};
+
+const copy = (en: string, zh = en, ja = en): Copy => ({ en, zh, ja });
+
+export function DataTemplatesScreen({ snapshot, title, locale, dataTemplates }: DataTemplatesScreenProps) {
+  const t = (value: Copy) => translate(locale, value);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>(dataTemplates[1]?.id ?? dataTemplates[0]?.id ?? "");
+
+  const selectedTemplate = useMemo(
+    () => dataTemplates.find((item) => item.id === selectedTemplateId) ?? dataTemplates[0] ?? null,
+    [dataTemplates, selectedTemplateId]
+  );
 
   return (
-    <div className="screenGrid">
-      <section className="heroCard heroLead sectionWide">
-        <div className="heroEyebrow">{t({ en: "Data template center", zh: "数据模板中心", ja: "データテンプレートセンター" })}</div>
-        <h2>{title}</h2>
-        <p>{t({ en: "Manage reusable seed, restore, and teardown recipes for test execution while staying inside the same platform frame as projects and environments.", zh: "在与项目和环境一致的平台框架中，统一管理可复用的造数、恢复和清理配方。", ja: "プロジェクトや環境と同じプラットフォーム枠内で、再利用可能な投入、復元、後始末レシピを一元管理します。" })}</p>
-      </section>
+    <div className="dataTemplatesDemoScreen">
+      <div className="dataTemplatesPath">{t(copy("Config / Data templates", "配置中心 / 数据模板", "設定 / データテンプレート"))}</div>
 
-      <section className="sectionCard sectionWide">
-        <div className="sectionHeader">
-          <div>
-            <p className="eyebrow">{t({ en: "Reusable packs", zh: "可复用模板包", ja: "再利用パック" })}</p>
-            <h3>{t({ en: "Project-scoped recipes", zh: "项目级模板", ja: "プロジェクト単位テンプレート" })}</h3>
-          </div>
+      <div className="dataTemplatesHead">
+        <div>
+          <h2>{title}</h2>
+          <p>{t(copy("Reusable DB seed / teardown recipes. Guarded by env whitelist and rollback strategy.", "可复用数据库预置 / 清理配方，受环境白名单与回滚策略保护。", "再利用できる DB 投入 / クリーンアップ定義。環境ホワイトリストとロールバック戦略で保護されます。"))}</p>
         </div>
-        <div className="stepList columns3">
-          {snapshot.projects.map((item) => (
-            <article key={item.key} className="stepCard">
-              <strong>{item.name}</strong>
-              <p>{item.scope}</p>
-              <small>
-                {item.environments} {t({ en: "target environments", zh: "目标环境", ja: "対象環境" })}
-              </small>
-            </article>
-          ))}
+        <div className="dataTemplatesHeadActions">
+          <button type="button" className="projectsActionButton">
+            {t(copy("Import", "导入", "インポート"))}
+          </button>
+          <button type="button" className="projectsActionButton primary">
+            {t(copy("New template", "新建模板", "新規テンプレート"))}
+          </button>
         </div>
-      </section>
+      </div>
 
-      <section className="sectionCard">
-        <div className="sectionHeader">
-          <div>
-            <p className="eyebrow">{t({ en: "Execution guards", zh: "执行约束", ja: "実行ガード" })}</p>
-            <h3>{t({ en: "Template policies", zh: "模板策略", ja: "テンプレート方針" })}</h3>
+      <div className="dataTemplatesWorkbench">
+        <section className="dataTemplatesTableCard">
+          <div className="dataTemplatesTableHead">
+            <span>{t(copy("Name", "名称", "名前"))}</span>
+            <span>{t(copy("Type", "类型", "タイプ"))}</span>
+            <span>{t(copy("Env allowed", "允许环境", "許可環境"))}</span>
+            <span>{t(copy("Risk", "风险", "リスク"))}</span>
+            <span>{t(copy("Rollback", "回滚", "ロールバック"))}</span>
+            <span>{t(copy("Uses", "调用", "使用回数"))}</span>
           </div>
-        </div>
-        <div className="detailStack">
-          {snapshot.environmentConfig.map((item) => (
-            <div key={item.label} className="detailRow">
-              <span>{item.label}</span>
-              <strong>{item.value}</strong>
-            </div>
-          ))}
-        </div>
-      </section>
+          <div className="dataTemplatesTableBody">
+            {dataTemplates.map((template) => (
+              <button
+                key={template.id}
+                type="button"
+                className={`dataTemplatesTableRow ${selectedTemplate?.id === template.id ? "isActive" : ""}`}
+                onClick={() => setSelectedTemplateId(template.id)}
+              >
+                <span className="dataTemplatesMono">{template.name}</span>
+                <span>
+                  <em className={`dataTemplateBadge ${template.type}`}>{template.type}</em>
+                </span>
+                <span className="dataTemplatesMuted">{template.envAllowed}</span>
+                <span>
+                  <em className={`dataTemplateBadge risk ${template.risk}`}>{template.risk}</em>
+                </span>
+                <span className="dataTemplatesMonoSmall">{template.rollback}</span>
+                <span className="dataTemplatesUses">{template.uses}</span>
+              </button>
+            ))}
+          </div>
+        </section>
 
-      <section className="sectionCard">
-        <div className="sectionHeader">
-          <div>
-            <p className="eyebrow">{t({ en: "Suggested recipes", zh: "推荐方案", ja: "推奨レシピ" })}</p>
-            <h3>{t({ en: "Restore and cleanup", zh: "恢复与清理", ja: "復元とクリーンアップ" })}</h3>
-          </div>
-        </div>
-        <div className="stepList">
-          <div className="stepCard">
-            <strong>{t({ en: "Checkout seed account", zh: "结算账号预置", ja: "決済アカウント投入" })}</strong>
-            <p>{t({ en: "Prepare reusable payment data before the run and clear temporary records after completion.", zh: "执行前准备可复用支付数据，执行后清理临时记录。", ja: "実行前に再利用可能な決済データを投入し、完了後に一時レコードを整理します." })}</p>
-          </div>
-          <div className="stepCard">
-            <strong>{t({ en: "Member profile snapshot", zh: "会员资料快照", ja: "会員プロフィールスナップショット" })}</strong>
-            <p>{t({ en: "Capture state before write actions, then verify the rollback result after the run.", zh: "在写操作前保存状态，执行后验证回滚结果。", ja: "書込み前に状態を保存し、実行後にロールバック結果を検証します。" })}</p>
-          </div>
-        </div>
-      </section>
+        <aside className="dataTemplateDetailCard">
+          {selectedTemplate ? (
+            <>
+              <div className="dataTemplateDetailHead">
+                <strong>{selectedTemplate.name}</strong>
+                <p>
+                  {selectedTemplate.type} · {selectedTemplate.steps.length} {t(copy("steps", "步骤", "ステップ"))} ·{" "}
+                  {t(copy("rolls back via", "回滚方式", "ロールバック"))} {selectedTemplate.rollback}
+                </p>
+              </div>
+
+              <div className="dataTemplateDetailBody">
+                <div className="dataTemplateDetailSection">
+                  <span>{t(copy("Parameters", "参数", "パラメータ"))}</span>
+                  <div className="dataTemplateParamList">
+                    {selectedTemplate.params.map((param) => (
+                      <div key={param.key} className="dataTemplateParamRow">
+                        <div className="dataTemplatesMono">{param.key}</div>
+                        <div className="dataTemplatesMonoSmall">{param.type}</div>
+                        <div className="dataTemplatesMuted">{param.required ? "required" : param.value ?? "--"}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="dataTemplateDetailSection">
+                  <span>{t(copy("Steps", "步骤", "ステップ"))}</span>
+                  <div className="dataTemplateStepList">
+                    {selectedTemplate.steps.map((step, index) => (
+                      <div key={step} className="dataTemplateStepRow">
+                        <i>{index + 1}</i>
+                        <div>
+                          <strong>{step}</strong>
+                          <p className="dataTemplatesMonoSmall">{step} (...)</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="dataTemplateDetailSection">
+                  <span>{t(copy("Guards", "守护", "ガード"))}</span>
+                  <div className="dataTemplateGuardList">
+                    {selectedTemplate.guards.map((guard) => (
+                      <div key={guard} className="dataTemplateGuardRow">
+                        <i>✓</i>
+                        <span>{guard}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="dataTemplateDetailSection">
+                  <span>{t(copy("Project scope", "项目范围", "プロジェクト範囲"))}</span>
+                  <div className="dataTemplateScopeBox">
+                    <strong>{snapshot.projects.find((item) => item.key === selectedTemplate.projectKey)?.name ?? selectedTemplate.projectKey}</strong>
+                    <p>{selectedTemplate.compareSummary}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="dataTemplateDetailFoot">
+                <button type="button" className="projectsActionButton">
+                  {t(copy("Edit", "编辑", "編集"))}
+                </button>
+                <button type="button" className="projectsActionButton">
+                  {t(copy("Dry-run", "试运行", "ドライラン"))}
+                </button>
+              </div>
+            </>
+          ) : null}
+        </aside>
+      </div>
     </div>
   );
 }

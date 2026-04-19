@@ -27,6 +27,7 @@ public final class Phase3MockDataService {
             .withLocale(Locale.ROOT)
             .withZone(ZoneId.systemDefault());
     private static final Set<String> ACTIVE_EXECUTION_STATES = Set.of(
+            "PRE_EXECUTION",
             "QUEUED",
             "WAITING",
             "RUNNING",

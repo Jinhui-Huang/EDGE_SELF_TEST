@@ -40,7 +40,7 @@ public final class SchedulerPersistenceService {
         putIfNotBlank(entry, "environment", environment);
         entry.put("title", firstNonBlank(text(payload, "title"), buildTitle(runId, environment)));
         entry.put("detail", firstNonBlank(text(payload, "detail"), "Accepted into the local scheduler request queue."));
-        entry.put("status", normalizeRequestStatus(firstNonBlank(text(payload, "status"), "QUEUED")));
+        entry.put("status", normalizeRequestStatus(firstNonBlank(text(payload, "status"), "PRE_EXECUTION")));
         entry.put("schedulerId", schedulerId);
         Integer position = integerValue(payload.get("position"));
         if (position != null && position > 0) {
@@ -213,7 +213,7 @@ public final class SchedulerPersistenceService {
 
     private String normalizeRequestStatus(String rawStatus) {
         String normalized = normalizeEventType(rawStatus);
-        return normalized == null ? "QUEUED" : normalized;
+        return normalized == null ? "PRE_EXECUTION" : normalized;
     }
 
     private String normalizeEventType(String rawValue) {

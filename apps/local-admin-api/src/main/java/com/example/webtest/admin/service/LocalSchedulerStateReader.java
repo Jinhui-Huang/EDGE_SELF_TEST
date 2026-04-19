@@ -14,6 +14,7 @@ import java.util.Set;
 
 final class LocalSchedulerStateReader {
     private static final Set<String> ACTIVE_EXECUTION_STATES = Set.of(
+            "PRE_EXECUTION",
             "QUEUED",
             "WAITING",
             "RUNNING",
@@ -218,6 +219,7 @@ final class LocalSchedulerStateReader {
         }
         String type = normalizeStatus(event.type());
         return switch (type) {
+            case "PRE_EXECUTION", "PREPARED" -> "PRE_EXECUTION";
             case "REQUESTED", "QUEUED" -> "QUEUED";
             case "WAITING" -> "WAITING";
             case "STARTED", "RUNNING", "HEARTBEAT" -> "RUNNING";
@@ -231,6 +233,7 @@ final class LocalSchedulerStateReader {
 
     private String queueLabel(String status) {
         return switch (normalizeStatus(status)) {
+            case "PRE_EXECUTION" -> "Pre-execution";
             case "RUNNING", "IN_PROGRESS" -> "In progress";
             case "NEEDS_REVIEW" -> "Needs review";
             case "WAITING", "QUEUED" -> "Waiting";
@@ -240,6 +243,7 @@ final class LocalSchedulerStateReader {
 
     private String detailForStatus(String status) {
         return switch (normalizeStatus(status)) {
+            case "PRE_EXECUTION" -> "Run definition is stored as pre-execution and awaits an Execution trigger.";
             case "RUNNING", "IN_PROGRESS" -> "Local scheduler has promoted the run to an active worker.";
             case "NEEDS_REVIEW" -> "Local scheduler is waiting for operator review.";
             case "WAITING", "QUEUED" -> "Local scheduler accepted the run and is waiting for capacity.";

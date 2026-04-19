@@ -82,7 +82,10 @@
             Detail
             <textarea id="launchDetail" name="detail" rows="3">Queued from the Edge popup after reviewing the current page context.</textarea>
           </label>
-          <button id="launchSubmitButton" type="submit">Queue Run</button>
+          <div class="actionRow">
+            <button id="launchSubmitButton" type="submit">Run</button>
+            <button id="launchExecuteButton" type="button">Execution</button>
+          </div>
         </form>
         <p class="actionStatus hidden" id="launchStatus" role="status" aria-live="polite"></p>
       </section>

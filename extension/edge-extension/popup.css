@@ -139,6 +139,15 @@ dd {
   grid-column: 1 / -1;
 }
 
+.actionRow {
+  display: flex;
+  gap: 8px;
+}
+
+.actionRow > button {
+  flex: 1 1 0;
+}
+
 .actionStatus {
   border-radius: 12px;
   font-size: 0.82rem;

@@ -167,17 +167,18 @@ export async function submitLaunch(event) {
     setMutationState("launchStatus", "error", "Run ID is required.");
     return;
   }
-  setButtonPending("launchSubmitButton", true, "Queueing...", "Queue Run");
-  setMutationState("launchStatus", "pending", "Submitting scheduler request through native host...");
+  setButtonPending("launchSubmitButton", true, "Running...", "Run");
+  setMutationState("launchStatus", "pending", "Submitting pre-execution request through native host...");
   try {
     await postSchedulerMutation("SCHEDULER_REQUEST_CREATE", {
       ...form,
+      status: "PRE_EXECUTION",
       title: buildRequestTitle(form),
       detail: buildContextDetail(form.detail, latestTab)
     });
     const refreshed = await refreshCurrentPage();
     const queueState = refreshed?.runtime?.queueState || "scheduler updated";
-    setMutationState("launchStatus", "success", `Queued ${form.runId}. ${queueState}`);
+    setMutationState("launchStatus", "success", `Prepared ${form.runId} for pre-execution. ${queueState}`);
     const reviewRunId = document.getElementById("reviewRunId");
     if (reviewRunId instanceof HTMLInputElement && !reviewRunId.dataset.touched) {
       reviewRunId.value = form.runId;
@@ -185,7 +186,34 @@ export async function submitLaunch(event) {
   } catch (error) {
     setMutationState("launchStatus", "error", error instanceof Error ? error.message : String(error));
   } finally {
-    setButtonPending("launchSubmitButton", false, "Queueing...", "Queue Run");
+    setButtonPending("launchSubmitButton", false, "Running...", "Run");
+  }
+}
+
+export async function submitExecution() {
+  const form = readForm("launch");
+  if (!form.runId) {
+    setMutationState("launchStatus", "error", "Run ID is required.");
+    return;
+  }
+  setButtonPending("launchExecuteButton", true, "Executing...", "Execution");
+  setMutationState("launchStatus", "pending", "Submitting formal execution event through native host...");
+  try {
+    await postSchedulerMutation("SCHEDULER_EVENT_CREATE", {
+      ...form,
+      title: buildRequestTitle(form),
+      type: "STARTED",
+      state: "RUNNING",
+      status: "RUNNING",
+      detail: buildContextDetail(form.detail, latestTab)
+    });
+    const refreshed = await refreshCurrentPage();
+    const queueState = refreshed?.runtime?.queueState || "execution started";
+    setMutationState("launchStatus", "success", `Execution started for ${form.runId}. ${queueState}`);
+  } catch (error) {
+    setMutationState("launchStatus", "error", error instanceof Error ? error.message : String(error));
+  } finally {
+    setButtonPending("launchExecuteButton", false, "Executing...", "Execution");
   }
 }
 
@@ -267,6 +295,9 @@ export function initPopup() {
     void refreshCurrentPage();
   });
   document.getElementById("launchForm")?.addEventListener("submit", submitLaunch);
+  document.getElementById("launchExecuteButton")?.addEventListener("click", () => {
+    void submitExecution();
+  });
   document.getElementById("reviewForm")?.addEventListener("submit", submitReview);
   trackTouchedFields();
   void refreshCurrentPage();

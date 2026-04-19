@@ -7,6 +7,7 @@ import { DataTemplatesScreen } from "./screens/DataTemplatesScreen";
 import { DocParseScreen } from "./screens/DocParseScreen";
 import { ExecutionScreen } from "./screens/ExecutionScreen";
 import { AiGenerateScreen } from "./screens/AiGenerateScreen";
+import { ModelConfigScreen } from "./screens/ModelConfigScreen";
 import { formatCopy, sharedCopy } from "./i18n";
 import { MonitorScreen } from "./screens/MonitorScreen";
 import { PluginPopupScreen } from "./screens/PluginPopupScreen";
@@ -19,8 +20,12 @@ import {
   CaseItem,
   ConfigItem,
   CopyValue,
+  DataTemplateItem,
   Locale,
+  ModelProvider,
+  ModelRoutingRule,
   MutationState,
+  PreparedCaseItem,
   ProjectItem,
   SchedulerMutationForm,
   ScreenId,
@@ -163,6 +168,277 @@ const fallbackSnapshot: AdminConsoleSnapshot = {
   ],
   caseTags: ["smoke", "regression", "locator-repair-needed", "depends-on-test-data"]
 };
+
+const defaultModelProviders: ModelProvider[] = [
+  {
+    id: "anthropic-claude-4-5-sonnet",
+    name: "Anthropic",
+    displayName: "Anthropic",
+    model: "claude-4.5-sonnet",
+    endpoint: "https://api.anthropic.com",
+    apiKey: "",
+    modality: "browser automation",
+    contextWindow: "200k",
+    maxOutputTokens: "8192",
+    temperature: "0.2",
+    timeoutMs: "60000",
+    status: "active",
+    role: "primary",
+    region: "global",
+    notes: "Primary browser automation model.",
+    usage: "61%",
+    latency: "820ms",
+    cost: "$0.011/call",
+    accent: "accent"
+  },
+  {
+    id: "openai-gpt-4o",
+    name: "OpenAI",
+    displayName: "OpenAI",
+    model: "gpt-4o",
+    endpoint: "https://api.openai.com/v1",
+    apiKey: "",
+    modality: "browser automation",
+    contextWindow: "128k",
+    maxOutputTokens: "4096",
+    temperature: "0.2",
+    timeoutMs: "45000",
+    status: "active",
+    role: "secondary",
+    region: "global",
+    notes: "Fast inline recovery and locator healing.",
+    usage: "24%",
+    latency: "640ms",
+    cost: "$0.009/call",
+    accent: "accent2"
+  },
+  {
+    id: "ollama-qwen2-5-14b",
+    name: "Local (Ollama)",
+    displayName: "Local (Ollama)",
+    model: "qwen2.5:14b",
+    endpoint: "http://localhost:11434",
+    apiKey: "",
+    modality: "local summarization",
+    contextWindow: "32k",
+    maxOutputTokens: "2048",
+    temperature: "0.1",
+    timeoutMs: "90000",
+    status: "active",
+    role: "secondary",
+    region: "on-prem",
+    notes: "Local-only fallback for data-sensitive work.",
+    usage: "7%",
+    latency: "2.1s",
+    cost: "—",
+    accent: "accent3"
+  },
+  {
+    id: "google-gemini-2-0-flash",
+    name: "Google",
+    displayName: "Google",
+    model: "gemini-2.0-flash",
+    endpoint: "https://generativelanguage.googleapis.com",
+    apiKey: "",
+    modality: "fallback reasoning",
+    contextWindow: "1M",
+    maxOutputTokens: "4096",
+    temperature: "0.2",
+    timeoutMs: "45000",
+    status: "fallback",
+    role: "fallback",
+    region: "global",
+    notes: "Fallback provider for availability coverage.",
+    usage: "0%",
+    latency: "—",
+    cost: "—",
+    accent: "accent4"
+  }
+];
+
+const defaultModelRoutingRules: ModelRoutingRule[] = [
+  {
+    id: "document-parsing",
+    task: "Document parsing",
+    primary: "claude-4.5",
+    fallback: ["gpt-4o"],
+    reason: "best at long structured docs"
+  },
+  {
+    id: "dsl-generation",
+    task: "DSL generation",
+    primary: "claude-4.5",
+    fallback: ["gpt-4o", "qwen2.5:14b"],
+    reason: "strict schema adherence"
+  },
+  {
+    id: "locator-healing",
+    task: "Locator healing",
+    primary: "gpt-4o",
+    fallback: ["claude-4.5"],
+    reason: "faster for inline decisions"
+  },
+  {
+    id: "element-summarization",
+    task: "Element summarization (plugin)",
+    primary: "qwen2.5:14b",
+    fallback: ["gpt-4o"],
+    reason: "keep data local"
+  }
+];
+
+const defaultDataTemplates: DataTemplateItem[] = [
+  {
+    id: "user-test-account",
+    name: "user.test_account",
+    type: "sql",
+    envAllowed: "dev, staging",
+    risk: "low",
+    uses: 247,
+    rollback: "snapshot",
+    projectKey: "member-center",
+    steps: ["SELECT baseline user", "INSERT login fixtures", "RESET profile flags"],
+    guards: ["prod environment blocked", "snapshot taken before run", "row count limit: 20"],
+    params: [
+      { key: "user_id", type: "uuid", required: true },
+      { key: "tenant", type: "string", value: "edge-demo" }
+    ],
+    compareSummary: "Compare account row baseline and restored profile state."
+  },
+  {
+    id: "order-seed-v2",
+    name: "order.seed.v2",
+    type: "composite",
+    envAllowed: "dev, staging",
+    risk: "medium",
+    uses: 128,
+    rollback: "sql",
+    projectKey: "checkout-web",
+    steps: ["INSERT orders", "INSERT order_items", "UPDATE products.stock"],
+    guards: ["prod environment blocked", "snapshot taken before run", "row count limit: 50"],
+    params: [
+      { key: "user_id", type: "uuid", required: true },
+      { key: "total_cents", type: "int", value: "8910" },
+      { key: "item_skus", type: "string[]", value: "[\"sku_A\",\"sku_B\"]" }
+    ],
+    compareSummary: "Compare order, order_items, and stock deltas before and after execution."
+  },
+  {
+    id: "product-inventory",
+    name: "product.inventory",
+    type: "service",
+    envAllowed: "dev",
+    risk: "low",
+    uses: 91,
+    rollback: "api",
+    projectKey: "ops-console",
+    steps: ["POST inventory seed", "PATCH safety stock", "GET reconciliation"],
+    guards: ["dev-only whitelist", "service timeout guard", "delta threshold limited to 10"],
+    params: [
+      { key: "warehouse_id", type: "string", required: true },
+      { key: "sku_count", type: "int", value: "12" }
+    ],
+    compareSummary: "Compare inventory counts and reconciliation status."
+  },
+  {
+    id: "coupon-single-use",
+    name: "coupon.single_use",
+    type: "sql",
+    envAllowed: "dev, staging",
+    risk: "low",
+    uses: 64,
+    rollback: "snapshot",
+    projectKey: "checkout-web",
+    steps: ["INSERT coupon row", "BIND test account", "VERIFY expiration"],
+    guards: ["prod environment blocked", "single row cap", "expiration auto cleanup"],
+    params: [
+      { key: "coupon_code", type: "string", required: true, value: "SAVE10" },
+      { key: "discount_rate", type: "decimal", value: "0.10" }
+    ],
+    compareSummary: "Compare coupon status and redemption counters."
+  },
+  {
+    id: "payment-mock-auth",
+    name: "payment.mock.auth",
+    type: "service",
+    envAllowed: "staging",
+    risk: "high",
+    uses: 33,
+    rollback: "manual",
+    projectKey: "checkout-web",
+    steps: ["CREATE auth session", "FORCE capture callback", "ARCHIVE mock trace"],
+    guards: ["staging approval required", "manual rollback", "trace retention 24h"],
+    params: [
+      { key: "merchant_id", type: "string", required: true },
+      { key: "capture_amount", type: "int", value: "8910" }
+    ],
+    compareSummary: "Compare payment authorization trail and callback payloads."
+  },
+  {
+    id: "audit-clear",
+    name: "audit.clear",
+    type: "sql",
+    envAllowed: "dev",
+    risk: "high",
+    uses: 12,
+    rollback: "snapshot",
+    projectKey: "ops-console",
+    steps: ["DELETE temp audit rows", "VACUUM preview tables", "RESEED view counters"],
+    guards: ["manual confirmation", "snapshot required", "affected rows capped at 200"],
+    params: [
+      { key: "operator_id", type: "string", required: true },
+      { key: "cleanup_scope", type: "string", value: "preview-only" }
+    ],
+    compareSummary: "Compare audit tables before cleanup and after restore."
+  }
+];
+
+function parseModelProviders(items: ConfigItem[]): ModelProvider[] {
+  const parsed = items
+    .filter((item) => item.label.startsWith("provider:"))
+    .map((item) => {
+      try {
+        return JSON.parse(item.value) as ModelProvider;
+      } catch {
+        return null;
+      }
+    })
+    .filter((item): item is ModelProvider => Boolean(item));
+
+  return parsed.length ? parsed : defaultModelProviders;
+}
+
+function parseModelRoutingRules(items: ConfigItem[]): ModelRoutingRule[] {
+  const parsed = items
+    .filter((item) => item.label.startsWith("route:"))
+    .map((item) => {
+      try {
+        return JSON.parse(item.value) as ModelRoutingRule;
+      } catch {
+        return null;
+      }
+    })
+    .filter((item): item is ModelRoutingRule => Boolean(item));
+
+  return parsed.length ? parsed : defaultModelRoutingRules;
+}
+
+function buildModelConfigItems(providers: ModelProvider[], routingRules: ModelRoutingRule[]): ConfigItem[] {
+  return [
+    { label: "Provider", value: providers.map((provider) => `${provider.name}/${provider.model}`).join(", ") },
+    { label: "Mode", value: "Audit-first / recommendation-only" },
+    { label: "Approval policy", value: "Operator sign-off required before non-read-only runtime actions" },
+    { label: "Output guard", value: "JSON schema plus rule validation" },
+    ...providers.map((provider) => ({
+      label: `provider:${provider.id}`,
+      value: JSON.stringify(provider)
+    })),
+    ...routingRules.map((rule) => ({
+      label: `route:${rule.id}`,
+      value: JSON.stringify(rule)
+    }))
+  ];
+}
 
 const screenCopy: Record<ScreenId, { title: CopyValue; description: CopyValue }> = {
   dashboard: {
@@ -724,7 +1000,7 @@ const uiCopy = {
   caseSaveHint: { en: "POST /catalog/case", zh: "POST /catalog/case", ja: "POST /catalog/case" },
   modelSaveHint: { en: "POST /config/model", zh: "POST /config/model", ja: "POST /config/model" },
   environmentSaveHint: { en: "POST /config/environment", zh: "POST /config/environment", ja: "POST /config/environment" },
-  executionSaveHint: { en: "POST /scheduler/requests", zh: "POST /scheduler/requests", ja: "POST /scheduler/requests" },
+  executionSaveHint: { en: "POST /scheduler/requests + /scheduler/events", zh: "POST /scheduler/requests + /scheduler/events", ja: "POST /scheduler/requests + /scheduler/events" },
   reviewSaveHint: { en: "POST /scheduler/events", zh: "POST /scheduler/events", ja: "POST /scheduler/events" },
   addProjectRow: { en: "Add project row", zh: "新增项目行", ja: "プロジェクト行を追加" },
   saveProjectCatalog: { en: "Save project catalog", zh: "保存项目目录", ja: "プロジェクトカタログを保存" },
@@ -732,7 +1008,8 @@ const uiCopy = {
   saveCaseCatalog: { en: "Save case catalog", zh: "保存用例目录", ja: "ケースカタログを保存" },
   saveModelConfig: { en: "Save model config", zh: "保存模型配置", ja: "モデル設定を保存" },
   saveEnvironmentConfig: { en: "Save environment config", zh: "保存环境配置", ja: "環境設定を保存" },
-  startExecution: { en: "Start execution", zh: "开始执行", ja: "実行開始" },
+  runAction: { en: "Run", zh: "预执行", ja: "事前実行" },
+  executionAction: { en: "Execution", zh: "正式执行", ja: "実行" },
   openAudit: { en: "Open audit", zh: "发起审计", ja: "監査を開始" },
   queueBoard: { en: "Queue board", zh: "队列看板", ja: "キューボード" },
   reviewBoard: { en: "Audit timeline", zh: "审计时间线", ja: "監査タイムライン" },
@@ -754,6 +1031,8 @@ const uiCopy = {
   fieldProject: { en: "Project", zh: "项目", ja: "プロジェクト" },
   fieldOwner: { en: "Owner", zh: "负责人", ja: "担当者" },
   fieldEnvironment: { en: "Environment", zh: "环境", ja: "環境" },
+  fieldTargetUrl: { en: "Test page URL", zh: "测试网页链接", ja: "テストページ URL" },
+  fieldExecutionModel: { en: "Web test model", zh: "网页自动测试模型", ja: "Web テストモデル" },
   fieldDetail: { en: "Detail", zh: "详情", ja: "詳細" },
   fieldAuditDetail: { en: "Audit detail", zh: "审计详情", ja: "監査詳細" },
   runColumn: { en: "Run", zh: "运行", ja: "実行" },
@@ -770,10 +1049,31 @@ function translate(locale: Locale, value: CopyValue): string {
   return typeof value === "string" ? value : value[locale] ?? value.en ?? value.zh ?? value.ja;
 }
 
+type AiGenerateFocus = {
+  projectKey: string;
+  projectName: string;
+  documentId: string;
+  documentName: string;
+  caseId: string;
+  caseName: string;
+  generatedCases: Array<{
+    id: string;
+    name: string;
+    category: string;
+    confidence: string;
+  }>;
+  reasoning: Array<{
+    label: string;
+    body: string;
+  }>;
+};
+
 export function App() {
   const [snapshot, setSnapshot] = useState<AdminConsoleSnapshot>(fallbackSnapshot);
   const [sourceLabel, setSourceLabel] = useState(translate("en", sharedCopy.sourceFallback));
   const [activeScreen, setActiveScreen] = useState<ScreenId>("dashboard");
+  const [selectedReportRunName, setSelectedReportRunName] = useState<string | null>(fallbackSnapshot.reports[0]?.runName ?? null);
+  const [aiGenerateFocus, setAiGenerateFocus] = useState<AiGenerateFocus | null>(null);
   const [locale, setLocale] = useState<Locale>("en");
   const [themeMode, setThemeMode] = useState<ThemeMode>("light");
   const [launchForm, setLaunchForm] = useState<SchedulerMutationForm>({
@@ -781,6 +1081,8 @@ export function App() {
     projectKey: "checkout-web",
     owner: "qa-platform",
     environment: "prod-like",
+    targetUrl: "https://checkout.demo.internal/cart",
+    executionModel: defaultModelProviders[0].model,
     detail: "Accepted from operator launch panel."
   });
   const [reviewForm, setReviewForm] = useState<SchedulerMutationForm>({
@@ -788,11 +1090,16 @@ export function App() {
     projectKey: "checkout-web",
     owner: "audit-operator",
     environment: "prod-like",
+    targetUrl: "",
+    executionModel: defaultModelProviders[0].model,
     detail: "Operator review opened from the admin console."
   });
   const [launchState, setLaunchState] = useState<MutationState>({ kind: "idle", message: "" });
+  const [executeState, setExecuteState] = useState<MutationState>({ kind: "idle", message: "" });
   const [reviewState, setReviewState] = useState<MutationState>({ kind: "idle", message: "" });
   const [modelConfigDraft, setModelConfigDraft] = useState<ConfigItem[]>(fallbackSnapshot.modelConfig);
+  const [modelProviders, setModelProviders] = useState<ModelProvider[]>(parseModelProviders(fallbackSnapshot.modelConfig));
+  const [modelRoutingRules, setModelRoutingRules] = useState<ModelRoutingRule[]>(parseModelRoutingRules(fallbackSnapshot.modelConfig));
   const [environmentConfigDraft, setEnvironmentConfigDraft] = useState<ConfigItem[]>(fallbackSnapshot.environmentConfig);
   const [projectDraft, setProjectDraft] = useState<ProjectItem[]>(
     fallbackSnapshot.projects.map((project) => ({
@@ -817,9 +1124,61 @@ export function App() {
     }))
   );
   const [caseState, setCaseState] = useState<MutationState>({ kind: "idle", message: "" });
+  const [preparedCases, setPreparedCases] = useState<PreparedCaseItem[]>([]);
+  const [selectedExecutionTemplateIds, setSelectedExecutionTemplateIds] = useState<string[]>(["order-seed-v2"]);
 
   function t(value: CopyValue) {
     return translate(locale, value);
+  }
+
+  function handlePrepareCase(caseId: string) {
+    const matchedCase = snapshot.cases.find((item) => item.id === caseId);
+    if (!matchedCase) {
+      return;
+    }
+
+    setPreparedCases((current) => {
+      if (current.some((item) => item.id === matchedCase.id)) {
+        return current;
+      }
+      return [
+        ...current,
+        {
+          id: matchedCase.id,
+          projectKey: matchedCase.projectKey,
+          name: matchedCase.name,
+          status: matchedCase.status,
+          tags: matchedCase.tags,
+          updatedAt: matchedCase.updatedAt
+        }
+      ];
+    });
+
+    setLaunchForm((current) => ({
+      ...current,
+      projectKey: matchedCase.projectKey || current.projectKey
+    }));
+  }
+
+  function openAiGenerateFromDocParse(focus: AiGenerateFocus) {
+    setAiGenerateFocus(focus);
+    setActiveScreen("aiGenerate");
+  }
+
+  function openReportDetail(runName: string) {
+    setSelectedReportRunName(runName);
+    setActiveScreen("reportDetail");
+  }
+
+  function openDataDiff(runName?: string | null) {
+    if (runName) {
+      setSelectedReportRunName(runName);
+    }
+    setActiveScreen("dataDiff");
+  }
+
+  function handleScreenChange(screen: ScreenId) {
+    setActiveScreen(screen);
   }
 
   const navigationItems = screenOrder.map((screenId) => {
@@ -848,6 +1207,16 @@ export function App() {
     setSourceLabel(t(sharedCopy.sourceLocalApi));
     return payload;
   }
+
+  useEffect(() => {
+    if (!snapshot.reports.length) {
+      setSelectedReportRunName(null);
+      return;
+    }
+    setSelectedReportRunName((current) =>
+      current && snapshot.reports.some((item) => item.runName === current) ? current : snapshot.reports[0].runName
+    );
+  }, [snapshot.reports]);
 
   async function postSchedulerMutation(
     path: string,
@@ -1044,6 +1413,8 @@ export function App() {
 
   useEffect(() => {
     setModelConfigDraft(snapshot.modelConfig);
+    setModelProviders(parseModelProviders(snapshot.modelConfig));
+    setModelRoutingRules(parseModelRoutingRules(snapshot.modelConfig));
   }, [snapshot.modelConfig]);
 
   useEffect(() => {
@@ -1075,13 +1446,50 @@ export function App() {
     );
   }, [snapshot.cases]);
 
+  useEffect(() => {
+    setPreparedCases((current) =>
+      current.filter((prepared) => snapshot.cases.some((testCase) => testCase.id === prepared.id))
+    );
+  }, [snapshot.cases]);
+
+  useEffect(() => {
+    const defaultExecutionModel = modelProviders[0]?.model ?? "";
+    setLaunchForm((current) => ({
+      ...current,
+      executionModel: current.executionModel || defaultExecutionModel
+    }));
+    setReviewForm((current) => ({
+      ...current,
+      executionModel: current.executionModel || defaultExecutionModel
+    }));
+  }, [modelProviders]);
+
   function handleLaunchSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     void postSchedulerMutation(
       "/api/phase3/scheduler/requests",
-      launchForm,
+      {
+        ...launchForm,
+        status: "PRE_EXECUTION",
+        title: `${launchForm.runId} / ${launchForm.environment}`
+      },
       setLaunchState,
       formatCopy(t(sharedCopy.launchQueued), { runId: launchForm.runId, environment: launchForm.environment })
+    );
+  }
+
+  function handleExecuteSubmit() {
+    void postSchedulerMutation(
+      "/api/phase3/scheduler/events",
+      {
+        ...launchForm,
+        title: `${launchForm.runId} / ${launchForm.environment}`,
+        type: "STARTED",
+        state: "RUNNING",
+        status: "RUNNING"
+      },
+      setExecuteState,
+      formatCopy(t(sharedCopy.executionStarted), { runId: launchForm.runId })
     );
   }
 
@@ -1125,6 +1533,12 @@ export function App() {
       }))
       .filter((item) => item.label && item.value);
     void postConfigItems(path, normalizedItems, setState, successMessage);
+  }
+
+  function handleModelConfigSave() {
+    const items = buildModelConfigItems(modelProviders, modelRoutingRules);
+    setModelConfigDraft(items);
+    void postConfigItems("/api/phase3/config/model", items, setModelConfigState, t(sharedCopy.savedModelConfig));
   }
 
   function updateProjectDraft(index: number, key: keyof ProjectItem, value: string) {
@@ -1292,6 +1706,7 @@ export function App() {
             addCaseRowLabel={t(uiCopy.addCaseRow)}
             saveCaseCatalogLabel={t(uiCopy.saveCaseCatalog)}
             locale={locale}
+            onPrepareCase={handlePrepareCase}
             onCaseChange={updateCaseDraft}
             onAddCaseRow={addCaseDraftRow}
             onRemoveCaseRow={removeCaseDraftRow}
@@ -1299,16 +1714,34 @@ export function App() {
           />
         );
       case "docParse":
-        return <DocParseScreen snapshot={snapshot} title={t(localizedScreenCopy.docParse.title)} locale={locale} />;
+        return (
+          <DocParseScreen
+            snapshot={snapshot}
+            title={t(localizedScreenCopy.docParse.title)}
+            locale={locale}
+            onOpenAiGenerate={openAiGenerateFromDocParse}
+          />
+        );
       case "aiGenerate":
-        return <AiGenerateScreen snapshot={snapshot} title={t(localizedScreenCopy.aiGenerate.title)} locale={locale} />;
+        return (
+          <AiGenerateScreen
+            snapshot={snapshot}
+            title={t(localizedScreenCopy.aiGenerate.title)}
+            locale={locale}
+            focus={aiGenerateFocus}
+          />
+        );
       case "execution":
         return (
           <ExecutionScreen
             snapshot={snapshot}
             launchForm={launchForm}
             reviewForm={reviewForm}
+            preparedCases={preparedCases}
+            dataTemplates={defaultDataTemplates}
+            selectedTemplateIds={selectedExecutionTemplateIds}
             launchState={launchState}
+            executeState={executeState}
             reviewState={reviewState}
             title={t(localizedScreenCopy.execution.title)}
             executionSaveHint={t(uiCopy.executionSaveHint)}
@@ -1318,16 +1751,25 @@ export function App() {
             fieldProjectLabel={t(uiCopy.fieldProject)}
             fieldOwnerLabel={t(uiCopy.fieldOwner)}
             fieldEnvironmentLabel={t(uiCopy.fieldEnvironment)}
+            fieldTargetUrlLabel={t(uiCopy.fieldTargetUrl)}
+            fieldExecutionModelLabel={t(uiCopy.fieldExecutionModel)}
             fieldDetailLabel={t(uiCopy.fieldDetail)}
             fieldAuditDetailLabel={t(uiCopy.fieldAuditDetail)}
-            startExecutionLabel={t(uiCopy.startExecution)}
+            runLabel={t(uiCopy.runAction)}
+            executionLabel={t(uiCopy.executionAction)}
             openAuditLabel={t(uiCopy.openAudit)}
             reviewSaveHint={t(uiCopy.reviewSaveHint)}
+            openMonitorLabel={t({ en: "Open Exec Monitor", zh: "打开 Exec Monitor", ja: "Exec Monitor を開く" })}
+            monitorLinkHint={t({ en: "Runtime handoff", zh: "运行期接力", ja: "ランタイム連携" })}
             locale={locale}
+            modelProviders={modelProviders}
             onLaunchFormChange={setLaunchForm}
             onReviewFormChange={setReviewForm}
+            onSelectedTemplateIdsChange={setSelectedExecutionTemplateIds}
             onLaunchSubmit={handleLaunchSubmit}
+            onExecuteSubmit={handleExecuteSubmit}
             onReviewSubmit={handleReviewSubmit}
+            onOpenMonitor={() => handleScreenChange("monitor")}
           />
         );
       case "monitor":
@@ -1338,33 +1780,35 @@ export function App() {
             snapshot={snapshot}
             reviewBoardLabel={t(uiCopy.reviewBoard)}
             reportListLabel={t(uiCopy.reportList)}
-            statusLabel={t(uiCopy.fieldStatus)}
-            runColumnLabel={t(uiCopy.runColumn)}
-            finishedAtColumnLabel={t(uiCopy.finishedAtColumn)}
-            entryColumnLabel={t(uiCopy.entryColumn)}
             locale={locale}
+            selectedRunName={selectedReportRunName}
+            onOpenDetail={openReportDetail}
           />
         );
       case "reportDetail":
-        return <ReportDetailScreen snapshot={snapshot} title={t(localizedScreenCopy.reportDetail.title)} locale={locale} />;
+        return (
+          <ReportDetailScreen
+            snapshot={snapshot}
+            title={t(localizedScreenCopy.reportDetail.title)}
+            locale={locale}
+            selectedRunName={selectedReportRunName}
+            onBackToReports={() => handleScreenChange("reports")}
+            onOpenDataDiff={() => openDataDiff(selectedReportRunName)}
+          />
+        );
       case "models":
         return (
-          <ConfigScreen
+          <ModelConfigScreen
             navigationLabel={navigationItems.find((item) => item.id === "models")?.label}
             title={t(localizedScreenCopy.models.title)}
             hint={t(uiCopy.modelSaveHint)}
-            items={modelConfigDraft}
+            providers={modelProviders}
+            routingRules={modelRoutingRules}
             state={modelConfigState}
-            setDraft={setModelConfigDraft}
-            setState={setModelConfigState}
-            path="/api/phase3/config/model"
-            successMessage={t(sharedCopy.savedModelConfig)}
             submitLabel={t(uiCopy.saveModelConfig)}
-            fieldLabelText={t(uiCopy.fieldLabel)}
-            fieldValueText={t(uiCopy.fieldValue)}
             locale={locale}
-            onConfigChange={updateConfigDraft}
-            onSubmit={handleConfigSubmit}
+            onProvidersChange={setModelProviders}
+            onSave={handleModelConfigSave}
           />
         );
       case "environments":
@@ -1388,9 +1832,23 @@ export function App() {
           />
         );
       case "dataDiff":
-        return <DataDiffScreen snapshot={snapshot} title={t(localizedScreenCopy.dataDiff.title)} locale={locale} />;
+        return (
+          <DataDiffScreen
+            snapshot={snapshot}
+            title={t(localizedScreenCopy.dataDiff.title)}
+            locale={locale}
+            selectedRunName={selectedReportRunName}
+          />
+        );
       case "dataTemplates":
-        return <DataTemplatesScreen snapshot={snapshot} title={t(localizedScreenCopy.dataTemplates.title)} locale={locale} />;
+        return (
+          <DataTemplatesScreen
+            snapshot={snapshot}
+            title={t(localizedScreenCopy.dataTemplates.title)}
+            locale={locale}
+            dataTemplates={defaultDataTemplates}
+          />
+        );
       case "plugin":
         return <PluginPopupScreen snapshot={snapshot} title={t(localizedScreenCopy.plugin.title)} locale={locale} />;
       default:
@@ -1422,7 +1880,7 @@ export function App() {
               navigation={navigationItems}
               activeScreen={activeScreen}
               locale={locale}
-              onScreenChange={setActiveScreen}
+              onScreenChange={handleScreenChange}
             />
 
             <main className="mainPanel">

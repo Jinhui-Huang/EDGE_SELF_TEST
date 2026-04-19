@@ -54,7 +54,7 @@
    - SCREENSHOT 已从 orchestrator 抽到 artifact-engine
 
 3. Phase 3 近况摘要：
-   -UI完全需要重构，应该类似常用的点击侧栏可切换操作页面的后台操作系统，同时支持中日英三语言切换，UIdemo必须参考docs/phase3/platform_and_edge_low_fidelity_wireframes.md
+   -UI完全需要重构，应该类似常用的点击侧栏可切换操作页面的后台操作系统，同时支持中日英三语言切换，UIdemo必须参考docs/phase3/platform_and_edge_low_fidelity_wireframes.md，禁止修改后台逻辑
    - local-admin-api 已提供本地快照读取与部分写入接口
    - admin-console 已支持调度写入、配置编辑、项目编辑、用例编辑
    - Edge popup 已接到 native-host 桥，不再直接调用本地 HTTP
@@ -125,31 +125,9 @@
      - 先从 `App.tsx` 抽 Frame、TopBar、Sidebar、Card 等通用组件
      - 再把 7 个现有 screen 拆文件
      - 再决定补更完整的 Phase 3 页面集，还是先补 project/case 管理深度
-9. 2026-04-19 admin-console 妯″潡鎷嗗垎瀹屾垚琛ュ厖璁板繂锛?
-   - `ui/admin-console/src/App.tsx` 鐜板湪涓昏淇濈暀 snapshot 鍔犺浇銆乨raft state銆丳OST 鎻愪氦娴佺▼銆乤ctive screen / locale / theme 缂栨帓
-   - 鏂板鍏变韩绫诲瀷鏂囦欢锛?`ui/admin-console/src/types.ts`
-   - 鏂板 tokens 鍏ュ彛锛?`ui/admin-console/src/tokens/shell.ts`锛屽厛鎵胯浇 sidebar shell 鐨?screen order / icon 鍏冩暟鎹?
-   - 鏂板 ui-kit 缁勪欢锛?
-     - `ui/admin-console/src/ui-kit/TopBar.tsx`
-     - `ui/admin-console/src/ui-kit/Sidebar.tsx`
-     - `ui/admin-console/src/ui-kit/ScreenHeader.tsx`
-     - `ui/admin-console/src/ui-kit/MutationStatus.tsx`
-   - 鏂板 screen 缁勪欢锛?
-     - `ui/admin-console/src/screens/DashboardScreen.tsx`
-     - `ui/admin-console/src/screens/ProjectsScreen.tsx`
-     - `ui/admin-console/src/screens/CasesScreen.tsx`
-     - `ui/admin-console/src/screens/ExecutionScreen.tsx`
-     - `ui/admin-console/src/screens/ReportsScreen.tsx`
-     - `ui/admin-console/src/screens/ConfigScreen.tsx`
-   - 鏈疆娌℃湁鏀?local-admin-api 鍗忚锛屽彧鍋氬墠绔粨鏋勯噸缁勶紱鐜版湁 6 涓?POST 鍐欐帴鍙ｅ叏閮ㄤ繚鎸佷笉鍙?
-   - 楠岃瘉宸查€氳繃锛?
-     - `npm test -- --run` in `ui/admin-console`
-     - `npm run build` in `ui/admin-console`
-   - 褰撳墠鏈畬鎴愶細 tokens 浠嶅亸杞伙紝backend snapshot 鏂囨鏈畬鏁村浗闄呭寲锛宲roject/case 浠嶇己 picker / archive filter / delete / richer validation锛岃繕鏈縼鍏?doc parse / AI generate / exec monitor / report detail 绛夊畬鏁?demo screens
-10. 2026-04-19 admin-console project/case 绠＄悊鍔犳繁琛ュ厖璁板繂
-   - `ui/admin-console/src/screens/ProjectsScreen.tsx` 宸叉敮鎸?catalog search銆乫ocus project rail銆乴inked cases panel銆乺emove row
-   - `ui/admin-console/src/screens/CasesScreen.tsx` 宸叉敮鎸?project filter銆乤rchived toggle銆乻tatus summary pills銆乸roject dropdown銆乺emove row
-   - `ui/admin-console/src/App.tsx` 鏂板 validation锛氱┖ catalog 涓嶅厑璁搞€乨uplicate project key 涓嶅厑璁搞€乨uplicate case id 涓嶅厑璁搞€乽nknown project key 涓嶅厑璁?
-   - 鏈疆娌℃湁鏀?`POST /api/phase3/catalog/project` 鍜?`POST /api/phase3/catalog/case` 鍗忚
-   - 楠岃瘉宸查€氳繃锛?`npm test -- --run` in `ui/admin-console`锛?`npm run build` in `ui/admin-console`
-   - 鍚庣画濡傛灉缁х画锛屼紭鍏堟柟鍚戞槸姝ｅ紡 delete/archive API锛屾垨缁х画娣卞寲 doc parse / AI generate / monitor / report detail
+12. 2026-04-19 Cases / Execution pre-execution UI refactor constraint
+   - Strict rule for the current stage: front-end UI refactor only.
+   - Do not modify any backend logic, backend contract, backend API behavior, native-host logic, or local-admin-api logic for this flow.
+   - `Cases` detail `Run` is redefined as `Pre-execution` in the UI flow only.
+   - `Execution` uses front-end state only to show prepared case count after `Run ID` + `Project` selection; clicking `Execution` starts the prepared UI flow only on the existing front-end wiring.
+   - This restriction must be followed strictly until the user explicitly reopens backend work.

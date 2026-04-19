@@ -32,6 +32,14 @@ const snapshot = {
       suites: 18,
       environments: 2,
       note: "locator review"
+    },
+    {
+      key: "member-center",
+      name: "member-center",
+      scope: "Profile flows",
+      suites: 9,
+      environments: 1,
+      note: "stable"
     }
   ],
   cases: [
@@ -42,6 +50,15 @@ const snapshot = {
       tags: ["smoke", "locator-repair-needed"],
       status: "ACTIVE",
       updatedAt: "2026-04-18 10:00",
+      archived: false
+    },
+    {
+      id: "member-profile-save",
+      projectKey: "member-center",
+      name: "Profile save",
+      tags: ["profile"],
+      status: "ACTIVE",
+      updatedAt: "2026-04-18 09:00",
       archived: false
     }
   ],
@@ -59,6 +76,12 @@ const snapshot = {
       status: "FAILED",
       finishedAt: "2026-04-18 09:10",
       entry: "Failure analysis pending"
+    },
+    {
+      runName: "member-center-daily",
+      status: "SUCCESS",
+      finishedAt: "2026-04-18 08:30",
+      entry: "5 artifacts exported"
     }
   ],
   modelConfig: [{ label: "Provider", value: "OpenAI Responses API" }],
@@ -118,9 +141,9 @@ describe("App", () => {
 
     render(<App />);
 
-    await userEvent.click(await screen.findByRole("button", { name: /Execution/ }));
-    const [startExecutionButton] = await screen.findAllByRole("button", { name: "Start execution" });
-    await userEvent.click(startExecutionButton);
+    await userEvent.click((await screen.findAllByRole("button", { name: /Execution/ }))[0]);
+    const [runButton] = await screen.findAllByRole("button", { name: "Run" });
+    await userEvent.click(runButton);
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
@@ -130,8 +153,75 @@ describe("App", () => {
         })
       );
     });
-    expect(await screen.findByText("Queued checkout-web-smoke for prod-like.")).toBeInTheDocument();
-    expect(await screen.findByText("In progress")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://127.0.0.1:8787/api/phase3/scheduler/requests",
+      expect.objectContaining({
+        body: expect.stringContaining("\"status\":\"PRE_EXECUTION\"")
+      })
+    );
+    expect(await screen.findByText("Prepared checkout-web-smoke for pre-execution in prod-like.")).toBeInTheDocument();
+    expect((await screen.findAllByText("In progress")).length).toBeGreaterThan(0);
+  });
+
+  it("starts formal execution from the Execution action", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockImplementationOnce(() => jsonResponse(snapshot))
+      .mockImplementationOnce(() => jsonResponse({ status: "ACCEPTED" }, 202))
+      .mockImplementationOnce(() => jsonResponse(snapshot))
+      .mockImplementationOnce(() => jsonResponse({ status: "ACCEPTED" }, 202))
+      .mockImplementationOnce(() =>
+        jsonResponse({
+          ...snapshot,
+          workQueue: [
+            {
+              title: "checkout-web-smoke / prod-like",
+              owner: "qa-platform",
+              state: "In progress",
+              detail: "Worker slot active"
+            }
+          ]
+        })
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    await userEvent.click(await screen.findByRole("button", { name: /Cases/ }));
+    await userEvent.click((await screen.findAllByRole("button", { name: "Detail" }))[0]);
+    await userEvent.click(await screen.findByRole("button", { name: "Pre-execution" }));
+
+    await userEvent.click((await screen.findAllByRole("button", { name: /Execution/ }))[0]);
+    const executionButtons = await screen.findAllByRole("button", { name: "Execution" });
+    await userEvent.click(executionButtons[executionButtons.length - 1]);
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "http://127.0.0.1:8787/api/phase3/scheduler/events",
+        expect.objectContaining({
+          method: "POST",
+          body: expect.stringContaining("\"status\":\"RUNNING\"")
+        })
+      );
+    });
+    expect(await screen.findByText("Execution started for checkout-web-smoke.")).toBeInTheDocument();
+  });
+
+  it("shows prepared case count in Execution after pre-execution from Cases", async () => {
+    const fetchMock = vi.fn().mockImplementation(() => jsonResponse(snapshot));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    await userEvent.click(await screen.findByRole("button", { name: /Cases/ }));
+    await userEvent.click((await screen.findAllByRole("button", { name: "Detail" }))[0]);
+    await userEvent.click(await screen.findByRole("button", { name: "Pre-execution" }));
+
+    await userEvent.click((await screen.findAllByRole("button", { name: /Execution/ }))[0]);
+
+    expect((await screen.findAllByText("Prepared cases")).length).toBeGreaterThan(0);
+    expect(await screen.findByText("1 prepared case will start when you click Execution.")).toBeInTheDocument();
+    expect(await screen.findByText("Checkout smoke")).toBeInTheDocument();
   });
 
   it("posts editable config updates and refreshes the snapshot", async () => {
@@ -173,6 +263,7 @@ describe("App", () => {
       .fn()
       .mockImplementationOnce(() => jsonResponse(snapshot))
       .mockImplementationOnce(() => jsonResponse({ status: "ACCEPTED" }, 202))
+      .mockImplementationOnce(() => jsonResponse({ status: "ACCEPTED" }, 202))
       .mockImplementationOnce(() =>
         jsonResponse({
           ...snapshot,
@@ -184,6 +275,14 @@ describe("App", () => {
               suites: 18,
               environments: 3,
               note: "Updated through the local catalog API."
+            },
+            {
+              key: "member-center",
+              name: "member-center",
+              scope: "Profile flows",
+              suites: 9,
+              environments: 1,
+              note: "stable"
             }
           ]
         })
@@ -211,56 +310,47 @@ describe("App", () => {
     expect(await screen.findByDisplayValue("Payment journey / audited")).toBeInTheDocument();
   });
 
-  it("posts editable case catalog updates and refreshes the snapshot", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockImplementationOnce(() => jsonResponse(snapshot))
-      .mockImplementationOnce(() => jsonResponse({ status: "ACCEPTED" }, 202))
-      .mockImplementationOnce(() =>
-        jsonResponse({
-          ...snapshot,
-          cases: [
-            {
-              id: "checkout-smoke",
-              projectKey: "checkout-web",
-              name: "Checkout smoke / audited",
-              tags: ["smoke", "audit-ready"],
-              status: "NEEDS_REVIEW",
-              updatedAt: "2026-04-18 11:00",
-              archived: false
-            }
-          ],
-          caseTags: ["audit-ready", "smoke"]
-        })
-      );
+  it("opens case detail inside the Cases screen", async () => {
+    const fetchMock = vi.fn().mockImplementation(() => jsonResponse(snapshot));
     vi.stubGlobal("fetch", fetchMock);
 
     render(<App />);
 
     await userEvent.click(await screen.findByRole("button", { name: /Cases/ }));
-    const caseNameInputs = await screen.findAllByDisplayValue("Checkout smoke");
-    await userEvent.clear(caseNameInputs[0]);
-    await userEvent.type(caseNameInputs[0], "Checkout smoke / audited");
+    await userEvent.click((await screen.findAllByRole("button", { name: "Detail" }))[0]);
 
-    const tagInputs = await screen.findAllByDisplayValue("smoke, locator-repair-needed");
-    await userEvent.clear(tagInputs[0]);
-    await userEvent.type(tagInputs[0], "smoke, audit-ready");
+    expect(await screen.findByText("Case catalog")).toBeInTheDocument();
+    expect(await screen.findByText("Steps")).toBeInTheDocument();
+    expect(screen.getAllByText("Checkout smoke").length).toBeGreaterThan(0);
+  });
 
-    const statusInputs = await screen.findAllByDisplayValue("ACTIVE");
-    await userEvent.clear(statusInputs[0]);
-    await userEvent.type(statusInputs[0], "NEEDS_REVIEW");
+  it("keeps Cases detail inside the Cases screen", async () => {
+    const fetchMock = vi.fn().mockImplementation(() => jsonResponse(snapshot));
+    vi.stubGlobal("fetch", fetchMock);
 
-    await userEvent.click(screen.getByRole("button", { name: "Save case catalog" }));
+    render(<App />);
 
-    await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith(
-        "http://127.0.0.1:8787/api/phase3/catalog/case",
-        expect.objectContaining({
-          method: "POST"
-        })
-      );
-    });
-    expect(await screen.findByText("Saved case catalog.")).toBeInTheDocument();
-    expect(await screen.findByDisplayValue("Checkout smoke / audited")).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole("button", { name: /Cases/ }));
+    await userEvent.click((await screen.findAllByRole("button", { name: "Detail" }))[0]);
+
+    expect(await screen.findByText("Case catalog")).toBeInTheDocument();
+    expect(screen.getAllByText("Checkout smoke").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Document catalog")).not.toBeInTheDocument();
+  });
+
+  it("switches the Reports overview when clicking another project", async () => {
+    const fetchMock = vi.fn().mockImplementation(() => jsonResponse(snapshot));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    await userEvent.click(await screen.findByRole("button", { name: /Reports/ }));
+    expect(await screen.findByText("checkout-web-nightly")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /member-center/i }));
+
+    expect(await screen.findByText("member-center-daily")).toBeInTheDocument();
+    expect(screen.queryByText("checkout-web-nightly")).not.toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "member-center" })).toBeInTheDocument();
   });
 });
