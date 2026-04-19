@@ -91,6 +91,46 @@ const fallbackSnapshot: AdminConsoleSnapshot = {
       suites: 9,
       environments: 2,
       note: "Last two scheduled runs were stable"
+    },
+    {
+      key: "search-portal",
+      name: "search-portal",
+      scope: "Search and discovery flows",
+      suites: 14,
+      environments: 4,
+      note: "Search index sync delay under investigation"
+    },
+    {
+      key: "notification-hub",
+      name: "notification-hub",
+      scope: "Push and email notification pipeline",
+      suites: 7,
+      environments: 3,
+      note: "All scheduled runs stable this week"
+    },
+    {
+      key: "admin-portal",
+      name: "admin-portal",
+      scope: "Back-office admin management",
+      suites: 12,
+      environments: 5,
+      note: "New permission matrix coverage added last sprint"
+    },
+    {
+      key: "payment-gateway",
+      name: "payment-gateway",
+      scope: "Third-party payment integration",
+      suites: 20,
+      environments: 6,
+      note: "PCI scope review pending — 3 cases quarantined for audit"
+    },
+    {
+      key: "inventory-api",
+      name: "inventory-api",
+      scope: "Stock and warehouse sync API",
+      suites: 8,
+      environments: 2,
+      note: "Stock delta assertions updated after schema change"
     }
   ],
   cases: [
@@ -1188,6 +1228,7 @@ export function App() {
     }))
   );
   const [modelConfigState, setModelConfigState] = useState<MutationState>({ kind: "idle", message: "" });
+  const [modelTestState, setModelTestState] = useState<MutationState>({ kind: "idle", message: "" });
   const [environmentConfigState, setEnvironmentConfigState] = useState<MutationState>({ kind: "idle", message: "" });
   const [databaseTestState, setDatabaseTestState] = useState<MutationState>({ kind: "idle", message: "" });
   const [projectState, setProjectState] = useState<MutationState>({ kind: "idle", message: "" });
@@ -1638,6 +1679,20 @@ export function App() {
     void postConfigItems("/api/phase3/config/environment", payload, setEnvironmentConfigState, t(sharedCopy.savedEnvironmentConfig));
   }
 
+  function handleModelConnectionTest(item: ModelProvider) {
+    const label = item.name.trim() || item.model;
+    setModelTestState({ kind: "pending", message: `Testing connection for ${label}...` });
+    window.setTimeout(() => {
+      const passed = Boolean(item.endpoint.trim() && item.apiKey.trim() && item.model.trim());
+      setModelTestState({
+        kind: passed ? "success" : "error",
+        message: passed
+          ? `Connection check passed for ${label}.`
+          : `Connection check failed for ${label}. Fill endpoint, API key, and model id.`
+      });
+    }, 500);
+  }
+
   function handleDatabaseConnectionTest(item: DatabaseConfig) {
     const label = item.name.trim() || item.type;
     setDatabaseTestState({ kind: "pending", message: `Testing connection for ${label}...` });
@@ -1918,9 +1973,11 @@ export function App() {
             providers={modelProviders}
             routingRules={modelRoutingRules}
             state={modelConfigState}
+            testState={modelTestState}
             submitLabel={t(uiCopy.saveModelConfig)}
             locale={locale}
             onProvidersChange={setModelProviders}
+            onTestConnection={handleModelConnectionTest}
             onSave={handleModelConfigSave}
           />
         );

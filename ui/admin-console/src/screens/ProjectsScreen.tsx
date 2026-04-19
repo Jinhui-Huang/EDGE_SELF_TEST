@@ -1,4 +1,4 @@
-import { FormEvent, useMemo, useState } from "react";
+import { Fragment, FormEvent, useMemo, useState } from "react";
 import { sharedCopy, translate } from "../i18n";
 import { AdminConsoleSnapshot, Locale, MutationState, ProjectItem } from "../types";
 import { MutationStatus } from "../ui-kit/MutationStatus";
@@ -128,7 +128,7 @@ export function ProjectsScreen({
   const t = (value: { en: string; zh: string; ja: string }) => translate(locale, value);
   const [query, setQuery] = useState("");
   const [selectedProjectKey, setSelectedProjectKey] = useState(snapshot.projects[0]?.key ?? snapshot.cases[0]?.projectKey ?? "");
-  const [openedProjectKey, setOpenedProjectKey] = useState(snapshot.projects[0]?.key ?? "");
+  const [openedProjectKey, setOpenedProjectKey] = useState("");
 
   const projectCards = useMemo(() => buildProjectCards(snapshot, locale), [locale, snapshot]);
   const visibleProjects = useMemo(() => {
@@ -185,144 +185,158 @@ export function ProjectsScreen({
       </div>
 
       <div className="projectsCardGrid">
-        {visibleProjects.map((project) => {
-          const isOpened = openedProjectKey === project.key;
+        {(() => {
+          const COLS = 3;
+          const rows: ProjectCardModel[][] = [];
+          for (let i = 0; i < visibleProjects.length; i += COLS) {
+            rows.push(visibleProjects.slice(i, i + COLS));
+          }
 
-          return (
-            <article key={project.key} className={`projectsCardStack ${isOpened ? "isOpened" : ""}`}>
-              <div
-                className={`projectsDemoCard ${project.accentClass} ${selectedProjectKey === project.key ? "isSelected" : ""}`}
-                onClick={() => setSelectedProjectKey(project.key)}
-              >
-                <div className="projectsDemoCardStripe" />
-                <div className="projectsDemoIdentity">
-                  <div className="projectsDemoAvatar" aria-hidden="true">
-                    {project.name.slice(0, 1).toUpperCase()}
-                  </div>
-                  <div className="projectsDemoIdentityCopy">
-                    <h3>{project.name}</h3>
-                    <p>{project.description}</p>
-                  </div>
-                </div>
+          return rows.map((row, rowIndex) => (
+            <Fragment key={rowIndex}>
+              {row.map((project) => {
+                const isOpened = openedProjectKey === project.key;
+                return (
+                  <article key={project.key} className="projectsCardStack">
+                    <div
+                      className={`projectsDemoCard ${project.accentClass} ${isOpened ? "isOpened" : ""} ${selectedProjectKey === project.key ? "isSelected" : ""}`}
+                      onClick={() => setSelectedProjectKey(project.key)}
+                    >
+                      <div className="projectsDemoCardStripe" />
+                      <div className="projectsDemoIdentity">
+                        <div className="projectsDemoAvatar" aria-hidden="true">
+                          {project.name.slice(0, 1).toUpperCase()}
+                        </div>
+                        <div className="projectsDemoIdentityCopy">
+                          <h3>{project.name}</h3>
+                          <p>{project.description}</p>
+                        </div>
+                      </div>
 
-                <div className="projectsDemoMiniGrid">
-                  <div className="projectsDemoMiniCard">
-                    <span>{t(copy("Docs", "文档", "Docs"))}</span>
-                    <strong>{project.docs}</strong>
-                  </div>
-                  <div className="projectsDemoMiniCard">
-                    <span>{t(copy("Cases", "用例", "Cases"))}</span>
-                    <strong>{project.cases}</strong>
-                  </div>
-                  <div className="projectsDemoMiniCard">
-                    <span>{t(copy("Pass", "通过", "Pass"))}</span>
-                    <strong className={project.passRate > 90 ? "isPassGood" : "isPassWarn"}>{project.passRate}%</strong>
-                  </div>
-                </div>
+                      <div className="projectsDemoMiniGrid">
+                        <div className="projectsDemoMiniCard">
+                          <span>{t(copy("Docs", "文档", "ドキュメント"))}</span>
+                          <strong>{project.docs}</strong>
+                        </div>
+                        <div className="projectsDemoMiniCard">
+                          <span>{t(copy("Cases", "用例", "ケース"))}</span>
+                          <strong>{project.cases}</strong>
+                        </div>
+                        <div className="projectsDemoMiniCard">
+                          <span>{t(copy("Pass", "通过率", "合格率"))}</span>
+                          <strong className={project.passRate > 90 ? "isPassGood" : "isPassWarn"}>{project.passRate}%</strong>
+                        </div>
+                        <div className="projectsDemoMiniCard">
+                          <span>{t(copy("Envs", "环境数", "環境数"))}</span>
+                          <strong>{project.environments}</strong>
+                        </div>
+                        <div className="projectsDemoMiniCard">
+                          <span>{t(copy("Queue", "队列", "キュー"))}</span>
+                          <strong className="projectsDemoMiniTrunc" title={project.queueState}>{project.queueState}</strong>
+                        </div>
+                        <div className="projectsDemoMiniCard">
+                          <span>{t(copy("Last run", "最近运行", "最近の実行"))}</span>
+                          <strong className={`projectsDemoMiniTrunc ${/fail/i.test(project.latestReportStatus) ? "isPassWarn" : "isPassGood"}`} title={project.latestReportStatus}>
+                            {project.latestReportStatus}
+                          </strong>
+                        </div>
+                      </div>
 
-                <div className="projectsDemoActions">
-                  <button
-                    type="button"
-                    className="projectsDemoButton secondary"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      setSelectedProjectKey(project.key);
-                      setOpenedProjectKey((current) => (current === project.key ? "" : project.key));
-                    }}
-                  >
-                    {isOpened ? t(copy("Close", "收起", "Close")) : t(copy("Open", "打开", "Open"))}
-                  </button>
-                  <button
-                    type="button"
-                    className="projectsDemoButton ghost"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      setSelectedProjectKey(project.key);
-                      setOpenedProjectKey(project.key);
-                    }}
-                  >
-                    {t(copy("Reports", "报告", "Reports"))}
-                  </button>
-                  <span className="projectsDemoTimestamp">{project.updatedAgo}</span>
-                </div>
-              </div>
+                      <div className="projectsDemoActions">
+                        <button
+                          type="button"
+                          className="projectsDemoButton secondary"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setSelectedProjectKey(project.key);
+                            setOpenedProjectKey((current) => (current === project.key ? "" : project.key));
+                          }}
+                        >
+                          {isOpened ? t(copy("Close", "收起", "Close")) : t(copy("Open", "打开", "Open"))}
+                        </button>
+                        <button
+                          type="button"
+                          className="projectsDemoButton ghost"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setSelectedProjectKey(project.key);
+                            setOpenedProjectKey(project.key);
+                          }}
+                        >
+                          {t(copy("Reports", "报告", "Reports"))}
+                        </button>
+                        <span className="projectsDemoTimestamp">{project.updatedAgo}</span>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
 
-              {isOpened ? (
-                <section className={`projectInlineDetail ${project.accentClass}`} aria-label={`${project.name} detail`}>
-                  <div className="projectInlineDetailHero">
-                    <div>
-                      <span className="projectInlineEyebrow">{t(copy("Project detail", "项目详情", "Project detail"))}</span>
-                      <h3>{project.name}</h3>
-                      <p>{project.note}</p>
+              {row.some((p) => p.key === openedProjectKey) && openedProject ? (
+                <section
+                  className={`projectFullDetail ${openedProject.accentClass}`}
+                  aria-label={`${openedProject.name} detail`}
+                >
+                  <div className="projectFullDetailHero">
+                    <div className="projectFullDetailHeroCopy">
+                      <span className="projectInlineEyebrow">{t(copy("Project detail", "项目详情", "プロジェクト詳細"))}</span>
+                      <h3 className="projectFullDetailTitle">{openedProject.name}</h3>
+                      <p className="projectFullDetailNote">{openedProject.note}</p>
                     </div>
                     <div className="projectInlineHeroActions">
                       <button type="button" className="projectsDemoButton secondary">
-                        {t(copy("Enter project", "进入项目", "Enter project"))}
+                        {t(copy("Enter project", "进入项目", "プロジェクトへ"))}
                       </button>
                       <button type="button" className="projectsDemoButton ghost">
-                        {t(copy("View reports", "查看报告", "View reports"))}
+                        {t(copy("View reports", "查看报告", "レポートを見る"))}
                       </button>
                     </div>
                   </div>
 
-                  <div className="projectInlineSummary">
+                  <div className="projectFullDetailSummary">
                     <div className="projectInlineSummaryCard">
-                      <span>{t(copy("Project info", "项目基本信息", "Project info"))}</span>
-                      <strong>{project.description}</strong>
+                      <span>{t(copy("Project info", "项目基本信息", "プロジェクト情報"))}</span>
+                      <strong>{openedProject.description}</strong>
                       <small>
-                        {t(copy("Key", "项目 Key", "Key"))}: {project.key} · {t(copy("Environments", "环境数", "Environments"))}:{" "}
-                        {project.environments}
+                        {t(copy("Key", "项目 Key", "キー"))}: {openedProject.key} · {t(copy("Environments", "环境数", "環境数"))}:{" "}
+                        {openedProject.environments}
                       </small>
                     </div>
                     <div className="projectInlineSummaryCard">
-                      <span>{t(copy("Docs entry", "文档入口", "Docs entry"))}</span>
-                      <strong>{project.docs}</strong>
-                      <small>{t(copy("Uploaded docs and parse workbench", "已上传文档与解析入口", "Uploaded docs and parse workbench"))}</small>
+                      <span>{t(copy("Docs entry", "文档入口", "ドキュメント"))}</span>
+                      <strong>{openedProject.docs}</strong>
+                      <small>{t(copy("Uploaded docs and parse workbench", "已上传文档与解析入口", "アップロード済みドキュメント"))}</small>
                     </div>
                     <div className="projectInlineSummaryCard">
-                      <span>{t(copy("Cases entry", "用例入口", "Cases entry"))}</span>
-                      <strong>{project.latestCaseName}</strong>
-                      <small>{project.latestCaseUpdatedAt}</small>
+                      <span>{t(copy("Cases entry", "用例入口", "ケース"))}</span>
+                      <strong className="projectFullDetailTrunc" title={openedProject.latestCaseName}>{openedProject.latestCaseName}</strong>
+                      <small>{openedProject.latestCaseUpdatedAt}</small>
                     </div>
-                  </div>
-
-                  <div className="projectInlineModuleGrid">
-                    <article className="projectInlineModule">
-                      <span>{t(copy("Execution entry", "执行入口", "Execution entry"))}</span>
-                      <strong>{project.queueState}</strong>
-                      <p>{project.queueDetail}</p>
-                    </article>
-                    <article className="projectInlineModule">
-                      <span>{t(copy("Reports entry", "报告入口", "Reports entry"))}</span>
-                      <strong>{project.latestReportName}</strong>
-                      <p>
-                        {project.latestReportStatus} · {project.latestReportFinishedAt}
-                      </p>
-                    </article>
-                    <article className="projectInlineModule">
-                      <span>{t(copy("Config entry", "配置入口", "Config entry"))}</span>
-                      <strong>{project.configSummary}</strong>
-                      <p>{t(copy("Model and environment policies stay in the same platform frame.", "模型与环境策略保持在同一平台框架内。", "モデルと環境ポリシーは同じプラットフォーム枠に維持されます。"))}</p>
-                    </article>
-                  </div>
-
-                  <div className="projectInlineFooter">
-                    <div className="projectInlineTags">
-                      {project.tags.length ? (
-                        project.tags.map((tag) => <span key={tag}>{tag}</span>)
-                      ) : (
-                        <span>{t(copy("No tags", "暂无标签", "No tags"))}</span>
-                      )}
+                    <div className="projectInlineSummaryCard">
+                      <span>{t(copy("Execution entry", "执行入口", "実行"))}</span>
+                      <strong className="projectFullDetailTrunc" title={openedProject.queueState}>{openedProject.queueState}</strong>
+                      <small className="projectFullDetailTrunc" title={openedProject.queueDetail}>{openedProject.queueDetail}</small>
                     </div>
-                    <span className="projectInlinePassRate">
-                      {t(copy("Weekly pass rate", "本周通过率", "Weekly pass rate"))}: {project.passRate}%
-                    </span>
+                    <div className="projectInlineSummaryCard">
+                      <span>{t(copy("Reports entry", "报告入口", "レポート"))}</span>
+                      <strong className="projectFullDetailTrunc" title={openedProject.latestReportName}>{openedProject.latestReportName}</strong>
+                      <small>{openedProject.latestReportStatus} · {openedProject.latestReportFinishedAt}</small>
+                    </div>
+                    <div className="projectInlineSummaryCard">
+                      <span>{t(copy("Pass rate", "通过率", "合格率"))}</span>
+                      <strong className={openedProject.passRate > 90 ? "isPassGood" : "isPassWarn"}>{openedProject.passRate}%</strong>
+                      <small>
+                        {openedProject.tags.length
+                          ? openedProject.tags.join(" · ")
+                          : t(copy("No tags", "暂无标签", "タグなし"))}
+                      </small>
+                    </div>
                   </div>
                 </section>
               ) : null}
-            </article>
-          );
-        })}
+            </Fragment>
+          ));
+        })()}
       </div>
 
       {!visibleProjects.length ? (

@@ -135,7 +135,15 @@ export function DataDiffScreen({ snapshot, title, locale, selectedRunName }: Dat
   const unexpectedChanges = rows.length - expectedChanges;
   const restoredCount = rows.filter((row) => row.restored).length;
   const affectedTables = new Set(rows.map((row) => row.table)).size;
-  const comparisonPlan = snapshot.environmentConfig[0]?.value ?? "plan.inv.delta";
+
+  const dbName = (() => {
+    try {
+      const raw = snapshot.environmentConfig[0]?.value ?? "";
+      return (JSON.parse(raw) as { name?: string }).name ?? raw.split(":")[1] ?? "-";
+    } catch {
+      return snapshot.environmentConfig[0]?.label?.split(":")[1] ?? "-";
+    }
+  })();
 
   return (
     <div className="dataDiffScreen">
@@ -150,15 +158,20 @@ export function DataDiffScreen({ snapshot, title, locale, selectedRunName }: Dat
       <section className="dataDiffHero">
         <div className="dataDiffHeroMain">
           <h2>{l(locale, "Data diff - orders & inventory", "数据差异 - 订单与库存", "データ差分 - 注文と在庫")}</h2>
-          <p>
-            {l(locale, "Comparison plan:", "对比方案：", "比較プラン:")} {comparisonPlan}
-            {" | "}
-            {l(locale, `${rows.length} changes detected`, `检测到 ${rows.length} 项变更`, `${rows.length} 件の変更を検出`)}
-            {" | "}
-            {l(locale, `${expectedChanges} expected`, `${expectedChanges} 项符合预期`, `${expectedChanges} 件が想定内`)}
-            {" | "}
-            {l(locale, `${unexpectedChanges} unexpected`, `${unexpectedChanges} 项非预期`, `${unexpectedChanges} 件が想定外`)}
-          </p>
+          <div className="dataDiffPlanMeta">
+            <span>
+              <i>{l(locale, "DB", "数据库", "DB")}</i>
+              <strong>{dbName}</strong>
+            </span>
+            <span>
+              <i>{l(locale, "Project", "项目", "プロジェクト")}</i>
+              <strong>{report.projectName}</strong>
+            </span>
+            <span>
+              <i>{l(locale, "Case", "用例", "ケース")}</i>
+              <strong>{report.caseName}</strong>
+            </span>
+          </div>
         </div>
         <div className="dataDiffHeroActions">
           <button type="button" className="reportsActionButton ghost">
