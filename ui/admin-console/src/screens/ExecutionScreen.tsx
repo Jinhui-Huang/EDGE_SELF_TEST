@@ -173,7 +173,7 @@ export function ExecutionScreen({
           <p>{t(copy("Bind run id, project, prepared cases, and data compare templates before starting execution.", "执行前先绑定 Run ID、项目、预执行用例和对比数据模板。", "実行前に Run ID、プロジェクト、事前実行ケース、比較テンプレートを確定します。"))}</p>
         </div>
         <div className="executionConsoleHeadActions">
-          <button type="button" className="projectsActionButton" onClick={onOpenMonitor}>
+          <button type="button" className="projectsActionButton executionMonitorButton" onClick={onOpenMonitor}>
             {openMonitorLabel}
           </button>
           <button type="button" className="projectsActionButton">
@@ -393,7 +393,7 @@ export function ExecutionScreen({
               <small>{queueLead?.detail ?? ""}</small>
             </article>
           </div>
-          <button type="button" className="projectsActionButton" onClick={onOpenMonitor}>
+          <button type="button" className="projectsActionButton executionReadinessButton" onClick={onOpenMonitor}>
             {openMonitorLabel}
           </button>
         </section>

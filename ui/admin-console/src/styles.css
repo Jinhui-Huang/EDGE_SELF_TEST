@@ -6,10 +6,9 @@
 
 .dataTemplatesDemoScreen,
 .executionConsoleScreen {
-  height: 100%;
   display: flex;
   flex-direction: column;
-  min-height: 0;
+  min-height: fit-content;
   gap: 14px;
 }
 
@@ -420,16 +419,17 @@
 }
 
 .executionConsoleGrid {
-  flex: 1;
-  min-height: 0;
   display: grid;
   grid-template-columns: 1.12fr 0.8fr 0.84fr;
   gap: 14px;
+  align-items: stretch;
 }
 
 .executionConsolePanel {
   display: flex;
   flex-direction: column;
+  height: 100%;
+  overflow: visible;
 }
 
 .executionConsolePanelHead {
@@ -572,6 +572,7 @@
 .executionCompareList {
   display: grid;
   gap: 10px;
+  grid-auto-rows: 1fr;
   padding: 0 14px 14px;
 }
 
@@ -582,6 +583,8 @@
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--surface-2);
+  min-height: 96px;
+  height: 100%;
 }
 
 .executionPreparedCaseCard {
@@ -615,6 +618,7 @@
 .executionChecklistGrid {
   display: grid;
   gap: 10px;
+  grid-auto-rows: 1fr;
   padding: 14px;
 }
 
@@ -628,6 +632,7 @@
   display: grid;
   grid-template-columns: 1.05fr 0.95fr 0.9fr;
   gap: 14px;
+  align-items: stretch;
 }
 
 .executionCompareCard {
@@ -671,6 +676,18 @@
 
 .executionQueueRow {
   padding: 12px;
+}
+
+.executionMonitorButton {
+  width: fit-content;
+  align-self: flex-start;
+}
+
+.executionReadinessButton {
+  display: inline-flex;
+  width: fit-content;
+  margin: 0 14px 10px;
+  align-self: flex-start;
 }
 
 @media (max-width: 1280px) {
