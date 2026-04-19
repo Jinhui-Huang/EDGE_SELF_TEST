@@ -634,7 +634,7 @@
 
 .executionConsoleBottomGrid {
   display: grid;
-  grid-template-columns: 1.05fr 0.95fr 0.9fr;
+  grid-template-columns: 1fr 1fr;
   gap: 14px;
   align-items: stretch;
   grid-auto-rows: 1fr;

@@ -425,37 +425,6 @@ export function ExecutionScreen({
       <div className="executionConsoleBottomGrid">
         <section className="executionConsolePanel">
           <div className="executionConsolePanelHead">
-            <strong>{t(copy("Template compare"))}</strong>
-            <span>{selectedTemplates.length}</span>
-          </div>
-          <div className="executionCompareList">
-            {selectedTemplates.length ? (
-              selectedTemplates.map((template) => (
-                <article key={template.id} className="executionCompareCard">
-                  <div className="executionCompareHead">
-                    <strong className="dataTemplatesMono">{template.name}</strong>
-                    <span>{template.rollback}</span>
-                  </div>
-                  <div className="executionCompareTimeline">
-                    <div>
-                      <span>{t(copy("Before"))}</span>
-                      <p>{template.compareSummary}</p>
-                    </div>
-                    <div>
-                      <span>{t(copy("After"))}</span>
-                      <p>{t(copy("Capture delta result and attach it to the run review."))}</p>
-                    </div>
-                  </div>
-                </article>
-              ))
-            ) : (
-              <div className="executionPreparedEmptyState">{t(copy("Select one or more templates from the dropdown above."))}</div>
-            )}
-          </div>
-        </section>
-
-        <section className="executionConsolePanel">
-          <div className="executionConsolePanelHead">
             <strong>{queueBoardLabel}</strong>
             <span>{snapshot.workQueue.length}</span>
           </div>

@@ -116,15 +116,12 @@
    - 验证已通过：
      - `npm test -- --run` in `ui/admin-console`
      - `npm run build` in `ui/admin-console`
-   - 还没完成：
-     - 还未正式拆成 `Frame` / `ui-kit` / `screens` 多文件
-     - snapshot 里的业务文案还未完整国际化
-     - 还未迁入 doc parse / AI generate / exec monitor / report detail 等完整 demo 屏幕
-     - project / case 管理仍缺 delete / archive filter / picker / richer validation
-   - 后续继续 UI 时，优先顺序改为：
-     - 先从 `App.tsx` 抽 Frame、TopBar、Sidebar、Card 等通用组件
-     - 再把 7 个现有 screen 拆文件
-     - 再决定补更完整的 Phase 3 页面集，还是先补 project/case 管理深度
+   - 已完成（截至 2026-04-19）：
+     - 已正式拆成 `Frame` / `ui-kit` / `screens` 多文件
+     - 已迁入 doc parse / AI generate / exec monitor / report detail 等完整 demo 屏幕
+     - project / case 管理 delete / archive filter / picker / richer validation 已完成
+   - 仍未完成：
+     - snapshot 里的业务文案部分未完整国际化（其余均已完成）
 12. 2026-04-19 Cases / Execution pre-execution UI refactor constraint
    - Strict rule for the current stage: front-end UI refactor only.
    - Do not modify any backend logic, backend contract, backend API behavior, native-host logic, or local-admin-api logic for this flow.
