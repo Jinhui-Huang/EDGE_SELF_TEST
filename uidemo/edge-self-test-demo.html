@@ -1,0 +1,2132 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>EDGE_SELF_TEST · Platform UI v2 (Interactive Demo)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+<style>
+  html, body { margin: 0; padding: 0; background: #0e0d0a; font-family: 'Geist', system-ui, sans-serif; overflow: hidden; }
+  * { box-sizing: border-box; }
+  #root { width: 100vw; height: 100vh; overflow: hidden; }
+
+  .shell { display: flex; flex-direction: column; width: 100vw; height: 100vh; }
+  .toolbar {
+    flex-shrink: 0; height: 44px; padding: 0 16px;
+    display: flex; align-items: center; gap: 12px;
+    background: rgba(20,18,14,0.96); color: #e8e3d6;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    font-size: 12px; z-index: 50;
+  }
+  .toolbar .dot { width: 8px; height: 8px; border-radius: 50%; background: #ff5f57; }
+  .toolbar .dot.y { background: #febc2e; }
+  .toolbar .dot.g { background: #28c840; }
+  .toolbar .brand { font-weight: 600; letter-spacing: -0.01em; }
+  .toolbar .sep { flex: 1; }
+  .toolbar select, .toolbar button {
+    font-family: inherit; font-size: 12px; padding: 5px 10px; border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04);
+    color: #e8e3d6; cursor: pointer; outline: none;
+    transition: background 120ms;
+  }
+  .toolbar select:hover, .toolbar button:hover { background: rgba(255,255,255,0.08); }
+  .toolbar label { color: #a8a193; margin-right: 4px; }
+
+  .stage { flex: 1; display: flex; min-height: 0; }
+  .scaler {
+    flex: 1; min-width: 0; min-height: 0;
+    display: flex; align-items: center; justify-content: center;
+    overflow: auto; padding: 16px;
+  }
+  .artboard-wrap { transform-origin: center center; }
+  .artboard {
+    width: 1440px; height: 900px;
+    box-shadow: 0 18px 60px rgba(0,0,0,0.4), 0 4px 14px rgba(0,0,0,0.25);
+    border-radius: 6px; overflow: hidden; position: relative;
+    background: #fff;
+  }
+  /* Scrollbar */
+  .scaler::-webkit-scrollbar { width: 10px; height: 10px; }
+  .scaler::-webkit-scrollbar-track { background: transparent; }
+  .scaler::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 5px; }
+  .scaler::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }
+
+  @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: 0.5 } }
+  @keyframes blink { 0%,100% { opacity: 1 } 50% { opacity: 0.35 } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone@7.25.6/babel.min.js" crossorigin></script>
+
+<script type="text/babel" data-presets="react">
+/* ============================================================
+ *  EDGE_SELF_TEST — Platform UI v2 (Interactive Demo)
+ *  单文件可交互演示 · 适合 React 接入
+ *
+ *  如何迁移到 React 项目：
+ *   1. 将 LIGHT / DARK / FONT / ThemeContext / useTheme / L() 拆到
+ *      src/theme.ts（直接导出即可）
+ *   2. 将 Logo / TopBar / Sidebar / Card / Button / Badge / Tabs / Ring /
+ *      BrowserChrome / CodeBlock 等拆到 src/components/ui-kit/
+ *   3. 将 ScreenDashboard / ScreenProjects / ... 等 11 个屏拆到
+ *      src/screens/ — 每屏独立文件，props 只依赖 useTheme()
+ *   4. Frame 是通用外壳（TopBar + Sidebar + children），建议保留为
+ *      src/components/Frame.tsx
+ *   5. 主题、语言全部通过 ThemeContext 传递；sidebar 通过 setScreen
+ *      抬升状态 —— 直接迁到 Zustand/Redux/Context 均可
+ *
+ *  本文件所有组件都是纯函数、仅依赖 useTheme() hook，
+ *  没有全局副作用 —— 复制粘贴即用。
+ * ============================================================ */
+
+const { useState, useEffect, useRef, useCallback, useContext, createContext, Fragment } = React;
+
+// ─────────────────────────────────────────────────────────────
+// 1) 设计 Tokens（Theme） — 浅色 / 深色
+// ─────────────────────────────────────────────────────────────
+const LIGHT = {
+  bg: '#F7F5F0',
+  surface: '#FFFFFF',
+  surface2: '#FAF8F3',
+  border: '#E8E3D8',
+  borderStrong: '#D4CEC0',
+  text: '#1A1814',
+  textMid: '#5C574D',
+  textDim: '#8A8578',
+  accent:       'oklch(72% 0.14 260)',
+  accentSoft:   'oklch(92% 0.05 260)',
+  accent2:      'oklch(72% 0.14 160)',
+  accent2Soft:  'oklch(92% 0.05 160)',
+  accent3:      'oklch(72% 0.14 40)',
+  accent3Soft:  'oklch(92% 0.05 40)',
+  accent4:      'oklch(72% 0.14 320)',
+  success:      'oklch(62% 0.14 150)',
+  warning:      'oklch(72% 0.14 70)',
+  danger:       'oklch(62% 0.18 25)',
+  shadow:   '0 1px 2px rgba(26,24,20,0.04), 0 8px 24px rgba(26,24,20,0.06)',
+  shadowLg: '0 8px 32px rgba(26,24,20,0.1), 0 2px 8px rgba(26,24,20,0.06)',
+};
+const DARK = {
+  bg: '#15140F',
+  surface: '#1E1C16',
+  surface2: '#24221B',
+  border: '#332F25',
+  borderStrong: '#47422F',
+  text: '#F5F1E6',
+  textMid: '#A8A193',
+  textDim: '#6E685B',
+  accent:       'oklch(75% 0.14 260)',
+  accentSoft:   'oklch(28% 0.06 260)',
+  accent2:      'oklch(75% 0.14 160)',
+  accent2Soft:  'oklch(28% 0.06 160)',
+  accent3:      'oklch(75% 0.14 40)',
+  accent3Soft:  'oklch(28% 0.06 40)',
+  accent4:      'oklch(75% 0.14 320)',
+  success:      'oklch(70% 0.14 150)',
+  warning:      'oklch(78% 0.14 70)',
+  danger:       'oklch(68% 0.18 25)',
+  shadow:   '0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35)',
+  shadowLg: '0 8px 32px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.3)',
+};
+const FONT = {
+  sans: '"Geist", "Inter", -apple-system, system-ui, sans-serif',
+  mono: '"Geist Mono", "JetBrains Mono", ui-monospace, monospace',
+};
+
+// 双语工具
+const L = (dict, lang) => {
+  if (!dict) return '';
+  if (typeof dict === 'string') return dict;
+  return dict[lang] || dict.en || dict.zh || '';
+};
+
+const ThemeContext = createContext({ theme: LIGHT, mode: 'light', lang: 'zh', screen: 'dashboard', setScreen: () => {} });
+const useTheme = () => useContext(ThemeContext);
+
+// ─────────────────────────────────────────────────────────────
+// 2) UI Kit — 复用组件
+// ─────────────────────────────────────────────────────────────
+function Logo({ size = 28 }) {
+  const { theme } = useTheme();
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div style={{
+        width: size, height: size, borderRadius: size * 0.3,
+        background: `conic-gradient(from 220deg, ${theme.accent}, ${theme.accent2}, ${theme.accent3}, ${theme.accent})`,
+        position: 'relative', boxShadow: `0 2px 8px ${theme.accent}40`,
+      }}>
+        <div style={{ position: 'absolute', inset: size * 0.22, background: theme.surface, borderRadius: size * 0.14 }}/>
+        <div style={{ position: 'absolute', inset: size * 0.35, background: theme.accent, borderRadius: '50%' }}/>
+      </div>
+      <div style={{ fontFamily: FONT.mono, fontSize: size * 0.5, fontWeight: 600, color: theme.text, letterSpacing: '-0.02em' }}>
+        edge<span style={{ color: theme.accent }}>.</span>test
+      </div>
+    </div>
+  );
+}
+
+function Divider({ v }) {
+  const { theme } = useTheme();
+  return v
+    ? <div style={{ width: 1, height: 20, background: theme.border }}/>
+    : <div style={{ height: 1, background: theme.border, margin: '8px 0' }}/>;
+}
+
+function Pill({ children, color, icon, style }) {
+  const { theme } = useTheme();
+  return (
+    <div style={{
+      display: 'inline-flex', alignItems: 'center', gap: 6,
+      padding: '4px 10px', background: theme.surface2,
+      border: `1px solid ${theme.border}`, borderRadius: 999,
+      fontSize: 12, color: theme.textMid, fontFamily: FONT.sans,
+      ...style,
+    }}>
+      {icon && <span style={{ color, fontSize: 10 }}>{icon}</span>}
+      {children}
+    </div>
+  );
+}
+
+function SearchBar({ placeholder, value }) {
+  const { theme } = useTheme();
+  return (
+    <div style={{
+      height: 34, maxWidth: 380,
+      display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px',
+      background: theme.surface2, border: `1px solid ${theme.border}`,
+      borderRadius: 8, fontSize: 13, color: theme.textDim,
+    }}>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>
+      </svg>
+      {value || placeholder}
+    </div>
+  );
+}
+
+function IconBtn({ children }) {
+  const { theme } = useTheme();
+  return (
+    <div style={{
+      width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
+      borderRadius: 8, color: theme.textMid, fontSize: 14, cursor: 'pointer',
+    }}>{children}</div>
+  );
+}
+
+function Avatar({ name = 'U', color }) {
+  const { theme } = useTheme();
+  const bg = color || theme.accent3;
+  const initials = name.split(/[\s.]/).filter(Boolean).slice(0, 2).map(s => s[0]).join('').toUpperCase();
+  return (
+    <div style={{
+      width: 30, height: 30, borderRadius: '50%', background: bg,
+      color: '#fff', fontWeight: 600, fontSize: 11,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>{initials}</div>
+  );
+}
+
+function TopBar({ project = 'ACME Web App', env = 'staging' }) {
+  const { theme, lang } = useTheme();
+  return (
+    <div style={{
+      height: 56, background: theme.surface,
+      borderBottom: `1px solid ${theme.border}`,
+      display: 'flex', alignItems: 'center', padding: '0 20px', gap: 16, flexShrink: 0,
+    }}>
+      <Logo size={26}/>
+      <Divider v/>
+      <Pill icon="●" color={theme.accent}>{project}</Pill>
+      <Pill icon="▸" color={theme.accent2}>{L({ en: 'env', zh: '环境' }, lang)}: <b>{env}</b></Pill>
+      <div style={{ flex: 1 }}>
+        <SearchBar placeholder={L({ en: 'Search projects, cases, runs…', zh: '搜索项目、用例、运行…' }, lang)}/>
+      </div>
+      <IconBtn>🔔</IconBtn>
+      <Avatar name="L.Chen"/>
+    </div>
+  );
+}
+
+// 分组侧边栏 — 11 屏导航
+const NAV_GROUPS = [
+  {
+    gEn: 'Main platform', gZh: '主平台',
+    items: [
+      { key: 'dashboard',  en: 'Dashboard',    zh: '仪表盘',   icon: '◐' },
+      { key: 'projects',   en: 'Projects',     zh: '项目列表', icon: '▦' },
+      { key: 'case',       en: 'Case detail',  zh: '用例详情', icon: '◈' },
+    ],
+  },
+  {
+    gEn: 'AI authoring', gZh: '文档 / AI',
+    items: [
+      { key: 'docparse',   en: 'Doc parse',    zh: '文档解析', icon: '▤' },
+      { key: 'aigen',      en: 'AI generate',  zh: 'AI 生成',  icon: '✦' },
+    ],
+  },
+  {
+    gEn: 'Runtime', gZh: '执行与报告',
+    items: [
+      { key: 'exec',       en: 'Exec monitor', zh: '执行监控', icon: '▶' },
+      { key: 'report',     en: 'Report',       zh: '报告详情', icon: '▩' },
+      { key: 'datadiff',   en: 'Data diff',    zh: '数据差异', icon: '△' },
+    ],
+  },
+  {
+    gEn: 'Config', gZh: '配置中心',
+    items: [
+      { key: 'models',     en: 'Models',       zh: '模型配置', icon: '⚙' },
+      { key: 'templates',  en: 'Data tpls',    zh: '数据模板', icon: '◎' },
+    ],
+  },
+  {
+    gEn: 'Browser plugin', gZh: 'Edge 插件',
+    items: [
+      { key: 'plugin',     en: 'Popup + picker', zh: '插件面板', icon: '◧' },
+    ],
+  },
+];
+
+function Sidebar({ width = 208 }) {
+  const { theme, lang, screen, setScreen } = useTheme();
+  return (
+    <div style={{
+      width, flexShrink: 0, background: theme.surface,
+      borderRight: `1px solid ${theme.border}`,
+      padding: '14px 10px 20px', overflow: 'auto',
+      display: 'flex', flexDirection: 'column', gap: 2,
+    }}>
+      {NAV_GROUPS.map((g, gi) => (
+        <Fragment key={gi}>
+          <div style={{
+            fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em',
+            color: theme.textDim, padding: '10px 10px 6px', marginTop: gi === 0 ? 0 : 6,
+          }}>{L({ en: g.gEn, zh: g.gZh }, lang)}</div>
+          {g.items.map(it => {
+            const active = it.key === screen;
+            return (
+              <div key={it.key}
+                onClick={() => setScreen(it.key)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '8px 10px', borderRadius: 8,
+                  fontSize: 13, fontWeight: active ? 600 : 500,
+                  color: active ? theme.text : theme.textMid,
+                  background: active ? theme.accentSoft : 'transparent',
+                  border: active ? `1px solid ${theme.accent}40` : '1px solid transparent',
+                  cursor: 'pointer',
+                  transition: 'background 140ms, color 140ms',
+                }}
+                onMouseEnter={e => { if (!active) e.currentTarget.style.background = theme.surface2; }}
+                onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
+              >
+                <span style={{ width: 16, color: active ? theme.accent : theme.textDim, fontSize: 12 }}>{it.icon}</span>
+                <span>{L({ en: it.en, zh: it.zh }, lang)}</span>
+                {active && <span style={{ marginLeft: 'auto', width: 4, height: 4, borderRadius: '50%', background: theme.accent }}/>}
+              </div>
+            );
+          })}
+        </Fragment>
+      ))}
+      <div style={{ flex: 1 }}/>
+      <div style={{ padding: 10, fontSize: 10, color: theme.textDim, lineHeight: 1.4 }}>
+        {L({ en: 'v2 demo · click any item', zh: 'v2 演示 · 点击切换' }, lang)}
+      </div>
+    </div>
+  );
+}
+
+function Card({ children, style, padded = true, glow, ...rest }) {
+  const { theme } = useTheme();
+  return (
+    <div {...rest} style={{
+      background: theme.surface, border: `1px solid ${theme.border}`,
+      borderRadius: 12, padding: padded ? 16 : 0,
+      boxShadow: glow ? `0 0 0 3px ${theme.accent}20, ${theme.shadow}` : theme.shadow,
+      transition: 'box-shadow 200ms', ...style,
+    }}>{children}</div>
+  );
+}
+
+function StatCard({ label, value, delta, color, icon }) {
+  const { theme } = useTheme();
+  return (
+    <Card>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+        <div style={{ fontSize: 11, color: theme.textMid, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</div>
+        <div style={{
+          width: 24, height: 24, borderRadius: 6,
+          background: (color || theme.accent) + '22', color: color || theme.accent,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 12, fontWeight: 700,
+        }}>{icon}</div>
+      </div>
+      <div style={{ fontSize: 28, fontWeight: 700, color: theme.text, letterSpacing: '-0.02em' }}>{value}</div>
+      {delta && (
+        <div style={{ fontSize: 11, color: theme.textMid, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ color: theme.success }}>▲</span> {delta}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function Button({ children, variant = 'secondary', icon, size = 'md', style, onClick }) {
+  const { theme } = useTheme();
+  const variants = {
+    primary:   { bg: theme.accent, color: '#fff', border: theme.accent },
+    secondary: { bg: theme.surface, color: theme.text, border: theme.borderStrong },
+    ghost:     { bg: 'transparent', color: theme.textMid, border: 'transparent' },
+    success:   { bg: theme.success, color: '#fff', border: theme.success },
+  };
+  const v = variants[variant];
+  const sizes = { sm: { h: 28, fs: 12, px: 10 }, md: { h: 34, fs: 13, px: 14 }, lg: { h: 40, fs: 14, px: 18 } };
+  const s = sizes[size];
+  return (
+    <div onClick={onClick} style={{
+      display: 'inline-flex', alignItems: 'center', gap: 6,
+      height: s.h, padding: `0 ${s.px}px`,
+      background: v.bg, color: v.color, border: `1px solid ${v.border}`,
+      borderRadius: 8, fontSize: s.fs, fontWeight: 500,
+      cursor: 'pointer', whiteSpace: 'nowrap',
+      boxShadow: variant === 'primary' ? `0 1px 2px ${theme.accent}40, 0 2px 8px ${theme.accent}30` : 'none',
+      ...style,
+    }}>
+      {icon && <span style={{ fontSize: s.fs - 1 }}>{icon}</span>}
+      {children}
+    </div>
+  );
+}
+
+function Badge({ children, variant = 'neutral', dot, style }) {
+  const { theme } = useTheme();
+  const variants = {
+    success: { bg: theme.success + '22', color: theme.success, dotC: theme.success },
+    warning: { bg: theme.warning + '22', color: theme.warning, dotC: theme.warning },
+    danger:  { bg: theme.danger + '22',  color: theme.danger,  dotC: theme.danger  },
+    info:    { bg: theme.accent + '22',  color: theme.accent,  dotC: theme.accent  },
+    neutral: { bg: theme.surface2,       color: theme.textMid, dotC: theme.textDim },
+    mint:    { bg: theme.accent2 + '22', color: theme.accent2, dotC: theme.accent2 },
+    coral:   { bg: theme.accent3 + '22', color: theme.accent3, dotC: theme.accent3 },
+  };
+  const v = variants[variant];
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 5,
+      padding: '2px 8px', background: v.bg, color: v.color,
+      borderRadius: 999, fontSize: 11, fontWeight: 600,
+      letterSpacing: '0.01em', ...style,
+    }}>
+      {dot && <span style={{ width: 6, height: 6, borderRadius: '50%', background: v.dotC }}/>}
+      {children}
+    </span>
+  );
+}
+
+function Tabs({ tabs, active, onClick }) {
+  const { theme } = useTheme();
+  const [local, setLocal] = useState(active);
+  useEffect(() => setLocal(active), [active]);
+  return (
+    <div style={{ display: 'flex', gap: 4, borderBottom: `1px solid ${theme.border}`, paddingLeft: 4 }}>
+      {tabs.map(t => {
+        const isActive = t.key === local;
+        return (
+          <div key={t.key}
+            onClick={() => { setLocal(t.key); onClick && onClick(t.key); }}
+            style={{
+              padding: '10px 14px', fontSize: 13,
+              fontWeight: isActive ? 600 : 500,
+              color: isActive ? theme.text : theme.textMid,
+              borderBottom: `2px solid ${isActive ? theme.accent : 'transparent'}`,
+              marginBottom: -1, cursor: 'pointer',
+            }}>{t.label}</div>
+        );
+      })}
+    </div>
+  );
+}
+
+function SectionHead({ title, subtitle, actions }) {
+  const { theme } = useTheme();
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-end', marginBottom: 16 }}>
+      <div>
+        <div style={{ fontSize: 20, fontWeight: 700, color: theme.text, letterSpacing: '-0.02em' }}>{title}</div>
+        {subtitle && <div style={{ fontSize: 13, color: theme.textMid, marginTop: 4 }}>{subtitle}</div>}
+      </div>
+      {actions && <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>{actions}</div>}
+    </div>
+  );
+}
+
+function Ring({ progress = 0.5, size = 44, stroke = 4, color, label }) {
+  const { theme } = useTheme();
+  const c = color || theme.accent;
+  const r = (size - stroke) / 2;
+  const circ = 2 * Math.PI * r;
+  return (
+    <div style={{ position: 'relative', width: size, height: size }}>
+      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={theme.border} strokeWidth={stroke}/>
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={c} strokeWidth={stroke}
+          strokeDasharray={circ} strokeDashoffset={circ * (1 - progress)}
+          strokeLinecap="round" style={{ transition: 'stroke-dashoffset 200ms' }}/>
+      </svg>
+      {label && (
+        <div style={{
+          position: 'absolute', inset: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: size * 0.24, fontWeight: 700, color: theme.text,
+        }}>{label}</div>
+      )}
+    </div>
+  );
+}
+
+function BrowserChrome({ url, children, width = 920, height = 560, showExtIcon }) {
+  const { theme } = useTheme();
+  return (
+    <div style={{
+      width, height, background: theme.surface,
+      border: `1px solid ${theme.borderStrong}`, borderRadius: 12,
+      overflow: 'hidden', boxShadow: theme.shadowLg,
+      display: 'flex', flexDirection: 'column',
+    }}>
+      <div style={{
+        height: 40, flexShrink: 0, background: theme.surface2,
+        borderBottom: `1px solid ${theme.border}`,
+        display: 'flex', alignItems: 'center', gap: 10, padding: '0 12px',
+      }}>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {['#FF5F57', '#FEBC2E', '#28C840'].map(c => (
+            <div key={c} style={{ width: 11, height: 11, borderRadius: '50%', background: c }}/>
+          ))}
+        </div>
+        <div style={{
+          flex: 1, height: 24, maxWidth: 420, background: theme.surface,
+          border: `1px solid ${theme.border}`, borderRadius: 6,
+          display: 'flex', alignItems: 'center', padding: '0 10px',
+          fontSize: 11, color: theme.textMid, fontFamily: FONT.mono,
+        }}>🔒 {url}</div>
+        {showExtIcon && (
+          <div style={{
+            width: 26, height: 26, borderRadius: 6,
+            background: `linear-gradient(135deg, ${theme.accent}, ${theme.accent2})`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: '#fff', fontSize: 12, fontWeight: 700,
+            boxShadow: showExtIcon === 'active' ? `0 0 0 3px ${theme.accent}40` : 'none',
+          }}>E</div>
+        )}
+      </div>
+      <div style={{ flex: 1, position: 'relative', overflow: 'hidden', background: theme.surface }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function CodeBlock({ lines, style }) {
+  const { theme } = useTheme();
+  return (
+    <div style={{
+      background: theme.surface2, border: `1px solid ${theme.border}`,
+      borderRadius: 10, padding: 14,
+      fontFamily: FONT.mono, fontSize: 11.5, lineHeight: 1.65,
+      color: theme.text, overflow: 'hidden', ...style,
+    }}>
+      {lines.map((ln, i) => (
+        <div key={i} style={{ display: 'flex', gap: 10 }}>
+          <span style={{ color: theme.textDim, width: 18, textAlign: 'right', flexShrink: 0, userSelect: 'none' }}>{i + 1}</span>
+          <span dangerouslySetInnerHTML={{ __html: ln }}/>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// 3) Frame — 每屏共用的 1440×900 外壳
+// ─────────────────────────────────────────────────────────────
+function Frame({ children, noSidebar }) {
+  const { theme } = useTheme();
+  return (
+    <div style={{
+      width: 1440, height: 900, background: theme.bg,
+      display: 'flex', flexDirection: 'column',
+      fontFamily: FONT.sans, color: theme.text, overflow: 'hidden',
+    }}>
+      <TopBar/>
+      <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
+        {!noSidebar && <Sidebar/>}
+        <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// 4) Screen 01 — 仪表盘
+// ─────────────────────────────────────────────────────────────
+function ScreenDashboard() {
+  const { theme, lang } = useTheme();
+  return (
+    <Frame>
+      <div style={{ padding: 24, height: '100%', overflow: 'hidden' }}>
+        <SectionHead
+          title={L({ en: 'Good morning, Lin', zh: '早上好，林工' }, lang)}
+          subtitle={L({ en: '3 runs active · 2 recoveries need review · 1 model budget alert', zh: '3 个运行中 · 2 个恢复待复核 · 1 个模型预算告警' }, lang)}
+          actions={<>
+            <Button variant="secondary" icon="⟳">{L({ en: 'Refresh', zh: '刷新' }, lang)}</Button>
+            <Button variant="primary" icon="＋">{L({ en: 'New run', zh: '新建运行' }, lang)}</Button>
+          </>}
+        />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 20 }}>
+          <StatCard label={L({ en: 'Projects', zh: '项目' }, lang)} value="12" delta="+2 this wk" color={theme.accent} icon="▦"/>
+          <StatCard label={L({ en: 'Runs today', zh: '今日运行' }, lang)} value="147" delta="+18%" color={theme.accent2} icon="▶"/>
+          <StatCard label={L({ en: 'Pass rate', zh: '通过率' }, lang)} value="94.2%" delta="+1.3pt" color={theme.success} icon="✓"/>
+          <StatCard label={L({ en: 'Recovery ok', zh: '恢复成功' }, lang)} value="96%" delta="stable" color={theme.accent3} icon="↺"/>
+          <StatCard label={L({ en: 'AI spend (mo)', zh: 'AI 本月花费' }, lang)} value="$1,248" delta="73% budget" color={theme.accent4} icon="◈"/>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 16, height: 'calc(100% - 220px)' }}>
+          <Card padded={false}>
+            <div style={{ padding: '14px 16px', borderBottom: `1px solid ${theme.border}`, display: 'flex', alignItems: 'center' }}>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>{L({ en: 'Recent runs', zh: '最近运行' }, lang)}</div>
+              <div style={{ marginLeft: 'auto', fontSize: 12, color: theme.textMid }}>{L({ en: 'last 24h', zh: '过去 24 小时' }, lang)}</div>
+            </div>
+            <div>
+              {[
+                { name: 'Login → Checkout smoke',  env: 'staging',     status: 'pass',    dur: '3m 14s', model: 'claude-4.5', time: '2m ago',  hue: theme.success },
+                { name: 'Password reset flow',     env: 'staging',     status: 'running', dur: '1m 02s', model: 'local-qwen', time: 'now',     hue: theme.accent  },
+                { name: 'Admin user CRUD',         env: 'dev',         status: 'pass',    dur: '5m 41s', model: 'gpt-4o',     time: '14m ago', hue: theme.success },
+                { name: 'Order refund exception',  env: 'staging',     status: 'fail',    dur: '2m 08s', model: 'claude-4.5', time: '26m ago', hue: theme.danger  },
+                { name: 'Product search DB diff',  env: 'dev',         status: 'pass',    dur: '4m 57s', model: 'claude-4.5', time: '41m ago', hue: theme.success },
+                { name: 'Signup → onboarding',     env: 'prod-mirror', status: 'pass',    dur: '7m 12s', model: 'gpt-4o',     time: '1h ago',  hue: theme.success },
+              ].map((r, i) => (
+                <div key={i} style={{
+                  display: 'grid',
+                  gridTemplateColumns: '12px 1.6fr 0.6fr 0.5fr 0.8fr 0.5fr 0.5fr',
+                  gap: 12, alignItems: 'center',
+                  padding: '10px 16px',
+                  borderBottom: i < 5 ? `1px solid ${theme.border}` : 'none',
+                  fontSize: 13,
+                }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: r.hue }}/>
+                  <div style={{ fontWeight: 500 }}>{r.name}</div>
+                  <div><Badge variant="neutral">{r.env}</Badge></div>
+                  <div><Badge variant={r.status === 'pass' ? 'success' : r.status === 'fail' ? 'danger' : 'info'} dot>{r.status}</Badge></div>
+                  <div style={{ color: theme.textMid, fontFamily: FONT.mono, fontSize: 11 }}>{r.model}</div>
+                  <div style={{ color: theme.textMid }}>{r.dur}</div>
+                  <div style={{ color: theme.textDim, textAlign: 'right' }}>{r.time}</div>
+                </div>
+              ))}
+            </div>
+          </Card>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minHeight: 0 }}>
+            <Card style={{ flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
+                <div style={{ fontSize: 14, fontWeight: 600 }}>{L({ en: 'Needs attention', zh: '待处理' }, lang)}</div>
+                <Badge variant="warning" style={{ marginLeft: 'auto' }}>4</Badge>
+              </div>
+              {[
+                { t: L({ en: 'Restore partial — order #8821 fixtures', zh: '恢复不完全 — 订单 #8821 测试数据' }, lang), sub: L({ en: '1 row left in orders_items', zh: 'orders_items 剩 1 条' }, lang), v: 'danger' },
+                { t: L({ en: 'Data pollution risk — users.email',    zh: '数据污染风险 — users.email'           }, lang), sub: L({ en: '3 test emails in prod-mirror', zh: 'prod-mirror 残留 3 条' }, lang), v: 'warning' },
+                { t: L({ en: 'Model budget 73% — claude-4.5',       zh: '模型预算 73% — claude-4.5'           }, lang), sub: L({ en: '$912 of $1,250 month', zh: '已用 $912 / $1,250' }, lang), v: 'warning' },
+                { t: L({ en: 'Locator drift — #checkout-btn',       zh: '定位器漂移 — #checkout-btn'         }, lang), sub: L({ en: 'auto-healed 5×, review', zh: '已自愈 5 次，待复核' }, lang), v: 'info' },
+              ].map((a, i) => (
+                <div key={i} style={{ display: 'flex', gap: 10, padding: '10px 0', borderBottom: i < 3 ? `1px solid ${theme.border}` : 'none' }}>
+                  <div style={{ width: 3, borderRadius: 2, background: a.v === 'danger' ? theme.danger : a.v === 'warning' ? theme.warning : theme.accent }}/>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12.5, fontWeight: 500 }}>{a.t}</div>
+                    <div style={{ fontSize: 11, color: theme.textMid, marginTop: 2 }}>{a.sub}</div>
+                  </div>
+                </div>
+              ))}
+            </Card>
+            <Card style={{ flex: 1 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>{L({ en: 'AI decisions (last hour)', zh: 'AI 决策 (近 1 小时)' }, lang)}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div>
+                  <div style={{ fontSize: 11, color: theme.textMid, marginBottom: 4 }}>{L({ en: 'Adopted', zh: '采纳' }, lang)}</div>
+                  <div style={{ fontSize: 22, fontWeight: 700 }}>87<span style={{ fontSize: 13, color: theme.textMid, fontWeight: 500 }}> / 92</span></div>
+                  <div style={{ height: 6, background: theme.border, borderRadius: 3, marginTop: 6, overflow: 'hidden' }}>
+                    <div style={{ width: '94.5%', height: '100%', background: theme.success }}/>
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: theme.textMid, marginBottom: 4 }}>{L({ en: 'Fallback triggered', zh: '触发回退' }, lang)}</div>
+                  <div style={{ fontSize: 22, fontWeight: 700 }}>5</div>
+                  <div style={{ fontSize: 11, color: theme.textMid, marginTop: 8 }}>{L({ en: '3× timeout, 2× schema err', zh: '3× 超时, 2× 结构错误' }, lang)}</div>
+                </div>
+              </div>
+              <Divider/>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <Pill icon="●" color={theme.accent}>claude-4.5 · 61</Pill>
+                <Pill icon="●" color={theme.accent2}>gpt-4o · 24</Pill>
+                <Pill icon="●" color={theme.accent3}>local-qwen · 7</Pill>
+              </div>
+            </Card>
+          </div>
+        </div>
+      </div>
+    </Frame>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// 5) Screen 02 — 项目列表
+// ─────────────────────────────────────────────────────────────
+function Tiny({ label, v, c }) {
+  const { theme } = useTheme();
+  return (
+    <div style={{ padding: 8, background: theme.surface2, border: `1px solid ${theme.border}`, borderRadius: 6 }}>
+      <div style={{ fontSize: 9, color: theme.textMid, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</div>
+      <div style={{ fontSize: 15, fontWeight: 700, color: c || theme.text }}>{v}</div>
+    </div>
+  );
+}
+
+function ScreenProjects() {
+  const { theme, lang } = useTheme();
+  const projects = [
+    { n: 'ACME Web App',       desc: 'e-commerce · checkout + account', docs: 24, cases: 156, pass: 94,  c: theme.accent  },
+    { n: 'Flux CRM',           desc: 'internal tool · pipeline + deals', docs: 12, cases: 81,  pass: 89,  c: theme.accent2 },
+    { n: 'Lumen Admin',        desc: 'backoffice · user & billing mgmt', docs: 18, cases: 142, pass: 97,  c: theme.accent3 },
+    { n: 'Harbor Docs',        desc: 'docs portal · search & auth',      docs: 6,  cases: 38,  pass: 100, c: theme.accent4 },
+    { n: 'Plume Mobile Web',   desc: 'responsive · read-only prod',      docs: 9,  cases: 54,  pass: 87,  c: theme.accent  },
+    { n: 'Relay Dashboard',    desc: 'analytics · charts + filters',     docs: 15, cases: 92,  pass: 91,  c: theme.accent2 },
+  ];
+  return (
+    <Frame>
+      <div style={{ padding: 24, height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <SectionHead
+          title={L({ en: 'Projects', zh: '项目' }, lang)}
+          subtitle={L({ en: '6 projects · 547 cases · pass rate this week 93.1%', zh: '6 个项目 · 547 条用例 · 本周通过率 93.1%' }, lang)}
+          actions={<>
+            <Button variant="ghost" icon="↓">{L({ en: 'Import', zh: '导入' }, lang)}</Button>
+            <Button variant="primary" icon="＋">{L({ en: 'New project', zh: '新建项目' }, lang)}</Button>
+          </>}
+        />
+        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, alignContent: 'start', overflow: 'auto' }}>
+          {projects.map((p, i) => (
+            <Card key={i} style={{ position: 'relative', overflow: 'hidden' }}>
+              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: p.c }}/>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
+                <div style={{
+                  width: 38, height: 38, borderRadius: 9,
+                  background: `linear-gradient(135deg, ${p.c}, ${p.c}aa)`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#fff', fontSize: 15, fontWeight: 700, flexShrink: 0,
+                }}>{p.n[0]}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>{p.n}</div>
+                  <div style={{ fontSize: 11, color: theme.textMid, marginTop: 2 }}>{p.desc}</div>
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 10 }}>
+                <Tiny label={L({ en: 'Docs',  zh: '文档' }, lang)} v={p.docs}/>
+                <Tiny label={L({ en: 'Cases', zh: '用例' }, lang)} v={p.cases}/>
+                <Tiny label={L({ en: 'Pass',  zh: '通过' }, lang)} v={`${p.pass}%`} c={p.pass > 90 ? theme.success : theme.warning}/>
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <Button variant="secondary" size="sm">{L({ en: 'Open',    zh: '打开' }, lang)}</Button>
+                <Button variant="ghost"     size="sm">{L({ en: 'Reports', zh: '报告' }, lang)}</Button>
+                <div style={{ marginLeft: 'auto', display: 'flex', gap: 2 }}>
+                  <div style={{ fontSize: 10, color: theme.textDim, alignSelf: 'center' }}>3h ago</div>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      </div>
+    </Frame>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// 6) Screen 03 — 用例详情
+// ─────────────────────────────────────────────────────────────
+function MetaRow({ k, v }) {
+  const { theme } = useTheme();
+  return (
+    <div style={{ display: 'flex', padding: '6px 0', fontSize: 12, alignItems: 'center' }}>
+      <div style={{ color: theme.textMid, width: 80, flexShrink: 0 }}>{k}</div>
+      <div style={{ color: theme.text, flex: 1 }}>{v}</div>
+    </div>
+  );
+}
+function PlanRow({ icon, color, title, sub }) {
+  const { theme } = useTheme();
+  return (
+    <div style={{ display: 'flex', gap: 10, padding: '8px 0', borderBottom: `1px solid ${theme.border}` }}>
+      <div style={{ width: 26, height: 26, borderRadius: 6, background: color + '22', color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>{icon}</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 12, fontFamily: FONT.mono, color: theme.text, overflow: 'hidden', textOverflow: 'ellipsis' }}>{title}</div>
+        <div style={{ fontSize: 11, color: theme.textMid, marginTop: 2 }}>{sub}</div>
+      </div>
+    </div>
+  );
+}
+
+function ScreenCaseDetail() {
+  const { theme, lang } = useTheme();
+  return (
+    <Frame>
+      <div style={{ padding: 24, height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ fontSize: 12, color: theme.textMid, marginBottom: 6 }}>
+          {L({ en: 'Cases / Checkout happy path', zh: '用例 / Checkout 正常流程' }, lang)}
+        </div>
+        <SectionHead
+          title={<span>Checkout happy path <Badge variant="mint" dot style={{ marginLeft: 10, verticalAlign: 'middle' }}>happy</Badge></span>}
+          subtitle={L({ en: 'From doc: checkout-regression-v3.md · updated 2m ago · 14 runs this week · 100% pass', zh: '来自文档: checkout-regression-v3.md · 2 分钟前更新 · 本周 14 次运行 · 通过率 100%' }, lang)}
+          actions={<>
+            <Button variant="ghost"     icon="✎">{L({ en: 'Edit DSL', zh: '编辑 DSL' }, lang)}</Button>
+            <Button variant="secondary" icon="◇">{L({ en: 'State machine', zh: '状态机' }, lang)}</Button>
+            <Button variant="primary"   icon="▶">{L({ en: 'Run', zh: '执行' }, lang)}</Button>
+          </>}
+        />
+        <Tabs active="o" tabs={[
+          { key: 'o', label: L({ en: 'Overview',      zh: '概览' }, lang) },
+          { key: 'd', label: 'DSL' },
+          { key: 's', label: L({ en: 'State machine', zh: '状态机' }, lang) },
+          { key: 'p', label: L({ en: 'Plans',         zh: '计划' }, lang) },
+          { key: 'h', label: L({ en: 'History',       zh: '历史' }, lang) },
+        ]}/>
+        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 340px', gap: 14, marginTop: 14, minHeight: 0 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14, minHeight: 0, overflow: 'hidden' }}>
+            <Card padded={false} style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ padding: '12px 14px', borderBottom: `1px solid ${theme.border}`, display: 'flex', alignItems: 'center' }}>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{L({ en: 'Steps', zh: '步骤' }, lang)}</div>
+                <Pill icon="●" color={theme.accent} style={{ marginLeft: 'auto' }}>8 steps · 5 assertions</Pill>
+              </div>
+              <div style={{ overflow: 'auto', flex: 1 }}>
+                {[
+                  { n: 1, act: 'open',   sel: '/cart',                         note: L({ en: 'navigate', zh: '导航' }, lang) },
+                  { n: 2, act: 'click',  sel: '#proceed-btn',                  note: L({ en: 'locator healed 1×', zh: '定位器自愈 1 次' }, lang), heal: true },
+                  { n: 3, act: 'fill',   sel: '[name=card]',   val: '4242 4242 4242 4242' },
+                  { n: 4, act: 'type',   sel: '[name=coupon]', val: 'SAVE10' },
+                  { n: 5, act: 'click',  sel: "button:has-text('Pay')" },
+                  { n: 6, act: 'assert', sel: 'url',   val: '/order/confirm/*',            note: 'assertion' },
+                  { n: 7, act: 'assert', sel: 'db',    val: 'orders.status = "paid"',      note: 'db assertion' },
+                  { n: 8, act: 'assert', sel: 'delta', val: 'stock = -2',                  note: 'comparison' },
+                ].map(s => (
+                  <div key={s.n} style={{
+                    display: 'grid', gridTemplateColumns: '32px 72px 1fr 1fr auto',
+                    gap: 10, alignItems: 'center',
+                    padding: '10px 14px', borderBottom: `1px solid ${theme.border}`, fontSize: 12.5,
+                  }}>
+                    <div style={{ color: theme.textDim, fontFamily: FONT.mono }}>{String(s.n).padStart(2, '0')}</div>
+                    <Badge variant={s.act === 'assert' ? 'info' : 'neutral'}>{s.act}</Badge>
+                    <div style={{ fontFamily: FONT.mono, color: theme.text, overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.sel}</div>
+                    <div style={{ fontFamily: FONT.mono, color: theme.textMid, fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.val || ''}</div>
+                    {s.heal ? <Badge variant="warning">◈ healed</Badge> : <div style={{ color: theme.textDim, fontSize: 11 }}>{s.note || ''}</div>}
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14, minHeight: 0 }}>
+            <Card>
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>{L({ en: 'Info', zh: '基本信息' }, lang)}</div>
+              <MetaRow k={L({ en: 'Source', zh: '来源' }, lang)} v={<span style={{ color: theme.accent, fontWeight: 500 }}>📄 checkout-regression-v3.md</span>}/>
+              <MetaRow k={L({ en: 'Tags',   zh: '标签' }, lang)} v={<><Badge variant="mint">happy</Badge> <Badge variant="neutral">smoke</Badge></>}/>
+              <MetaRow k={L({ en: 'Owner',  zh: '负责人' }, lang)} v={<Avatar name="Lin Chen"/>}/>
+              <MetaRow k={L({ en: 'Last run', zh: '最近运行' }, lang)} v={<span style={{ color: theme.success }}>● pass · 2m ago</span>}/>
+              <MetaRow k={L({ en: 'Updated',  zh: '更新' }, lang)} v="2 min ago"/>
+            </Card>
+            <Card>
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>{L({ en: 'Plans', zh: '计划' }, lang)}</div>
+              <PlanRow icon="◈" color={theme.accent2} title="plan.checkout.seed.v2" sub={L({ en: 'data plan · seeds 1 user, 2 products', zh: '数据计划 · 预置 1 用户, 2 商品' }, lang)}/>
+              <PlanRow icon="↺" color={theme.accent3} title="plan.orders.sql.snap"  sub={L({ en: 'restore · SQL snapshot', zh: '恢复 · SQL 快照' }, lang)}/>
+              <PlanRow icon="△" color={theme.accent}  title="plan.inv.delta"        sub={L({ en: 'comparison · stock −2 expected', zh: '比较 · 预期库存 −2' }, lang)}/>
+            </Card>
+            <Card>
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>{L({ en: 'Recent runs', zh: '最近运行' }, lang)}</div>
+              <div style={{ display: 'flex', gap: 3, marginBottom: 10 }}>
+                {Array.from({ length: 20 }).map((_, i) => {
+                  const c = i === 7 || i === 13 ? theme.danger : i === 15 ? theme.warning : theme.success;
+                  return <div key={i} style={{ flex: 1, height: 24, borderRadius: 3, background: c, opacity: 0.85 }}/>;
+                })}
+              </div>
+              <div style={{ fontSize: 11, color: theme.textMid }}>
+                {L({ en: '20 runs · 17 pass · 2 fail · 1 flaky', zh: '20 次运行 · 17 通过 · 2 失败 · 1 不稳定' }, lang)}
+              </div>
+            </Card>
+          </div>
+        </div>
+      </div>
+    </Frame>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// 7) Screen 04 — 文档解析
+// ─────────────────────────────────────────────────────────────
+function BlockLabel({ children, color }) {
+  return <div style={{ fontSize: 10, fontWeight: 600, color, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>{children}</div>;
+}
+function CheckList({ items, tone }) {
+  const { theme } = useTheme();
+  const colors = { success: theme.success, warning: theme.warning, danger: theme.danger };
+  const glyphs = { success: '✓', warning: '~', danger: '!' };
+  return (
+    <div style={{ marginBottom: 12 }}>
+      {items.map((it, i) => (
+        <div key={i} style={{ display: 'flex', gap: 8, padding: '4px 0', fontSize: 12, color: theme.text, lineHeight: 1.5 }}>
+          <span style={{ color: colors[tone], fontWeight: 700, width: 12, flexShrink: 0 }}>{glyphs[tone]}</span>
+          <span>{it}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ScreenDocParse() {
+  const { theme, lang } = useTheme();
+  return (
+    <Frame>
+      <div style={{ padding: 24, height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ fontSize: 12, color: theme.textMid, marginBottom: 6 }}>
+          {L({ en: 'Projects / ACME Web App / Documents', zh: '项目 / ACME Web App / 测试文档' }, lang)}
+        </div>
+        <SectionHead
+          title="checkout-regression-v3.md"
+          subtitle={L({ en: 'Parsed 2 min ago · claude-4.5 · 12 cases detected', zh: '2 分钟前解析 · claude-4.5 · 检出 12 个用例' }, lang)}
+          actions={<>
+            <Button variant="ghost">{L({ en: 'Re-parse', zh: '重新解析' }, lang)}</Button>
+            <Button variant="secondary" icon="✎">{L({ en: 'Manual edit', zh: '手动修正' }, lang)}</Button>
+            <Button variant="primary"   icon="→">{L({ en: 'Generate tests', zh: '生成测试' }, lang)}</Button>
+          </>}
+        />
+        <Tabs active="parse" tabs={[
+          { key: 'parse', label: L({ en: 'Parse result',    zh: '解析结果' }, lang) },
+          { key: 'raw',   label: L({ en: 'Raw document',    zh: '原始文档' }, lang) },
+          { key: 'hist',  label: L({ en: 'Version history', zh: '版本历史' }, lang) },
+        ]}/>
+        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1.2fr 340px', gap: 14, marginTop: 14, minHeight: 0 }}>
+          <Card padded={false} style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ padding: '12px 14px', borderBottom: `1px solid ${theme.border}`, display: 'flex', alignItems: 'center' }}>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>{L({ en: 'Cases detected', zh: '检出用例' }, lang)}</div>
+              <Badge variant="info" style={{ marginLeft: 'auto' }}>12</Badge>
+            </div>
+            <div style={{ overflow: 'auto', flex: 1 }}>
+              {[
+                { n: 'Checkout happy path',          cat: 'happy',     conf: 'high' },
+                { n: 'Checkout — expired card',      cat: 'exception', conf: 'high' },
+                { n: 'Checkout — insufficient stock',cat: 'exception', conf: 'medium' },
+                { n: 'Apply coupon',                 cat: 'happy',     conf: 'high' },
+                { n: 'Coupon — stacked (forbidden)', cat: 'exception', conf: 'medium' },
+                { n: 'Address — intl shipping',      cat: 'boundary',  conf: 'low' },
+                { n: 'Guest checkout',               cat: 'happy',     conf: 'high' },
+                { n: 'Tax — state switch',           cat: 'boundary',  conf: 'medium' },
+              ].map((c, i) => (
+                <div key={i} style={{
+                  padding: '10px 14px', borderBottom: `1px solid ${theme.border}`,
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  background: i === 0 ? theme.accentSoft : 'transparent',
+                }}>
+                  <div style={{ fontSize: 12.5, fontWeight: i === 0 ? 600 : 500, flex: 1 }}>{c.n}</div>
+                  <Badge variant={c.cat === 'happy' ? 'mint' : c.cat === 'exception' ? 'coral' : 'neutral'}>{c.cat}</Badge>
+                  <div style={{ fontSize: 10, color: c.conf === 'high' ? theme.success : c.conf === 'medium' ? theme.warning : theme.textDim, width: 44, textAlign: 'right' }}>
+                    {c.conf === 'high' ? '●●●' : c.conf === 'medium' ? '●●○' : '●○○'}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+          <Card padded={false} style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ padding: '12px 14px', borderBottom: `1px solid ${theme.border}` }}>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>Checkout happy path</div>
+              <div style={{ fontSize: 11, color: theme.textMid, marginTop: 3 }}>
+                {L({ en: '2 pages · 5 assertions · 1 data plan · restore: sql', zh: '2 页面 · 5 断言 · 1 数据计划 · 恢复: sql' }, lang)}
+              </div>
+            </div>
+            <div style={{ padding: 14, overflow: 'auto', flex: 1 }}>
+              <BlockLabel color={theme.accent2}>{L({ en: 'Test goal', zh: '测试目标' }, lang)}</BlockLabel>
+              <div style={{ fontSize: 12.5, color: theme.textMid, lineHeight: 1.55, marginBottom: 14 }}>
+                {L({
+                  en: 'Logged-in user adds 2 items, applies a valid coupon, enters card details and completes checkout. Assert order confirmation, receipt email, inventory decremented.',
+                  zh: '登录用户添加 2 件商品，使用有效优惠券，输入卡号并完成支付。断言订单确认、邮件回执、库存扣减。',
+                }, lang)}
+              </div>
+              <BlockLabel color={theme.accent}>{L({ en: 'Pages involved', zh: '涉及页面' }, lang)}</BlockLabel>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
+                <Pill icon="▸" color={theme.accent}>/cart</Pill>
+                <Pill icon="▸" color={theme.accent}>/checkout</Pill>
+                <Pill icon="▸" color={theme.accent}>/order/confirm</Pill>
+              </div>
+              <BlockLabel color={theme.success}>{L({ en: 'Explicit (from doc)', zh: '明确项 (文档给出)' }, lang)}</BlockLabel>
+              <CheckList items={[
+                L({ en: 'Coupon code "SAVE10"',        zh: '优惠券码 "SAVE10"' }, lang),
+                L({ en: 'Card 4242 4242 4242 4242',    zh: '卡号 4242 4242 4242 4242' }, lang),
+                L({ en: 'Expected total: $89.10',      zh: '预期总额: $89.10' }, lang),
+              ]} tone="success"/>
+              <BlockLabel color={theme.warning}>{L({ en: 'Inferred by AI', zh: 'AI 推断项' }, lang)}</BlockLabel>
+              <CheckList items={[
+                L({ en: 'Shipping address pre-filled from profile', zh: '收货地址使用用户默认地址' }, lang),
+                L({ en: 'Email template: order_confirmation_v2',    zh: '邮件模板: order_confirmation_v2' }, lang),
+              ]} tone="warning"/>
+              <BlockLabel color={theme.danger}>{L({ en: 'Missing — please fill', zh: '缺失项 — 请补充' }, lang)}</BlockLabel>
+              <CheckList items={[
+                L({ en: 'What DB rows need seed data?', zh: '需要预置哪些数据库行?' }, lang),
+                L({ en: 'Expected stock decrement delta?', zh: '预期库存扣减值?' }, lang),
+              ]} tone="danger"/>
+            </div>
+          </Card>
+          <Card padded={false} style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ padding: '12px 14px', borderBottom: `1px solid ${theme.border}`, display: 'flex', alignItems: 'center' }}>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>{L({ en: 'AI reasoning', zh: 'AI 推理' }, lang)}</div>
+              <Pill icon="●" color={theme.accent} style={{ marginLeft: 'auto' }}>claude-4.5</Pill>
+            </div>
+            <div style={{ padding: 14, fontSize: 11.5, color: theme.textMid, lineHeight: 1.6, overflow: 'auto', flex: 1 }}>
+              <div style={{ marginBottom: 10 }}>
+                <b style={{ color: theme.text }}>{L({ en: 'Structure', zh: '结构' }, lang)}.</b> {L({
+                  en: 'Document uses H2 per scenario, bullets for steps. Detected 12 H2 blocks. 3 share a "Coupon" parent — may want a sub-suite.',
+                  zh: '文档使用 H2 划分场景，项目符号描述步骤。检出 12 个 H2 块。其中 3 个共享 "优惠券" 父级，可考虑子套件。',
+                }, lang)}
+              </div>
+              <div style={{ marginBottom: 10 }}>
+                <b style={{ color: theme.text }}>{L({ en: 'Data plan', zh: '数据计划' }, lang)}.</b> {L({
+                  en: 'Will seed one test user, 2 products, 1 coupon via fixtures. Restore via SQL snapshot of orders table.',
+                  zh: '将预置 1 个测试用户、2 个商品、1 张优惠券。通过 orders 表 SQL 快照恢复。',
+                }, lang)}
+              </div>
+              <div style={{ marginBottom: 10 }}>
+                <b style={{ color: theme.text }}>{L({ en: 'Assertions', zh: '断言' }, lang)}.</b> {L({
+                  en: '5 from explicit doc, 3 inferred (confirmation URL, email queue, stock delta).',
+                  zh: '5 条来自明确描述，3 条为推断 (确认页 URL、邮件队列、库存增量)。',
+                }, lang)}
+              </div>
+              <div>
+                <b style={{ color: theme.text }}>{L({ en: 'Risk', zh: '风险' }, lang)}.</b> {L({
+                  en: 'Medium. Payment gateway mocked — real auth path not covered.',
+                  zh: '中等。支付网关为 mock — 未覆盖真实授权链路。',
+                }, lang)}
+              </div>
+            </div>
+            <div style={{ padding: 12, borderTop: `1px solid ${theme.border}`, background: theme.surface2, display: 'flex', gap: 8 }}>
+              <Button variant="ghost"     size="sm">↺ {L({ en: 'Regenerate',   zh: '重跑' }, lang)}</Button>
+              <Button variant="secondary" size="sm">◈ {L({ en: 'Switch model', zh: '切模型' }, lang)}</Button>
+            </div>
+          </Card>
+        </div>
+      </div>
+    </Frame>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// 8) Screen 05 — AI 生成测试
+// ─────────────────────────────────────────────────────────────
+function TreeNode({ children, glyph, c, indent = 0 }) {
+  const { theme } = useTheme();
+  return (
+    <div style={{ display: 'flex', gap: 6, padding: '3px 0', paddingLeft: indent * 16 }}>
+      <span style={{ color: c, width: 10 }}>{glyph}</span>
+      <span style={{ color: indent ? theme.textMid : theme.text, fontWeight: indent ? 400 : 500 }}>{children}</span>
+    </div>
+  );
+}
+function StateMachineSVG() {
+  const { theme } = useTheme();
+  const nodes = [
+    { id: 'cart', x: 80,  y: 70,  label: 'cart.loaded',        color: theme.accent  },
+    { id: 'form', x: 280, y: 70,  label: 'checkout.form',      color: theme.accent  },
+    { id: 'pay',  x: 280, y: 220, label: 'payment.processing', color: theme.warning },
+    { id: 'done', x: 80,  y: 220, label: 'order.confirmed',    color: theme.success },
+    { id: 'fail', x: 480, y: 220, label: 'payment.failed',     color: theme.danger  },
+  ];
+  const edges = [
+    { from: 'cart', to: 'form', label: 'click proceed' },
+    { from: 'form', to: 'pay',  label: 'submit' },
+    { from: 'pay',  to: 'done', label: '2xx' },
+    { from: 'pay',  to: 'fail', label: '4xx/5xx', dashed: true },
+    { from: 'fail', to: 'form', label: 'retry',   dashed: true },
+  ];
+  const n = (id) => nodes.find(x => x.id === id);
+  return (
+    <svg viewBox="0 0 560 320" style={{ width: '100%', height: '100%' }}>
+      <defs>
+        <marker id="arrow" viewBox="0 -5 10 10" refX="8" refY="0" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M0,-4L8,0L0,4" fill={theme.textMid}/>
+        </marker>
+      </defs>
+      {edges.map((e, i) => {
+        const a = n(e.from), b = n(e.to);
+        const midX = (a.x + b.x) / 2, midY = (a.y + b.y) / 2;
+        return (
+          <g key={i}>
+            <line x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+              stroke={theme.textMid} strokeWidth="1.4"
+              strokeDasharray={e.dashed ? '4 3' : null}
+              markerEnd="url(#arrow)" opacity="0.6"/>
+            <rect x={midX - 40} y={midY - 8} width="80" height="16" rx="8" fill={theme.surface2} stroke={theme.border}/>
+            <text x={midX} y={midY + 3} fontSize="9" fill={theme.textMid} textAnchor="middle" fontFamily={FONT.mono}>{e.label}</text>
+          </g>
+        );
+      })}
+      {nodes.map(nd => (
+        <g key={nd.id}>
+          <rect x={nd.x - 62} y={nd.y - 18} width="124" height="36" rx="18" fill={nd.color + '18'} stroke={nd.color} strokeWidth="1.4"/>
+          <circle cx={nd.x - 48} cy={nd.y} r="3" fill={nd.color}/>
+          <text x={nd.x - 38} y={nd.y + 4} fontSize="11" fill={theme.text} fontFamily={FONT.mono} fontWeight="500">{nd.label}</text>
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+function ScreenAIGenerate() {
+  const { theme, lang } = useTheme();
+  const dslLines = [
+    `<span style="color:${theme.accent}">case</span> <span style="color:${theme.accent2}">"Checkout happy path"</span> {`,
+    `  <span style="color:${theme.textMid}">env:</span> staging`,
+    `  <span style="color:${theme.textMid}">dataPlanRef:</span> <span style="color:${theme.accent3}">plan.checkout.seed.v2</span>`,
+    `  <span style="color:${theme.textMid}">restorePlanRef:</span> <span style="color:${theme.accent3}">plan.orders.sql.snap</span>`,
+    `  <span style="color:${theme.textMid}">comparisonPlanRef:</span> <span style="color:${theme.accent3}">plan.inv.delta</span>`,
+    ``,
+    `  <span style="color:${theme.accent}">step</span> open <span style="color:${theme.accent2}">"/cart"</span>`,
+    `  <span style="color:${theme.accent}">step</span> click <span style="color:${theme.accent2}">"#proceed-btn"</span>`,
+    `    <span style="color:${theme.textMid}">// locator.candidates[0].score = 0.94</span>`,
+    `  <span style="color:${theme.accent}">step</span> fill <span style="color:${theme.accent2}">"[name=card]"</span> = <span style="color:${theme.accent3}">"4242 4242 4242 4242"</span>`,
+    `  <span style="color:${theme.accent}">step</span> type <span style="color:${theme.accent2}">"[name=coupon]"</span> = <span style="color:${theme.accent3}">"SAVE10"</span>`,
+    `  <span style="color:${theme.accent}">step</span> click <span style="color:${theme.accent2}">"button:has-text('Pay')"</span>`,
+    ``,
+    `  <span style="color:${theme.accent}">assert</span> url = <span style="color:${theme.accent2}">/order/confirm/*</span>`,
+    `  <span style="color:${theme.accent}">assert</span> text <span style="color:${theme.accent2}">"Thanks for your order"</span>`,
+    `  <span style="color:${theme.accent}">assert</span> db <span style="color:${theme.accent3}">orders.status</span> = <span style="color:${theme.accent2}">"paid"</span>`,
+    `  <span style="color:${theme.accent}">assert</span> delta <span style="color:${theme.accent3}">stock</span> = <span style="color:${theme.accent2}">-2</span>`,
+    `}`,
+  ];
+  return (
+    <Frame>
+      <div style={{ padding: 24, height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <SectionHead
+          title={L({ en: 'AI generated test — Checkout happy path', zh: 'AI 生成测试 — Checkout 正常流程' }, lang)}
+          subtitle={L({ en: 'Review before saving. Edit DSL directly or ask AI to refine.', zh: '保存前请复核。可直接编辑 DSL 或让 AI 修订。' }, lang)}
+          actions={<>
+            <Button variant="ghost"     icon="↺">{L({ en: 'Regenerate',   zh: '重新生成' }, lang)}</Button>
+            <Button variant="secondary" icon="▶">Dry-run</Button>
+            <Button variant="primary"   icon="💾">{L({ en: 'Save as case', zh: '保存为用例' }, lang)}</Button>
+          </>}
+        />
+        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '320px 1fr 1fr', gap: 14, minHeight: 0 }}>
+          <Card padded={false} style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ padding: '12px 14px', borderBottom: `1px solid ${theme.border}`, fontSize: 13, fontWeight: 600 }}>
+              {L({ en: 'Flow / state tree', zh: '流程 / 状态树' }, lang)}
+            </div>
+            <div style={{ padding: 14, fontSize: 12.5, fontFamily: FONT.mono, overflow: 'auto', flex: 1 }}>
+              <TreeNode glyph="▸" c={theme.accent}>cart.loaded</TreeNode>
+              <TreeNode glyph="├" indent={1} c={theme.textDim}>click #proceed</TreeNode>
+              <TreeNode glyph="▸" c={theme.accent}>checkout.form</TreeNode>
+              <TreeNode glyph="├" indent={1} c={theme.textDim}>fill card fields</TreeNode>
+              <TreeNode glyph="├" indent={1} c={theme.textDim}>apply coupon</TreeNode>
+              <TreeNode glyph="├" indent={1} c={theme.textDim}>click Pay</TreeNode>
+              <TreeNode glyph="◈" c={theme.warning}>payment.processing</TreeNode>
+              <TreeNode glyph="└" indent={1} c={theme.textDim}>wait: spinner gone</TreeNode>
+              <TreeNode glyph="▸" c={theme.success}>order.confirmed</TreeNode>
+              <TreeNode glyph="├" indent={1} c={theme.textDim}>assert url</TreeNode>
+              <TreeNode glyph="├" indent={1} c={theme.textDim}>assert text</TreeNode>
+              <TreeNode glyph="├" indent={1} c={theme.textDim}>assert db.orders</TreeNode>
+              <TreeNode glyph="└" indent={1} c={theme.textDim}>assert stock delta</TreeNode>
+            </div>
+          </Card>
+          <Card padded={false} style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ padding: '12px 14px', borderBottom: `1px solid ${theme.border}`, display: 'flex', alignItems: 'center' }}>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>{L({ en: 'State machine', zh: '状态机' }, lang)}</div>
+              <Pill icon="◇" color={theme.accent2} style={{ marginLeft: 'auto' }}>4 states · 5 edges</Pill>
+            </div>
+            <div style={{ flex: 1, padding: 14, position: 'relative' }}>
+              <StateMachineSVG/>
+            </div>
+          </Card>
+          <Card padded={false} style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ padding: '12px 14px', borderBottom: `1px solid ${theme.border}`, display: 'flex', alignItems: 'center' }}>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>DSL</div>
+              <Pill icon="✓" color={theme.success} style={{ marginLeft: 'auto' }}>{L({ en: 'schema ok', zh: '结构校验通过' }, lang)}</Pill>
+            </div>
+            <div style={{ flex: 1, padding: 14, overflow: 'auto' }}>
+              <CodeBlock lines={dslLines} style={{ fontSize: 11 }}/>
+            </div>
+          </Card>
+        </div>
+      </div>
+    </Frame>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// 9) Screen 06 — 执行监控
+// ─────────────────────────────────────────────────────────────
+function MiniStat({ label, value, c }) {
+  const { theme } = useTheme();
+  return (
+    <div>
+      <div style={{ fontSize: 10, color: theme.textMid, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</div>
+      <div style={{ fontSize: 18, fontWeight: 700, color: c }}>{value}</div>
+    </div>
+  );
+}
+function Field({ label, value, accent, dim }) {
+  return (
+    <div>
+      <div style={{ fontSize: 10, color: '#777', marginBottom: 3, textTransform: 'uppercase' }}>{label}</div>
+      <div style={{
+        height: 32, padding: '0 10px',
+        background: accent ? '#EEF6FF' : dim ? '#F8F8F8' : '#fff',
+        border: `1px solid ${accent ? '#9CC7FF' : '#E3E3E3'}`,
+        borderRadius: 5, fontSize: 12,
+        display: 'flex', alignItems: 'center',
+        color: '#222', fontFamily: FONT.mono,
+      }}>{value}</div>
+    </div>
+  );
+}
+function MockCheckoutPage() {
+  const { theme } = useTheme();
+  return (
+    <div style={{
+      width: '100%', height: '100%',
+      background: '#fff', border: `1px solid ${theme.border}`,
+      borderRadius: 8, padding: 20, position: 'relative',
+      fontFamily: FONT.sans, color: '#111',
+    }}>
+      <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Checkout</div>
+      <div style={{ fontSize: 12, color: '#777', marginBottom: 16 }}>2 items · $89.10</div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 8 }}>
+        <Field label="Card number" value="4242 4242 4242 4242" dim/>
+        <Field label="Expiry"      value="12 / 28"/>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+        <Field label="CVC"    value="123"/>
+        <Field label="Coupon" value="SAVE10" accent/>
+      </div>
+      <div style={{ padding: 10, background: '#F5F7FA', borderRadius: 6, fontSize: 12, color: '#334', marginBottom: 12 }}>
+        Subtotal $99.00 · Coupon −$9.90 · Tax $0.00 → <b>Total $89.10</b>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ fontSize: 11, color: '#888' }}>Secured by stripe-mock</div>
+        <div style={{ padding: '9px 20px', background: '#1A73E8', color: '#fff', borderRadius: 6, fontSize: 13, fontWeight: 600 }}>Pay $89.10</div>
+      </div>
+    </div>
+  );
+}
+
+function ScreenExecMonitor() {
+  const { theme, lang } = useTheme();
+  return (
+    <Frame>
+      <div style={{ padding: 24, height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
+          <div>
+            <div style={{ fontSize: 12, color: theme.textMid, marginBottom: 4 }}>
+              {L({ en: 'Executions / run_8f2a1c3e', zh: '执行 / run_8f2a1c3e' }, lang)}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em' }}>Checkout happy path</div>
+              <Badge variant="info" dot>{L({ en: 'running', zh: '执行中' }, lang)}</Badge>
+              <Pill icon="▸" color={theme.accent2}>staging</Pill>
+              <Pill icon="●" color={theme.accent}>claude-4.5</Pill>
+            </div>
+          </div>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+            <Button variant="ghost" icon="⏸">{L({ en: 'Pause', zh: '暂停' }, lang)}</Button>
+            <Button variant="secondary" icon="✕" style={{ color: theme.danger, borderColor: theme.danger + '60' }}>
+              {L({ en: 'Abort', zh: '终止' }, lang)}
+            </Button>
+          </div>
+        </div>
+        <Card style={{ marginBottom: 14, padding: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <Ring progress={0.62} size={52} stroke={5} color={theme.accent} label="62%"/>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                <div style={{ fontSize: 12, color: theme.textMid }}>
+                  {L({ en: 'Step 5 of 8', zh: '第 5 步 / 共 8 步' }, lang)} — <b style={{ color: theme.text }}>click "Pay"</b>
+                </div>
+                <div style={{ fontSize: 12, color: theme.textMid, fontFamily: FONT.mono }}>01:48 / ~02:50</div>
+              </div>
+              <div style={{ display: 'flex', gap: 3 }}>
+                {['done','done','done','done','run','todo','todo','todo'].map((s, i) => (
+                  <div key={i} style={{
+                    flex: 1, height: 8, borderRadius: 2,
+                    background: s === 'done' ? theme.success : s === 'run' ? theme.accent : theme.border,
+                    animation: s === 'run' ? 'pulse 1.5s ease-in-out infinite' : 'none',
+                  }}/>
+                ))}
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 16 }}>
+              <MiniStat label={L({ en: 'Assertions', zh: '断言' }, lang)} value="3/5" c={theme.success}/>
+              <MiniStat label={L({ en: 'AI calls',   zh: 'AI 调用' }, lang)} value="12"  c={theme.accent}/>
+              <MiniStat label={L({ en: 'Heals',      zh: '自愈' }, lang)}   value="1"   c={theme.warning}/>
+            </div>
+          </div>
+        </Card>
+        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '280px 1fr 360px', gap: 14, minHeight: 0 }}>
+          <Card padded={false} style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ padding: '12px 14px', borderBottom: `1px solid ${theme.border}`, fontSize: 13, fontWeight: 600 }}>
+              {L({ en: 'Steps timeline', zh: '步骤时间线' }, lang)}
+            </div>
+            <div style={{ padding: 12, overflow: 'auto', flex: 1 }}>
+              {[
+                { n: 1, label: 'open /cart',     dur: '0.8s', status: 'done' },
+                { n: 2, label: 'click #proceed', dur: '1.4s', status: 'done', note: 'heal' },
+                { n: 3, label: 'fill card',      dur: '0.6s', status: 'done' },
+                { n: 4, label: 'type coupon',    dur: '0.4s', status: 'done' },
+                { n: 5, label: "click 'Pay'",    dur: '…',    status: 'run'  },
+                { n: 6, label: 'assert url',     dur: '',     status: 'todo' },
+                { n: 7, label: 'assert db',      dur: '',     status: 'todo' },
+                { n: 8, label: 'assert delta',   dur: '',     status: 'todo' },
+              ].map(s => {
+                const c = s.status === 'done' ? theme.success : s.status === 'run' ? theme.accent : theme.textDim;
+                return (
+                  <div key={s.n} style={{
+                    display: 'flex', gap: 10, alignItems: 'flex-start',
+                    padding: '8px 4px',
+                    background: s.status === 'run' ? theme.accentSoft : 'transparent',
+                    borderRadius: 6, marginBottom: 2,
+                  }}>
+                    <div style={{
+                      width: 20, height: 20, borderRadius: '50%',
+                      background: c + '22', color: c,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 10, fontWeight: 700, flexShrink: 0,
+                    }}>
+                      {s.status === 'done' ? '✓' : s.status === 'run' ? '•' : s.n}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontFamily: FONT.mono, color: theme.text, overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.label}</div>
+                      <div style={{ fontSize: 10, color: theme.textDim, marginTop: 2 }}>
+                        {s.dur} {s.note && <Badge variant="warning">◈ {s.note}</Badge>}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+          <Card padded={false} style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ padding: '12px 14px', borderBottom: `1px solid ${theme.border}`, display: 'flex', alignItems: 'center' }}>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>{L({ en: 'Live page', zh: '实时页面' }, lang)}</div>
+              <Pill icon="🔒" color={theme.accent} style={{ marginLeft: 'auto', fontFamily: FONT.mono }}>app.acme.example/checkout</Pill>
+            </div>
+            <div style={{ flex: 1, background: theme.bg, padding: 16, overflow: 'hidden', position: 'relative' }}>
+              <MockCheckoutPage/>
+              <div style={{
+                position: 'absolute', right: 36, bottom: 70, width: 110, height: 38,
+                border: `2px solid ${theme.accent}`, borderRadius: 6,
+                boxShadow: `0 0 0 4px ${theme.accent}30`,
+                animation: 'pulse 1.8s ease-in-out infinite',
+              }}>
+                <div style={{
+                  position: 'absolute', top: -22, left: 0,
+                  fontSize: 10, fontWeight: 700,
+                  background: theme.accent, color: '#fff',
+                  padding: '2px 6px', borderRadius: 4, fontFamily: FONT.mono,
+                }}>step 5 · click</div>
+              </div>
+            </div>
+          </Card>
+          <Card padded={false} style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ padding: '12px 14px', borderBottom: `1px solid ${theme.border}`, display: 'flex', alignItems: 'center' }}>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>{L({ en: 'AI runtime log', zh: 'AI 运行时日志' }, lang)}</div>
+              <Badge variant="info" dot style={{ marginLeft: 'auto' }}>live</Badge>
+            </div>
+            <div style={{ padding: 12, overflow: 'auto', flex: 1, fontSize: 11.5, lineHeight: 1.55 }}>
+              {[
+                { t: '+01:48', type: 'decision', model: 'claude-4.5', content: 'Confirmed Pay button visible at candidate[0] (score 0.94). Proceeding.' },
+                { t: '+01:46', type: 'heal',     model: 'claude-4.5', content: 'Locator #proceed-btn failed. Tried candidate[1] → matched 1 element. Healed.' },
+                { t: '+01:12', type: 'state',    model: '—',          content: 'Page recognized as checkout.form (confidence 0.97).' },
+                { t: '+00:48', type: 'decision', model: 'claude-4.5', content: 'Field [name=coupon] detected. Typing "SAVE10".' },
+                { t: '+00:03', type: 'seed',     model: '—',          content: 'Data plan plan.checkout.seed.v2 completed. 3 rows inserted.' },
+              ].map((d, i) => (
+                <div key={i} style={{
+                  padding: 8, borderRadius: 6,
+                  background: i === 0 ? theme.accentSoft : 'transparent',
+                  marginBottom: 4,
+                }}>
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 3 }}>
+                    <div style={{ fontFamily: FONT.mono, fontSize: 10, color: theme.textDim }}>{d.t}</div>
+                    <Badge variant={d.type === 'heal' ? 'warning' : d.type === 'decision' ? 'info' : d.type === 'state' ? 'mint' : 'coral'}>{d.type}</Badge>
+                    {d.model !== '—' && <div style={{ fontSize: 10, color: theme.textMid, fontFamily: FONT.mono, marginLeft: 'auto' }}>{d.model}</div>}
+                  </div>
+                  <div style={{ color: theme.text, fontSize: 11.5 }}>{d.content}</div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+      </div>
+    </Frame>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// 10) Screen 07 — 报告详情
+// ─────────────────────────────────────────────────────────────
+function SmallBox({ label, value, c }) {
+  const { theme } = useTheme();
+  return (
+    <div style={{ padding: 10, background: theme.surface2, border: `1px solid ${theme.border}`, borderRadius: 8 }}>
+      <div style={{ fontSize: 10, color: theme.textMid, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</div>
+      <div style={{ fontSize: 16, fontWeight: 700, color: c, marginTop: 3 }}>{value}</div>
+    </div>
+  );
+}
+
+function ScreenReportDetail() {
+  const { theme, lang } = useTheme();
+  return (
+    <Frame>
+      <div style={{ padding: 24, height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ fontSize: 12, color: theme.textMid, marginBottom: 6 }}>
+          {L({ en: 'Reports / run_8f2a1c3e', zh: '报告 / run_8f2a1c3e' }, lang)}
+        </div>
+        <SectionHead
+          title={<span>Checkout happy path <Badge variant="success" dot style={{ marginLeft: 10, verticalAlign: 'middle' }}>PASS</Badge></span>}
+          subtitle={L({ en: '2025-11-04 14:22 · 3m 14s · staging · claude-4.5 · by Lin Chen', zh: '2025-11-04 14:22 · 3 分 14 秒 · staging · claude-4.5 · Lin Chen' }, lang)}
+          actions={<>
+            <Button variant="ghost"     icon="↓">{L({ en: 'Download artifacts', zh: '下载产物' }, lang)}</Button>
+            <Button variant="secondary" icon="↺">{L({ en: 'Re-run',             zh: '重跑' }, lang)}</Button>
+          </>}
+        />
+        <Tabs active="o" tabs={[
+          { key: 'o', label: L({ en: 'Overview',     zh: '概览' }, lang) },
+          { key: 'p', label: L({ en: 'Steps',        zh: '步骤' }, lang) },
+          { key: 'a', label: L({ en: 'Assertions',   zh: '断言' }, lang) },
+          { key: 'd', label: L({ en: 'Data diff',    zh: '数据差异' }, lang) },
+          { key: 'r', label: L({ en: 'Recovery',     zh: '恢复' }, lang) },
+          { key: 'i', label: L({ en: 'AI decisions', zh: 'AI 决策' }, lang) },
+        ]}/>
+        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, marginTop: 14, minHeight: 0 }}>
+          <Card>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>{L({ en: 'Summary', zh: '概要' }, lang)}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 14 }}>
+              <Ring progress={1} size={64} stroke={6} color={theme.success} label="8/8"/>
+              <div>
+                <div style={{ fontSize: 11, color: theme.textMid, marginBottom: 2 }}>{L({ en: 'Steps passed', zh: '步骤通过' }, lang)}</div>
+                <div style={{ fontSize: 20, fontWeight: 700 }}>100%</div>
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <SmallBox label={L({ en: 'Duration',   zh: '时长' }, lang)}    value="3m 14s"  c={theme.text}/>
+              <SmallBox label={L({ en: 'Assertions', zh: '断言' }, lang)}    value="5/5"     c={theme.success}/>
+              <SmallBox label={L({ en: 'AI calls',   zh: 'AI 调用' }, lang)} value="23"      c={theme.accent}/>
+              <SmallBox label={L({ en: 'AI cost',    zh: 'AI 花费' }, lang)} value="$0.082"  c={theme.accent4}/>
+              <SmallBox label={L({ en: 'Heals',      zh: '自愈' }, lang)}   value="1"        c={theme.warning}/>
+              <SmallBox label={L({ en: 'Recovery',   zh: '恢复' }, lang)}   value="✓ ok"     c={theme.success}/>
+            </div>
+          </Card>
+          <Card padded={false} style={{ overflow: 'hidden' }}>
+            <div style={{ padding: '12px 14px', borderBottom: `1px solid ${theme.border}`, fontSize: 13, fontWeight: 600 }}>
+              {L({ en: 'Page screenshots', zh: '页面截图' }, lang)}
+            </div>
+            <div style={{ padding: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              {[
+                { t: '/cart',          c: theme.accent  },
+                { t: '/checkout',      c: theme.accent2 },
+                { t: '/pay/spin',      c: theme.warning },
+                { t: '/order/confirm', c: theme.success },
+              ].map((s, i) => (
+                <div key={i} style={{
+                  aspectRatio: '16/10',
+                  background: `linear-gradient(135deg, ${s.c}18, ${s.c}08)`,
+                  border: `1px solid ${theme.border}`, borderRadius: 6,
+                  position: 'relative', display: 'flex', flexDirection: 'column', padding: 8,
+                }}>
+                  <div style={{ fontSize: 9, color: theme.textDim, fontFamily: FONT.mono }}>{String(i+1).padStart(2,'0')}</div>
+                  <div style={{ flex: 1, marginTop: 4, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    <div style={{ height: 4, background: '#fff', borderRadius: 2, width: '70%' }}/>
+                    <div style={{ height: 3, background: '#fff', borderRadius: 2, width: '40%', opacity: 0.7 }}/>
+                    <div style={{ height: 3, background: '#fff', borderRadius: 2, width: '55%', opacity: 0.7 }}/>
+                    <div style={{ height: 14, background: s.c, borderRadius: 2, width: '30%', marginTop: 'auto', opacity: 0.8 }}/>
+                  </div>
+                  <div style={{ position: 'absolute', bottom: 6, right: 8, fontSize: 9, color: theme.textMid, fontFamily: FONT.mono }}>{s.t}</div>
+                </div>
+              ))}
+            </div>
+          </Card>
+          <Card padded={false} style={{ overflow: 'hidden' }}>
+            <div style={{ padding: '12px 14px', borderBottom: `1px solid ${theme.border}`, fontSize: 13, fontWeight: 600 }}>
+              {L({ en: 'Assertions', zh: '断言' }, lang)}
+            </div>
+            <div>
+              {[
+                { n: 'url matches /order/confirm/*', pass: true, actual: '/order/confirm/ord_8821' },
+                { n: 'text "Thanks for your order"', pass: true, actual: 'exact match' },
+                { n: 'db orders.status = "paid"',    pass: true, actual: '"paid"' },
+                { n: 'delta stock = -2',             pass: true, actual: '-2 (sku_A: -1, sku_B: -1)' },
+                { n: 'email sent',                   pass: true, actual: '1 queued · order_confirmation_v2' },
+              ].map((a, i) => (
+                <div key={i} style={{
+                  padding: '10px 14px',
+                  borderBottom: i < 4 ? `1px solid ${theme.border}` : 'none',
+                  display: 'flex', gap: 10, alignItems: 'flex-start',
+                }}>
+                  <div style={{
+                    width: 18, height: 18, borderRadius: '50%',
+                    background: (a.pass ? theme.success : theme.danger) + '22',
+                    color: a.pass ? theme.success : theme.danger,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 10, fontWeight: 800, flexShrink: 0,
+                  }}>{a.pass ? '✓' : '✕'}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontFamily: FONT.mono, color: theme.text }}>{a.n}</div>
+                    <div style={{ fontSize: 11, color: theme.textMid, marginTop: 2 }}>→ {a.actual}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+      </div>
+    </Frame>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// 11) Screen 08 — 数据差异
+// ─────────────────────────────────────────────────────────────
+function DiffStat({ label, value, c, icon }) {
+  const { theme } = useTheme();
+  return (
+    <div style={{
+      padding: 12, background: theme.surface,
+      border: `1px solid ${theme.border}`, borderRadius: 10,
+      display: 'flex', alignItems: 'center', gap: 12,
+    }}>
+      <div style={{
+        width: 34, height: 34, borderRadius: 8,
+        background: c + '22', color: c,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 15, fontWeight: 800,
+      }}>{icon}</div>
+      <div>
+        <div style={{ fontSize: 10, color: theme.textMid, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</div>
+        <div style={{ fontSize: 20, fontWeight: 700, color: theme.text }}>{value}</div>
+      </div>
+    </div>
+  );
+}
+
+function ScreenDataDiff() {
+  const { theme, lang } = useTheme();
+  const rows = [
+    { tbl: 'orders',      pk: 'ord_8821', field: 'status',      b: 'null', a: '"paid"',   r: 'null', exp: true,  rec: true  },
+    { tbl: 'orders',      pk: 'ord_8821', field: 'total_cents', b: 'null', a: '8910',     r: 'null', exp: true,  rec: true  },
+    { tbl: 'order_items', pk: 'oi_9104',  field: '(row)',       b: '—',    a: 'inserted', r: '—',    exp: true,  rec: true  },
+    { tbl: 'order_items', pk: 'oi_9105',  field: '(row)',       b: '—',    a: 'inserted', r: '—',    exp: true,  rec: true  },
+    { tbl: 'products',    pk: 'sku_A',    field: 'stock',       b: '50',   a: '49',       r: '50',   exp: true,  rec: true  },
+    { tbl: 'products',    pk: 'sku_B',    field: 'stock',       b: '28',   a: '27',       r: '28',   exp: true,  rec: true  },
+    { tbl: 'coupons',     pk: 'SAVE10',   field: 'used_count',  b: '142',  a: '143',      r: '142',  exp: true,  rec: true  },
+    { tbl: 'audit_log',   pk: 'log_…',    field: '(row)',       b: '—',    a: 'inserted', r: 'kept', exp: false, rec: false },
+  ];
+  return (
+    <Frame>
+      <div style={{ padding: 24, height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ fontSize: 12, color: theme.textMid, marginBottom: 6 }}>
+          {L({ en: 'Reports / run_8f2a1c3e / Data diff', zh: '报告 / run_8f2a1c3e / 数据差异' }, lang)}
+        </div>
+        <SectionHead
+          title={L({ en: 'Data diff — orders & inventory', zh: '数据差异 — 订单与库存' }, lang)}
+          subtitle={L({ en: 'Comparison plan: plan.inv.delta · 8 changes detected · 7 expected · 1 unexpected', zh: '比较计划: plan.inv.delta · 检出 8 项变更 · 7 符合预期 · 1 非预期' }, lang)}
+          actions={<>
+            <Button variant="ghost"     icon="⧉">{L({ en: 'View raw JSON', zh: '查看原始 JSON' }, lang)}</Button>
+            <Button variant="secondary" icon="↺">{L({ en: 'Re-restore',    zh: '重新恢复' }, lang)}</Button>
+          </>}
+        />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 14 }}>
+          <DiffStat label={L({ en: 'Expected changes', zh: '预期变更' }, lang)} value="7"   c={theme.success} icon="✓"/>
+          <DiffStat label={L({ en: 'Unexpected',       zh: '非预期'   }, lang)} value="1"   c={theme.warning} icon="!"/>
+          <DiffStat label={L({ en: 'Restored',         zh: '已恢复'   }, lang)} value="7/8" c={theme.accent}  icon="↺"/>
+          <DiffStat label={L({ en: 'Tables affected',  zh: '涉及表'   }, lang)} value="5"   c={theme.accent2} icon="▦"/>
+        </div>
+        <Card padded={false} style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <div style={{
+            display: 'grid', gridTemplateColumns: '140px 140px 120px 1fr 1fr 1fr 100px 80px',
+            padding: '10px 14px',
+            background: theme.surface2, borderBottom: `1px solid ${theme.border}`,
+            fontSize: 10, fontWeight: 600, color: theme.textMid,
+            textTransform: 'uppercase', letterSpacing: '0.05em',
+          }}>
+            <div>table</div><div>pk</div><div>field</div>
+            <div style={{ color: theme.textMid }}>before</div>
+            <div style={{ color: theme.accent }}>after</div>
+            <div style={{ color: theme.textMid }}>after_restore</div>
+            <div>expected</div><div>restored</div>
+          </div>
+          <div style={{ overflow: 'auto', flex: 1 }}>
+            {rows.map((r, i) => {
+              const wonky = !r.exp || !r.rec;
+              return (
+                <div key={i} style={{
+                  display: 'grid', gridTemplateColumns: '140px 140px 120px 1fr 1fr 1fr 100px 80px',
+                  padding: '10px 14px',
+                  borderBottom: i < rows.length - 1 ? `1px solid ${theme.border}` : 'none',
+                  fontSize: 12, alignItems: 'center',
+                  background: wonky ? theme.warning + '14' : 'transparent',
+                  fontFamily: FONT.mono,
+                }}>
+                  <div style={{ color: theme.text, fontWeight: 500 }}>{r.tbl}</div>
+                  <div style={{ color: theme.textMid }}>{r.pk}</div>
+                  <div style={{ color: theme.textMid }}>{r.field}</div>
+                  <div style={{ color: theme.textDim, fontSize: 11 }}>{r.b}</div>
+                  <div style={{ color: theme.accent, fontSize: 11 }}>{r.a}</div>
+                  <div style={{ color: r.rec ? theme.success : theme.danger, fontSize: 11 }}>{r.r}</div>
+                  <div>{r.exp ? <Badge variant="success" dot>exp</Badge> : <Badge variant="warning" dot>unexp</Badge>}</div>
+                  <div>{r.rec ? <Badge variant="success">✓</Badge> : <Badge variant="danger">✕</Badge>}</div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      </div>
+    </Frame>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// 12) Screen 09 — 模型配置
+// ─────────────────────────────────────────────────────────────
+function MiniKV({ k, v }) {
+  const { theme } = useTheme();
+  return (
+    <div>
+      <div style={{ fontSize: 10, color: theme.textMid, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{k}</div>
+      <div style={{ fontSize: 14, fontWeight: 600, color: theme.text, marginTop: 3, fontFamily: FONT.mono }}>{v}</div>
+    </div>
+  );
+}
+
+function ScreenModelConfig() {
+  const { theme, lang } = useTheme();
+  const providers = [
+    { name: 'Anthropic',       model: 'claude-4.5-sonnet', status: 'active',   use: '61%', latency: '820ms', cost: '$0.011/call', primary: true, c: theme.accent  },
+    { name: 'OpenAI',          model: 'gpt-4o',            status: 'active',   use: '24%', latency: '640ms', cost: '$0.009/call',                c: theme.accent2 },
+    { name: 'Local (Ollama)',  model: 'qwen2.5:14b',       status: 'active',   use: '7%',  latency: '2.1s',  cost: '—',                          c: theme.accent3 },
+    { name: 'Google',          model: 'gemini-2.0-flash',  status: 'fallback', use: '0%',  latency: '—',     cost: '—',                          c: theme.accent4 },
+  ];
+  return (
+    <Frame>
+      <div style={{ padding: 24, height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ fontSize: 12, color: theme.textMid, marginBottom: 6 }}>
+          {L({ en: 'Config / Models', zh: '配置中心 / 模型' }, lang)}
+        </div>
+        <SectionHead
+          title={L({ en: 'Model providers', zh: '模型提供方' }, lang)}
+          subtitle={L({ en: 'Route AI tasks to the best model. Fallback triggers on timeout or schema error.', zh: '将 AI 任务路由到合适的模型。超时或结构错误时触发回退。' }, lang)}
+          actions={<Button variant="primary" icon="＋">{L({ en: 'Add provider', zh: '新增提供方' }, lang)}</Button>}
+        />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14, marginBottom: 14 }}>
+          {providers.map(p => (
+            <Card key={p.model} style={{ position: 'relative', borderLeft: `3px solid ${p.c}` }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <div style={{ fontSize: 15, fontWeight: 600 }}>{p.name}</div>
+                    {p.primary && <Badge variant="info" dot>primary</Badge>}
+                    <Badge variant={p.status === 'active' ? 'success' : 'neutral'} dot>{p.status}</Badge>
+                  </div>
+                  <div style={{ fontSize: 12, color: theme.textMid, fontFamily: FONT.mono }}>{p.model}</div>
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <Button variant="ghost" size="sm">{L({ en: 'Test', zh: '测试' }, lang)}</Button>
+                  <Button variant="ghost" size="sm">···</Button>
+                </div>
+              </div>
+              <Divider/>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+                <MiniKV k={L({ en: 'Usage',   zh: '使用率' }, lang)} v={p.use}/>
+                <MiniKV k={L({ en: 'Latency', zh: '延迟'   }, lang)} v={p.latency}/>
+                <MiniKV k={L({ en: 'Cost',    zh: '成本'   }, lang)} v={p.cost}/>
+              </div>
+            </Card>
+          ))}
+        </div>
+        <Card padded={false} style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: '14px 16px', borderBottom: `1px solid ${theme.border}`, display: 'flex', alignItems: 'center' }}>
+            <div style={{ fontSize: 14, fontWeight: 600 }}>{L({ en: 'Task → model routing', zh: '任务 → 模型 路由' }, lang)}</div>
+            <Pill icon="◈" color={theme.accent} style={{ marginLeft: 'auto' }}>{L({ en: '4 rules', zh: '4 条规则' }, lang)}</Pill>
+          </div>
+          <div>
+            {[
+              { task: L({ en: 'Document parsing',             zh: '文档解析' }, lang),        primary: 'claude-4.5', fb: ['gpt-4o'],                  why: L({ en: 'best at long structured docs', zh: '擅长长结构化文档' }, lang) },
+              { task: L({ en: 'DSL generation',               zh: 'DSL 生成' }, lang),         primary: 'claude-4.5', fb: ['gpt-4o', 'qwen2.5:14b'],   why: L({ en: 'strict schema adherence',      zh: '严格遵守 schema' }, lang) },
+              { task: L({ en: 'Locator healing',              zh: '定位器自愈' }, lang),       primary: 'gpt-4o',     fb: ['claude-4.5'],              why: L({ en: 'faster for inline decisions',  zh: '行内决策更快' }, lang) },
+              { task: L({ en: 'Element summarization (plugin)', zh: '元素摘要 (插件)' }, lang), primary: 'qwen2.5:14b',fb: ['gpt-4o'],                  why: L({ en: 'keep data local',              zh: '数据本地化' }, lang) },
+            ].map((r, i) => (
+              <div key={i} style={{
+                display: 'grid', gridTemplateColumns: '1fr 160px 1fr 1fr 80px',
+                padding: '12px 16px',
+                borderBottom: i < 3 ? `1px solid ${theme.border}` : 'none',
+                alignItems: 'center', fontSize: 13, gap: 12,
+              }}>
+                <div style={{ fontWeight: 500 }}>{r.task}</div>
+                <div><Pill icon="●" color={theme.accent}>{r.primary}</Pill></div>
+                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                  {r.fb.map(f => <Badge key={f} variant="neutral">↺ {f}</Badge>)}
+                </div>
+                <div style={{ fontSize: 11, color: theme.textMid }}>{r.why}</div>
+                <div style={{ textAlign: 'right' }}><Button variant="ghost" size="sm">✎</Button></div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+    </Frame>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// 13) Screen 10 — 数据模板
+// ─────────────────────────────────────────────────────────────
+function SubHead({ children }) {
+  const { theme } = useTheme();
+  return (
+    <div style={{
+      fontSize: 10, fontWeight: 600, color: theme.textMid,
+      textTransform: 'uppercase', letterSpacing: '0.06em', margin: '12px 0 6px',
+    }}>{children}</div>
+  );
+}
+function ParamRow({ k, t, v, req }) {
+  const { theme } = useTheme();
+  return (
+    <div style={{ display: 'flex', gap: 8, fontSize: 11.5, fontFamily: FONT.mono, padding: '4px 0' }}>
+      <div style={{ color: theme.text,    fontWeight: 500, width: 100 }}>{k}</div>
+      <div style={{ color: theme.accent2, width: 60 }}>{t}</div>
+      {req && <Badge variant="warning">required</Badge>}
+      {v && <div style={{ color: theme.textMid, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>= {v}</div>}
+    </div>
+  );
+}
+function StepRow({ i, name, sql }) {
+  const { theme } = useTheme();
+  return (
+    <div style={{ padding: 8, background: theme.surface2, borderRadius: 6, border: `1px solid ${theme.border}`, marginBottom: 6 }}>
+      <div style={{ display: 'flex', gap: 6, fontSize: 11.5, alignItems: 'center' }}>
+        <div style={{
+          width: 16, height: 16, borderRadius: 4,
+          background: theme.accent + '22', color: theme.accent,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 10, fontWeight: 700,
+        }}>{i}</div>
+        <div style={{ fontWeight: 500 }}>{name}</div>
+      </div>
+      <div style={{ fontFamily: FONT.mono, fontSize: 10.5, color: theme.textMid, marginTop: 4 }}>{sql}</div>
+    </div>
+  );
+}
+function GuardRow({ ok, text }) {
+  const { theme } = useTheme();
+  return (
+    <div style={{ display: 'flex', gap: 8, fontSize: 11.5, padding: '3px 0' }}>
+      <span style={{ color: ok ? theme.success : theme.danger, width: 12 }}>{ok ? '✓' : '✕'}</span>
+      <span style={{ color: theme.text }}>{text}</span>
+    </div>
+  );
+}
+
+function ScreenDataTemplates() {
+  const { theme, lang } = useTheme();
+  const tpls = [
+    { name: 'user.test_account',   type: 'sql',       env: 'dev, staging', risk: 'low',    uses: 247, rb: 'snapshot' },
+    { name: 'order.seed.v2',       type: 'composite', env: 'dev, staging', risk: 'medium', uses: 128, rb: 'sql'      },
+    { name: 'product.inventory',   type: 'service',   env: 'dev',          risk: 'low',    uses: 91,  rb: 'api'      },
+    { name: 'coupon.single_use',   type: 'sql',       env: 'dev, staging', risk: 'low',    uses: 64,  rb: 'snapshot' },
+    { name: 'payment.mock.auth',   type: 'service',   env: 'staging',      risk: 'high',   uses: 33,  rb: 'manual'   },
+    { name: 'audit.clear',         type: 'sql',       env: 'dev',          risk: 'high',   uses: 12,  rb: 'snapshot' },
+  ];
+  return (
+    <Frame>
+      <div style={{ padding: 24, height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ fontSize: 12, color: theme.textMid, marginBottom: 6 }}>
+          {L({ en: 'Config / Data templates', zh: '配置中心 / 数据模板' }, lang)}
+        </div>
+        <SectionHead
+          title={L({ en: 'Data templates', zh: '数据模板' }, lang)}
+          subtitle={L({ en: 'Reusable DB seed / teardown recipes. Guarded by env whitelist & rollback strategy.', zh: '可复用的数据库预置 / 清理脚本。受环境白名单与回滚策略保护。' }, lang)}
+          actions={<>
+            <Button variant="ghost"   icon="↓">{L({ en: 'Import',       zh: '导入' }, lang)}</Button>
+            <Button variant="primary" icon="＋">{L({ en: 'New template', zh: '新建模板' }, lang)}</Button>
+          </>}
+        />
+        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 340px', gap: 14, minHeight: 0 }}>
+          <Card padded={false} style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <div style={{
+              display: 'grid', gridTemplateColumns: '1.5fr 100px 1.2fr 100px 90px 100px',
+              padding: '10px 14px',
+              background: theme.surface2, borderBottom: `1px solid ${theme.border}`,
+              fontSize: 10, fontWeight: 600, color: theme.textMid,
+              textTransform: 'uppercase', letterSpacing: '0.05em',
+            }}>
+              <div>{L({ en: 'Name',        zh: '名称' }, lang)}</div>
+              <div>{L({ en: 'Type',        zh: '类型' }, lang)}</div>
+              <div>{L({ en: 'Env allowed', zh: '允许环境' }, lang)}</div>
+              <div>{L({ en: 'Risk',        zh: '风险' }, lang)}</div>
+              <div>{L({ en: 'Rollback',    zh: '回滚' }, lang)}</div>
+              <div>{L({ en: 'Uses',        zh: '调用' }, lang)}</div>
+            </div>
+            <div style={{ overflow: 'auto', flex: 1 }}>
+              {tpls.map((t, i) => (
+                <div key={i} style={{
+                  display: 'grid', gridTemplateColumns: '1.5fr 100px 1.2fr 100px 90px 100px',
+                  padding: '12px 14px',
+                  borderBottom: i < tpls.length - 1 ? `1px solid ${theme.border}` : 'none',
+                  fontSize: 13, alignItems: 'center',
+                  background: i === 1 ? theme.accentSoft : 'transparent',
+                }}>
+                  <div style={{ fontFamily: FONT.mono, fontSize: 12, fontWeight: 500 }}>{t.name}</div>
+                  <div><Badge variant={t.type === 'sql' ? 'mint' : t.type === 'service' ? 'info' : 'coral'}>{t.type}</Badge></div>
+                  <div style={{ fontSize: 11, color: theme.textMid }}>{t.env}</div>
+                  <div><Badge variant={t.risk === 'low' ? 'success' : t.risk === 'medium' ? 'warning' : 'danger'} dot>{t.risk}</Badge></div>
+                  <div style={{ fontSize: 11, color: theme.textMid, fontFamily: FONT.mono }}>{t.rb}</div>
+                  <div style={{ fontSize: 13, color: theme.text, fontWeight: 600 }}>{t.uses}</div>
+                </div>
+              ))}
+            </div>
+          </Card>
+          <Card padded={false} style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ padding: '12px 14px', borderBottom: `1px solid ${theme.border}` }}>
+              <div style={{ fontSize: 13, fontWeight: 600, fontFamily: FONT.mono }}>order.seed.v2</div>
+              <div style={{ fontSize: 11, color: theme.textMid, marginTop: 3 }}>
+                {L({ en: 'composite · 3 steps · rolls back via sql snapshot', zh: '复合 · 3 步 · 通过 sql 快照回滚' }, lang)}
+              </div>
+            </div>
+            <div style={{ padding: 14, overflow: 'auto', flex: 1 }}>
+              <SubHead>{L({ en: 'Parameters', zh: '参数' }, lang)}</SubHead>
+              <ParamRow k="user_id"      t="uuid"    req/>
+              <ParamRow k="total_cents"  t="int"     v="8910"/>
+              <ParamRow k="item_skus"    t="string[]" v='["sku_A","sku_B"]'/>
+              <SubHead>{L({ en: 'Steps', zh: '步骤' }, lang)}</SubHead>
+              <StepRow i={1} name="INSERT orders"         sql="INSERT INTO orders (…)"/>
+              <StepRow i={2} name="INSERT order_items"    sql="INSERT INTO order_items (…)"/>
+              <StepRow i={3} name="UPDATE products.stock" sql="UPDATE products SET stock = stock - 1 …"/>
+              <SubHead>{L({ en: 'Guards', zh: '守护' }, lang)}</SubHead>
+              <GuardRow ok text={L({ en: 'prod environment blocked', zh: '禁止 prod 环境' }, lang)}/>
+              <GuardRow ok text={L({ en: 'snapshot taken before run', zh: '执行前自动快照' }, lang)}/>
+              <GuardRow ok text={L({ en: 'row count limit: 50',       zh: '行数上限: 50' }, lang)}/>
+            </div>
+            <div style={{ padding: 12, borderTop: `1px solid ${theme.border}`, display: 'flex', gap: 8 }}>
+              <Button variant="ghost"     size="sm">✎ {L({ en: 'Edit',    zh: '编辑' }, lang)}</Button>
+              <Button variant="secondary" size="sm">▶ {L({ en: 'Dry-run', zh: '试运行' }, lang)}</Button>
+            </div>
+          </Card>
+        </div>
+      </div>
+    </Frame>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// 14) Screen 11 — Edge 插件面板
+// ─────────────────────────────────────────────────────────────
+function QActionRow({ icon, c, title, sub }) {
+  const { theme } = useTheme();
+  return (
+    <div style={{
+      display: 'flex', gap: 10, padding: 8, borderRadius: 8,
+      alignItems: 'center', marginBottom: 2,
+    }}>
+      <div style={{
+        width: 32, height: 32, borderRadius: 8,
+        background: c + '22', color: c,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 14, fontWeight: 700, flexShrink: 0,
+      }}>{icon}</div>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 12.5, fontWeight: 500 }}>{title}</div>
+        <div style={{ fontSize: 10.5, color: theme.textMid, marginTop: 1 }}>{sub}</div>
+      </div>
+      <div style={{ color: theme.textDim, fontSize: 14 }}>›</div>
+    </div>
+  );
+}
+function MockCheckoutSmall() {
+  return (
+    <div style={{ fontFamily: 'sans-serif', color: '#111' }}>
+      <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 14 }}>Checkout</div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        {['Card number','Expiry','CVC','Coupon'].map(l => (
+          <div key={l}>
+            <div style={{ fontSize: 10, color: '#666', marginBottom: 3 }}>{l}</div>
+            <div style={{ height: 32, border: '1px solid #ddd', borderRadius: 5, background: '#fff' }}/>
+          </div>
+        ))}
+      </div>
+      <div style={{ marginTop: 14, padding: 10, background: '#f3f5f7', borderRadius: 6, fontSize: 12 }}>
+        Total <b>$89.10</b>
+      </div>
+      <div style={{ marginTop: 14, display: 'flex', justifyContent: 'flex-end' }}>
+        <div style={{
+          padding: '10px 22px', background: '#1A73E8', color: '#fff',
+          borderRadius: 6, fontSize: 13, fontWeight: 600,
+          boxShadow: '0 0 0 3px rgba(26,115,232,0.2)',
+          border: '2px solid #FF6B4A',
+        }}>Pay $89.10</div>
+      </div>
+    </div>
+  );
+}
+
+function ScreenPluginPopup() {
+  const { theme, lang } = useTheme();
+  return (
+    <div style={{
+      width: 1440, height: 900, background: theme.bg,
+      fontFamily: FONT.sans, color: theme.text, overflow: 'hidden',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 40,
+    }}>
+      <BrowserChrome url="app.acme.example/checkout" width={900} height={640} showExtIcon="active">
+        <div style={{ padding: 24, height: '100%', fontFamily: FONT.sans, color: '#111' }}>
+          <MockCheckoutSmall/>
+        </div>
+        <div style={{
+          position: 'absolute', top: 8, right: 36,
+          width: 340, maxHeight: 600,
+          background: theme.surface,
+          border: `1px solid ${theme.borderStrong}`,
+          borderRadius: 12, boxShadow: theme.shadowLg,
+          overflow: 'hidden',
+          display: 'flex', flexDirection: 'column',
+        }}>
+          <div style={{
+            padding: '12px 14px', borderBottom: `1px solid ${theme.border}`,
+            display: 'flex', alignItems: 'center', gap: 10,
+          }}>
+            <div style={{
+              width: 24, height: 24, borderRadius: 6,
+              background: `linear-gradient(135deg, ${theme.accent}, ${theme.accent2})`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#fff', fontSize: 11, fontWeight: 700,
+            }}>E</div>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>edge.test</div>
+              <div style={{ fontSize: 10, color: theme.textMid }}>
+                <span style={{ color: theme.success }}>● host connected</span> · staging
+              </div>
+            </div>
+          </div>
+          <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 12, overflow: 'auto' }}>
+            <div>
+              <SubHead>{L({ en: 'Current page', zh: '当前页面' }, lang)}</SubHead>
+              <div style={{ fontSize: 12, fontFamily: FONT.mono, color: theme.text, marginBottom: 2 }}>Checkout</div>
+              <div style={{ fontSize: 11, color: theme.textMid, fontFamily: FONT.mono }}>/checkout</div>
+              <div style={{ display: 'flex', gap: 4, marginTop: 8, flexWrap: 'wrap' }}>
+                <Badge variant="mint" dot>recognized</Badge>
+                <Badge variant="info">3 forms · 8 buttons</Badge>
+              </div>
+            </div>
+            <Divider/>
+            <div>
+              <SubHead>{L({ en: 'Active run', zh: '当前运行' }, lang)}</SubHead>
+              <div style={{
+                padding: 10, background: theme.accentSoft,
+                border: `1px solid ${theme.accent}40`, borderRadius: 8,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                  <Badge variant="info" dot>running</Badge>
+                  <div style={{ fontSize: 11, color: theme.textMid, marginLeft: 'auto', fontFamily: FONT.mono }}>run_8f2a…</div>
+                </div>
+                <div style={{ fontSize: 12, fontWeight: 500, marginBottom: 2 }}>Checkout happy path</div>
+                <div style={{ fontSize: 10, color: theme.textMid, fontFamily: FONT.mono }}>step 5/8 · click 'Pay'</div>
+                <div style={{ height: 4, background: theme.border, borderRadius: 2, marginTop: 6, overflow: 'hidden' }}>
+                  <div style={{ width: '62%', height: '100%', background: theme.accent }}/>
+                </div>
+              </div>
+            </div>
+            <Divider/>
+            <div>
+              <SubHead>{L({ en: 'Quick actions', zh: '快捷操作' }, lang)}</SubHead>
+              <QActionRow icon="◎" c={theme.accent}  title={L({ en: 'Pick element',      zh: '拾取元素' }, lang)} sub={L({ en: 'Hover to capture locator', zh: '悬停拾取定位器' }, lang)}/>
+              <QActionRow icon="▦" c={theme.accent2} title={L({ en: 'Page summary',      zh: '页面摘要' }, lang)} sub={L({ en: 'Structured view',          zh: '结构化视图' }, lang)}/>
+              <QActionRow icon="▶" c={theme.accent3} title={L({ en: 'Quick smoke test',  zh: '快速冒烟测试' }, lang)} sub={L({ en: 'Run on current URL',       zh: '在当前页面执行' }, lang)}/>
+              <QActionRow icon="↗" c={theme.accent4} title={L({ en: 'Open in platform',  zh: '打开后台' }, lang)} sub={L({ en: 'Full report & logs',       zh: '完整报告与日志' }, lang)}/>
+            </div>
+          </div>
+        </div>
+      </BrowserChrome>
+
+      <div style={{
+        width: 340, background: theme.surface,
+        border: `1px solid ${theme.borderStrong}`,
+        borderRadius: 12, boxShadow: theme.shadowLg,
+        overflow: 'hidden', display: 'flex', flexDirection: 'column',
+      }}>
+        <div style={{
+          padding: '12px 14px', borderBottom: `1px solid ${theme.border}`,
+          background: `linear-gradient(90deg, ${theme.accent}, ${theme.accent2})`,
+          color: '#fff',
+        }}>
+          <div style={{ fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center' }}>
+            ◎ {L({ en: 'Pick mode', zh: '拾取模式' }, lang)}
+            <Badge variant="neutral" dot style={{ marginLeft: 'auto', background: 'rgba(255,255,255,0.2)', color: '#fff' }}>active</Badge>
+          </div>
+          <div style={{ fontSize: 10, opacity: 0.85, marginTop: 3 }}>
+            {L({ en: 'Hover to highlight · click to select', zh: '悬停高亮 · 点击选中' }, lang)}
+          </div>
+        </div>
+        <div style={{ padding: 14, overflow: 'auto' }}>
+          <SubHead>{L({ en: 'Selected element', zh: '已选中元素' }, lang)}</SubHead>
+          <div style={{
+            padding: 10, background: theme.surface2,
+            border: `1px solid ${theme.border}`, borderRadius: 8,
+            fontFamily: FONT.mono, fontSize: 11, marginBottom: 12,
+          }}>
+            <div style={{ color: theme.accent }}>&lt;button&gt;</div>
+            <div style={{ color: theme.text, marginLeft: 12 }}>Pay $89.10</div>
+            <div style={{ color: theme.textMid, marginTop: 4, fontSize: 10 }}>
+              role=button · 140×38px · visible
+            </div>
+          </div>
+          <SubHead>{L({ en: 'Candidate locators', zh: '候选定位器' }, lang)}</SubHead>
+          {[
+            { s: "button:has-text('Pay')",             score: 0.94, type: 'text',   rec: true },
+            { s: "#pay-submit",                        score: 0.88, type: 'id' },
+            { s: "[data-testid='checkout-pay']",       score: 0.86, type: 'testid' },
+            { s: "form > div:nth-child(3) > button",   score: 0.42, type: 'css',    warn: true },
+            { s: "role=button[name='Pay $89.10']",     score: 0.81, type: 'role' },
+          ].map((l, i) => (
+            <div key={i} style={{
+              padding: '8px 10px',
+              border: `1px solid ${l.rec ? theme.accent + '60' : theme.border}`,
+              borderRadius: 8,
+              background: l.rec ? theme.accentSoft : theme.surface,
+              marginBottom: 6,
+              display: 'flex', alignItems: 'center', gap: 8,
+            }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontFamily: FONT.mono, fontSize: 11, color: theme.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.s}</div>
+                <div style={{ display: 'flex', gap: 4, marginTop: 3 }}>
+                  <Badge variant="neutral">{l.type}</Badge>
+                  {l.rec  && <Badge variant="info" dot>recommended</Badge>}
+                  {l.warn && <Badge variant="warning">fragile</Badge>}
+                </div>
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: l.score > 0.8 ? theme.success : l.score > 0.5 ? theme.warning : theme.danger }}>
+                {l.score.toFixed(2)}
+              </div>
+            </div>
+          ))}
+          <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+            <Button variant="secondary" size="sm" icon="⧉">{L({ en: 'Copy',       zh: '复制' }, lang)}</Button>
+            <Button variant="primary"   size="sm" icon="→">{L({ en: 'Use in DSL', zh: '插入 DSL' }, lang)}</Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// 15) Screen 注册表 — key → component + 标题
+// ─────────────────────────────────────────────────────────────
+const SCREENS = {
+  dashboard: { en: '01 · Dashboard',      zh: '01 · 仪表盘',      C: ScreenDashboard     },
+  projects:  { en: '02 · Projects',       zh: '02 · 项目列表',    C: ScreenProjects      },
+  case:      { en: '03 · Case detail',    zh: '03 · 用例详情',    C: ScreenCaseDetail    },
+  docparse:  { en: '04 · Doc parse',      zh: '04 · 文档解析',    C: ScreenDocParse      },
+  aigen:     { en: '05 · AI generate',    zh: '05 · AI 生成',     C: ScreenAIGenerate    },
+  exec:      { en: '06 · Exec monitor',   zh: '06 · 执行监控',    C: ScreenExecMonitor   },
+  report:    { en: '07 · Report detail',  zh: '07 · 报告详情',    C: ScreenReportDetail  },
+  datadiff:  { en: '08 · Data diff',      zh: '08 · 数据差异',    C: ScreenDataDiff      },
+  models:    { en: '09 · Model config',   zh: '09 · 模型配置',    C: ScreenModelConfig   },
+  templates: { en: '10 · Data templates', zh: '10 · 数据模板',    C: ScreenDataTemplates },
+  plugin:    { en: '11 · Plugin popup',   zh: '11 · 插件面板',    C: ScreenPluginPopup   },
+};
+
+// ─────────────────────────────────────────────────────────────
+// 16) App Shell — 顶部工具栏 + 按视口缩放显示
+// ─────────────────────────────────────────────────────────────
+function useFitScale(ref, base = { w: 1440, h: 900 }) {
+  const [scale, setScale] = useState(1);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      const r = el.getBoundingClientRect();
+      const padding = 32;
+      const sW = (r.width  - padding) / base.w;
+      const sH = (r.height - padding) / base.h;
+      setScale(Math.min(sW, sH, 1.4));
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [ref, base.w, base.h]);
+  return scale;
+}
+
+function App() {
+  const [mode,   setMode]   = useState('light');
+  const [lang,   setLang]   = useState('zh');
+  const [screen, setScreen] = useState('dashboard');
+  const theme = mode === 'dark' ? DARK : LIGHT;
+
+  const stageRef = useRef(null);
+  const scale = useFitScale(stageRef);
+
+  const ctx = { theme, mode, lang, screen, setScreen };
+  const ScreenC = SCREENS[screen].C;
+
+  return (
+    <ThemeContext.Provider value={ctx}>
+      <div className="shell">
+        {/* 顶部工具栏 */}
+        <div className="toolbar">
+          <div className="dot"/><div className="dot y"/><div className="dot g"/>
+          <span className="brand">EDGE_SELF_TEST · Platform UI v2</span>
+          <span style={{ fontSize: 11, color: '#a8a193' }}>
+            {lang === 'zh' ? '可交互 Demo' : 'Interactive demo'}
+          </span>
+          <span className="sep"/>
+          <label>{lang === 'zh' ? '屏' : 'Screen'}</label>
+          <select value={screen} onChange={e => setScreen(e.target.value)}>
+            {Object.entries(SCREENS).map(([k, v]) => (
+              <option key={k} value={k}>{L({ en: v.en, zh: v.zh }, lang)}</option>
+            ))}
+          </select>
+          <label>{lang === 'zh' ? '主题' : 'Theme'}</label>
+          <select value={mode} onChange={e => setMode(e.target.value)}>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+          <label>{lang === 'zh' ? '语言' : 'Lang'}</label>
+          <select value={lang} onChange={e => setLang(e.target.value)}>
+            <option value="zh">中文</option>
+            <option value="en">English</option>
+          </select>
+          <span style={{ fontSize: 10, color: '#6e685b', marginLeft: 8 }}>
+            {Math.round(scale * 100)}%
+          </span>
+        </div>
+
+        {/* 舞台 */}
+        <div className="stage">
+          <div className="scaler" ref={stageRef}>
+            <div className="artboard-wrap" style={{ transform: `scale(${scale})` }}>
+              <div className="artboard">
+                <ScreenC/>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </ThemeContext.Provider>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

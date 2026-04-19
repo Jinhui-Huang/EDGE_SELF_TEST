@@ -21,3 +21,4 @@ config/**/secrets.*
 node_modules/
 dist/
 coverage/
+*.tsbuildinfo

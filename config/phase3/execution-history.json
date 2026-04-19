@@ -1,0 +1,29 @@
+{
+  "items": [
+    {
+      "runId": "member-center-daily",
+      "projectKey": "member-center",
+      "status": "RUNNING",
+      "owner": "team-growth",
+      "environment": "staging-edge",
+      "detail": "Browser session is active and waiting for profile-save assertions.",
+      "total": 24,
+      "failed": 0,
+      "artifacts": 2,
+      "startedAt": "2026-04-18T19:58:00Z"
+    },
+    {
+      "runId": "ops-console-maintenance",
+      "projectKey": "ops-console",
+      "status": "CANCELLED",
+      "owner": "ops",
+      "environment": "ops-dr",
+      "detail": "Run was cancelled after a maintenance window change.",
+      "total": 0,
+      "failed": 0,
+      "artifacts": 0,
+      "startedAt": "2026-04-18T17:40:00Z",
+      "finishedAt": "2026-04-18T17:47:00Z"
+    }
+  ]
+}

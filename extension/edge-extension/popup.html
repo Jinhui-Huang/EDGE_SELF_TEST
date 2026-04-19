@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Web Test Helper</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="popup">
+      <section class="hero">
+        <p class="eyebrow">Phase 3 Plugin</p>
+        <h1>Lightweight Assistive Entry</h1>
+        <p class="muted">The popup stays focused on current page context and runtime status while the platform owns configuration and reports.</p>
+      </section>
+
+      <section class="panel">
+        <div class="panelHeader">
+          <h2>Popup Home</h2>
+          <span class="badge" id="connectionBadge">Mock</span>
+        </div>
+        <p>Connection state: <strong id="connectionState">Waiting for local admin API</strong></p>
+        <p id="connectionSummary">Current workflow: page summary, runtime state, and next recommended action.</p>
+      </section>
+
+      <section class="panel">
+        <div class="panelHeader">
+          <h2>Current Page Summary</h2>
+          <button id="refreshButton" type="button">Refresh</button>
+        </div>
+        <dl class="summary">
+          <div>
+            <dt>Title</dt>
+            <dd id="pageTitle">Not loaded</dd>
+          </div>
+          <div>
+            <dt>URL</dt>
+            <dd id="pageUrl">Not loaded</dd>
+          </div>
+          <div>
+            <dt>Suggested action</dt>
+            <dd id="runtimeAction">Gather context, then let platform rules evaluate the next step.</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="panel">
+        <div class="panelHeader">
+          <h2>Current Runtime Status</h2>
+          <span class="status" id="runtimeState">Audit-only</span>
+        </div>
+        <ul class="statusList">
+          <li>Mode: <span id="runtimeMode">Audit-first</span></li>
+          <li>Queue: <span id="runtimeQueue">Unknown</span></li>
+          <li>Audit: <span id="runtimeAudit">Decision logging required</span></li>
+        </ul>
+      </section>
+
+      <section class="panel">
+        <div class="panelHeader">
+          <h2>Quick Launch</h2>
+          <span class="status">native-host -> scheduler/requests</span>
+        </div>
+        <form class="actionForm" id="launchForm">
+          <label>
+            Run ID
+            <input id="launchRunId" name="runId" type="text" value="popup-checkout-smoke" />
+          </label>
+          <label>
+            Project
+            <input id="launchProjectKey" name="projectKey" type="text" value="checkout-web" />
+          </label>
+          <label>
+            Owner
+            <input id="launchOwner" name="owner" type="text" value="edge-popup" />
+          </label>
+          <label>
+            Environment
+            <input id="launchEnvironment" name="environment" type="text" value="staging-edge" />
+          </label>
+          <label class="fullWidth">
+            Detail
+            <textarea id="launchDetail" name="detail" rows="3">Queued from the Edge popup after reviewing the current page context.</textarea>
+          </label>
+          <button id="launchSubmitButton" type="submit">Queue Run</button>
+        </form>
+        <p class="actionStatus hidden" id="launchStatus" role="status" aria-live="polite"></p>
+      </section>
+
+      <section class="panel">
+        <div class="panelHeader">
+          <h2>Audit Review</h2>
+          <span class="status">native-host -> scheduler/events</span>
+        </div>
+        <form class="actionForm" id="reviewForm">
+          <label>
+            Run ID
+            <input id="reviewRunId" name="runId" type="text" value="popup-checkout-smoke" />
+          </label>
+          <label>
+            Project
+            <input id="reviewProjectKey" name="projectKey" type="text" value="checkout-web" />
+          </label>
+          <label>
+            Owner
+            <input id="reviewOwner" name="owner" type="text" value="edge-popup-audit" />
+          </label>
+          <label>
+            Environment
+            <input id="reviewEnvironment" name="environment" type="text" value="staging-edge" />
+          </label>
+          <label class="fullWidth">
+            Audit detail
+            <textarea id="reviewDetail" name="detail" rows="3">Operator requested follow-up review from the Edge popup.</textarea>
+          </label>
+          <button id="reviewSubmitButton" type="submit">Record Review</button>
+        </form>
+        <p class="actionStatus hidden" id="reviewStatus" role="status" aria-live="polite"></p>
+      </section>
+    </main>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

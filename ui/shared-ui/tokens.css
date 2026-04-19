@@ -1,0 +1,18 @@
+:root {
+  --shell-bg: #f2ede3;
+  --shell-panel: #fffaf0;
+  --shell-panel-strong: #f5e6c8;
+  --shell-ink: #1f2520;
+  --shell-muted: #5d645d;
+  --shell-accent: #17624c;
+  --shell-accent-strong: #0c4635;
+  --shell-warning: #9f5314;
+  --shell-border: #d7c8ad;
+  --shell-shadow: 0 20px 60px rgba(44, 44, 28, 0.12);
+  --shell-radius-xl: 28px;
+  --shell-radius-lg: 18px;
+  --shell-radius-md: 12px;
+  --shell-sidebar-width: 280px;
+  --shell-font-heading: "Segoe UI Semibold", "Microsoft YaHei UI", sans-serif;
+  --shell-font-body: "Segoe UI", "Microsoft YaHei UI", sans-serif;
+}

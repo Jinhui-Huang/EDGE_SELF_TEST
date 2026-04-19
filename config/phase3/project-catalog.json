@@ -1,0 +1,197 @@
+{
+  "projects": [
+    {
+      "key": "checkout-web",
+      "name": "checkout-web",
+      "scope": "Payment journey",
+      "environments": ["7"],
+      "note": "2 failed cases still need locator repair review"
+    },
+    {
+      "key": "member-center",
+      "name": "member-center",
+      "scope": "Account and profile flows",
+      "environments": ["3"],
+      "note": "1 new environment variance detected this week"
+    },
+    {
+      "key": "ops-console",
+      "name": "ops-console",
+      "scope": "Operations back office",
+      "environments": ["2"],
+      "note": "Last two scheduled runs were stable"
+    },
+    {
+      "key": "search-web",
+      "name": "search-web",
+      "scope": "Search, filter, and result ranking",
+      "environments": ["2", "5"],
+      "note": "Facet sync smoke is queued for tonight"
+    },
+    {
+      "key": "crm-portal",
+      "name": "crm-portal",
+      "scope": "Sales leads and customer workspace",
+      "environments": ["4", "6"],
+      "note": "Bulk import path needs another regression sweep"
+    },
+    {
+      "key": "inventory-hub",
+      "name": "inventory-hub",
+      "scope": "Stock, warehouse, and transfer flows",
+      "environments": ["3", "8", "11"],
+      "note": "Cross-region stock sync passed after data refresh"
+    },
+    {
+      "key": "billing-admin",
+      "name": "billing-admin",
+      "scope": "Invoice, refund, and tax operations",
+      "environments": ["2", "9"],
+      "note": "Refund export checks need updated finance fixtures"
+    },
+    {
+      "key": "support-desk",
+      "name": "support-desk",
+      "scope": "Ticket routing and agent workflow",
+      "environments": ["1", "4"],
+      "note": "SLA escalation workflow remained green all week"
+    }
+  ],
+  "cases": [
+    {
+      "id": "checkout-smoke",
+      "projectKey": "checkout-web",
+      "name": "Checkout smoke",
+      "tags": ["smoke", "payment"],
+      "status": "ACTIVE",
+      "updatedAt": "2026-04-18T18:05:00Z",
+      "archived": false
+    },
+    {
+      "id": "checkout-regression-card",
+      "projectKey": "checkout-web",
+      "name": "Checkout card regression",
+      "tags": ["regression", "locator-repair-needed"],
+      "status": "ACTIVE",
+      "updatedAt": "2026-04-18T17:42:00Z",
+      "archived": false
+    },
+    {
+      "id": "member-profile-save",
+      "projectKey": "member-center",
+      "name": "Profile save",
+      "tags": ["profile", "regression"],
+      "status": "ACTIVE",
+      "updatedAt": "2026-04-18T16:55:00Z",
+      "archived": false
+    },
+    {
+      "id": "member-password-reset",
+      "projectKey": "member-center",
+      "name": "Password reset",
+      "tags": ["smoke", "auth"],
+      "status": "ACTIVE",
+      "updatedAt": "2026-04-18T16:20:00Z",
+      "archived": false
+    },
+    {
+      "id": "ops-scheduler-drill",
+      "projectKey": "ops-console",
+      "name": "Scheduler drill",
+      "tags": ["ops", "depends-on-test-data"],
+      "status": "ACTIVE",
+      "updatedAt": "2026-04-18T15:40:00Z",
+      "archived": false
+    },
+    {
+      "id": "search-query-smoke",
+      "projectKey": "search-web",
+      "name": "Keyword query smoke",
+      "tags": ["smoke", "search"],
+      "status": "ACTIVE",
+      "updatedAt": "2026-04-19T00:20:00Z",
+      "archived": false
+    },
+    {
+      "id": "search-filter-regression",
+      "projectKey": "search-web",
+      "name": "Filter persistence regression",
+      "tags": ["regression", "facet"],
+      "status": "ACTIVE",
+      "updatedAt": "2026-04-18T23:10:00Z",
+      "archived": false
+    },
+    {
+      "id": "crm-lead-create",
+      "projectKey": "crm-portal",
+      "name": "Lead create and assign",
+      "tags": ["smoke", "crm"],
+      "status": "ACTIVE",
+      "updatedAt": "2026-04-18T22:48:00Z",
+      "archived": false
+    },
+    {
+      "id": "crm-import-regression",
+      "projectKey": "crm-portal",
+      "name": "CSV import regression",
+      "tags": ["regression", "import"],
+      "status": "ACTIVE",
+      "updatedAt": "2026-04-18T21:15:00Z",
+      "archived": false
+    },
+    {
+      "id": "inventory-transfer-smoke",
+      "projectKey": "inventory-hub",
+      "name": "Warehouse transfer smoke",
+      "tags": ["smoke", "inventory"],
+      "status": "ACTIVE",
+      "updatedAt": "2026-04-18T20:10:00Z",
+      "archived": false
+    },
+    {
+      "id": "inventory-recount-audit",
+      "projectKey": "inventory-hub",
+      "name": "Cycle count audit trail",
+      "tags": ["audit", "warehouse"],
+      "status": "ACTIVE",
+      "updatedAt": "2026-04-18T19:55:00Z",
+      "archived": false
+    },
+    {
+      "id": "billing-refund-smoke",
+      "projectKey": "billing-admin",
+      "name": "Refund approval smoke",
+      "tags": ["smoke", "refund"],
+      "status": "ACTIVE",
+      "updatedAt": "2026-04-18T19:30:00Z",
+      "archived": false
+    },
+    {
+      "id": "billing-tax-export",
+      "projectKey": "billing-admin",
+      "name": "Tax export compliance check",
+      "tags": ["regression", "finance"],
+      "status": "ACTIVE",
+      "updatedAt": "2026-04-18T18:58:00Z",
+      "archived": false
+    },
+    {
+      "id": "support-ticket-route",
+      "projectKey": "support-desk",
+      "name": "Ticket auto-route",
+      "tags": ["smoke", "support"],
+      "status": "ACTIVE",
+      "updatedAt": "2026-04-18T18:35:00Z",
+      "archived": false
+    },
+    {
+      "id": "support-sla-escalation",
+      "projectKey": "support-desk",
+      "name": "SLA escalation policy",
+      "tags": ["regression", "ops"],
+      "status": "ACTIVE",
+      "updatedAt": "2026-04-18T18:18:00Z",
+      "archived": false
+    }
+  ]
+}

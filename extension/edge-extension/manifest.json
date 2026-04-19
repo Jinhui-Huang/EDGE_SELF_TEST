@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "Enterprise Web Test Platform Helper",
+  "version": "0.1.0",
+  "description": "Phase 3 lightweight Edge assistant entry for current page summary and runtime status.",
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Web Test Helper",
+    "default_popup": "popup.html"
+  },
+  "permissions": ["activeTab", "storage", "nativeMessaging"],
+  "host_permissions": ["<all_urls>"]
+}

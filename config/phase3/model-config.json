@@ -1,0 +1,20 @@
+{
+  "items": [
+    {
+      "label": "Provider",
+      "value": "OpenAI Responses API"
+    },
+    {
+      "label": "Mode",
+      "value": "Audit-first / recommendation-only"
+    },
+    {
+      "label": "Approval policy",
+      "value": "Operator sign-off required before non-read-only runtime actions"
+    },
+    {
+      "label": "Output guard",
+      "value": "JSON schema plus rule validation"
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "items": [
+    {
+      "title": "payment-smoke / prod-like",
+      "owner": "qa-platform",
+      "state": "Waiting",
+      "detail": "Run starts after the locked environment is released.",
+      "updatedAt": "2026-04-18T10:20:00Z"
+    },
+    {
+      "title": "account-regression / staging",
+      "owner": "team-growth",
+      "state": "Needs review",
+      "detail": "Recent locator repair suggestion was rejected by policy.",
+      "updatedAt": "2026-04-18T10:35:00Z"
+    },
+    {
+      "title": "report-retention-audit",
+      "owner": "ops",
+      "state": "In progress",
+      "detail": "Cleanup dry-run is ready for operator review.",
+      "updatedAt": "2026-04-18T10:46:00Z"
+    }
+  ]
+}

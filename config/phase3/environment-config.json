@@ -1,0 +1,20 @@
+{
+  "items": [
+    {
+      "label": "Browser pool",
+      "value": "edge-stable-win11 / edge-beta-win11"
+    },
+    {
+      "label": "Account slots",
+      "value": "smoke_bot_01, ops_audit_02"
+    },
+    {
+      "label": "Network zone",
+      "value": "staging / prod-like split routing"
+    },
+    {
+      "label": "Data policy",
+      "value": "Projects, reports, queue, execution history, and config cards prefer local filesystem readers"
+    }
+  ]
+}

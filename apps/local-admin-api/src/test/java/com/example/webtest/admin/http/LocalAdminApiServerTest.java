@@ -1,0 +1,798 @@
+package com.example.webtest.admin.http;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import com.example.webtest.admin.service.CatalogPersistenceService;
+import com.example.webtest.admin.service.ConfigPersistenceService;
+import com.example.webtest.admin.service.Phase3MockDataService;
+import com.example.webtest.admin.service.SchedulerPersistenceService;
+import com.example.webtest.json.Jsons;
+import java.net.InetSocketAddress;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.List;
+import java.util.Map;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+class LocalAdminApiServerTest {
+    @Test
+    void servesPhase3AdminAndExtensionSnapshots(@TempDir Path tempDir) throws Exception {
+        Path runsDir = tempDir.resolve("runs");
+        Path runDir = runsDir.resolve("checkout-web-nightly");
+        Files.createDirectories(runDir);
+        Map<String, Object> reportPayload = Map.of(
+                "runId", "checkout-web-nightly",
+                "startedAt", "2026-04-18T09:00:00Z",
+                "finishedAt", "2026-04-18T09:10:00Z",
+                "summary", Map.of(
+                        "total", 72,
+                        "passed", 71,
+                        "failed", 1,
+                        "skipped", 0,
+                        "durationMs", 600_000),
+                "steps", List.of(
+                        Map.of("artifacts", List.of(Map.of("path", "failure.png"))),
+                        Map.of("artifacts", List.of())));
+        Files.writeString(runDir.resolve("report.json"), Jsons.writeValueAsString(reportPayload), StandardCharsets.UTF_8);
+        Files.writeString(runDir.resolve("report.html"), "<html></html>", StandardCharsets.UTF_8);
+
+        Path queueFile = tempDir.resolve("execution-queue.json");
+        Map<String, Object> queuePayload = Map.of(
+                "items", List.of(
+                        Map.of(
+                                "title", "payment-smoke / prod-like",
+                                "owner", "qa-platform",
+                                "state", "Waiting",
+                                "detail", "Run starts after environment release.",
+                                "updatedAt", "2026-04-18T10:20:00Z"),
+                        Map.of(
+                                "title", "report-retention-audit",
+                                "owner", "ops",
+                                "state", "In progress",
+                                "detail", "Cleanup dry-run is ready for operator review.",
+                                "updatedAt", "2026-04-18T10:46:00Z")));
+        Files.writeString(queueFile, Jsons.writeValueAsString(queuePayload), StandardCharsets.UTF_8);
+
+        Path schedulerRequestsFile = tempDir.resolve("scheduler-requests.json");
+        Path schedulerEventsFile = tempDir.resolve("scheduler-events.json");
+        Path schedulerStateFile = tempDir.resolve("scheduler-state.json");
+        Map<String, Object> schedulerPayload = Map.of(
+                "schedulerId", "local-phase3-scheduler",
+                "queue", List.of(
+                        Map.of(
+                                "title", "scheduler-checkout-smoke / prod-like",
+                                "owner", "scheduler-daemon",
+                                "state", "In progress",
+                                "detail", "Worker slot 2 is executing payment assertions.",
+                                "updatedAt", "2026-04-18T10:56:00Z"),
+                        Map.of(
+                                "title", "scheduler-member-regression / staging",
+                                "owner", "scheduler-daemon",
+                                "state", "Waiting",
+                                "detail", "Waiting for browser capacity to free up.",
+                                "updatedAt", "2026-04-18T10:54:00Z")),
+                "executions", List.of(
+                        Map.ofEntries(
+                                Map.entry("runId", "scheduler-checkout-smoke"),
+                                Map.entry("projectKey", "checkout-web"),
+                                Map.entry("status", "RUNNING"),
+                                Map.entry("owner", "scheduler-daemon"),
+                                Map.entry("environment", "prod-like"),
+                                Map.entry("detail", "Scheduler promoted the run from queue to active worker."),
+                                Map.entry("schedulerId", "local-phase3-scheduler"),
+                                Map.entry("position", 1),
+                                Map.entry("total", 38),
+                                Map.entry("failed", 0),
+                                Map.entry("artifacts", 4),
+                                Map.entry("startedAt", "2026-04-18T10:55:00Z")),
+                        Map.ofEntries(
+                                Map.entry("runId", "scheduler-ops-audit"),
+                                Map.entry("projectKey", "ops-console"),
+                                Map.entry("status", "QUEUED"),
+                                Map.entry("owner", "scheduler-daemon"),
+                                Map.entry("environment", "ops-dr"),
+                                Map.entry("detail", "Awaiting approval before maintenance execution."),
+                                Map.entry("schedulerId", "local-phase3-scheduler"),
+                                Map.entry("position", 2),
+                                Map.entry("total", 0),
+                                Map.entry("failed", 0),
+                                Map.entry("artifacts", 0),
+                                Map.entry("startedAt", "2026-04-18T10:52:00Z"))));
+        Files.writeString(schedulerStateFile, Jsons.writeValueAsString(schedulerPayload), StandardCharsets.UTF_8);
+
+        Path catalogFile = tempDir.resolve("project-catalog.json");
+        Map<String, Object> catalogPayload = Map.of(
+                "projects", List.of(
+                        Map.of(
+                                "key", "checkout-web",
+                                "name", "checkout-web",
+                                "scope", "Payment journey",
+                                "environments", List.of("staging-edge", "prod-like"),
+                                "note", "Checkout stability review remains active."),
+                        Map.of(
+                                "key", "member-center",
+                                "name", "member-center",
+                                "scope", "Account and profile flows",
+                                "environments", List.of("staging-edge"),
+                                "note", "No local runs recorded yet.")),
+                "cases", List.of(
+                        Map.of(
+                                "id", "checkout-smoke",
+                                "projectKey", "checkout-web",
+                                "name", "Checkout smoke",
+                                "tags", List.of("smoke", "locator-repair-needed"),
+                                "status", "ACTIVE",
+                                "updatedAt", "2026-04-18T10:00:00Z",
+                                "archived", false),
+                        Map.of(
+                                "id", "checkout-regression",
+                                "projectKey", "checkout-web",
+                                "name", "Checkout regression",
+                                "tags", List.of("regression"),
+                                "status", "ACTIVE",
+                                "updatedAt", "2026-04-18T10:10:00Z",
+                                "archived", false),
+                        Map.of(
+                                "id", "member-profile",
+                                "projectKey", "member-center",
+                                "name", "Profile save",
+                                "tags", List.of("profile"),
+                                "status", "ACTIVE",
+                                "updatedAt", "2026-04-18T10:30:00Z",
+                                "archived", false)));
+        Files.writeString(catalogFile, Jsons.writeValueAsString(catalogPayload), StandardCharsets.UTF_8);
+
+        Path executionHistoryFile = tempDir.resolve("execution-history.json");
+        Map<String, Object> historyPayload = Map.of(
+                "items", List.of(
+                        Map.of(
+                                "runId", "member-center-daily",
+                                "projectKey", "member-center",
+                                "status", "RUNNING",
+                                "owner", "team-growth",
+                                "environment", "staging-edge",
+                                "detail", "Browser session is active and waiting for profile-save assertions.",
+                                "total", 24,
+                                "failed", 0,
+                                "artifacts", 2,
+                                "startedAt", "2026-04-18T10:50:00Z"),
+                        Map.ofEntries(
+                                Map.entry("runId", "ops-console-maintenance"),
+                                Map.entry("projectKey", "ops-console"),
+                                Map.entry("status", "CANCELLED"),
+                                Map.entry("owner", "ops"),
+                                Map.entry("environment", "ops-dr"),
+                                Map.entry("detail", "Run was cancelled after a maintenance window change."),
+                                Map.entry("total", 0),
+                                Map.entry("failed", 0),
+                                Map.entry("artifacts", 0),
+                                Map.entry("startedAt", "2026-04-18T08:00:00Z"),
+                                Map.entry("finishedAt", "2026-04-18T08:05:00Z"))));
+        Files.writeString(executionHistoryFile, Jsons.writeValueAsString(historyPayload), StandardCharsets.UTF_8);
+
+        Path modelConfigFile = tempDir.resolve("model-config.json");
+        Map<String, Object> modelConfigPayload = Map.of(
+                "items", List.of(
+                        Map.of("label", "Provider", "value", "OpenAI Responses API"),
+                        Map.of("label", "Mode", "value", "Audit-first / staged approval"),
+                        Map.of("label", "Fallback", "value", "Rules-only plan when model is offline")));
+        Files.writeString(modelConfigFile, Jsons.writeValueAsString(modelConfigPayload), StandardCharsets.UTF_8);
+
+        Path environmentConfigFile = tempDir.resolve("environment-config.json");
+        Map<String, Object> environmentConfigPayload = Map.of(
+                "items", List.of(
+                        Map.of("label", "Browser pool", "value", "edge-stable-win11 / edge-beta-win11"),
+                        Map.of("label", "Account slots", "value", "smoke_bot_01, member_ops_02"),
+                        Map.of("label", "Network zone", "value", "staging / prod-like split routing")));
+        Files.writeString(environmentConfigFile, Jsons.writeValueAsString(environmentConfigPayload), StandardCharsets.UTF_8);
+
+        try (LocalAdminApiServer server = new LocalAdminApiServer(
+                new InetSocketAddress("127.0.0.1", 0),
+                new Phase3MockDataService(
+                        runsDir,
+                        schedulerRequestsFile,
+                        schedulerEventsFile,
+                        schedulerStateFile,
+                        queueFile,
+                        catalogFile,
+                        executionHistoryFile,
+                        modelConfigFile,
+                        environmentConfigFile,
+                        Clock.fixed(Instant.parse("2026-04-18T11:00:00Z"), ZoneOffset.UTC)),
+                new SchedulerPersistenceService(
+                        schedulerRequestsFile,
+                        schedulerEventsFile,
+                        Clock.fixed(Instant.parse("2026-04-18T11:00:00Z"), ZoneOffset.UTC)),
+                new ConfigPersistenceService(
+                        modelConfigFile,
+                        environmentConfigFile),
+                new CatalogPersistenceService(catalogFile, Clock.fixed(Instant.parse("2026-04-18T11:00:00Z"), ZoneOffset.UTC)))) {
+            server.start();
+            HttpClient client = HttpClient.newHttpClient();
+
+            HttpResponse<String> health = client.send(request(server, "/health"), HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> admin = client.send(
+                    request(server, "/api/phase3/admin-console"),
+                    HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> extension = client.send(
+                    request(server, "/api/phase3/extension-popup"),
+                    HttpResponse.BodyHandlers.ofString());
+
+            assertEquals(200, health.statusCode());
+            assertTrue(health.body().contains("\"UP\""));
+            assertEquals(200, admin.statusCode());
+            assertTrue(admin.body().contains("\"navigation\""));
+            assertTrue(admin.body().contains("\"checkout-web-nightly\""));
+            assertTrue(admin.body().contains("\"scheduler-checkout-smoke / prod-like\""));
+            assertTrue(admin.body().contains("\"Active projects\""));
+            assertTrue(admin.body().contains("\"checkout-web\""));
+            assertTrue(admin.body().contains("\"Payment journey\""));
+            assertTrue(admin.body().contains("\"locator-repair-needed\""));
+            assertTrue(admin.body().contains("\"cases\""));
+            assertTrue(admin.body().contains("\"Checkout smoke\""));
+            assertTrue(admin.body().contains("\"scheduler-checkout-smoke\""));
+            assertTrue(admin.body().contains("\"RUNNING\""));
+            assertTrue(admin.body().contains("\"scheduler-state.json / local-phase3-scheduler / prod-like / scheduler-daemon\""));
+            assertTrue(admin.body().contains("\"OpenAI Responses API\""));
+            assertTrue(admin.body().contains("\"edge-stable-win11 / edge-beta-win11\""));
+            assertEquals(200, extension.statusCode());
+            assertTrue(extension.body().contains("\"runtime\""));
+            assertTrue(extension.body().contains("\"2 queued / 1 active / 1 waiting / 0 review\""));
+            assertTrue(extension.body().contains("\"Latest local run is still active; keep audit review open until it settles\""));
+        }
+    }
+
+    @Test
+    void prefersDerivedSchedulerServiceFilesOverSnapshot(@TempDir Path tempDir) throws Exception {
+        Path runsDir = tempDir.resolve("runs");
+        Files.createDirectories(runsDir);
+
+        Path schedulerRequestsFile = tempDir.resolve("scheduler-requests.json");
+        Map<String, Object> requestsPayload = Map.of(
+                "schedulerId", "derived-phase3-scheduler",
+                "requests", List.of(
+                        Map.of(
+                                "runId", "derived-checkout-smoke",
+                                "projectKey", "checkout-web",
+                                "owner", "qa-platform",
+                                "environment", "prod-like",
+                                "title", "derived-checkout-smoke / prod-like",
+                                "detail", "Accepted into the local scheduler request queue.",
+                                "status", "QUEUED",
+                                "position", 1,
+                                "requestedAt", "2026-04-18T10:58:00Z"),
+                        Map.of(
+                                "runId", "derived-member-regression",
+                                "projectKey", "member-center",
+                                "owner", "team-growth",
+                                "environment", "staging-edge",
+                                "title", "derived-member-regression / staging-edge",
+                                "detail", "Waiting for browser capacity.",
+                                "status", "WAITING",
+                                "position", 2,
+                                "requestedAt", "2026-04-18T10:57:00Z")));
+        Files.writeString(schedulerRequestsFile, Jsons.writeValueAsString(requestsPayload), StandardCharsets.UTF_8);
+
+        Path schedulerEventsFile = tempDir.resolve("scheduler-events.json");
+        Map<String, Object> eventsPayload = Map.of(
+                "schedulerId", "derived-phase3-scheduler",
+                "events", List.of(
+                        Map.ofEntries(
+                                Map.entry("runId", "derived-checkout-smoke"),
+                                Map.entry("projectKey", "checkout-web"),
+                                Map.entry("owner", "scheduler-daemon"),
+                                Map.entry("environment", "prod-like"),
+                                Map.entry("type", "STARTED"),
+                                Map.entry("detail", "Worker slot 3 is executing payment assertions."),
+                                Map.entry("position", 1),
+                                Map.entry("total", 41),
+                                Map.entry("failed", 0),
+                                Map.entry("artifacts", 5),
+                                Map.entry("at", "2026-04-18T10:59:00Z")),
+                        Map.ofEntries(
+                                Map.entry("runId", "derived-member-regression"),
+                                Map.entry("projectKey", "member-center"),
+                                Map.entry("owner", "scheduler-daemon"),
+                                Map.entry("environment", "staging-edge"),
+                                Map.entry("type", "NEEDS_REVIEW"),
+                                Map.entry("detail", "Locator repair recommendation requires operator approval."),
+                                Map.entry("position", 2),
+                                Map.entry("total", 0),
+                                Map.entry("failed", 0),
+                                Map.entry("artifacts", 0),
+                                Map.entry("at", "2026-04-18T10:58:30Z"))));
+        Files.writeString(schedulerEventsFile, Jsons.writeValueAsString(eventsPayload), StandardCharsets.UTF_8);
+
+        Path schedulerStateFile = tempDir.resolve("scheduler-state.json");
+        Map<String, Object> schedulerSnapshotPayload = Map.of(
+                "schedulerId", "snapshot-fallback-should-not-win",
+                "queue", List.of(Map.of(
+                        "title", "snapshot-run / ignored",
+                        "owner", "snapshot",
+                        "state", "Waiting",
+                        "detail", "This entry should be ignored when derived service files exist.",
+                        "updatedAt", "2026-04-18T10:20:00Z")),
+                "executions", List.of(Map.ofEntries(
+                        Map.entry("runId", "snapshot-run"),
+                        Map.entry("projectKey", "snapshot-project"),
+                        Map.entry("status", "RUNNING"),
+                        Map.entry("owner", "snapshot"),
+                        Map.entry("environment", "ignored"),
+                        Map.entry("detail", "Snapshot should not win."),
+                        Map.entry("schedulerId", "snapshot-fallback-should-not-win"),
+                        Map.entry("position", 7),
+                        Map.entry("total", 1),
+                        Map.entry("failed", 0),
+                        Map.entry("artifacts", 0),
+                        Map.entry("startedAt", "2026-04-18T10:00:00Z"))));
+        Files.writeString(schedulerStateFile, Jsons.writeValueAsString(schedulerSnapshotPayload), StandardCharsets.UTF_8);
+
+        Path queueFile = tempDir.resolve("execution-queue.json");
+        Files.writeString(queueFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Path catalogFile = tempDir.resolve("project-catalog.json");
+        Files.writeString(catalogFile, Jsons.writeValueAsString(Map.of("projects", List.of(), "cases", List.of())), StandardCharsets.UTF_8);
+        Path executionHistoryFile = tempDir.resolve("execution-history.json");
+        Files.writeString(executionHistoryFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Path modelConfigFile = tempDir.resolve("model-config.json");
+        Files.writeString(modelConfigFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Path environmentConfigFile = tempDir.resolve("environment-config.json");
+        Files.writeString(environmentConfigFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+
+        try (LocalAdminApiServer server = new LocalAdminApiServer(
+                new InetSocketAddress("127.0.0.1", 0),
+                new Phase3MockDataService(
+                        runsDir,
+                        schedulerRequestsFile,
+                        schedulerEventsFile,
+                        schedulerStateFile,
+                        queueFile,
+                        catalogFile,
+                        executionHistoryFile,
+                        modelConfigFile,
+                        environmentConfigFile,
+                        Clock.fixed(Instant.parse("2026-04-18T11:00:00Z"), ZoneOffset.UTC)),
+                new SchedulerPersistenceService(
+                        schedulerRequestsFile,
+                        schedulerEventsFile,
+                        Clock.fixed(Instant.parse("2026-04-18T11:00:00Z"), ZoneOffset.UTC)),
+                new ConfigPersistenceService(
+                        modelConfigFile,
+                        environmentConfigFile),
+                new CatalogPersistenceService(catalogFile, Clock.fixed(Instant.parse("2026-04-18T11:00:00Z"), ZoneOffset.UTC)))) {
+            server.start();
+            HttpClient client = HttpClient.newHttpClient();
+
+            HttpResponse<String> admin = client.send(
+                    request(server, "/api/phase3/admin-console"),
+                    HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> extension = client.send(
+                    request(server, "/api/phase3/extension-popup"),
+                    HttpResponse.BodyHandlers.ofString());
+
+            assertEquals(200, admin.statusCode());
+            assertTrue(admin.body().contains("\"derived-checkout-smoke / prod-like\""));
+            assertTrue(admin.body().contains("\"derived-member-regression / staging-edge\""));
+            assertTrue(admin.body().contains("\"scheduler-service / derived-phase3-scheduler / prod-like / scheduler-daemon\""));
+            assertTrue(admin.body().contains("\"Scheduler status RUNNING. Worker slot 3 is executing payment assertions."));
+            assertTrue(!admin.body().contains("\"snapshot-run\""));
+
+            assertEquals(200, extension.statusCode());
+            assertTrue(extension.body().contains("\"2 queued / 1 active / 0 waiting / 1 review\""));
+        }
+    }
+
+    @Test
+    void persistsSchedulerMutationsAndReflectsThemInSnapshots(@TempDir Path tempDir) throws Exception {
+        Path runsDir = tempDir.resolve("runs");
+        Files.createDirectories(runsDir);
+        Path schedulerRequestsFile = tempDir.resolve("scheduler-requests.json");
+        Path schedulerEventsFile = tempDir.resolve("scheduler-events.json");
+        Path schedulerStateFile = tempDir.resolve("scheduler-state.json");
+        Path queueFile = tempDir.resolve("execution-queue.json");
+        Path catalogFile = tempDir.resolve("project-catalog.json");
+        Path executionHistoryFile = tempDir.resolve("execution-history.json");
+        Path modelConfigFile = tempDir.resolve("model-config.json");
+        Path environmentConfigFile = tempDir.resolve("environment-config.json");
+        Files.writeString(catalogFile, Jsons.writeValueAsString(Map.of(
+                "projects", List.of(Map.of(
+                        "key", "checkout-web",
+                        "name", "checkout-web",
+                        "scope", "Payment journey",
+                        "environments", List.of("prod-like"),
+                        "note", "Scheduler-persisted requests should surface here.")),
+                "cases", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(queueFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(executionHistoryFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(modelConfigFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(environmentConfigFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+
+        Clock clock = Clock.fixed(Instant.parse("2026-04-18T11:00:00Z"), ZoneOffset.UTC);
+        try (LocalAdminApiServer server = new LocalAdminApiServer(
+                new InetSocketAddress("127.0.0.1", 0),
+                new Phase3MockDataService(
+                        runsDir,
+                        schedulerRequestsFile,
+                        schedulerEventsFile,
+                        schedulerStateFile,
+                        queueFile,
+                        catalogFile,
+                        executionHistoryFile,
+                        modelConfigFile,
+                        environmentConfigFile,
+                        clock),
+                new SchedulerPersistenceService(
+                        schedulerRequestsFile,
+                        schedulerEventsFile,
+                        clock),
+                new ConfigPersistenceService(
+                        modelConfigFile,
+                        environmentConfigFile),
+                new CatalogPersistenceService(catalogFile, clock))) {
+            server.start();
+            HttpClient client = HttpClient.newHttpClient();
+
+            HttpResponse<String> requestMutation = client.send(
+                    request(server, "/api/phase3/scheduler/requests", "POST", Jsons.writeValueAsString(Map.of(
+                            "runId", "checkout-web-smoke",
+                            "projectKey", "checkout-web",
+                            "owner", "qa-platform",
+                            "environment", "prod-like",
+                            "detail", "Accepted from operator launch panel."))),
+                    HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> eventMutation = client.send(
+                    request(server, "/api/phase3/scheduler/events", "POST", Jsons.writeValueAsString(Map.of(
+                            "runId", "checkout-web-smoke",
+                            "projectKey", "checkout-web",
+                            "owner", "scheduler-daemon",
+                            "environment", "prod-like",
+                            "type", "STARTED",
+                            "detail", "Worker slot 4 is executing checkout smoke.",
+                            "total", 12,
+                            "failed", 0,
+                            "artifacts", 1,
+                            "position", 1))),
+                    HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> admin = client.send(
+                    request(server, "/api/phase3/admin-console"),
+                    HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> extension = client.send(
+                    request(server, "/api/phase3/extension-popup"),
+                    HttpResponse.BodyHandlers.ofString());
+
+            assertEquals(202, requestMutation.statusCode());
+            assertTrue(requestMutation.body().contains("\"ACCEPTED\""));
+            assertTrue(requestMutation.body().contains("\"scheduler-request\""));
+            assertTrue(requestMutation.body().contains("\"checkout-web-smoke / prod-like\""));
+
+            assertEquals(202, eventMutation.statusCode());
+            assertTrue(eventMutation.body().contains("\"scheduler-event\""));
+            assertTrue(eventMutation.body().contains("\"STARTED\""));
+
+            String persistedRequests = Files.readString(schedulerRequestsFile, StandardCharsets.UTF_8);
+            String persistedEvents = Files.readString(schedulerEventsFile, StandardCharsets.UTF_8);
+            assertTrue(persistedRequests.contains("\"checkout-web-smoke\""));
+            assertTrue(persistedRequests.contains("\"local-phase3-scheduler\""));
+            assertTrue(persistedEvents.contains("\"STARTED\""));
+            assertTrue(persistedEvents.contains("\"2026-04-18T11:00:00Z\""));
+
+            assertEquals(200, admin.statusCode());
+            assertTrue(admin.body().contains("\"checkout-web-smoke / prod-like\""));
+            assertTrue(admin.body().contains("\"scheduler-service / local-phase3-scheduler / prod-like / scheduler-daemon\""));
+            assertTrue(admin.body().contains("\"RUNNING\""));
+
+            assertEquals(200, extension.statusCode());
+            assertTrue(extension.body().contains("\"1 queued / 1 active / 0 waiting / 0 review\""));
+        }
+    }
+
+    @Test
+    void persistsEditableConfigItemsAndReflectsThemInSnapshots(@TempDir Path tempDir) throws Exception {
+        Path runsDir = tempDir.resolve("runs");
+        Files.createDirectories(runsDir);
+        Path schedulerRequestsFile = tempDir.resolve("scheduler-requests.json");
+        Path schedulerEventsFile = tempDir.resolve("scheduler-events.json");
+        Path schedulerStateFile = tempDir.resolve("scheduler-state.json");
+        Path queueFile = tempDir.resolve("execution-queue.json");
+        Path catalogFile = tempDir.resolve("project-catalog.json");
+        Path executionHistoryFile = tempDir.resolve("execution-history.json");
+        Path modelConfigFile = tempDir.resolve("model-config.json");
+        Path environmentConfigFile = tempDir.resolve("environment-config.json");
+        Files.writeString(queueFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(catalogFile, Jsons.writeValueAsString(Map.of("projects", List.of(), "cases", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(executionHistoryFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(modelConfigFile, Jsons.writeValueAsString(Map.of(
+                "items", List.of(Map.of("label", "Provider", "value", "OpenAI Responses API")))), StandardCharsets.UTF_8);
+        Files.writeString(environmentConfigFile, Jsons.writeValueAsString(Map.of(
+                "items", List.of(Map.of("label", "Browser pool", "value", "edge-stable-win11")))), StandardCharsets.UTF_8);
+
+        Clock clock = Clock.fixed(Instant.parse("2026-04-18T11:00:00Z"), ZoneOffset.UTC);
+        try (LocalAdminApiServer server = new LocalAdminApiServer(
+                new InetSocketAddress("127.0.0.1", 0),
+                new Phase3MockDataService(
+                        runsDir,
+                        schedulerRequestsFile,
+                        schedulerEventsFile,
+                        schedulerStateFile,
+                        queueFile,
+                        catalogFile,
+                        executionHistoryFile,
+                        modelConfigFile,
+                        environmentConfigFile,
+                        clock),
+                new SchedulerPersistenceService(
+                        schedulerRequestsFile,
+                        schedulerEventsFile,
+                        clock),
+                new ConfigPersistenceService(
+                        modelConfigFile,
+                        environmentConfigFile),
+                new CatalogPersistenceService(catalogFile, clock))) {
+            server.start();
+            HttpClient client = HttpClient.newHttpClient();
+
+            HttpResponse<String> modelMutation = client.send(
+                    request(server, "/api/phase3/config/model", "POST", Jsons.writeValueAsString(Map.of(
+                            "label", "Provider",
+                            "value", "OpenAI Responses API / audited"))),
+                    HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> environmentMutation = client.send(
+                    request(server, "/api/phase3/config/environment", "POST", Jsons.writeValueAsString(Map.of(
+                            "label", "Browser pool",
+                            "value", "edge-stable-win11 / edge-beta-win11"))),
+                    HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> appendedModelMutation = client.send(
+                    request(server, "/api/phase3/config/model", "POST", Jsons.writeValueAsString(Map.of(
+                            "label", "Mode",
+                            "value", "Audit-first / staged approval"))),
+                    HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> admin = client.send(
+                    request(server, "/api/phase3/admin-console"),
+                    HttpResponse.BodyHandlers.ofString());
+
+            assertEquals(202, modelMutation.statusCode());
+            assertTrue(modelMutation.body().contains("\"model-config-item\""));
+            assertTrue(modelMutation.body().contains("\"updated\":true"));
+
+            assertEquals(202, environmentMutation.statusCode());
+            assertTrue(environmentMutation.body().contains("\"environment-config-item\""));
+            assertTrue(environmentMutation.body().contains("\"updated\":true"));
+
+            assertEquals(202, appendedModelMutation.statusCode());
+            assertTrue(appendedModelMutation.body().contains("\"updated\":false"));
+            assertTrue(appendedModelMutation.body().contains("\"Mode\""));
+
+            String persistedModelConfig = Files.readString(modelConfigFile, StandardCharsets.UTF_8);
+            String persistedEnvironmentConfig = Files.readString(environmentConfigFile, StandardCharsets.UTF_8);
+            assertTrue(persistedModelConfig.contains("\"OpenAI Responses API / audited\""));
+            assertTrue(persistedModelConfig.contains("\"Audit-first / staged approval\""));
+            assertTrue(persistedEnvironmentConfig.contains("\"edge-stable-win11 / edge-beta-win11\""));
+
+            assertEquals(200, admin.statusCode());
+            assertTrue(admin.body().contains("\"OpenAI Responses API / audited\""));
+            assertTrue(admin.body().contains("\"Audit-first / staged approval\""));
+            assertTrue(admin.body().contains("\"edge-stable-win11 / edge-beta-win11\""));
+        }
+    }
+
+    @Test
+    void persistsEditableCatalogProjectsAndReflectsThemInSnapshots(@TempDir Path tempDir) throws Exception {
+        Path runsDir = tempDir.resolve("runs");
+        Files.createDirectories(runsDir);
+        Path schedulerRequestsFile = tempDir.resolve("scheduler-requests.json");
+        Path schedulerEventsFile = tempDir.resolve("scheduler-events.json");
+        Path schedulerStateFile = tempDir.resolve("scheduler-state.json");
+        Path queueFile = tempDir.resolve("execution-queue.json");
+        Path catalogFile = tempDir.resolve("project-catalog.json");
+        Path executionHistoryFile = tempDir.resolve("execution-history.json");
+        Path modelConfigFile = tempDir.resolve("model-config.json");
+        Path environmentConfigFile = tempDir.resolve("environment-config.json");
+        Files.writeString(queueFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(executionHistoryFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(modelConfigFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(environmentConfigFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(catalogFile, Jsons.writeValueAsString(Map.of(
+                "projects", List.of(Map.of(
+                        "key", "checkout-web",
+                        "name", "checkout-web",
+                        "scope", "Payment journey",
+                        "environments", List.of("prod-like"),
+                        "note", "Initial catalog note.")),
+                "cases", List.of(Map.of(
+                        "id", "checkout-smoke",
+                        "projectKey", "checkout-web",
+                        "name", "Checkout smoke",
+                        "tags", List.of("smoke"),
+                        "status", "ACTIVE",
+                        "updatedAt", "2026-04-18T10:00:00Z",
+                        "archived", false)))), StandardCharsets.UTF_8);
+
+        Clock clock = Clock.fixed(Instant.parse("2026-04-18T11:00:00Z"), ZoneOffset.UTC);
+        try (LocalAdminApiServer server = new LocalAdminApiServer(
+                new InetSocketAddress("127.0.0.1", 0),
+                new Phase3MockDataService(
+                        runsDir,
+                        schedulerRequestsFile,
+                        schedulerEventsFile,
+                        schedulerStateFile,
+                        queueFile,
+                        catalogFile,
+                        executionHistoryFile,
+                        modelConfigFile,
+                        environmentConfigFile,
+                        clock),
+                new SchedulerPersistenceService(
+                        schedulerRequestsFile,
+                        schedulerEventsFile,
+                        clock),
+                new ConfigPersistenceService(
+                        modelConfigFile,
+                        environmentConfigFile),
+                new CatalogPersistenceService(catalogFile, clock))) {
+            server.start();
+            HttpClient client = HttpClient.newHttpClient();
+
+            HttpResponse<String> updateMutation = client.send(
+                    request(server, "/api/phase3/catalog/project", "POST", Jsons.writeValueAsString(Map.of(
+                            "key", "checkout-web",
+                            "name", "checkout-web",
+                            "scope", "Payment journey / audited",
+                            "environments", List.of("prod-like", "staging-edge"),
+                            "note", "Operator updated the Phase 3 catalog row."))),
+                    HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> appendMutation = client.send(
+                    request(server, "/api/phase3/catalog/project", "POST", Jsons.writeValueAsString(Map.of(
+                            "key", "member-center",
+                            "name", "member-center",
+                            "scope", "Account and profile flows",
+                            "environments", List.of("staging-edge", "uat"),
+                            "note", "Added from the admin console shell."))),
+                    HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> admin = client.send(
+                    request(server, "/api/phase3/admin-console"),
+                    HttpResponse.BodyHandlers.ofString());
+
+            assertEquals(202, updateMutation.statusCode());
+            assertTrue(updateMutation.body().contains("\"catalog-project\""));
+            assertTrue(updateMutation.body().contains("\"updated\":true"));
+
+            assertEquals(202, appendMutation.statusCode());
+            assertTrue(appendMutation.body().contains("\"updated\":false"));
+            assertTrue(appendMutation.body().contains("\"member-center\""));
+
+            String persistedCatalog = Files.readString(catalogFile, StandardCharsets.UTF_8);
+            assertTrue(persistedCatalog.contains("\"Payment journey / audited\""));
+            assertTrue(persistedCatalog.contains("\"member-center\""));
+            assertTrue(persistedCatalog.contains("\"Checkout smoke\""));
+
+            assertEquals(200, admin.statusCode());
+            assertTrue(admin.body().contains("\"Payment journey / audited\""));
+            assertTrue(admin.body().contains("\"member-center\""));
+            assertTrue(admin.body().contains("\"1 active cases are mapped"));
+        }
+    }
+
+    @Test
+    void persistsEditableCatalogCasesAndReflectsThemInSnapshots(@TempDir Path tempDir) throws Exception {
+        Path runsDir = tempDir.resolve("runs");
+        Files.createDirectories(runsDir);
+        Path schedulerRequestsFile = tempDir.resolve("scheduler-requests.json");
+        Path schedulerEventsFile = tempDir.resolve("scheduler-events.json");
+        Path schedulerStateFile = tempDir.resolve("scheduler-state.json");
+        Path queueFile = tempDir.resolve("execution-queue.json");
+        Path catalogFile = tempDir.resolve("project-catalog.json");
+        Path executionHistoryFile = tempDir.resolve("execution-history.json");
+        Path modelConfigFile = tempDir.resolve("model-config.json");
+        Path environmentConfigFile = tempDir.resolve("environment-config.json");
+        Files.writeString(queueFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(executionHistoryFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(modelConfigFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(environmentConfigFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(catalogFile, Jsons.writeValueAsString(Map.of(
+                "projects", List.of(Map.of(
+                        "key", "checkout-web",
+                        "name", "checkout-web",
+                        "scope", "Payment journey",
+                        "environments", List.of("prod-like"),
+                        "note", "Initial catalog note.")),
+                "cases", List.of(Map.of(
+                        "id", "checkout-smoke",
+                        "projectKey", "checkout-web",
+                        "name", "Checkout smoke",
+                        "tags", List.of("smoke"),
+                        "status", "ACTIVE",
+                        "updatedAt", "2026-04-18T10:00:00Z",
+                        "archived", false)))), StandardCharsets.UTF_8);
+
+        Clock clock = Clock.fixed(Instant.parse("2026-04-18T11:00:00Z"), ZoneOffset.UTC);
+        try (LocalAdminApiServer server = new LocalAdminApiServer(
+                new InetSocketAddress("127.0.0.1", 0),
+                new Phase3MockDataService(
+                        runsDir,
+                        schedulerRequestsFile,
+                        schedulerEventsFile,
+                        schedulerStateFile,
+                        queueFile,
+                        catalogFile,
+                        executionHistoryFile,
+                        modelConfigFile,
+                        environmentConfigFile,
+                        clock),
+                new SchedulerPersistenceService(
+                        schedulerRequestsFile,
+                        schedulerEventsFile,
+                        clock),
+                new ConfigPersistenceService(
+                        modelConfigFile,
+                        environmentConfigFile),
+                new CatalogPersistenceService(catalogFile, clock))) {
+            server.start();
+            HttpClient client = HttpClient.newHttpClient();
+
+            HttpResponse<String> updateMutation = client.send(
+                    request(server, "/api/phase3/catalog/case", "POST", Jsons.writeValueAsString(Map.of(
+                            "id", "checkout-smoke",
+                            "projectKey", "checkout-web",
+                            "name", "Checkout smoke / audited",
+                            "tags", List.of("smoke", "audit-ready"),
+                            "status", "NEEDS_REVIEW",
+                            "archived", false))),
+                    HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> appendMutation = client.send(
+                    request(server, "/api/phase3/catalog/case", "POST", Jsons.writeValueAsString(Map.of(
+                            "id", "checkout-regression-card",
+                            "projectKey", "checkout-web",
+                            "name", "Checkout card regression",
+                            "tags", "regression, locator-repair-needed",
+                            "status", "ACTIVE",
+                            "archived", false))),
+                    HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> admin = client.send(
+                    request(server, "/api/phase3/admin-console"),
+                    HttpResponse.BodyHandlers.ofString());
+
+            assertEquals(202, updateMutation.statusCode());
+            assertTrue(updateMutation.body().contains("\"catalog-case\""));
+            assertTrue(updateMutation.body().contains("\"updated\":true"));
+
+            assertEquals(202, appendMutation.statusCode());
+            assertTrue(appendMutation.body().contains("\"updated\":false"));
+            assertTrue(appendMutation.body().contains("\"checkout-regression-card\""));
+
+            String persistedCatalog = Files.readString(catalogFile, StandardCharsets.UTF_8);
+            assertTrue(persistedCatalog.contains("\"Checkout smoke / audited\""));
+            assertTrue(persistedCatalog.contains("\"audit-ready\""));
+            assertTrue(persistedCatalog.contains("\"checkout-regression-card\""));
+            assertTrue(persistedCatalog.contains("\"2026-04-18T11:00:00Z\""));
+
+            assertEquals(200, admin.statusCode());
+            assertTrue(admin.body().contains("\"Checkout smoke / audited\""));
+            assertTrue(admin.body().contains("\"checkout-regression-card\""));
+            assertTrue(admin.body().contains("\"audit-ready\""));
+        }
+    }
+
+    private static HttpRequest request(LocalAdminApiServer server, String path) {
+        return request(server, path, "GET", null);
+    }
+
+    private static HttpRequest request(LocalAdminApiServer server, String path, String method, String body) {
+        HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + server.port() + path));
+        if (body == null) {
+            builder.method(method, HttpRequest.BodyPublishers.noBody());
+        } else {
+            builder.header("Content-Type", "application/json");
+            builder.method(method, HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8));
+        }
+        return builder.build();
+    }
+}

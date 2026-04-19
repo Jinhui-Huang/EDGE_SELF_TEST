@@ -1,0 +1,56 @@
+{
+  "schedulerId": "local-phase3-scheduler",
+  "queue": [
+    {
+      "title": "checkout-web-smoke / prod-like",
+      "owner": "scheduler-daemon",
+      "state": "In progress",
+      "detail": "Worker slot 2 is executing payment assertions.",
+      "updatedAt": "2026-04-18T20:42:00Z"
+    },
+    {
+      "title": "member-center-regression / staging-edge",
+      "owner": "scheduler-daemon",
+      "state": "Waiting",
+      "detail": "Waiting for browser capacity to free up.",
+      "updatedAt": "2026-04-18T20:39:00Z"
+    },
+    {
+      "title": "ops-console-maintenance / ops-dr",
+      "owner": "scheduler-daemon",
+      "state": "Needs review",
+      "detail": "Awaiting operator approval after preflight policy checks.",
+      "updatedAt": "2026-04-18T20:35:00Z"
+    }
+  ],
+  "executions": [
+    {
+      "runId": "checkout-web-smoke",
+      "projectKey": "checkout-web",
+      "status": "RUNNING",
+      "owner": "scheduler-daemon",
+      "environment": "prod-like",
+      "detail": "Scheduler promoted the run from queue to active worker.",
+      "schedulerId": "local-phase3-scheduler",
+      "position": 1,
+      "total": 38,
+      "failed": 0,
+      "artifacts": 4,
+      "startedAt": "2026-04-18T20:40:00Z"
+    },
+    {
+      "runId": "ops-console-maintenance",
+      "projectKey": "ops-console",
+      "status": "QUEUED",
+      "owner": "scheduler-daemon",
+      "environment": "ops-dr",
+      "detail": "Awaiting approval before maintenance execution.",
+      "schedulerId": "local-phase3-scheduler",
+      "position": 2,
+      "total": 0,
+      "failed": 0,
+      "artifacts": 0,
+      "startedAt": "2026-04-18T20:34:00Z"
+    }
+  ]
+}
