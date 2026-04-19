@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { sharedCopy, translate } from "../i18n";
 import {
   AdminConsoleSnapshot,
+  DatabaseConfig,
   DataTemplateItem,
   Locale,
   ModelProvider,
@@ -17,7 +18,9 @@ type ExecutionScreenProps = {
   reviewForm: SchedulerMutationForm;
   preparedCases: PreparedCaseItem[];
   dataTemplates: DataTemplateItem[];
+  databaseConfigs: DatabaseConfig[];
   selectedTemplateIds: string[];
+  selectedDatabaseId: string;
   launchState: MutationState;
   executeState: MutationState;
   reviewState: MutationState;
@@ -44,6 +47,7 @@ type ExecutionScreenProps = {
   onLaunchFormChange: (updater: (current: SchedulerMutationForm) => SchedulerMutationForm) => void;
   onReviewFormChange: (updater: (current: SchedulerMutationForm) => SchedulerMutationForm) => void;
   onSelectedTemplateIdsChange: (ids: string[]) => void;
+  onSelectedDatabaseIdChange: (id: string) => void;
   onLaunchSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onExecuteSubmit: () => void;
   onReviewSubmit: (event: FormEvent<HTMLFormElement>) => void;
@@ -64,7 +68,9 @@ export function ExecutionScreen({
   reviewForm,
   preparedCases,
   dataTemplates,
+  databaseConfigs,
   selectedTemplateIds,
+  selectedDatabaseId,
   launchState,
   executeState,
   reviewState,
@@ -91,6 +97,7 @@ export function ExecutionScreen({
   onLaunchFormChange,
   onReviewFormChange,
   onSelectedTemplateIdsChange,
+  onSelectedDatabaseIdChange,
   onLaunchSubmit,
   onExecuteSubmit,
   onReviewSubmit,
@@ -119,7 +126,10 @@ export function ExecutionScreen({
     [dataTemplates, selectedTemplateIds]
   );
 
-  const executionReady = Boolean(launchForm.runId.trim() && launchForm.projectKey.trim() && preparedCasesForProject.length > 0);
+  const selectedDatabase = databaseConfigs.find((item) => item.id === selectedDatabaseId) ?? databaseConfigs[0];
+  const executionReady = Boolean(
+    launchForm.runId.trim() && launchForm.projectKey.trim() && preparedCasesForProject.length > 0
+  );
 
   useEffect(() => {
     if (!availableTemplates.length) {
@@ -128,11 +138,13 @@ export function ExecutionScreen({
       }
       return;
     }
+
     const validIds = selectedTemplateIds.filter((id) => availableTemplates.some((item) => item.id === id));
     if (validIds.length !== selectedTemplateIds.length) {
       onSelectedTemplateIdsChange(validIds.length ? validIds : [availableTemplates[0].id]);
       return;
     }
+
     if (!validIds.length) {
       onSelectedTemplateIdsChange([availableTemplates[0].id]);
     }
@@ -144,6 +156,7 @@ export function ExecutionScreen({
         setDropdownOpen(false);
       }
     }
+
     document.addEventListener("mousedown", handlePointerDown);
     return () => document.removeEventListener("mousedown", handlePointerDown);
   }, []);
@@ -158,9 +171,7 @@ export function ExecutionScreen({
 
   return (
     <div className="executionConsoleScreen">
-      <div className="dataTemplatesPath">
-        {t(copy("Executions / run_8f2a1c3e", "执行 / run_8f2a1c3e", "実行 / run_8f2a1c3e"))}
-      </div>
+      <div className="dataTemplatesPath">{t(copy("Executions / run_8f2a1c3e"))}</div>
 
       <div className="executionConsoleHead">
         <div>
@@ -170,7 +181,7 @@ export function ExecutionScreen({
             <span className="executionConsolePill">{launchForm.environment}</span>
             <span className="executionConsolePill isModel">{launchForm.executionModel}</span>
           </div>
-          <p>{t(copy("Bind run id, project, prepared cases, and data compare templates before starting execution.", "执行前先绑定 Run ID、项目、预执行用例和对比数据模板。", "実行前に Run ID、プロジェクト、事前実行ケース、比較テンプレートを確定します。"))}</p>
+          <p>{t(copy("Bind run id, project, prepared cases, database, and compare templates before starting execution."))}</p>
         </div>
         <div className="executionConsoleHeadActions">
           <button type="button" className="projectsActionButton executionMonitorButton" onClick={onOpenMonitor}>
@@ -189,32 +200,38 @@ export function ExecutionScreen({
         <div className="executionConsoleProgressBody">
           <div className="executionConsoleProgressMeta">
             <span>
-              {t(copy("Prepared cases", "预执行用例", "事前実行ケース"))} <strong>{preparedCasesForProject.length}</strong>
+              {t(copy("Prepared cases"))} <strong>{preparedCasesForProject.length}</strong>
             </span>
             <span className="dataTemplatesMonoSmall">
-              {selectedTemplates.length} {t(copy("template compare targets", "个模板对比目标", "件の比較テンプレート"))}
+              {selectedTemplates.length} {t(copy("template compare targets"))}
             </span>
           </div>
           <div className="executionConsoleProgressBar">
             {Array.from({ length: 8 }, (_, index) => (
               <i
                 key={index}
-                className={index < Math.max(1, Math.min(8, preparedCasesForProject.length)) ? "isDone" : index === 4 && executionReady ? "isRunning" : ""}
+                className={
+                  index < Math.max(1, Math.min(8, preparedCasesForProject.length))
+                    ? "isDone"
+                    : index === 4 && executionReady
+                      ? "isRunning"
+                      : ""
+                }
               />
             ))}
           </div>
         </div>
         <div className="executionConsoleMiniStats">
           <div>
-            <span>{t(copy("Project", "项目", "プロジェクト"))}</span>
+            <span>{t(copy("Project"))}</span>
             <strong>{primaryProject?.name ?? "--"}</strong>
           </div>
           <div>
-            <span>{t(copy("Templates", "模板", "テンプレート"))}</span>
-            <strong>{selectedTemplates.length}</strong>
+            <span>{t(copy("Database"))}</span>
+            <strong>{selectedDatabase?.type ?? "--"}</strong>
           </div>
           <div>
-            <span>{t(copy("Queue", "队列", "キュー"))}</span>
+            <span>{t(copy("Queue"))}</span>
             <strong>{queueLead?.state ?? "--"}</strong>
           </div>
         </div>
@@ -223,7 +240,7 @@ export function ExecutionScreen({
       <div className="executionConsoleGrid">
         <section className="executionConsolePanel">
           <div className="executionConsolePanelHead">
-            <strong>{t(copy("Launch", "启动", "起動"))}</strong>
+            <strong>{t(copy("Launch"))}</strong>
             <span>{runLabel}</span>
           </div>
           <form className="executionConsoleForm" onSubmit={onLaunchSubmit}>
@@ -270,7 +287,7 @@ export function ExecutionScreen({
               </select>
             </label>
             <label className="fullWidth">
-              {t(copy("Compare data templates", "对比数据模板", "比較データテンプレート"))}
+              {t(copy("Compare data templates"))}
               <div className="executionMultiSelect" ref={dropdownRef}>
                 <button
                   type="button"
@@ -280,7 +297,7 @@ export function ExecutionScreen({
                   <span>
                     {selectedTemplates.length
                       ? selectedTemplates.map((item) => item.name).join(", ")
-                      : t(copy("Select templates", "选择模板", "テンプレートを選択"))}
+                      : t(copy("Select templates"))}
                   </span>
                   <i>▾</i>
                 </button>
@@ -297,19 +314,27 @@ export function ExecutionScreen({
                           <div>
                             <strong>{template.name}</strong>
                             <small>
-                              {template.type} · {template.compareSummary}
+                              {template.type} / {template.compareSummary}
                             </small>
                           </div>
                         </label>
                       ))
                     ) : (
-                      <div className="executionMultiSelectEmpty">
-                        {t(copy("No template available for this project.", "当前项目没有可选模板。", "このプロジェクトで選べるテンプレートはありません。"))}
-                      </div>
+                      <div className="executionMultiSelectEmpty">{t(copy("No template available for this project."))}</div>
                     )}
                   </div>
                 ) : null}
               </div>
+            </label>
+            <label className="fullWidth">
+              {t(copy("Database connection"))}
+              <select value={selectedDatabaseId} onChange={(event) => onSelectedDatabaseIdChange(event.target.value)}>
+                {databaseConfigs.map((database) => (
+                  <option key={database.id} value={database.id}>
+                    {database.name} / {database.type}
+                  </option>
+                ))}
+              </select>
             </label>
             <label className="fullWidth">
               {fieldDetailLabel}
@@ -335,7 +360,7 @@ export function ExecutionScreen({
 
         <section className="executionConsolePanel">
           <div className="executionConsolePanelHead">
-            <strong>{t(copy("Prepared cases", "预执行用例", "事前実行ケース"))}</strong>
+            <strong>{t(copy("Prepared cases"))}</strong>
             <span>{primaryProject?.name ?? launchForm.projectKey}</span>
           </div>
           <div className="executionPreparedCountHero">{preparedCasesForProject.length}</div>
@@ -354,41 +379,39 @@ export function ExecutionScreen({
                 </article>
               ))
             ) : (
-              <div className="executionPreparedEmptyState">
-                {t(copy("Go back to Cases and run Pre-execution first.", "请先到 Cases 执行预执行。", "先に Cases で事前実行してください。"))}
-              </div>
+              <div className="executionPreparedEmptyState">{t(copy("Go back to Cases and run Pre-execution first."))}</div>
             )}
           </div>
         </section>
 
         <section className="executionConsolePanel">
           <div className="executionConsolePanelHead">
-            <strong>{t(copy("Execution readiness", "执行就绪度", "実行準備"))}</strong>
+            <strong>{t(copy("Execution readiness"))}</strong>
             <span>{monitorLinkHint}</span>
           </div>
           <div className="executionChecklistGrid">
             <article>
-              <span>{t(copy("Project", "项目", "プロジェクト"))}</span>
+              <span>{t(copy("Project"))}</span>
               <strong>{primaryProject?.name ?? "-"}</strong>
               <small>{primaryProject?.note ?? snapshot.summary.description}</small>
             </article>
             <article>
-              <span>{t(copy("Prepared cases", "预执行用例", "事前実行ケース"))}</span>
+              <span>{t(copy("Prepared cases"))}</span>
               <strong>{preparedCasesForProject.length}</strong>
-              <small>{t(copy("Only prepared cases join this run.", "仅预执行过的用例会进入本次执行。", "事前実行済みケースのみ参加します。"))}</small>
+              <small>{t(copy("Only prepared cases join this run."))}</small>
             </article>
             <article>
-              <span>{t(copy("Runtime policy", "运行策略", "実行ポリシー"))}</span>
+              <span>{t(copy("Runtime policy"))}</span>
               <strong>{modelPolicy}</strong>
               <small>{snapshot.constraints[0] ?? snapshot.summary.runtimeStrategy}</small>
             </article>
             <article>
-              <span>{t(copy("Data boundary", "数据边界", "データ境界"))}</span>
-              <strong>{environmentPolicy}</strong>
-              <small>{snapshot.environmentConfig[0]?.value ?? ""}</small>
+              <span>{t(copy("Data boundary"))}</span>
+              <strong>{selectedDatabase?.name ?? environmentPolicy}</strong>
+              <small>{selectedDatabase ? `${selectedDatabase.type} / ${selectedDatabase.schema || "-"}` : environmentPolicy}</small>
             </article>
             <article>
-              <span>{t(copy("Queue pressure", "队列压力", "キュー圧力"))}</span>
+              <span>{t(copy("Queue pressure"))}</span>
               <strong>{queueLead?.state ?? "Waiting"}</strong>
               <small>{queueLead?.detail ?? ""}</small>
             </article>
@@ -402,7 +425,7 @@ export function ExecutionScreen({
       <div className="executionConsoleBottomGrid">
         <section className="executionConsolePanel">
           <div className="executionConsolePanelHead">
-            <strong>{t(copy("Template compare", "模板对比", "テンプレート比較"))}</strong>
+            <strong>{t(copy("Template compare"))}</strong>
             <span>{selectedTemplates.length}</span>
           </div>
           <div className="executionCompareList">
@@ -415,20 +438,18 @@ export function ExecutionScreen({
                   </div>
                   <div className="executionCompareTimeline">
                     <div>
-                      <span>{t(copy("Before", "执行前", "実行前"))}</span>
+                      <span>{t(copy("Before"))}</span>
                       <p>{template.compareSummary}</p>
                     </div>
                     <div>
-                      <span>{t(copy("After", "执行后", "実行後"))}</span>
-                      <p>{t(copy("Capture delta result and attach to run review.", "捕获差异结果并附加到执行审计。", "差分結果を取得して実行レビューに添付します。"))}</p>
+                      <span>{t(copy("After"))}</span>
+                      <p>{t(copy("Capture delta result and attach it to the run review."))}</p>
                     </div>
                   </div>
                 </article>
               ))
             ) : (
-              <div className="executionPreparedEmptyState">
-                {t(copy("Select one or more templates from the dropdown above.", "请从上方下拉框选择一个或多个模板。", "上のドロップダウンからテンプレートを選択してください。"))}
-              </div>
+              <div className="executionPreparedEmptyState">{t(copy("Select one or more templates from the dropdown above."))}</div>
             )}
           </div>
         </section>

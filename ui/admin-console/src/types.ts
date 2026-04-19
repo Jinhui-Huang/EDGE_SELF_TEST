@@ -72,7 +72,23 @@ export type SchedulerMutationForm = {
   environment: string;
   targetUrl: string;
   executionModel: string;
+  databaseId: string;
   detail: string;
+};
+
+export type DatabaseType = "Oracle" | "MySQL" | "PostgreSQL" | "SQL Server" | "MariaDB" | "DB2";
+
+export type DatabaseConfig = {
+  id: string;
+  name: string;
+  type: DatabaseType;
+  driver: string;
+  url: string;
+  schema: string;
+  username: string;
+  password: string;
+  mybatisEnv: string;
+  note: string;
 };
 
 export type ModelProvider = {

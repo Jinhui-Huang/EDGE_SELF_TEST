@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { CasesScreen } from "./screens/CasesScreen";
-import { ConfigScreen } from "./screens/ConfigScreen";
+import { DatabaseConfigScreen } from "./screens/DatabaseConfigScreen";
 import { DashboardScreen } from "./screens/DashboardScreen";
 import { DataDiffScreen } from "./screens/DataDiffScreen";
 import { DataTemplatesScreen } from "./screens/DataTemplatesScreen";
@@ -20,6 +20,7 @@ import {
   CaseItem,
   ConfigItem,
   CopyValue,
+  DatabaseConfig,
   DataTemplateItem,
   Locale,
   ModelProvider,
@@ -55,7 +56,7 @@ const fallbackSnapshot: AdminConsoleSnapshot = {
     { id: "reports", label: "Reports", summary: "Recent runs, failures, and maintenance" },
     { id: "reportDetail", label: "Report Detail", summary: "Inspect a focused run narrative and artifacts" },
     { id: "models", label: "Model Config", summary: "Model access and audit toggles" },
-    { id: "environments", label: "Environment Config", summary: "Target environments and browser pools" },
+    { id: "environments", label: "Database Config", summary: "Mainstream database connections and validation" },
     { id: "dataDiff", label: "Data Diff", summary: "Track DB change previews and restore checkpoints" },
     { id: "dataTemplates", label: "Data Templates", summary: "Manage reusable seed and teardown recipes" },
     { id: "plugin", label: "Plugin Popup", summary: "Keep popup scope aligned with the platform" }
@@ -152,9 +153,21 @@ const fallbackSnapshot: AdminConsoleSnapshot = {
     { label: "Output guard", value: "JSON schema plus rule validation" }
   ],
   environmentConfig: [
-    { label: "Browser pool", value: "Edge stable / staging" },
-    { label: "Account slots", value: "smoke_bot_01, ops_audit_02" },
-    { label: "Data policy", value: "Read-only mock scope for Phase 3 shell" }
+    {
+      label: "database:oracle-checkout-main",
+      value:
+        '{"id":"oracle-checkout-main","name":"checkout-oracle-main-prodlike","type":"Oracle","driver":"oracle.jdbc.OracleDriver","url":"jdbc:oracle:thin:@//10.18.8.21:1521/CHKPDB1","schema":"CHECKOUT_APP","username":"qa_checkout","password":"******","mybatisEnv":"qa-oracle","note":"Checkout core order database"}'
+    },
+    {
+      label: "database:mysql-member-center",
+      value:
+        '{"id":"mysql-member-center","name":"member-center-mysql-staging","type":"MySQL","driver":"com.mysql.cj.jdbc.Driver","url":"jdbc:mysql://10.18.8.35:3306/member_center","schema":"member_center","username":"qa_member","password":"******","mybatisEnv":"qa-mysql","note":"Member center staging database"}'
+    },
+    {
+      label: "database:pg-ops-reporting",
+      value:
+        '{"id":"pg-ops-reporting","name":"ops-reporting-postgres-analytics","type":"PostgreSQL","driver":"org.postgresql.Driver","url":"jdbc:postgresql://10.18.8.48:5432/ops_reporting","schema":"ops_audit","username":"qa_ops","password":"******","mybatisEnv":"qa-postgres","note":"Ops reporting and audit restore database"}'
+    }
   ],
   timeline: [
     { time: "09:10", title: "checkout-web run finished", detail: "72 steps, 1 failure, payment button locator mismatch" },
@@ -393,6 +406,45 @@ const defaultDataTemplates: DataTemplateItem[] = [
   }
 ];
 
+const defaultDatabaseConfigs: DatabaseConfig[] = [
+  {
+    id: "oracle-checkout-main",
+    name: "checkout-oracle-main-prodlike",
+    type: "Oracle",
+    driver: "oracle.jdbc.OracleDriver",
+    url: "jdbc:oracle:thin:@//10.18.8.21:1521/CHKPDB1",
+    schema: "CHECKOUT_APP",
+    username: "qa_checkout",
+    password: "******",
+    mybatisEnv: "qa-oracle",
+    note: "Checkout core order database"
+  },
+  {
+    id: "mysql-member-center",
+    name: "member-center-mysql-staging",
+    type: "MySQL",
+    driver: "com.mysql.cj.jdbc.Driver",
+    url: "jdbc:mysql://10.18.8.35:3306/member_center",
+    schema: "member_center",
+    username: "qa_member",
+    password: "******",
+    mybatisEnv: "qa-mysql",
+    note: "Member center staging database"
+  },
+  {
+    id: "pg-ops-reporting",
+    name: "ops-reporting-postgres-analytics",
+    type: "PostgreSQL",
+    driver: "org.postgresql.Driver",
+    url: "jdbc:postgresql://10.18.8.48:5432/ops_reporting",
+    schema: "ops_audit",
+    username: "qa_ops",
+    password: "******",
+    mybatisEnv: "qa-postgres",
+    note: "Ops reporting and audit restore database"
+  }
+];
+
 function parseModelProviders(items: ConfigItem[]): ModelProvider[] {
   const parsed = items
     .filter((item) => item.label.startsWith("provider:"))
@@ -421,6 +473,28 @@ function parseModelRoutingRules(items: ConfigItem[]): ModelRoutingRule[] {
     .filter((item): item is ModelRoutingRule => Boolean(item));
 
   return parsed.length ? parsed : defaultModelRoutingRules;
+}
+
+function parseDatabaseConfigs(items: ConfigItem[]): DatabaseConfig[] {
+  const parsed = items
+    .filter((item) => item.label.startsWith("database:"))
+    .map((item) => {
+      try {
+        return JSON.parse(item.value) as DatabaseConfig;
+      } catch {
+        return null;
+      }
+    })
+    .filter((item): item is DatabaseConfig => Boolean(item));
+
+  return parsed.length ? parsed : defaultDatabaseConfigs;
+}
+
+function buildDatabaseConfigItems(items: DatabaseConfig[]): ConfigItem[] {
+  return items.map((item) => ({
+    label: `database:${item.id}`,
+    value: JSON.stringify(item)
+  }));
 }
 
 function buildModelConfigItems(providers: ModelProvider[], routingRules: ModelRoutingRule[]): ConfigItem[] {
@@ -563,12 +637,12 @@ const screenCopy: Record<ScreenId, { title: CopyValue; description: CopyValue }>
   },
   environments: {
     title: {
-      en: "Environment policy",
+      en: "Database Config",
       zh: "环境策略",
       ja: "環境ポリシー"
     },
     description: {
-      en: "Maintain browser pools and environment rules in the same platform frame as the other operators.",
+      en: "Manage Oracle, MyBatis, and other mainstream database connections from a dedicated configuration workspace.",
       zh: "在同一平台框架内维护浏览器池与环境规则。",
       ja: "同じプラットフォーム枠組みの中でブラウザプールと環境ルールを管理します。"
     }
@@ -951,9 +1025,9 @@ const localizedScreenCopy: Record<ScreenId, { title: CopyValue; description: Cop
     }
   },
   environments: {
-    title: { en: "Environment policy", zh: "环境策略", ja: "環境方針" },
+    title: { en: "Database Config", zh: "Database Config", ja: "Database Config" },
     description: {
-      en: "Maintain browser pools and environment rules in the same platform frame as the other operators.",
+      en: "Manage Oracle, MyBatis, and other mainstream database connections from a dedicated configuration workspace.",
       zh: "在与其他操作员相同的平台框架中维护浏览器池和环境规则。",
       ja: "他の運用者と同じプラットフォーム枠内でブラウザプールと環境ルールを管理します。"
     }
@@ -999,7 +1073,7 @@ const uiCopy = {
   projectSaveHint: { en: "POST /catalog/project", zh: "POST /catalog/project", ja: "POST /catalog/project" },
   caseSaveHint: { en: "POST /catalog/case", zh: "POST /catalog/case", ja: "POST /catalog/case" },
   modelSaveHint: { en: "POST /config/model", zh: "POST /config/model", ja: "POST /config/model" },
-  environmentSaveHint: { en: "POST /config/environment", zh: "POST /config/environment", ja: "POST /config/environment" },
+  environmentSaveHint: { en: "POST /config/database", zh: "POST /config/database", ja: "POST /config/database" },
   executionSaveHint: { en: "POST /scheduler/requests + /scheduler/events", zh: "POST /scheduler/requests + /scheduler/events", ja: "POST /scheduler/requests + /scheduler/events" },
   reviewSaveHint: { en: "POST /scheduler/events", zh: "POST /scheduler/events", ja: "POST /scheduler/events" },
   addProjectRow: { en: "Add project row", zh: "新增项目行", ja: "プロジェクト行を追加" },
@@ -1007,7 +1081,7 @@ const uiCopy = {
   addCaseRow: { en: "Add case row", zh: "新增用例行", ja: "ケース行を追加" },
   saveCaseCatalog: { en: "Save case catalog", zh: "保存用例目录", ja: "ケースカタログを保存" },
   saveModelConfig: { en: "Save model config", zh: "保存模型配置", ja: "モデル設定を保存" },
-  saveEnvironmentConfig: { en: "Save environment config", zh: "保存环境配置", ja: "環境設定を保存" },
+  saveEnvironmentConfig: { en: "Save database config", zh: "保存数据库配置", ja: "データベース設定を保存" },
   runAction: { en: "Run", zh: "预执行", ja: "事前実行" },
   executionAction: { en: "Execution", zh: "正式执行", ja: "実行" },
   openAudit: { en: "Open audit", zh: "发起审计", ja: "監査を開始" },
@@ -1083,6 +1157,7 @@ export function App() {
     environment: "prod-like",
     targetUrl: "https://checkout.demo.internal/cart",
     executionModel: defaultModelProviders[0].model,
+    databaseId: defaultDatabaseConfigs[0].id,
     detail: "Accepted from operator launch panel."
   });
   const [reviewForm, setReviewForm] = useState<SchedulerMutationForm>({
@@ -1092,6 +1167,7 @@ export function App() {
     environment: "prod-like",
     targetUrl: "",
     executionModel: defaultModelProviders[0].model,
+    databaseId: defaultDatabaseConfigs[0].id,
     detail: "Operator review opened from the admin console."
   });
   const [launchState, setLaunchState] = useState<MutationState>({ kind: "idle", message: "" });
@@ -1100,7 +1176,7 @@ export function App() {
   const [modelConfigDraft, setModelConfigDraft] = useState<ConfigItem[]>(fallbackSnapshot.modelConfig);
   const [modelProviders, setModelProviders] = useState<ModelProvider[]>(parseModelProviders(fallbackSnapshot.modelConfig));
   const [modelRoutingRules, setModelRoutingRules] = useState<ModelRoutingRule[]>(parseModelRoutingRules(fallbackSnapshot.modelConfig));
-  const [environmentConfigDraft, setEnvironmentConfigDraft] = useState<ConfigItem[]>(fallbackSnapshot.environmentConfig);
+  const [databaseConfigs, setDatabaseConfigs] = useState<DatabaseConfig[]>(parseDatabaseConfigs(fallbackSnapshot.environmentConfig));
   const [projectDraft, setProjectDraft] = useState<ProjectItem[]>(
     fallbackSnapshot.projects.map((project) => ({
       key: project.key,
@@ -1112,6 +1188,7 @@ export function App() {
   );
   const [modelConfigState, setModelConfigState] = useState<MutationState>({ kind: "idle", message: "" });
   const [environmentConfigState, setEnvironmentConfigState] = useState<MutationState>({ kind: "idle", message: "" });
+  const [databaseTestState, setDatabaseTestState] = useState<MutationState>({ kind: "idle", message: "" });
   const [projectState, setProjectState] = useState<MutationState>({ kind: "idle", message: "" });
   const [caseDraft, setCaseDraft] = useState<CaseItem[]>(
     fallbackSnapshot.cases.map((testCase) => ({
@@ -1418,7 +1495,7 @@ export function App() {
   }, [snapshot.modelConfig]);
 
   useEffect(() => {
-    setEnvironmentConfigDraft(snapshot.environmentConfig);
+    setDatabaseConfigs(parseDatabaseConfigs(snapshot.environmentConfig));
   }, [snapshot.environmentConfig]);
 
   useEffect(() => {
@@ -1463,6 +1540,18 @@ export function App() {
       executionModel: current.executionModel || defaultExecutionModel
     }));
   }, [modelProviders]);
+
+  useEffect(() => {
+    const defaultDatabaseId = databaseConfigs[0]?.id ?? "";
+    setLaunchForm((current) => ({
+      ...current,
+      databaseId: databaseConfigs.some((item) => item.id === current.databaseId) ? current.databaseId : defaultDatabaseId
+    }));
+    setReviewForm((current) => ({
+      ...current,
+      databaseId: databaseConfigs.some((item) => item.id === current.databaseId) ? current.databaseId : defaultDatabaseId
+    }));
+  }, [databaseConfigs]);
 
   function handleLaunchSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1539,6 +1628,26 @@ export function App() {
     const items = buildModelConfigItems(modelProviders, modelRoutingRules);
     setModelConfigDraft(items);
     void postConfigItems("/api/phase3/config/model", items, setModelConfigState, t(sharedCopy.savedModelConfig));
+  }
+
+  function handleDatabaseConfigSave(items: DatabaseConfig[]) {
+    const normalizedItems = items.filter((item) => item.name.trim());
+    setDatabaseConfigs(normalizedItems);
+    const payload = buildDatabaseConfigItems(normalizedItems);
+    void postConfigItems("/api/phase3/config/environment", payload, setEnvironmentConfigState, t(sharedCopy.savedEnvironmentConfig));
+  }
+
+  function handleDatabaseConnectionTest(item: DatabaseConfig) {
+    const label = item.name.trim() || item.type;
+    setDatabaseTestState({ kind: "pending", message: `Testing connection for ${label}...` });
+
+    window.setTimeout(() => {
+      const passed = Boolean(item.url.trim() && item.username.trim() && item.password.trim() && item.driver.trim());
+      setDatabaseTestState({
+        kind: passed ? "success" : "error",
+        message: passed ? `Connection check passed for ${label}.` : `Connection check failed for ${label}. Fill URL, driver, username, and password.`
+      });
+    }, 500);
   }
 
   function updateProjectDraft(index: number, key: keyof ProjectItem, value: string) {
@@ -1763,9 +1872,12 @@ export function App() {
             monitorLinkHint={t({ en: "Runtime handoff", zh: "运行期接力", ja: "ランタイム連携" })}
             locale={locale}
             modelProviders={modelProviders}
+            databaseConfigs={databaseConfigs}
+            selectedDatabaseId={launchForm.databaseId}
             onLaunchFormChange={setLaunchForm}
             onReviewFormChange={setReviewForm}
             onSelectedTemplateIdsChange={setSelectedExecutionTemplateIds}
+            onSelectedDatabaseIdChange={(databaseId) => setLaunchForm((current) => ({ ...current, databaseId }))}
             onLaunchSubmit={handleLaunchSubmit}
             onExecuteSubmit={handleExecuteSubmit}
             onReviewSubmit={handleReviewSubmit}
@@ -1813,22 +1925,15 @@ export function App() {
         );
       case "environments":
         return (
-          <ConfigScreen
+          <DatabaseConfigScreen
             navigationLabel={navigationItems.find((item) => item.id === "environments")?.label}
             title={t(localizedScreenCopy.environments.title)}
             hint={t(uiCopy.environmentSaveHint)}
-            items={environmentConfigDraft}
+            databases={databaseConfigs}
             state={environmentConfigState}
-            setDraft={setEnvironmentConfigDraft}
-            setState={setEnvironmentConfigState}
-            path="/api/phase3/config/environment"
-            successMessage={t(sharedCopy.savedEnvironmentConfig)}
-            submitLabel={t(uiCopy.saveEnvironmentConfig)}
-            fieldLabelText={t(uiCopy.fieldLabel)}
-            fieldValueText={t(uiCopy.fieldValue)}
-            locale={locale}
-            onConfigChange={updateConfigDraft}
-            onSubmit={handleConfigSubmit}
+            testState={databaseTestState}
+            onSave={handleDatabaseConfigSave}
+            onTestConnection={handleDatabaseConnectionTest}
           />
         );
       case "dataDiff":
