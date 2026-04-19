@@ -1025,7 +1025,7 @@ const localizedScreenCopy: Record<ScreenId, { title: CopyValue; description: Cop
     }
   },
   environments: {
-    title: { en: "Database Config", zh: "Database Config", ja: "Database Config" },
+    title: { en: "Database Config", zh: "数据库配置", ja: "データベース設定" },
     description: {
       en: "Manage Oracle, MyBatis, and other mainstream database connections from a dedicated configuration workspace.",
       zh: "在与其他操作员相同的平台框架中维护浏览器池和环境规则。",
@@ -1061,6 +1061,7 @@ const localizedScreenCopy: Record<ScreenId, { title: CopyValue; description: Cop
 const uiCopy = {
   product: { en: "Edge Self Test", zh: "Edge 自测平台", ja: "Edge 自動テスト" },
   shellLabel: { en: "Phase 3 control plane", zh: "Phase 3 控制台", ja: "Phase 3 コントロールプレーン" },
+  envLabel: { en: "env", zh: "环境", ja: "環境" },
   dataSource: { en: "Data source", zh: "数据来源", ja: "データソース" },
   currentConstraints: { en: "Current constraints", zh: "当前约束", ja: "現在の制約" },
   runtimePolicy: { en: "Runtime policy", zh: "运行策略", ja: "実行方針" },
@@ -1929,6 +1930,7 @@ export function App() {
             navigationLabel={navigationItems.find((item) => item.id === "environments")?.label}
             title={t(localizedScreenCopy.environments.title)}
             hint={t(uiCopy.environmentSaveHint)}
+            locale={locale}
             databases={databaseConfigs}
             state={environmentConfigState}
             testState={databaseTestState}
@@ -1968,6 +1970,7 @@ export function App() {
           <TopBar
             productLabel={t(uiCopy.product)}
             shellLabel={t(uiCopy.shellLabel)}
+            envLabel={t(uiCopy.envLabel)}
             dataSourceLabel={t(uiCopy.dataSource)}
             sourceLabel={sourceLabel}
             languageLabel={t(uiCopy.language)}

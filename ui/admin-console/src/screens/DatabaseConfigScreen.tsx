@@ -1,17 +1,22 @@
 import { useEffect, useState } from "react";
-import { DatabaseConfig, DatabaseType, MutationState } from "../types";
+import { translate } from "../i18n";
+import { DatabaseConfig, DatabaseType, Locale, MutationState } from "../types";
 import { MutationStatus } from "../ui-kit/MutationStatus";
 
 type DatabaseConfigScreenProps = {
   navigationLabel?: string;
   title: string;
   hint: string;
+  locale: Locale;
   databases: DatabaseConfig[];
   state: MutationState;
   testState: MutationState;
   onSave: (items: DatabaseConfig[]) => void;
   onTestConnection: (item: DatabaseConfig) => void;
 };
+
+type Copy = { en: string; zh: string; ja: string };
+const copy = (en: string, zh = en, ja = en): Copy => ({ en, zh, ja });
 
 const databaseTypes: DatabaseType[] = ["Oracle", "MySQL", "PostgreSQL", "SQL Server", "MariaDB", "DB2"];
 
@@ -32,12 +37,15 @@ export function DatabaseConfigScreen({
   navigationLabel,
   title,
   hint,
+  locale,
   databases,
   state,
   testState,
   onSave,
   onTestConnection
 }: DatabaseConfigScreenProps) {
+  const t = (value: Copy) => translate(locale, value);
+
   const [drafts, setDrafts] = useState<DatabaseConfig[]>(databases);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -112,7 +120,7 @@ export function DatabaseConfigScreen({
         <div className="databaseConfigHeaderActions">
           <span className="actionHint">{hint}</span>
           <button type="button" className="projectsActionButton primary" onClick={openCreateDialog}>
-            New database
+            {t(copy("New database", "新建数据库", "新規データベース"))}
           </button>
         </div>
       </div>
@@ -136,17 +144,17 @@ export function DatabaseConfigScreen({
               </div>
               <div className="databaseCardFieldPair">
                 <div className="databaseCardField">
-                  <span>Schema</span>
+                  <span>{t(copy("Schema", "模式", "スキーマ"))}</span>
                   <strong>{item.schema || "-"}</strong>
                 </div>
                 <div className="databaseCardField">
-                  <span>User</span>
+                  <span>{t(copy("User", "用户", "ユーザー"))}</span>
                   <strong>{item.username || "-"}</strong>
                 </div>
               </div>
               <div className="databaseCardFieldPair">
                 <div className="databaseCardField">
-                  <span>Driver</span>
+                  <span>{t(copy("Driver", "驱动", "ドライバー"))}</span>
                   <strong title={item.driver}>{item.driver || "-"}</strong>
                 </div>
                 <div className="databaseCardField">
@@ -165,7 +173,7 @@ export function DatabaseConfigScreen({
                   onTestConnection(item);
                 }}
               >
-                Test connection
+                {t(copy("Test connection", "测试连接", "接続テスト"))}
               </button>
             </div>
           </article>
@@ -180,26 +188,34 @@ export function DatabaseConfigScreen({
           <div className="databaseDialog" onClick={(event) => event.stopPropagation()}>
             <div className="databaseDialogHead">
               <div>
-                <p className="eyebrow">{editingId ? "Edit database" : "Create database"}</p>
-                <h3>{editingId ? "Update database config" : "New database config"}</h3>
+                <p className="eyebrow">
+                  {editingId
+                    ? t(copy("Edit database", "编辑数据库", "データベースを編集"))
+                    : t(copy("Create database", "创建数据库", "データベースを作成"))}
+                </p>
+                <h3>
+                  {editingId
+                    ? t(copy("Update database config", "更新数据库配置", "データベース設定を更新"))
+                    : t(copy("New database config", "新建数据库配置", "新規データベース設定"))}
+                </h3>
               </div>
               <button type="button" className="projectsActionButton" onClick={closeDialog}>
-                Close
+                {t(copy("Close", "关闭", "閉じる"))}
               </button>
             </div>
 
             <div className="databaseDialogBody">
               <div className="databaseDialogGrid">
                 <label>
-                  Database name
+                  {t(copy("Database name", "数据库名称", "データベース名"))}
                   <input
-                    placeholder="Example: oracle-main-trade"
+                    placeholder={t(copy("Example: oracle-main-trade", "示例：oracle-main-trade", "例：oracle-main-trade"))}
                     value={form.name}
                     onChange={(event) => updateForm("name", event.target.value)}
                   />
                 </label>
                 <label>
-                  Database type
+                  {t(copy("Database type", "数据库类型", "データベース種別"))}
                   <select value={form.type} onChange={(event) => updateForm("type", event.target.value as DatabaseType)}>
                     {databaseTypes.map((type) => (
                       <option key={type} value={type}>
@@ -217,50 +233,50 @@ export function DatabaseConfigScreen({
                   />
                 </label>
                 <label>
-                  Username
+                  {t(copy("Username", "用户名", "ユーザー名"))}
                   <input
-                    placeholder="Example: qa_reader"
+                    placeholder={t(copy("Example: qa_reader", "示例：qa_reader", "例：qa_reader"))}
                     value={form.username}
                     onChange={(event) => updateForm("username", event.target.value)}
                   />
                 </label>
                 <label>
-                  Password
+                  {t(copy("Password", "密码", "パスワード"))}
                   <input
                     type="password"
-                    placeholder="Input database password"
+                    placeholder={t(copy("Input database password", "输入数据库密码", "データベースパスワードを入力"))}
                     value={form.password}
                     onChange={(event) => updateForm("password", event.target.value)}
                   />
                 </label>
                 <label>
-                  Driver
+                  {t(copy("Driver", "驱动类名", "ドライバークラス名"))}
                   <input
-                    placeholder="Example: oracle.jdbc.OracleDriver"
+                    placeholder={t(copy("Example: oracle.jdbc.OracleDriver", "示例：oracle.jdbc.OracleDriver", "例：oracle.jdbc.OracleDriver"))}
                     value={form.driver}
                     onChange={(event) => updateForm("driver", event.target.value)}
                   />
                 </label>
                 <label>
-                  Schema
+                  {t(copy("Schema", "数据库模式", "スキーマ"))}
                   <input
-                    placeholder="Example: CHECKOUT_APP"
+                    placeholder={t(copy("Example: CHECKOUT_APP", "示例：CHECKOUT_APP", "例：CHECKOUT_APP"))}
                     value={form.schema}
                     onChange={(event) => updateForm("schema", event.target.value)}
                   />
                 </label>
                 <label>
-                  MyBatis env
+                  {t(copy("MyBatis env", "MyBatis 环境", "MyBatis 環境"))}
                   <input
-                    placeholder="Example: qa-oracle"
+                    placeholder={t(copy("Example: qa-oracle", "示例：qa-oracle", "例：qa-oracle"))}
                     value={form.mybatisEnv}
                     onChange={(event) => updateForm("mybatisEnv", event.target.value)}
                   />
                 </label>
                 <label>
-                  Note
+                  {t(copy("Note", "备注", "メモ"))}
                   <input
-                    placeholder="Example: Checkout staging primary database"
+                    placeholder={t(copy("Example: Checkout staging primary database", "示例：Checkout staging 主数据库", "例：チェックアウト ステージング メインDB"))}
                     value={form.note}
                     onChange={(event) => updateForm("note", event.target.value)}
                   />
@@ -270,15 +286,15 @@ export function DatabaseConfigScreen({
 
             <div className="databaseDialogActions">
               <button type="button" className="projectsActionButton" onClick={() => onTestConnection(form)}>
-                Test connection
+                {t(copy("Test connection", "测试连接", "接続テスト"))}
               </button>
               {editingId ? (
                 <button type="button" className="projectsActionButton danger" onClick={deleteCurrent}>
-                  Delete
+                  {t(copy("Delete", "删除", "削除"))}
                 </button>
               ) : null}
               <button type="button" className="projectsActionButton primary" onClick={saveDialog}>
-                Save database
+                {t(copy("Save database", "保存数据库", "データベースを保存"))}
               </button>
             </div>
           </div>

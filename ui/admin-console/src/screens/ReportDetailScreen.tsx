@@ -63,7 +63,7 @@ export function ReportDetailScreen({
     <div className="reportDetailScreen">
       <div className="reportDetailBreadcrumb">
         <button type="button" className="reportDetailBacklink" onClick={onBackToReports}>
-          {t(copy("Reports", "Reports", "Reports"))}
+          {t(copy("Reports", "报告", "レポート"))}
         </button>
         <span>/</span>
         <span>{report.runName}</span>

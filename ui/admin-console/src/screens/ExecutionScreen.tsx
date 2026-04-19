@@ -171,7 +171,7 @@ export function ExecutionScreen({
 
   return (
     <div className="executionConsoleScreen">
-      <div className="dataTemplatesPath">{t(copy("Executions / run_8f2a1c3e"))}</div>
+      <div className="dataTemplatesPath">{t(copy("Executions / run_8f2a1c3e", "执行 / run_8f2a1c3e", "実行 / run_8f2a1c3e"))}</div>
 
       <div className="executionConsoleHead">
         <div>
@@ -181,7 +181,7 @@ export function ExecutionScreen({
             <span className="executionConsolePill">{launchForm.environment}</span>
             <span className="executionConsolePill isModel">{launchForm.executionModel}</span>
           </div>
-          <p>{t(copy("Bind run id, project, prepared cases, database, and compare templates before starting execution."))}</p>
+          <p>{t(copy("Bind run id, project, prepared cases, database, and compare templates before starting execution.", "绑定运行 ID、项目、预执行用例和数据库，确认无误后开始正式执行。", "実行 ID・プロジェクト・事前実行済みケース・データベースを設定してから実行を開始します。"))}</p>
         </div>
         <div className="executionConsoleHeadActions">
           <button type="button" className="projectsActionButton executionMonitorButton" onClick={onOpenMonitor}>

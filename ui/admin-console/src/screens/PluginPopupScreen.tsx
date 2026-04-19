@@ -25,26 +25,26 @@ const quickActions: Array<{ icon: string; tone: string; title: LocalizedCopy; su
   {
     icon: "O",
     tone: "accent",
-    title: { en: "Pick element", zh: "Pick element", ja: "Pick element" },
-    sub: { en: "Hover to capture locator", zh: "Hover to capture locator", ja: "Hover to capture locator" }
+    title: { en: "Pick element", zh: "拾取元素", ja: "要素を選択" },
+    sub: { en: "Hover to capture locator", zh: "悬停捕获定位器", ja: "ホバーしてロケーターを取得" }
   },
   {
     icon: "[]",
     tone: "mint",
-    title: { en: "Page summary", zh: "Page summary", ja: "Page summary" },
-    sub: { en: "Structured view", zh: "Structured view", ja: "Structured view" }
+    title: { en: "Page summary", zh: "页面摘要", ja: "ページ概要" },
+    sub: { en: "Structured view", zh: "结构化视图", ja: "構造化ビュー" }
   },
   {
     icon: ">",
     tone: "coral",
-    title: { en: "Quick smoke test", zh: "Quick smoke test", ja: "Quick smoke test" },
-    sub: { en: "Run on current URL", zh: "Run on current URL", ja: "Run on current URL" }
+    title: { en: "Quick smoke test", zh: "快速冒烟测试", ja: "クイックスモークテスト" },
+    sub: { en: "Run on current URL", zh: "在当前页执行", ja: "現在の URL で実行" }
   },
   {
     icon: "->",
     tone: "violet",
-    title: { en: "Open in platform", zh: "Open in platform", ja: "Open in platform" },
-    sub: { en: "Full report and logs", zh: "Full report and logs", ja: "Full report and logs" }
+    title: { en: "Open in platform", zh: "在平台中打开", ja: "プラットフォームで開く" },
+    sub: { en: "Full report and logs", zh: "完整报告与日志", ja: "レポートとログ全体を表示" }
   }
 ];
 
@@ -90,14 +90,14 @@ export function PluginPopupScreen({ snapshot, title, locale }: PluginPopupScreen
               <div>
                 <strong>edge.test</strong>
                 <p>
-                  <span>{t({ en: "host connected", zh: "host connected", ja: "host connected" })}</span> / staging
+                  <span>{t({ en: "host connected", zh: "主机已连接", ja: "ホスト接続済み" })}</span> / staging
                 </p>
               </div>
             </div>
 
             <div className="pluginFloatingBody">
               <section>
-                <h4>{t({ en: "Current page", zh: "Current page", ja: "Current page" })}</h4>
+                <h4>{t({ en: "Current page", zh: "当前页面", ja: "現在のページ" })}</h4>
                 <strong>Checkout</strong>
                 <p>/checkout</p>
                 <div className="pluginBadgeRow">
@@ -109,14 +109,14 @@ export function PluginPopupScreen({ snapshot, title, locale }: PluginPopupScreen
               <div className="pluginDivider" />
 
               <section>
-                <h4>{t({ en: "Active run", zh: "Active run", ja: "Active run" })}</h4>
+                <h4>{t({ en: "Active run", zh: "当前运行", ja: "実行中" })}</h4>
                 <div className="pluginRunCard">
                   <div className="pluginRunMeta">
                     <span className="pluginBadge info dot">running</span>
                     <span className="pluginRunId">run_8f2a</span>
                   </div>
                   <strong>{latestRun?.title ?? "Checkout happy path"}</strong>
-                  <p>{t({ en: "step 5/8 / click 'Pay'", zh: "step 5/8 / click 'Pay'", ja: "step 5/8 / click 'Pay'" })}</p>
+                  <p>{t({ en: "step 5/8 / click 'Pay'", zh: "步骤 5/8 / 点击「Pay」", ja: "ステップ 5/8 / 「Pay」をクリック" })}</p>
                   <div className="pluginProgress">
                     <div />
                   </div>
@@ -126,7 +126,7 @@ export function PluginPopupScreen({ snapshot, title, locale }: PluginPopupScreen
               <div className="pluginDivider" />
 
               <section>
-                <h4>{t({ en: "Quick actions", zh: "Quick actions", ja: "Quick actions" })}</h4>
+                <h4>{t({ en: "Quick actions", zh: "快捷操作", ja: "クイックアクション" })}</h4>
                 {quickActions.map((action) => (
                   <div key={action.title.en} className="pluginQuickAction">
                     <div className={`pluginQuickIcon ${action.tone}`}>{action.icon}</div>
@@ -146,15 +146,15 @@ export function PluginPopupScreen({ snapshot, title, locale }: PluginPopupScreen
       <aside className="pluginPickerPanel">
         <div className="pluginPickerHeader">
           <div>
-            <strong>{t({ en: "Pick mode", zh: "Pick mode", ja: "Pick mode" })}</strong>
-            <p>{t({ en: "Hover to highlight / click to select", zh: "Hover to highlight / click to select", ja: "Hover to highlight / click to select" })}</p>
+            <strong>{t({ en: "Pick mode", zh: "拾取模式", ja: "ピックモード" })}</strong>
+            <p>{t({ en: "Hover to highlight / click to select", zh: "悬停高亮 / 单击选中", ja: "ホバーでハイライト / クリックで選択" })}</p>
           </div>
           <span className="pluginBadge active dot">active</span>
         </div>
 
         <div className="pluginPickerBody">
           <section>
-            <h4>{t({ en: "Selected element", zh: "Selected element", ja: "Selected element" })}</h4>
+            <h4>{t({ en: "Selected element", zh: "已选中元素", ja: "選択済み要素" })}</h4>
             <div className="pluginCodeCard">
               <div className="pluginCodeTag">&lt;button&gt;</div>
               <div className="pluginCodeText">Pay $89.10</div>
@@ -163,7 +163,7 @@ export function PluginPopupScreen({ snapshot, title, locale }: PluginPopupScreen
           </section>
 
           <section>
-            <h4>{t({ en: "Candidate locators", zh: "Candidate locators", ja: "Candidate locators" })}</h4>
+            <h4>{t({ en: "Candidate locators", zh: "候选定位器", ja: "候補ロケーター" })}</h4>
             <div className="pluginLocatorList">
               {candidateLocators.map((locator) => (
                 <div key={locator.value} className={`pluginLocatorRow${locator.recommended ? " recommended" : ""}`}>
@@ -189,9 +189,9 @@ export function PluginPopupScreen({ snapshot, title, locale }: PluginPopupScreen
 
           <div className="pluginPickerActions">
             <button type="button" className="secondaryButton">
-              Copy
+              {t({ en: "Copy", zh: "复制", ja: "コピー" })}
             </button>
-            <button type="button">Use in DSL</button>
+            <button type="button">{t({ en: "Use in DSL", zh: "插入 DSL", ja: "DSL に挿入" })}</button>
           </div>
         </div>
       </aside>

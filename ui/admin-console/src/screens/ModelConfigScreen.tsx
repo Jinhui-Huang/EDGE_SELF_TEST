@@ -120,7 +120,7 @@ export function ModelConfigScreen({
         <div className="modelConfigHeaderActions">
           <span className="actionHint">{hint}</span>
           <button className="projectsActionButton primary" type="button" onClick={() => setModalOpen(true)}>
-            + {t(copy("Add provider", "Add provider", "Add provider"))}
+            + {t(copy("Add provider", "添加提供方", "プロバイダーを追加"))}
           </button>
         </div>
       </div>
@@ -132,7 +132,7 @@ export function ModelConfigScreen({
               <div className="modelProviderIdentity">
                 <div className="modelProviderTitleRow">
                   <strong>{provider.name}</strong>
-                  {provider.role === "primary" ? <span className="modelBadge info">primary</span> : null}
+                  {provider.role === "primary" ? <span className="modelBadge info">{t(copy("primary", "主模型", "プライマリ"))}</span> : null}
                   <span className={`modelBadge ${provider.status === "active" ? "success" : "neutral"}`}>{provider.status}</span>
                 </div>
                 <div className="modelProviderModel">{provider.model}</div>

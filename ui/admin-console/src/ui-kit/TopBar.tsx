@@ -3,6 +3,7 @@ import { Locale, ThemeMode } from "../types";
 type TopBarProps = {
   productLabel: string;
   shellLabel: string;
+  envLabel: string;
   dataSourceLabel: string;
   sourceLabel: string;
   languageLabel: string;
@@ -19,6 +20,7 @@ type TopBarProps = {
 export function TopBar({
   productLabel,
   shellLabel,
+  envLabel,
   dataSourceLabel,
   sourceLabel,
   languageLabel,
@@ -50,7 +52,7 @@ export function TopBar({
         </span>
         <span className="pill secondary">
           <span className="pillDot" />
-          env: <strong>staging</strong>
+          {envLabel}: <strong>staging</strong>
         </span>
       </div>
 
