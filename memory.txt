@@ -560,3 +560,18 @@
      - models
      - environments
      - plugin
+38. 2026-04-20 Interface review backlog consolidated
+   - Generated `docs/phase3/interface/review-backlog.md` as the implementation-ready backlog companion to the per-screen screen-doc packages.
+   - The backlog consolidates current documented gaps into prioritized buckets:
+     - P0 runtime chain and plugin popup contract issues
+     - P1 report-chain, AI-generation, template-registry, and connection-test gaps
+     - P2 dashboard/projects/cases/docParse wiring gaps
+   - Each backlog item now records:
+     - affected screens
+     - current gap
+     - required interfaces or handoff contracts
+     - acceptance target
+   - The backlog also records:
+     - cross-screen dependency notes
+     - a suggested implementation order for the next approved build phase
+   - No backend or UI code was changed; this remains documentation-only work.

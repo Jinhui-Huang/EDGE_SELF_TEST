@@ -2109,3 +2109,32 @@
 
 ## Next Step
 - The documentation set is now ready for unified review using the single overview file plus the per-screen deep-dive folders.
+## 2026-04-20 Interface Review Backlog Consolidation
+
+## Task
+- Convert the generated per-screen documentation package into one implementation-ready review backlog.
+
+## Completed
+- Generated `docs/phase3/interface/review-backlog.md`.
+- Consolidated the highest-signal unresolved items into prioritized backlog buckets:
+  - P0 runtime chain
+  - P1 report / AI generation / template-registry / connection-test gaps
+  - P2 dashboard / projects / cases / docParse wiring gaps
+- Captured each backlog item with:
+  - affected screens
+  - current gap
+  - required interface design
+  - acceptance target
+- Added cross-screen dependency notes and a suggested implementation order for the next post-review build phase.
+
+## Modified Files
+- `docs/phase3/interface/review-backlog.md`
+- `memory.txt`
+- `01_dev_progress.md`
+
+## Verification
+- Built by reconciling the already-generated per-screen interface documents with `docs/phase3/interface/ui-control-interface-overview.md`.
+- No UI or backend implementation was changed.
+
+## Next Step
+- Use `review-backlog.md` as the primary implementation sequencing file once the documentation package passes review.
