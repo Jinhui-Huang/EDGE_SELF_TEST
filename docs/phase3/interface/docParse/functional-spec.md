@@ -1,0 +1,467 @@
+# DocParse Functional Specification
+
+## 1. Document Position
+
+- Screen name: `docParse`
+- Front-end implementation: `ui/admin-console/src/screens/DocParseScreen.tsx`
+- Parent orchestration: `ui/admin-console/src/App.tsx`
+- Documentation stage rule:
+  - This document defines current and intended screen behavior for review.
+  - It must not trigger UI or backend implementation changes in the current stage.
+  - Any discovered gap can only be recorded as a review item.
+
+## 2. Screen Purpose
+
+The `docParse` screen is the document-ingestion and parse-review page of the Phase 3 admin console. It is the upstream entry for the document-driven generation workflow.
+
+Its job is to:
+
+- organize parsed documents by project
+- open one document into a parse-review canvas
+- expose detected case candidates
+- let the operator review parse result, raw document, and version history
+- hand the selected document/case context into `aiGenerate`
+
+This screen answers these operator questions:
+
+- Which requirement/change documents exist for this project?
+- What cases were detected from the selected document?
+- What did the parser infer vs what is still missing?
+- Which case should be pushed into `aiGenerate` next?
+
+## 3. Operator Role
+
+Primary users:
+
+- QA platform operator
+- test engineer turning business documents into generated tests
+- document reviewer checking parse quality before generation
+
+Typical usage moments:
+
+- after choosing a project
+- before `aiGenerate`
+- when comparing raw document text, parse result, and version history
+
+## 4. Screen Placement in Product Flow
+
+The screen lives inside the common admin-console frame:
+
+- top bar
+- sidebar
+- main panel: `docParse`
+
+The screen is an upstream page for:
+
+- `aiGenerate`
+
+It is intentionally separated from:
+
+- `cases`
+
+## 5. Current Implementation State
+
+Current implementation facts:
+
+- The page is rendered by `DocParseScreen.tsx`.
+- The page does not fetch directly.
+- The page builds its document catalog through local helper `buildDocuments(snapshot)`.
+- project switching is implemented.
+- document detail opening is implemented.
+- `Generate tests` is implemented as App-level focus handoff into `aiGenerate`.
+- parse/raw/history tabs are implemented as local tab state.
+- `Upload file` is implemented only as local filename capture; no backend upload occurs.
+- `Re-parse` is visible but not wired.
+- `Manual edit` is visible but not wired.
+
+This matters for review:
+
+- the page already owns a real upstream handoff into `aiGenerate`
+- but document list, parse result, and version history are still synthetic front-end data, not backend-authored parse artifacts
+
+## 6. Functional Areas
+
+### 6.1 Overview Header
+
+Visible elements:
+
+- eyebrow/title
+- explanatory lead text
+- collapse / expand button
+
+Functional role:
+
+- explain that document parsing is reviewed here before generation
+
+Current behavior:
+
+- collapse toggle is implemented locally
+
+### 6.2 Project Switch Rail
+
+Visible elements:
+
+- one project button per project
+- project name
+- project scope
+- document count
+- case count
+
+Functional role:
+
+- switch document catalog scope by project
+
+Current behavior:
+
+- implemented as local state change
+- switching project clears opened document and selected case
+
+### 6.3 Document Catalog
+
+Visible elements per document row:
+
+- document name
+- subtitle
+- status badge
+- updated time
+- detected case count
+- version count
+- `Detail`
+
+Functional role:
+
+- let the operator choose which parsed document to inspect
+
+Current behavior:
+
+- `Detail` opens the parse-review canvas for that document
+
+### 6.4 Detail Hero
+
+Visible elements:
+
+- path
+- document name
+- status badge
+- subtitle
+- actions:
+  - `Re-parse`
+  - `Manual edit`
+  - `Generate tests`
+
+Functional role:
+
+- anchor the currently opened document and expose its next actions
+
+Current behavior:
+
+- `Generate tests` is implemented
+- `Re-parse` is visible only
+- `Manual edit` is visible only
+
+### 6.5 Tab Bar
+
+Visible elements:
+
+- `Parse result`
+- `Raw document`
+- `Version history`
+- `Upload file`
+
+Functional role:
+
+- switch between the three document-review surfaces
+- expose upload entry for additional source files
+
+Current behavior:
+
+- tab switching is implemented locally
+- upload currently only stores local filenames in the UI
+
+### 6.6 Parse Result View
+
+Visible elements:
+
+- detected case list
+- selected case detail
+- pages/assertions/pending-fill insight cards
+- test goal
+- pages involved
+- explicit items
+- inferred items
+- missing items
+- AI reasoning panel
+
+Functional role:
+
+- let the operator inspect what the parser extracted and what still needs completion
+
+Current behavior:
+
+- all content is front-end-generated from the selected document model
+- case-name button can open `aiGenerate` directly for that case
+
+### 6.7 Raw Document View
+
+Visible elements:
+
+- raw source text
+- uploaded file list
+
+Functional role:
+
+- show original source material for verification
+
+Current behavior:
+
+- raw source is local generated text
+- uploaded files list is local UI state only
+
+### 6.8 Version History View
+
+Visible elements:
+
+- version list
+- time
+- summary
+
+Functional role:
+
+- show document revision history relevant to parsing
+
+Current behavior:
+
+- version history is local generated data
+
+## 7. Data Semantics by Area
+
+### 7.1 Document Catalog Data
+
+- documents are currently built by `buildDocuments(snapshot)`
+- source domains:
+  - `snapshot.projects`
+  - `snapshot.cases`
+  - `snapshot.generatedAt`
+
+### 7.2 Parse Result Data
+
+- detected cases
+- parse insights
+- raw document
+- versions
+- reasoning
+
+are all currently front-end document-model data, not backend parser output
+
+### 7.3 AI Generate Focus Output
+
+`Generate tests` sends structured App-level focus payload to `aiGenerate`, including:
+
+- project key/name
+- document id/name
+- case id/name
+- generated cases
+- reasoning blocks
+
+This is a real cross-screen output from the current page.
+
+## 8. Screen Inputs and Outputs
+
+### 8.1 Screen Inputs
+
+The screen consumes:
+
+- current locale
+- shell snapshot
+- page title
+- callback:
+  - `onOpenAiGenerate`
+
+### 8.2 Screen Outputs
+
+The screen produces:
+
+- local UI outputs
+  - selected project
+  - opened document
+  - selected case
+  - active tab
+  - uploaded filename list
+- cross-screen navigation output
+  - `aiGenerate` focus handoff
+
+## 9. User Actions
+
+Visible actions on this screen:
+
+- collapse or expand overview
+- switch project
+- open one document
+- select one detected case
+- click `Generate tests`
+- click case-name direct generate button
+- switch tabs
+- upload files
+- click `Re-parse`
+- click `Manual edit`
+
+Current implementation summary:
+
+- implemented:
+  - overview collapse
+  - project switch
+  - document detail open
+  - selected case change
+  - `Generate tests`
+  - tab switching
+  - local file-name upload capture
+- visible but not implemented:
+  - `Re-parse`
+  - `Manual edit`
+  - real backend upload
+
+## 10. Functional Control Responsibility Matrix
+
+### 10.1 Overview Controls
+
+- collapse / expand button
+  - function: compress or reveal the document overview
+  - output type: local screen state only
+  - current implementation: implemented
+
+### 10.2 Project and Document Controls
+
+- project button
+  - function: switch current document catalog scope
+  - output type: local screen state only
+  - current implementation: implemented
+- `Detail`
+  - function: open the selected document into the parse-review canvas
+  - output type: local screen state only
+  - current implementation: implemented
+
+### 10.3 Hero Controls
+
+- `Re-parse`
+  - function: request document parsing again
+  - output type: future parse mutation
+  - current implementation: visual only
+- `Manual edit`
+  - function: correct parse result or source metadata manually
+  - output type: future manual-edit flow
+  - current implementation: visual only
+- `Generate tests`
+  - function: hand selected document/case parse context into `aiGenerate`
+  - output type: cross-screen App-level focus handoff
+  - current implementation: implemented
+
+### 10.4 Tab and Upload Controls
+
+- `Parse result` / `Raw document` / `Version history`
+  - function: switch detail sub-view
+  - output type: local tab state only
+  - current implementation: implemented
+- `Upload file`
+  - function: add source files for parse review or re-parse
+  - output type: current local filename list; future upload flow
+  - current implementation: local filename capture only
+
+### 10.5 Parse Result Controls
+
+- case row
+  - function: choose current candidate case
+  - output type: local screen state only
+  - current implementation: implemented
+- case-name generate button
+  - function: open `aiGenerate` focused on that specific candidate case
+  - output type: cross-screen App-level focus handoff
+  - current implementation: implemented
+
+## 11. State Model
+
+The screen should support:
+
+- project selected
+- document opened
+- no document opened
+- selected case changed
+- parse/raw/history tab selection
+- upload list populated
+- parse action pending
+- manual-edit pending
+
+Current implementation status:
+
+- local selection states are implemented
+- upload list UI state is implemented
+- parse/manual-edit action states are not implemented
+
+## 12. Validation and Rules
+
+Current implemented rules:
+
+- if selected project no longer exists, fall back to first available project
+- if opened document changes or selected case becomes invalid, selected case falls back to the first case in that document
+- `Generate tests` requires an opened document and a valid selected case
+- tab switching is disabled until a document is opened
+
+Current upload rule:
+
+- selected files are stored as filenames only
+- no persistence or parser submission occurs
+
+## 13. Cross-Screen Relationships
+
+### 13.1 Upstream Dependencies
+
+The screen depends on:
+
+- shared snapshot loading
+- project and case domains for synthetic document generation
+
+### 13.2 Downstream Screens
+
+The screen serves as an upstream context for:
+
+- `aiGenerate`
+
+### 13.3 Shared Data Context
+
+The screen shares these domains with other screens:
+
+- projects
+- cases
+
+## 14. Screen Boundary
+
+The `docParse` screen is responsible for:
+
+- document-first parse review
+- candidate-case selection
+- raw document and history inspection
+- generation handoff into `aiGenerate`
+
+The `docParse` screen is not currently responsible for:
+
+- persisting cases directly
+- editing true case catalogs
+- executing tests
+
+## 15. Known Gaps and Review Items
+
+Review items discovered while documenting:
+
+- document catalog and parse result are currently synthetic front-end data, not backend parser output.
+- `Upload file` does not upload anything yet; it only stores filenames locally.
+- `Re-parse` is visible but not wired.
+- `Manual edit` is visible but not wired.
+- raw document and version history are placeholder data rather than true persisted document artifacts.
+
+These are documentation review items only. No implementation change is made in this stage.
+
+## 16. Suggested Output Files for This Screen Folder
+
+This folder should keep:
+
+- `functional-spec.md`
+- `interface-spec.md`

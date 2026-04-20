@@ -128,3 +128,435 @@
    - `Cases` detail `Run` is redefined as `Pre-execution` in the UI flow only.
    - `Execution` uses front-end state only to show prepared case count after `Run ID` + `Project` selection; clicking `Execution` starts the prepared UI flow only on the existing front-end wiring.
    - This restriction must be followed strictly until the user explicitly reopens backend work.
+13. 2026-04-20 Phase 3 documentation stage constraint
+   - The dashboard UI refactor and the Edge plugin UI refactor are considered completed for the current stage.
+   - The current stage is documentation only. Do not modify backend logic, backend contracts, local-admin-api behavior, native-host logic, front-end UI structure, or front-end interaction behavior.
+   - New work should focus on defining two deliverables for each real screen:
+     - a detailed functional description document
+     - a detailed interface document
+   - All new screen documents must be generated under `docs/phase3/interface`.
+   - In `docs/phase3/interface`, each screen must use its own folder named by the screen name.
+   - The functional description for each screen must cover:
+     - screen purpose and operator value
+     - visible modules and interaction areas
+     - field meanings, actions, states, and validation rules already implied by the current UI
+     - relations with upstream and downstream screens
+     - data dependencies and interface dependencies
+   - The interface document for each screen must cover:
+     - read interfaces used by the screen
+     - write interfaces used by the screen
+   - request and response structures already implied by the current implementation and Phase 3 docs
+   - ownership boundaries between screen UI, app state, and backend endpoints
+   - If documentation reveals a missing function or a UI gap, it may be recorded as a review item only. No UI change may be implemented before user review.
+   - The first documentation target should start from `dashboard`, because it is the overview entry and the hub that references queue, reports, risks, model policy, and operational status.
+14. 2026-04-20 Dashboard documentation package completed
+   - Generated the first screen folder under `docs/phase3/interface/dashboard`.
+   - Generated:
+     - `docs/phase3/interface/dashboard/functional-spec.md`
+     - `docs/phase3/interface/dashboard/interface-spec.md`
+   - The dashboard documents explicitly distinguish:
+     - current implementation behavior
+     - intended screen responsibility
+     - cross-screen relationships
+     - app-level snapshot dependency on `GET /api/phase3/admin-console`
+   - Review items were recorded in the docs only:
+     - `Refresh` button is visible but not wired
+     - `New run` button is visible but not wired to `execution`
+     - the page still renders mostly screen-local static overview data instead of mapping shell snapshot fields deeply
+   - These review items must remain documentation-only until user review allows UI changes.
+15. 2026-04-20 Dashboard interface spec regenerated with backend architecture context
+   - Re-read all documents under `docs/phase3/main` to align the screen interface doc with the full Phase 3 platform design.
+   - The regenerated `docs/phase3/interface/dashboard/interface-spec.md` now distinguishes:
+     - current implemented local-admin-api endpoints
+     - backend module construction and ownership
+     - dashboard direct interface vs indirect source interfaces
+     - local file-backed state sources aggregated into the admin snapshot
+     - native-host / extension sibling architecture
+     - future planned management API evolution from the main design docs
+   - The document now treats `GET /api/phase3/admin-console` as the dashboard direct read interface and explains in detail how it aggregates:
+     - scheduler request/event state
+     - catalog state
+     - model/environment config state
+     - execution history and local report state
+   - The document also explains the detailed function of the related Phase 3 mutation interfaces:
+     - `POST /api/phase3/scheduler/requests`
+     - `POST /api/phase3/scheduler/events`
+     - `POST /api/phase3/config/model`
+     - `POST /api/phase3/config/environment`
+     - `POST /api/phase3/catalog/project`
+     - `POST /api/phase3/catalog/case`
+16. 2026-04-20 Dashboard interface spec supplemented with control-level mapping
+   - The dashboard interface document now contains a dedicated control-to-interface mapping section.
+   - For each visible dashboard control, the document now states:
+     - control location
+     - user action
+     - intended request or route
+     - owning module
+     - success/failure feedback expectation
+     - current implementation status
+   - This clarified that dashboard currently has:
+     - visible but unwired action buttons
+     - read-only summary cards and panels
+     - no dashboard-local input field or dropdown that submits payloads directly
+   - Use the same structure for later screen interface docs so each page documents not only API endpoints but also which button or control should invoke them.
+17. 2026-04-20 Dashboard functional spec supplemented for review depth
+   - The dashboard functional document now also includes:
+     - screen input definition
+     - screen output definition
+     - functional control responsibility matrix
+   - This makes the functional document align better with the interface document:
+     - functional-spec explains what each area and control is for
+     - interface-spec explains what each control should request or route to
+   - Reuse this structure for later pages so functional-spec is not only a page overview, but also a reviewable function description at control granularity.
+18. 2026-04-20 Projects documentation package completed
+   - Generated the second screen folder under `docs/phase3/interface/projects`.
+   - Generated:
+     - `docs/phase3/interface/projects/functional-spec.md`
+     - `docs/phase3/interface/projects/interface-spec.md`
+   - The projects documents follow the same depth as dashboard:
+     - functional-spec includes purpose, areas, inputs/outputs, state model, validation, cross-screen relations, and control responsibility matrix
+     - interface-spec includes direct read/write interfaces, persistence reflection path, local-only controls, control-to-interface mapping, and future API evolution notes
+   - The projects interface document now explicitly distinguishes:
+     - direct read from `GET /api/phase3/admin-console`
+     - direct write to `POST /api/phase3/catalog/project`
+     - local-only controls such as search, card selection, open/close detail, row add/remove
+     - visible but still unwired controls such as `Import`, `New project`, `Enter project`, and `View reports`
+19. 2026-04-20 Projects unwired controls now have concrete implementation design
+   - The projects interface document no longer stops at “unimplemented”.
+   - It now gives direct design for each unwired control:
+     - `New project` reuses existing local row-add flow and existing `POST /api/phase3/catalog/project`
+     - `Import` gets a detailed preview/commit import API design
+     - card `Reports` and inline `View reports` use route-state handoff into `reports`, not a new backend API
+     - inline `Enter project` uses route-state handoff into `cases`, not a new backend API
+   - Rule going forward:
+     - if a placeholder control can reuse an existing interface or route-state handoff, prefer that
+     - only design a new backend endpoint when the control introduces a truly new backend responsibility such as import/preview/commit
+20. 2026-04-20 Dashboard unwired controls also supplemented with concrete implementation design
+   - The dashboard interface document now applies the same standard as projects.
+   - It no longer stops at “intended behavior” for unwired controls.
+   - Concrete implementation design was added for:
+     - `Refresh`
+     - `New run`
+     - recent run row click
+     - attention item click
+     - AI summary/provider chip click
+   - The design reuses existing app-level state and route handlers where possible:
+     - `loadSnapshot()`
+     - `handleScreenChange("execution" | "monitor" | "models")`
+     - `openReportDetail(runName)`
+     - `openDataDiff(runName)`
+   - Rule reinforced:
+     - dashboard overview controls should prefer route-state and existing shell reload logic
+     - they should not introduce new backend endpoints unless the screen truly creates a new backend responsibility
+21. 2026-04-20 Cases documentation package completed
+   - Generated the third screen folder under `docs/phase3/interface/cases`.
+   - Generated:
+     - `docs/phase3/interface/cases/functional-spec.md`
+     - `docs/phase3/interface/cases/interface-spec.md`
+   - The cases functional document now distinguishes:
+     - current visible behavior as a project-scoped case overview plus lower detail canvas
+     - the real implemented `Pre-execution` handoff into `execution`
+     - the current absence of a visible case catalog editor even though app-level case save capability exists
+     - the intended relation to DSL, state-machine, plans, and history maintenance
+   - The cases interface document now distinguishes:
+     - direct read from `GET /api/phase3/admin-console`
+     - state-only `Pre-execution` handoff from `cases` to `execution`
+     - app-level case persistence through `POST /api/phase3/catalog/case`
+     - new proposed detailed interfaces required by currently unwired controls:
+       - `GET /api/phase3/cases/{caseId}/dsl`
+       - `POST /api/phase3/cases/{caseId}/dsl/validate`
+       - `PUT /api/phase3/cases/{caseId}/dsl`
+       - `GET /api/phase3/cases/{caseId}/state-machine`
+       - `GET /api/phase3/cases/{caseId}/plans`
+       - `GET /api/phase3/cases/{caseId}/history`
+   - Review conclusion for this screen:
+     - the current UI is a read-and-handoff surface, not yet a full case-management editor surface
+     - placeholder controls now have concrete implementation design instead of only "unwired" notes
+22. 2026-04-20 Execution documentation package completed
+   - Generated the fourth screen folder under `docs/phase3/interface/execution`.
+   - Generated:
+     - `docs/phase3/interface/execution/functional-spec.md`
+     - `docs/phase3/interface/execution/interface-spec.md`
+   - The execution functional document now distinguishes:
+     - real scheduler mutation ownership on `Run`, `Execution`, and `Open Audit`
+     - app-state-only prepared-case input from `cases`
+     - mixed data-source design where queue/model/environment context comes from the shared snapshot but compare templates are still front-end seeded
+     - current visible but unwired controls such as the header contract-hint button and display-only queue/prepared-case cards
+   - The execution interface document now distinguishes:
+     - direct read from `GET /api/phase3/admin-console`
+     - direct write to `POST /api/phase3/scheduler/requests`
+     - direct write to `POST /api/phase3/scheduler/events`
+     - current app-state prepared-case boundary
+     - current front-end-seeded compare-template boundary
+   - Concrete implementation design was added for currently unwired execution controls:
+     - header execution-contract hint button as a local contract-help drawer
+     - queue row drill-down via route-state to `monitor` or `reportDetail`
+     - prepared-case card drill-down via route-state back to `cases`
+     - future backend-backed compare-template read interface `GET /api/phase3/data-templates`
+     - future runtime detail interface `GET /api/phase3/runs/{runId}/status`
+23. 2026-04-20 Monitor documentation package completed
+   - Generated the fifth screen folder under `docs/phase3/interface/monitor`.
+   - Generated:
+     - `docs/phase3/interface/monitor/functional-spec.md`
+     - `docs/phase3/interface/monitor/interface-spec.md`
+   - The monitor functional document now distinguishes:
+     - the current UI shell for runtime observation
+     - the very limited real snapshot context currently used by the page
+     - the hardcoded/local placeholder nature of `runId`, progress, step timeline, live page, and AI runtime log
+     - visible but unwired runtime-control actions `Pause` and `Abort`
+   - The monitor interface document now distinguishes:
+     - current shallow read context from `GET /api/phase3/admin-console`
+     - the absence of any true run-specific runtime payload in the current screen props
+     - the need for explicit route-state handoff from `execution` to `monitor` carrying `runId`
+   - Concrete implementation design was added for currently unwired monitor controls and missing monitor data contracts:
+     - `GET /api/phase3/runs/{runId}/status`
+     - `GET /api/phase3/runs/{runId}/steps`
+     - `GET /api/phase3/runs/{runId}/runtime-log`
+     - `GET /api/phase3/runs/{runId}/live-page`
+     - `POST /api/phase3/runs/{runId}/pause`
+     - `POST /api/phase3/runs/{runId}/abort`
+     - local step/log drill-down behavior
+24. 2026-04-20 Reports documentation package completed
+   - Generated the sixth screen folder under `docs/phase3/interface/reports`.
+   - Generated:
+     - `docs/phase3/interface/reports/functional-spec.md`
+     - `docs/phase3/interface/reports/interface-spec.md`
+   - The reports functional document now distinguishes:
+     - project-first report browsing and run-detail entry responsibilities
+     - the implemented overview collapse, project switch, and `Detail` actions
+     - the display-only operator timeline side panel
+   - The reports interface document now distinguishes:
+     - direct read from `GET /api/phase3/admin-console`
+     - route-state handoff into `reportDetail` via selected run name
+     - the front-end-derived nature of the current report list view model built in `reportViewModel.ts`
+   - Review conclusion for this screen:
+     - many visible list-row fields are currently heuristic/synthetic UI fields rather than stable backend report-list contract fields
+     - `Detail` is already a real implemented route-state handoff and should remain lightweight on the list page
+   - Added concrete future report interface design for:
+     - `GET /api/phase3/runs`
+     - `GET /api/phase3/runs/{runId}/report-summary`
+     - `GET /api/phase3/runs/{runId}/report`
+     - timeline-item route-state drill-down design
+25. 2026-04-20 ReportDetail documentation package completed
+   - Generated the seventh screen folder under `docs/phase3/interface/reportDetail`.
+   - Generated:
+     - `docs/phase3/interface/reportDetail/functional-spec.md`
+     - `docs/phase3/interface/reportDetail/interface-spec.md`
+   - The report-detail functional document now distinguishes:
+     - the current role of the page as the one-run detail drill-down page after `reports`
+     - the implemented back-to-reports behavior and `Data diff` handoff
+     - the visible but unwired hero actions `Download artifacts` and `Re-run`
+     - the visible tab structure where only `Data diff` is currently actionable
+   - The report-detail interface document now distinguishes:
+     - current read context from `GET /api/phase3/admin-console`
+     - route-state handoff from `reports` via selected run name
+     - current synthetic detail layer built from `selectReportViewModel(...)`
+     - future backend-authored report detail interfaces for full report, steps, assertions, recovery, AI decisions, and artifacts
+   - Concrete implementation design was added for currently unwired controls:
+     - `Download artifacts`
+     - `Re-run`
+     - tabs other than `Data diff`
+   - Review conclusion for this screen:
+     - `reportDetail` is now clearly defined as the first page that should eventually move from synthetic UI detail to true backend-authored `report.json` / `report.html` driven detail
+26. 2026-04-20 DataDiff documentation package completed
+   - Generated the eighth screen folder under `docs/phase3/interface/dataDiff`.
+   - Generated:
+     - `docs/phase3/interface/dataDiff/functional-spec.md`
+     - `docs/phase3/interface/dataDiff/interface-spec.md`
+   - The data-diff functional document now distinguishes:
+     - the current page purpose as a one-run before/after/after_restore comparison page
+     - the current selected-run route-state entry from `reportDetail`
+     - the visible but unwired hero actions `View raw JSON` and `Re-restore`
+     - the local placeholder nature of the current diff table and stats
+   - The data-diff interface document now distinguishes:
+     - current shallow read context from `GET /api/phase3/admin-console`
+     - the synthetic diff-row layer generated by `makeDiffRows(report)`
+     - the future backend-authored run-diff and restore-result interfaces required by this page
+   - Concrete implementation design was added for:
+     - `GET /api/phase3/runs/{runId}/data-diff`
+     - `GET /api/phase3/runs/{runId}/data-diff/raw`
+     - `GET /api/phase3/runs/{runId}/restore-result`
+     - `POST /api/phase3/runs/{runId}/restore/retry`
+     - local raw-json drawer behavior
+27. 2026-04-20 DocParse documentation package completed
+   - Generated the ninth screen folder under `docs/phase3/interface/docParse`.
+   - Generated:
+     - `docs/phase3/interface/docParse/functional-spec.md`
+     - `docs/phase3/interface/docParse/interface-spec.md`
+   - The doc-parse functional document now distinguishes:
+     - the current page role as the document-ingestion and parse-review screen upstream of `aiGenerate`
+     - the implemented project switch, document open, tab switch, and route-state generate handoff
+     - the visible but unwired actions `Re-parse` and `Manual edit`
+     - the local-only nature of file upload, raw document, and version-history data
+   - The doc-parse interface document now distinguishes:
+     - current indirect dependence on `GET /api/phase3/admin-console`
+     - the synthetic document catalog created by `buildDocuments(snapshot)`
+     - the real route-state contract from `docParse` into `aiGenerate`
+   - Concrete future interface design was added for:
+     - `GET /api/phase3/documents`
+     - `POST /api/phase3/documents/upload`
+     - `GET /api/phase3/documents/{documentId}/parse-result`
+     - `GET /api/phase3/documents/{documentId}/raw`
+     - `GET /api/phase3/documents/{documentId}/versions`
+     - `POST /api/phase3/documents/{documentId}/reparse`
+     - `PUT /api/phase3/documents/{documentId}/parse-result`
+28. 2026-04-20 AiGenerate documentation package completed
+   - Generated the tenth screen folder under `docs/phase3/interface/aiGenerate`.
+   - Generated:
+     - `docs/phase3/interface/aiGenerate/functional-spec.md`
+     - `docs/phase3/interface/aiGenerate/interface-spec.md`
+   - The ai-generate functional document now distinguishes:
+     - the current page role as the generation-review screen between `docParse` and future `cases` / `execution`
+     - the implemented candidate-tab switching and focus fallback behavior
+     - the placeholder nature of the current flow tree, state machine, and DSL surfaces
+     - the visible but unwired actions `Regenerate`, `Dry-run`, and `Save as case`
+   - The ai-generate interface document now distinguishes:
+     - current route-state handoff from `docParse`
+     - current snapshot fallback dependence when no focus exists
+     - the reuse boundary for `POST /api/phase3/catalog/case` as the final save path
+   - Concrete future interface design was added for:
+     - `POST /api/phase3/agent/generate-case`
+     - `POST /api/phase3/cases/dsl/validate`
+     - `POST /api/phase3/agent/generate-case/dry-run`
+     - `POST /api/phase3/catalog/case` submission shape for generated-case persistence
+29. 2026-04-20 DataTemplates documentation package completed
+   - Generated the eleventh screen folder under `docs/phase3/interface/dataTemplates`.
+   - Generated:
+     - `docs/phase3/interface/dataTemplates/functional-spec.md`
+     - `docs/phase3/interface/dataTemplates/interface-spec.md`
+   - The data-templates functional document now distinguishes:
+     - the current page role as the reusable data-template catalog and safety-review screen
+     - the implemented template-row selection and detail rendering behavior
+     - the visible but unwired actions `Import`, `New template`, `Edit`, and `Dry-run`
+     - the downstream influence of this screen on `execution` and `dataDiff`
+   - The data-templates interface document now distinguishes:
+     - the current local template source `defaultDataTemplates` in `App.tsx`
+     - the indirect snapshot use of `GET /api/phase3/admin-console` only for project-name lookup
+     - the current cross-screen coupling where `execution` consumes the same local template list
+   - Concrete future interface design was added for:
+     - `GET /api/phase3/data-templates`
+     - `GET /api/phase3/data-templates/{templateId}`
+     - `POST /api/phase3/data-templates`
+     - `PUT /api/phase3/data-templates/{templateId}`
+     - `POST /api/phase3/data-templates/import/preview`
+     - `POST /api/phase3/data-templates/import/commit`
+     - `POST /api/phase3/data-templates/{templateId}/dry-run`
+30. 2026-04-20 Models documentation package completed
+   - Generated the twelfth screen folder under `docs/phase3/interface/models`.
+   - Generated:
+     - `docs/phase3/interface/models/functional-spec.md`
+     - `docs/phase3/interface/models/interface-spec.md`
+   - The models functional document now distinguishes:
+     - the current page role as the AI provider and routing-policy configuration screen
+     - the implemented provider modal add/edit/delete draft flow
+     - the implemented footer save mutation
+     - the visible but unwired routing-rule edit action
+   - The models interface document now distinguishes:
+     - current read from `GET /api/phase3/admin-console`
+     - current save through repeated `POST /api/phase3/config/model`
+     - current generic config-item persistence into `config/phase3/model-config.json`
+     - the local-only nature of provider connection testing via front-end timeout and field presence checks
+   - Concrete future interface design was added for:
+     - `POST /api/phase3/config/model/test-connection`
+     - `GET /api/phase3/models`
+     - `PUT /api/phase3/models`
+     - routing-rule edit flow reusing the current save pipeline
+31. 2026-04-20 Environments documentation package completed
+   - Generated the thirteenth screen folder under `docs/phase3/interface/environments`.
+   - Generated:
+     - `docs/phase3/interface/environments/functional-spec.md`
+     - `docs/phase3/interface/environments/interface-spec.md`
+   - The environments functional document now distinguishes:
+     - the current page role as the datasource/database configuration screen under the `environments` navigation item
+     - the implemented create/edit dialog flow
+     - the implemented immediate-persist save and delete actions
+     - the local-only nature of connection testing
+   - The environments interface document now distinguishes:
+     - current read from `GET /api/phase3/admin-console`
+     - current save through repeated `POST /api/phase3/config/environment`
+     - current generic config-item persistence into `config/phase3/environment-config.json`
+     - the mismatch between the page name `environments` and the actual UI scope, which currently manages only datasource/database configs
+   - Concrete future interface design was added for:
+     - `GET /api/phase3/datasources`
+     - `PUT /api/phase3/datasources`
+     - `POST /api/phase3/datasources/test-connection`
+     - `GET /api/phase3/environments`
+32. 2026-04-20 Plugin screen classification clarified
+   - `plugin` must be treated as the Edge extension front-end template shell, not as a platform business-management screen.
+   - Future `docs/phase3/interface/plugin/*` documents must describe it as the UI/template surface for the Edge plugin front end.
+   - Review and interface design for this screen should focus on extension-popup UI responsibilities, native-messaging boundaries, and extension-side interaction entry points.
+33. 2026-04-20 Plugin documentation package completed
+   - Generated the fourteenth screen folder under `docs/phase3/interface/plugin`.
+   - Generated:
+     - `docs/phase3/interface/plugin/functional-spec.md`
+     - `docs/phase3/interface/plugin/interface-spec.md`
+   - The plugin functional document now distinguishes:
+     - the current page role as the Edge extension front-end template shell rather than a platform business-management screen
+     - the intended popup responsibilities of page summary, active run visibility, quick actions, and locator pick mode
+     - the currently static/demo nature of all quick actions and picker controls
+   - The plugin interface document now distinguishes:
+     - the current mismatch where `PluginPopupScreen.tsx` still consumes `AdminConsoleSnapshot`
+     - the dedicated popup snapshot contract already available at `GET /api/phase3/extension-popup`
+     - the extension/background/native-message boundary for quick actions and pick-mode behavior
+   - Concrete future interface design was added for:
+     - `GET /api/phase3/extension-popup`
+     - `EXT_PAGE_SUMMARY_GET` / `PAGE_SUMMARY_GET`
+     - `PAGE_HIGHLIGHT`
+     - `EXT_EXECUTION_START` / `EXECUTION_START`
+     - `EXECUTION_STATUS_GET`
+     - `ENVIRONMENTS_GET`
+     - `DATASOURCES_GET`
+34. 2026-04-20 Cross-screen consistency pass executed
+   - Ran a consistency review across the generated `docs/phase3/interface/*` packages.
+   - Checked screen positioning, cross-screen navigation descriptions, interface ownership boundaries, and current-vs-future implementation labeling.
+   - Corrected one wording inconsistency in `docs/phase3/interface/plugin/interface-spec.md` so the current screen clearly reads from `GET /api/phase3/admin-console` today while still documenting `GET /api/phase3/extension-popup` as the dedicated future popup contract.
+   - No new major cross-package contract conflicts were found beyond already recorded review items such as:
+     - `execution -> monitor` still lacks explicit `runId` handoff
+     - `plugin` still uses `AdminConsoleSnapshot` instead of `ExtensionPopupSnapshot`
+35. 2026-04-20 Second-pass terminology normalization completed
+   - Performed a second-pass normalization across current implemented cross-screen handoff wording.
+   - Updated the generated docs so currently implemented shared `App.tsx` state transitions are described as `App-level handoff` / `App-level focus handoff` / `App-level selected-run handoff` instead of generic `route-state` wording.
+   - Kept `route-state` wording only where the document is describing future navigation design rather than current implementation.
+   - Updated files:
+     - `docs/phase3/interface/docParse/functional-spec.md`
+     - `docs/phase3/interface/docParse/interface-spec.md`
+     - `docs/phase3/interface/aiGenerate/functional-spec.md`
+     - `docs/phase3/interface/aiGenerate/interface-spec.md`
+     - `docs/phase3/interface/reports/interface-spec.md`
+     - `docs/phase3/interface/reportDetail/functional-spec.md`
+     - `docs/phase3/interface/reportDetail/interface-spec.md`
+     - `docs/phase3/interface/dataDiff/interface-spec.md`
+36. 2026-04-20 Third-pass payload and naming normalization completed
+   - Performed a third-pass cleanup on summary-field wording and run identifier terminology.
+   - Normalized remaining interface-summary bullets toward `current direct read source` / `current direct write source` wording where needed.
+   - Added identifier notes to the run-centric interface documents so they explicitly distinguish:
+     - current UI selection by `runName`
+     - future backend path parameters by canonical `{runId}`
+   - Updated files:
+     - `docs/phase3/interface/reports/interface-spec.md`
+     - `docs/phase3/interface/reportDetail/interface-spec.md`
+     - `docs/phase3/interface/dataDiff/interface-spec.md`
+     - `docs/phase3/interface/execution/interface-spec.md`
+     - `docs/phase3/interface/projects/interface-spec.md`
+37. 2026-04-20 UI control/interface overview file generated
+   - Generated a root-level overview file under `docs/phase3/interface/ui-control-interface-overview.md`.
+   - The overview consolidates all documented screens, button-like controls, dropdown/select controls, and clickable row/card controls into one review file.
+   - Each entry records:
+     - current behavior
+     - current request or App-level handoff
+     - future interface design when the control is visible but not yet wired
+   - The file covers:
+     - dashboard
+     - projects
+     - cases
+     - docParse
+     - aiGenerate
+     - execution
+     - monitor
+     - reports
+     - reportDetail
+     - dataDiff
+     - dataTemplates
+     - models
+     - environments
+     - plugin
