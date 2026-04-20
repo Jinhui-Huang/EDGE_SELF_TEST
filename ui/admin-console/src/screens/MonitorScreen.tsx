@@ -5,14 +5,15 @@ type MonitorScreenProps = {
   snapshot: AdminConsoleSnapshot;
   title: string;
   locale: Locale;
+  selectedRunId?: string | null;
 };
 
 type MonitorBadgeTone = "info" | "success" | "warning" | "neutral" | "mint" | "coral";
 
-export function MonitorScreen({ snapshot, title, locale }: MonitorScreenProps) {
+export function MonitorScreen({ snapshot, title, locale, selectedRunId }: MonitorScreenProps) {
   const t = (value: { en: string; zh: string; ja: string }) => translate(locale, value);
 
-  const runId = "run_8f2a1c3e";
+  const runId = selectedRunId ?? null;
   const activeProject = snapshot.projects[0];
   const activeReport = snapshot.reports[0];
   const queueLead = snapshot.workQueue[0];
@@ -96,11 +97,11 @@ export function MonitorScreen({ snapshot, title, locale }: MonitorScreenProps) {
       <section className="monitorHero">
         <div className="monitorHeroMain">
           <p className="monitorPath">
-            {t({ en: "Executions", zh: "执行", ja: "実行" })} / {runId}
+            {t({ en: "Executions", zh: "执行", ja: "実行" })} / {runId ?? t({ en: "(no run selected)", zh: "(未选择运行)", ja: "(実行未選択)" })}
           </p>
           <div className="monitorTitleRow">
             <h2>{activeProject?.scope ?? title}</h2>
-            <span className="monitorBadge info dot">{t({ en: "running", zh: "执行中", ja: "実行中" })}</span>
+            <span className={`monitorBadge ${runId ? "info" : "neutral"} dot`}>{runId ? t({ en: "running", zh: "执行中", ja: "実行中" }) : t({ en: "idle", zh: "空闲", ja: "待機中" })}</span>
             <span className="monitorPill">
               <span className="monitorPillIcon mint">▸</span>
               {queueLead?.title.split(" / ")[1] ?? "staging"}

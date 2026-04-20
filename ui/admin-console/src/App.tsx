@@ -1188,6 +1188,7 @@ export function App() {
   const [sourceLabel, setSourceLabel] = useState(translate("en", sharedCopy.sourceFallback));
   const [activeScreen, setActiveScreen] = useState<ScreenId>("dashboard");
   const [selectedReportRunName, setSelectedReportRunName] = useState<string | null>(fallbackSnapshot.reports[0]?.runName ?? null);
+  const [selectedMonitorRunId, setSelectedMonitorRunId] = useState<string | null>(null);
   const [aiGenerateFocus, setAiGenerateFocus] = useState<AiGenerateFocus | null>(null);
   const [locale, setLocale] = useState<Locale>("en");
   const [themeMode, setThemeMode] = useState<ThemeMode>("light");
@@ -1296,7 +1297,15 @@ export function App() {
     setActiveScreen("dataDiff");
   }
 
+  function openMonitor(runId?: string | null) {
+    setSelectedMonitorRunId(runId?.trim() || null);
+    setActiveScreen("monitor");
+  }
+
   function handleScreenChange(screen: ScreenId) {
+    if (screen === "monitor") {
+      setSelectedMonitorRunId(null);
+    }
     setActiveScreen(screen);
   }
 
@@ -1937,11 +1946,11 @@ export function App() {
             onLaunchSubmit={handleLaunchSubmit}
             onExecuteSubmit={handleExecuteSubmit}
             onReviewSubmit={handleReviewSubmit}
-            onOpenMonitor={() => handleScreenChange("monitor")}
+            onOpenMonitor={() => openMonitor(launchForm.runId)}
           />
         );
       case "monitor":
-        return <MonitorScreen snapshot={snapshot} title={t(localizedScreenCopy.monitor.title)} locale={locale} />;
+        return <MonitorScreen snapshot={snapshot} title={t(localizedScreenCopy.monitor.title)} locale={locale} selectedRunId={selectedMonitorRunId} />;
       case "reports":
         return (
           <ReportsScreen

@@ -575,3 +575,18 @@
      - cross-screen dependency notes
      - a suggested implementation order for the next approved build phase
    - No backend or UI code was changed; this remains documentation-only work.
+39. 2026-04-20 P0-1 execution→monitor runId handoff implemented (revised)
+   - Phase 3 interface联调正式开始，文档-only限制解除。
+   - App.tsx 新增 `selectedMonitorRunId` 状态和 `openMonitor(runId)` helper。
+   - `openMonitor` 总是显式更新 selectedMonitorRunId：truthy runId 设为该值，falsy 设为 null。不保留旧 run 上下文，避免状态泄漏。
+   - ExecutionScreen 的 `onOpenMonitor` 改为 `() => openMonitor(launchForm.runId)`：带 run 上下文进入 monitor。
+   - MonitorScreen 新增 `selectedRunId` prop，替代之前硬编码的 `"run_8f2a1c3e"`。
+   - 当 selectedRunId 为 null 时，monitor 显示"(no run selected)" + idle badge，不做虚假 fallback。
+   - sidebar 直接点击 monitor 走 `handleScreenChange("monitor")`，该函数现在会显式 `setSelectedMonitorRunId(null)` 清空旧上下文 = 通用入口语义。
+   - 设计决策：sidebar 入 monitor = 无选中 run 的通用入口，不复用上一次 execution 的 run。如果将来产品需要"保持上下文"行为，需要显式确认。
+   - 不再有不可靠的 workQueue title 解析 fallback，canonical runId 来源干净。
+   - 修改文件：
+     - `ui/admin-console/src/App.tsx`
+     - `ui/admin-console/src/screens/MonitorScreen.tsx`
+   - 验证：build 通过，测试 11/13 通过（2 个失败为 pre-existing）。
+   - 已知限制：monitor 内部运行时数据（steps、log、live page、progress）仍为占位数据，需 P0-2 落地真实 runtime API 后替换。
