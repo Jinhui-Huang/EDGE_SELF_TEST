@@ -4,6 +4,7 @@ import com.example.webtest.admin.service.CatalogPersistenceService;
 import com.example.webtest.admin.http.LocalAdminApiServer;
 import com.example.webtest.admin.service.ConfigPersistenceService;
 import com.example.webtest.admin.service.Phase3MockDataService;
+import com.example.webtest.admin.service.RunStatusService;
 import com.example.webtest.admin.service.SchedulerPersistenceService;
 import java.net.InetSocketAddress;
 import java.nio.file.Path;
@@ -77,6 +78,10 @@ public final class LocalAdminApiApp {
         }
 
         Clock clock = Clock.systemUTC();
+        SchedulerPersistenceService schedulerPersistence = new SchedulerPersistenceService(
+                schedulerRequestsFile,
+                schedulerEventsFile,
+                clock);
         try (LocalAdminApiServer server = new LocalAdminApiServer(
                 new InetSocketAddress("127.0.0.1", port),
                 new Phase3MockDataService(
@@ -90,14 +95,16 @@ public final class LocalAdminApiApp {
                         modelConfigFile,
                         environmentConfigFile,
                         clock),
-                new SchedulerPersistenceService(
-                        schedulerRequestsFile,
-                        schedulerEventsFile,
-                        clock),
+                schedulerPersistence,
                 new ConfigPersistenceService(
                         modelConfigFile,
                         environmentConfigFile),
-                new CatalogPersistenceService(catalogFile, clock))) {
+                new CatalogPersistenceService(catalogFile, clock),
+                new RunStatusService(
+                        schedulerRequestsFile,
+                        schedulerEventsFile,
+                        schedulerPersistence,
+                        clock))) {
             server.start();
             System.out.println("Local admin API listening on http://127.0.0.1:" + server.port());
             new CountDownLatch(1).await();

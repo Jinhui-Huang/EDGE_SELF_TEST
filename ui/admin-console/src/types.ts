@@ -208,3 +208,85 @@ export type ConfigSubmitHandler = (
   setState: (state: MutationState) => void,
   successMessage: string
 ) => void;
+
+// ---- Monitor runtime types (P0-2) ----
+
+export type RunStatus = {
+  runId: string;
+  projectKey: string;
+  status: string;
+  environment: string;
+  model: string;
+  owner: string;
+  progress: {
+    currentStep: number;
+    totalSteps: number;
+    percent: number;
+    elapsedMs: number;
+    estimatedTotalMs: number;
+  };
+  currentPage: {
+    url: string;
+    state: string;
+  };
+  counters: {
+    assertionsPassed: number;
+    assertionsTotal: number;
+    aiCalls: number;
+    heals: number;
+  };
+  control: {
+    canPause: boolean;
+    canAbort: boolean;
+  };
+  lastUpdatedAt: string;
+};
+
+export type RunStep = {
+  index: number;
+  label: string;
+  state: "DONE" | "RUNNING" | "TODO";
+  durationMs: number;
+  startedAt?: string;
+  note?: string;
+};
+
+export type RunStepsResponse = {
+  runId: string;
+  items: RunStep[];
+};
+
+export type RuntimeLogEntry = {
+  at: string;
+  type: string;
+  model: string;
+  summary: string;
+};
+
+export type RuntimeLogResponse = {
+  runId: string;
+  items: RuntimeLogEntry[];
+  nextCursor: string | null;
+};
+
+export type LivePage = {
+  runId: string;
+  capturedAt: string;
+  url: string;
+  title: string;
+  pageState: string;
+  highlight: {
+    stepIndex: number;
+    action: string;
+    target: string;
+  };
+  screenshotPath: string | null;
+};
+
+export type RunControlResponse = {
+  status: string;
+  kind: string;
+  runId: string;
+  requestedState: string;
+  message: string;
+};

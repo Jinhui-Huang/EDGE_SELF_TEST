@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.example.webtest.admin.service.CatalogPersistenceService;
 import com.example.webtest.admin.service.ConfigPersistenceService;
 import com.example.webtest.admin.service.Phase3MockDataService;
+import com.example.webtest.admin.service.RunStatusService;
 import com.example.webtest.admin.service.SchedulerPersistenceService;
 import com.example.webtest.json.Jsons;
 import java.net.InetSocketAddress;
@@ -216,7 +217,8 @@ class LocalAdminApiServerTest {
                 new ConfigPersistenceService(
                         modelConfigFile,
                         environmentConfigFile),
-                new CatalogPersistenceService(catalogFile, Clock.fixed(Instant.parse("2026-04-18T11:00:00Z"), ZoneOffset.UTC)))) {
+                new CatalogPersistenceService(catalogFile, Clock.fixed(Instant.parse("2026-04-18T11:00:00Z"), ZoneOffset.UTC)),
+                new RunStatusService(schedulerRequestsFile, schedulerEventsFile, new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, Clock.fixed(Instant.parse("2026-04-18T11:00:00Z"), ZoneOffset.UTC)), Clock.fixed(Instant.parse("2026-04-18T11:00:00Z"), ZoneOffset.UTC)))) {
             server.start();
             HttpClient client = HttpClient.newHttpClient();
 
@@ -368,7 +370,8 @@ class LocalAdminApiServerTest {
                 new ConfigPersistenceService(
                         modelConfigFile,
                         environmentConfigFile),
-                new CatalogPersistenceService(catalogFile, Clock.fixed(Instant.parse("2026-04-18T11:00:00Z"), ZoneOffset.UTC)))) {
+                new CatalogPersistenceService(catalogFile, Clock.fixed(Instant.parse("2026-04-18T11:00:00Z"), ZoneOffset.UTC)),
+                new RunStatusService(schedulerRequestsFile, schedulerEventsFile, new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, Clock.fixed(Instant.parse("2026-04-18T11:00:00Z"), ZoneOffset.UTC)), Clock.fixed(Instant.parse("2026-04-18T11:00:00Z"), ZoneOffset.UTC)))) {
             server.start();
             HttpClient client = HttpClient.newHttpClient();
 
@@ -437,7 +440,8 @@ class LocalAdminApiServerTest {
                 new ConfigPersistenceService(
                         modelConfigFile,
                         environmentConfigFile),
-                new CatalogPersistenceService(catalogFile, clock))) {
+                new CatalogPersistenceService(catalogFile, clock),
+                new RunStatusService(schedulerRequestsFile, schedulerEventsFile, new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, clock), clock))) {
             server.start();
             HttpClient client = HttpClient.newHttpClient();
 
@@ -537,7 +541,8 @@ class LocalAdminApiServerTest {
                 new ConfigPersistenceService(
                         modelConfigFile,
                         environmentConfigFile),
-                new CatalogPersistenceService(catalogFile, clock))) {
+                new CatalogPersistenceService(catalogFile, clock),
+                new RunStatusService(schedulerRequestsFile, schedulerEventsFile, new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, clock), clock))) {
             server.start();
             HttpClient client = HttpClient.newHttpClient();
 
@@ -638,7 +643,8 @@ class LocalAdminApiServerTest {
                 new ConfigPersistenceService(
                         modelConfigFile,
                         environmentConfigFile),
-                new CatalogPersistenceService(catalogFile, clock))) {
+                new CatalogPersistenceService(catalogFile, clock),
+                new RunStatusService(schedulerRequestsFile, schedulerEventsFile, new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, clock), clock))) {
             server.start();
             HttpClient client = HttpClient.newHttpClient();
 
@@ -735,7 +741,8 @@ class LocalAdminApiServerTest {
                 new ConfigPersistenceService(
                         modelConfigFile,
                         environmentConfigFile),
-                new CatalogPersistenceService(catalogFile, clock))) {
+                new CatalogPersistenceService(catalogFile, clock),
+                new RunStatusService(schedulerRequestsFile, schedulerEventsFile, new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, clock), clock))) {
             server.start();
             HttpClient client = HttpClient.newHttpClient();
 
@@ -779,6 +786,117 @@ class LocalAdminApiServerTest {
             assertTrue(admin.body().contains("\"Checkout smoke / audited\""));
             assertTrue(admin.body().contains("\"checkout-regression-card\""));
             assertTrue(admin.body().contains("\"audit-ready\""));
+        }
+    }
+
+    @Test
+    void rejectsAbortOnTerminalRunAndPauseOnPausedRun(@TempDir Path tempDir) throws Exception {
+        Path runsDir = tempDir.resolve("runs");
+        Files.createDirectories(runsDir);
+        Path schedulerRequestsFile = tempDir.resolve("scheduler-requests.json");
+        Path schedulerEventsFile = tempDir.resolve("scheduler-events.json");
+        Path schedulerStateFile = tempDir.resolve("scheduler-state.json");
+        Path queueFile = tempDir.resolve("execution-queue.json");
+        Path catalogFile = tempDir.resolve("project-catalog.json");
+        Path executionHistoryFile = tempDir.resolve("execution-history.json");
+        Path modelConfigFile = tempDir.resolve("model-config.json");
+        Path environmentConfigFile = tempDir.resolve("environment-config.json");
+        Files.writeString(queueFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(catalogFile, Jsons.writeValueAsString(Map.of("projects", List.of(), "cases", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(executionHistoryFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(modelConfigFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(environmentConfigFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+
+        // Create a run that has already succeeded
+        Files.writeString(schedulerRequestsFile, Jsons.writeValueAsString(Map.of(
+                "requests", List.of(Map.of(
+                        "runId", "finished-run",
+                        "projectKey", "test-project",
+                        "owner", "qa",
+                        "environment", "staging",
+                        "status", "QUEUED")))), StandardCharsets.UTF_8);
+        Files.writeString(schedulerEventsFile, Jsons.writeValueAsString(Map.of(
+                "events", List.of(
+                        Map.of("runId", "finished-run", "type", "STARTED", "status", "RUNNING",
+                                "at", "2026-04-18T10:00:00Z", "detail", "Started"),
+                        Map.of("runId", "finished-run", "type", "COMPLETED", "status", "OK",
+                                "at", "2026-04-18T10:05:00Z", "detail", "All passed")))), StandardCharsets.UTF_8);
+
+        Clock clock = Clock.fixed(Instant.parse("2026-04-18T11:00:00Z"), ZoneOffset.UTC);
+        try (LocalAdminApiServer server = new LocalAdminApiServer(
+                new InetSocketAddress("127.0.0.1", 0),
+                new Phase3MockDataService(runsDir, schedulerRequestsFile, schedulerEventsFile, schedulerStateFile,
+                        queueFile, catalogFile, executionHistoryFile, modelConfigFile, environmentConfigFile, clock),
+                new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, clock),
+                new ConfigPersistenceService(modelConfigFile, environmentConfigFile),
+                new CatalogPersistenceService(catalogFile, clock),
+                new RunStatusService(schedulerRequestsFile, schedulerEventsFile,
+                        new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, clock), clock))) {
+            server.start();
+            HttpClient client = HttpClient.newHttpClient();
+
+            for (String terminalStatus : List.of("OK", "SUCCESS", "FAILED", "ERROR")) {
+                Files.writeString(schedulerEventsFile, Jsons.writeValueAsString(Map.of(
+                        "events", List.of(
+                                Map.of("runId", "finished-run", "type", "STARTED", "status", "RUNNING",
+                                        "at", "2026-04-18T10:00:00Z", "detail", "Started"),
+                                Map.of("runId", "finished-run", "type", "COMPLETED", "status", terminalStatus,
+                                        "at", "2026-04-18T10:05:00Z", "detail", "Terminal")))), StandardCharsets.UTF_8);
+
+                HttpResponse<String> abortOnTerminal = client.send(
+                        request(server, "/api/phase3/runs/finished-run/abort", "POST", "{}"),
+                        HttpResponse.BodyHandlers.ofString());
+                assertEquals(409, abortOnTerminal.statusCode());
+                assertTrue(abortOnTerminal.body().contains("\"REJECTED\""));
+                assertTrue(abortOnTerminal.body().contains("terminal state"));
+
+                String terminalEventsAfterAbort = Files.readString(schedulerEventsFile, StandardCharsets.UTF_8);
+                assertTrue(!terminalEventsAfterAbort.contains("\"ABORTED\""));
+            }
+
+            // Pause on terminal run (OK) should also be rejected with 409
+            Files.writeString(schedulerEventsFile, Jsons.writeValueAsString(Map.of(
+                    "events", List.of(
+                            Map.of("runId", "finished-run", "type", "STARTED", "status", "RUNNING",
+                                    "at", "2026-04-18T10:00:00Z", "detail", "Started"),
+                            Map.of("runId", "finished-run", "type", "COMPLETED", "status", "OK",
+                                    "at", "2026-04-18T10:05:00Z", "detail", "All passed")))), StandardCharsets.UTF_8);
+            HttpResponse<String> pauseOnOk = client.send(
+                    request(server, "/api/phase3/runs/finished-run/pause", "POST", "{}"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(409, pauseOnOk.statusCode());
+            assertTrue(pauseOnOk.body().contains("\"REJECTED\""));
+
+            // Verify no ABORTED event was written
+            String eventsAfter = Files.readString(schedulerEventsFile, StandardCharsets.UTF_8);
+            assertTrue(!eventsAfter.contains("\"ABORTED\""));
+
+            // Now test pause on a running run — should succeed with 202
+            Files.writeString(schedulerRequestsFile, Jsons.writeValueAsString(Map.of(
+                    "requests", List.of(Map.of(
+                            "runId", "running-run",
+                            "projectKey", "test-project",
+                            "owner", "qa",
+                            "environment", "staging",
+                            "status", "QUEUED")))), StandardCharsets.UTF_8);
+            Files.writeString(schedulerEventsFile, Jsons.writeValueAsString(Map.of(
+                    "events", List.of(
+                            Map.of("runId", "running-run", "type", "STARTED", "status", "RUNNING",
+                                    "at", "2026-04-18T10:00:00Z", "detail", "Started")))), StandardCharsets.UTF_8);
+
+            // Pause on running run should succeed
+            HttpResponse<String> pauseOnRunning = client.send(
+                    request(server, "/api/phase3/runs/running-run/pause", "POST", "{}"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(202, pauseOnRunning.statusCode());
+            assertTrue(pauseOnRunning.body().contains("\"ACCEPTED\""));
+
+            // Pause again on now-paused run should be rejected with 409
+            HttpResponse<String> pauseAgain = client.send(
+                    request(server, "/api/phase3/runs/running-run/pause", "POST", "{}"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(409, pauseAgain.statusCode());
+            assertTrue(pauseAgain.body().contains("\"ALREADY_PAUSED\""));
         }
     }
 

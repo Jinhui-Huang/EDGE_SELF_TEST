@@ -590,3 +590,74 @@
      - `ui/admin-console/src/screens/MonitorScreen.tsx`
    - 验证：build 通过，测试 11/13 通过（2 个失败为 pre-existing）。
    - 已知限制：monitor 内部运行时数据（steps、log、live page、progress）仍为占位数据，需 P0-2 落地真实 runtime API 后替换。
+40. 2026-04-20 P0-2 monitor runtime API implementation completed
+   - 后端新增 `RunStatusService`，基于 scheduler-requests.json + scheduler-events.json 派生 run 状态。
+   - 新增 6 个 REST 端点：
+     - `GET /api/phase3/runs/{runId}/status` — 运行状态、进度、计数器、控制能力
+     - `GET /api/phase3/runs/{runId}/steps` — 步骤时间线（真实 STEP_* 事件或占位步骤）
+     - `GET /api/phase3/runs/{runId}/runtime-log` — 运行时日志（非 step 事件）
+     - `GET /api/phase3/runs/{runId}/live-page` — 当前页面状态
+     - `POST /api/phase3/runs/{runId}/pause` — 写入 PAUSED 事件，验证是否可暂停
+     - `POST /api/phase3/runs/{runId}/abort` — 写入 ABORTED 事件，验证是否已终止
+   - pause/abort 有真实语义：校验当前状态，拒绝对终态 run 的操作，写入真实 scheduler event。
+   - 前端 MonitorScreen 完全重写：
+     - 不再硬编码任何运行时数据
+     - selectedRunId 为 null → 显示 idle 空状态，不发请求
+     - selectedRunId 存在 → 并行 fetch 4 个 read 端点，管理 loading/error/loaded 状态
+     - Pause/Abort 按钮绑定真实接口，操作成功后自动刷新 monitor 数据和全局 snapshot
+     - 新增 apiBaseUrl prop，由 App.tsx 传入
+   - 新增 TypeScript 类型：RunStatus, RunStep, RunStepsResponse, RuntimeLogEntry, RuntimeLogResponse, LivePage, RunControlResponse
+   - 修改文件：
+     - 新建：`apps/local-admin-api/src/main/java/com/example/webtest/admin/service/RunStatusService.java`
+     - 修改：`LocalAdminApiServer.java`（新增 handleRunEndpoint 路由）
+     - 修改：`LocalAdminApiApp.java`（注入 RunStatusService）
+     - 修改：`LocalAdminApiServerTest.java`（更新构造器调用）
+     - 修改：`ui/admin-console/src/App.tsx`（传递 apiBaseUrl / onPauseRun / onAbortRun）
+     - 修改：`ui/admin-console/src/screens/MonitorScreen.tsx`（完全重写）
+     - 修改：`ui/admin-console/src/types.ts`（新增 monitor 类型）
+   - 验证：
+     - 前端 build 通过，测试 11/13 通过（2 个失败为 pre-existing）
+     - 后端 Maven compile + test 通过
+     - 真实端到端测试：启动 local-admin-api → curl 6 个端点 → 全部返回预期结构 → pause 后 status 正确变化
+   - 已知限制：
+     - 当 scheduler 中无 STEP_* 类型事件时，steps 返回占位步骤（来源于后端，不再由前端生成）
+     - live-page 目前无真实截图，返回 screenshotPath: null
+     - counters（assertions, AI calls, heals）需要运行引擎产生对应类型事件才有真实数据
+     - 这些限制是"无真实运行引擎产生事件"的固有问题，不是接口设计缺口
+41. 2026-04-20 P0-2 runtime API implementation review held for fixes
+   - Reviewed the latest P0-2 backend/frontend runtime monitor implementation and did not approve it yet.
+   - Current implementation direction is correct overall:
+     - runtime read endpoints exist
+     - monitor no longer relies on hardcoded runtime data
+     - pause/abort buttons are wired to backend control endpoints
+   - Blocking review findings recorded:
+     - `pause` / `abort` endpoints currently always return HTTP 202, so the frontend treats rejected control operations as success
+     - `RunStatusService.abortRun()` still allows terminal runs (`OK` / `SUCCESS` / `FAILED` / `ERROR`) to be aborted, which can incorrectly append an `ABORTED` event to a finished run
+   - Remaining work before approval:
+     - fix backend control-result semantics
+     - fix frontend control-response handling if needed
+     - add tests for rejected control actions and terminal-run abort rejection
+   - No code was changed in this review pass; this was a review/recording step only.
+42. 2026-04-21 P0-2 runtime API fixes reviewed and approved
+   - Re-read all `docs/phase3` document folders before the final review:
+     - `docs/phase3/main`
+     - `docs/phase3/interface`
+   - Confirmed the current project stage is Phase 3 interface integration, driven by `docs/phase3/interface/review-backlog.md`.
+   - Confirmed P0-2 monitor runtime API is now approved after the blocking control-flow fixes.
+   - Backend control endpoint semantics are now correct:
+     - accepted pause/abort operations return HTTP 202 with `status = ACCEPTED`
+     - rejected pause/abort operations return HTTP 409 with `status = REJECTED` or `ALREADY_*`
+   - `RunStatusService.abortRun()` now rejects terminal run statuses instead of appending an invalid `ABORTED` event.
+   - Terminal abort test coverage was strengthened to cover:
+     - `OK`
+     - `SUCCESS`
+     - `FAILED`
+     - `ERROR`
+   - Frontend monitor control handlers now treat non-accepted control responses as rejected and surface the response message instead of success.
+   - Verification:
+     - `mvn "-Dmaven.repo.local=.m2/repository" -pl apps/local-admin-api -am test` passed
+     - `npm run build` in `ui/admin-console` passed
+     - `npm test -- --run` in `ui/admin-console` still has the same 2 known pre-existing failures unrelated to P0-2
+   - Next implementation prompt should start P0-3:
+     - replace plugin/admin-console snapshot dependency with the dedicated popup contract `GET /api/phase3/extension-popup`
+     - keep the Edge plugin as a lightweight assistive UI, not a platform business-management page

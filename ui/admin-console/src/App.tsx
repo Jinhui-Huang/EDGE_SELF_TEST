@@ -28,6 +28,7 @@ import {
   MutationState,
   PreparedCaseItem,
   ProjectItem,
+  RunControlResponse,
   SchedulerMutationForm,
   ScreenId,
   ThemeMode
@@ -1950,7 +1951,35 @@ export function App() {
           />
         );
       case "monitor":
-        return <MonitorScreen snapshot={snapshot} title={t(localizedScreenCopy.monitor.title)} locale={locale} selectedRunId={selectedMonitorRunId} />;
+        return (
+          <MonitorScreen
+            snapshot={snapshot}
+            title={t(localizedScreenCopy.monitor.title)}
+            locale={locale}
+            selectedRunId={selectedMonitorRunId}
+            apiBaseUrl={apiBaseUrl}
+            onPauseRun={async (monitorRunId) => {
+              const response = await fetch(`${apiBaseUrl}/api/phase3/runs/${encodeURIComponent(monitorRunId)}/pause`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ operator: "monitor" })
+              });
+              const result = await response.json() as RunControlResponse;
+              if (result.status !== "ACCEPTED") throw new Error(result.message || `Control rejected: ${result.status}`);
+              await loadSnapshot();
+            }}
+            onAbortRun={async (monitorRunId) => {
+              const response = await fetch(`${apiBaseUrl}/api/phase3/runs/${encodeURIComponent(monitorRunId)}/abort`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ operator: "monitor" })
+              });
+              const result = await response.json() as RunControlResponse;
+              if (result.status !== "ACCEPTED") throw new Error(result.message || `Control rejected: ${result.status}`);
+              await loadSnapshot();
+            }}
+          />
+        );
       case "reports":
         return (
           <ReportsScreen
