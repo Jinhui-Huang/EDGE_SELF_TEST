@@ -290,3 +290,24 @@ export type RunControlResponse = {
   requestedState: string;
   message: string;
 };
+
+// ---- Extension popup snapshot (P0-3) ----
+
+export type ExtensionPopupSnapshot = {
+  generatedAt: string;
+  status: string;
+  summary: string;
+  page: {
+    title: string;
+    url: string;
+    domain: string;
+    lastUpdatedAt: string;
+  };
+  runtime: {
+    mode: string;
+    queueState: string;
+    auditState: string;
+    nextAction: string;
+  };
+  hints: string[];
+};

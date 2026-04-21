@@ -2355,3 +2355,51 @@ Implementation expectations:
 - Add or update tests/build verification.
 - Update memory.txt and 01_dev_progress.md after completion.
 ```
+
+## 2026-04-21 P0-3 Plugin Popup Contract Split
+
+## Task
+- Replace the plugin/admin-console snapshot dependency with the dedicated popup contract `GET /api/phase3/extension-popup`.
+- Keep the Edge plugin as a lightweight assistive UI.
+
+## Completed
+- Added `ExtensionPopupSnapshot` TypeScript type to `types.ts`, matching the Java `ExtensionPopupSnapshot` record shape:
+  - `generatedAt`, `status`, `summary`
+  - `page { title, url, domain, lastUpdatedAt }`
+  - `runtime { mode, queueState, auditState, nextAction }`
+  - `hints: string[]`
+- Rewrote `PluginPopupScreen.tsx`:
+  - Props changed from `{ snapshot: AdminConsoleSnapshot, title, locale }` to `{ apiBaseUrl, title, locale }`.
+  - Screen now fetches `GET /api/phase3/extension-popup` on mount with loading/error/loaded state management.
+  - Host connection status reflects fetch state: connecting / host unreachable / host connected.
+  - Current-page section (title, path, domain) renders from popup snapshot `page` fields.
+  - Active-run section renders from popup snapshot `runtime` fields (mode, queueState, auditState, nextAction).
+  - Running-state detection derives from `runtime.queueState` instead of loosely reading `workQueue[0]`.
+  - Progress bar only appears when queue state indicates active running.
+- Updated `App.tsx` to pass `apiBaseUrl` instead of `snapshot` for the plugin screen.
+- No backend changes — `GET /api/phase3/extension-popup` already existed and serves the correct model.
+
+## Modified Files
+- `ui/admin-console/src/types.ts`
+- `ui/admin-console/src/screens/PluginPopupScreen.tsx`
+- `ui/admin-console/src/App.tsx`
+- `memory.txt`
+- `01_dev_progress.md`
+
+## Verification
+- Passed: `npm run build` in `ui/admin-console`
+- Ran: `npm test -- --run` in `ui/admin-console` — 11/13 passed; command still exits non-zero because of 2 pre-existing failures unrelated to P0-3
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl apps/local-admin-api -am test`
+
+## Remaining Plugin Limitations
+- Quick actions, pick mode, and locator candidates remain display-only demo content.
+- No real extension/native-message wiring (future work, not P0 scope).
+- Page section still shows mock forms/buttons count badge — real content-script integration is post-P0.
+
+## Next Step
+- P0 chain is complete (P0-1, P0-2, P0-3).
+- Next priority is P1 from `docs/phase3/interface/review-backlog.md`:
+  - P1-1: Complete real `aiGenerate` generation flow.
+  - P1-2: Make report pages read real report artifacts.
+  - P1-3: Add real data-template registry.
+  - P1-4: Convert local-only connection tests into real validation interfaces.

@@ -1,8 +1,9 @@
+import { useEffect, useState } from "react";
 import { translate } from "../i18n";
-import { AdminConsoleSnapshot, Locale } from "../types";
+import { ExtensionPopupSnapshot, Locale } from "../types";
 
 type PluginPopupScreenProps = {
-  snapshot: AdminConsoleSnapshot;
+  apiBaseUrl: string;
   title: string;
   locale: Locale;
 };
@@ -48,9 +49,40 @@ const quickActions: Array<{ icon: string; tone: string; title: LocalizedCopy; su
   }
 ];
 
-export function PluginPopupScreen({ snapshot, title, locale }: PluginPopupScreenProps) {
-  const latestRun = snapshot.workQueue[0];
+export function PluginPopupScreen({ apiBaseUrl, title, locale }: PluginPopupScreenProps) {
   const t = (value: LocalizedCopy) => translate(locale, value);
+
+  const [popupSnapshot, setPopupSnapshot] = useState<ExtensionPopupSnapshot | null>(null);
+  const [loadState, setLoadState] = useState<"loading" | "loaded" | "error">("loading");
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoadState("loading");
+    fetch(`${apiBaseUrl}/api/phase3/extension-popup`)
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json() as Promise<ExtensionPopupSnapshot>;
+      })
+      .then((data) => {
+        if (!cancelled) {
+          setPopupSnapshot(data);
+          setLoadState("loaded");
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setLoadState("error");
+      });
+    return () => { cancelled = true; };
+  }, [apiBaseUrl]);
+
+  const page = popupSnapshot?.page;
+  const runtime = popupSnapshot?.runtime;
+
+  const pageTitle = page?.title ?? "Checkout - Payment";
+  const pagePath = page?.url ? new URL(page.url).pathname : "/checkout/payment";
+  const pageDomain = page?.domain ?? "staging.example.test";
+  const queueState = runtime?.queueState ?? "Idle";
+  const isRunning = queueState.toLowerCase().includes("active") || queueState.toLowerCase().includes("running");
 
   return (
     <div className="pluginDemoScreen" aria-label={title}>
@@ -61,13 +93,13 @@ export function PluginPopupScreen({ snapshot, title, locale }: PluginPopupScreen
             <span />
             <span />
           </div>
-          <div className="pluginBrowserUrl">app.acme.example/checkout</div>
+          <div className="pluginBrowserUrl">{pageDomain}{pagePath}</div>
           <div className="pluginBrowserExt">E</div>
         </div>
 
         <div className="pluginBrowserCanvas">
           <div className="pluginCheckoutMock">
-            <h2>Checkout</h2>
+            <h2>{pageTitle.split(" - ")[0] || "Checkout"}</h2>
             <div className="pluginCheckoutGrid">
               {["Card number", "Expiry", "CVC", "Coupon"].map((label) => (
                 <div key={label}>
@@ -90,7 +122,14 @@ export function PluginPopupScreen({ snapshot, title, locale }: PluginPopupScreen
               <div>
                 <strong>edge.test</strong>
                 <p>
-                  <span>{t({ en: "host connected", zh: "主机已连接", ja: "ホスト接続済み" })}</span> / staging
+                  <span>
+                    {loadState === "loading"
+                      ? t({ en: "connecting…", zh: "连接中…", ja: "接続中…" })
+                      : loadState === "error"
+                        ? t({ en: "host unreachable", zh: "主机不可达", ja: "ホスト接続不可" })
+                        : t({ en: "host connected", zh: "主机已连接", ja: "ホスト接続済み" })}
+                  </span>{" "}
+                  / {pageDomain.split(".")[0] || "staging"}
                 </p>
               </div>
             </div>
@@ -98,8 +137,8 @@ export function PluginPopupScreen({ snapshot, title, locale }: PluginPopupScreen
             <div className="pluginFloatingBody">
               <section>
                 <h4>{t({ en: "Current page", zh: "当前页面", ja: "現在のページ" })}</h4>
-                <strong>Checkout</strong>
-                <p>/checkout</p>
+                <strong>{pageTitle}</strong>
+                <p>{pagePath}</p>
                 <div className="pluginBadgeRow">
                   <span className="pluginBadge mint">recognized</span>
                   <span className="pluginBadge info">3 forms / 8 buttons</span>
@@ -112,14 +151,20 @@ export function PluginPopupScreen({ snapshot, title, locale }: PluginPopupScreen
                 <h4>{t({ en: "Active run", zh: "当前运行", ja: "実行中" })}</h4>
                 <div className="pluginRunCard">
                   <div className="pluginRunMeta">
-                    <span className="pluginBadge info dot">running</span>
-                    <span className="pluginRunId">run_8f2a</span>
+                    <span className={`pluginBadge info dot`}>
+                      {isRunning ? "running" : "idle"}
+                    </span>
+                    <span className="pluginRunId">
+                      {runtime?.mode ?? "Audit-first"}
+                    </span>
                   </div>
-                  <strong>{latestRun?.title ?? "Checkout happy path"}</strong>
-                  <p>{t({ en: "step 5/8 / click 'Pay'", zh: "步骤 5/8 / 点击「Pay」", ja: "ステップ 5/8 / 「Pay」をクリック" })}</p>
-                  <div className="pluginProgress">
-                    <div />
-                  </div>
+                  <strong>{runtime?.nextAction ?? t({ en: "No active run", zh: "无活跃运行", ja: "実行なし" })}</strong>
+                  <p>{runtime?.auditState ?? ""}</p>
+                  {isRunning && (
+                    <div className="pluginProgress">
+                      <div />
+                    </div>
+                  )}
                 </div>
               </section>
 

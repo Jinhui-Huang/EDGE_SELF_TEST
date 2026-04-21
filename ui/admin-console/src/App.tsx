@@ -2052,7 +2052,7 @@ export function App() {
           />
         );
       case "plugin":
-        return <PluginPopupScreen snapshot={snapshot} title={t(localizedScreenCopy.plugin.title)} locale={locale} />;
+        return <PluginPopupScreen apiBaseUrl={apiBaseUrl} title={t(localizedScreenCopy.plugin.title)} locale={locale} />;
       default:
         return null;
     }

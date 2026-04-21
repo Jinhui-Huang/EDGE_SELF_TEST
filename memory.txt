@@ -661,3 +661,27 @@
    - Next implementation prompt should start P0-3:
      - replace plugin/admin-console snapshot dependency with the dedicated popup contract `GET /api/phase3/extension-popup`
      - keep the Edge plugin as a lightweight assistive UI, not a platform business-management page
+43. 2026-04-21 P0-3 plugin popup contract split completed
+   - PluginPopupScreen no longer depends on AdminConsoleSnapshot.
+   - New TypeScript type `ExtensionPopupSnapshot` added to `types.ts`, matching the Java `ExtensionPopupSnapshot` record.
+   - PluginPopupScreen now:
+     - accepts `apiBaseUrl` + `title` + `locale` props (no more `snapshot`)
+     - fetches `GET /api/phase3/extension-popup` on mount
+     - renders loading / error / connected host state
+     - uses popup snapshot `page` fields for current-page section (title, url, domain)
+     - uses popup snapshot `runtime` fields for active-run section (mode, queueState, auditState, nextAction)
+     - detects running state from `runtime.queueState` instead of loosely reading `workQueue[0]`
+   - App.tsx updated to pass `apiBaseUrl` instead of `snapshot` for the plugin screen.
+   - No backend changes were needed — `GET /api/phase3/extension-popup` already existed.
+   - Verification:
+     - `npm run build` in `ui/admin-console` passed
+     - `npm test -- --run` in `ui/admin-console`: 11/13 passed; command still exits non-zero because of 2 pre-existing failures
+     - `mvn "-Dmaven.repo.local=.m2/repository" -pl apps/local-admin-api -am test` passed
+   - Modified files:
+     - `ui/admin-console/src/types.ts`
+     - `ui/admin-console/src/screens/PluginPopupScreen.tsx`
+     - `ui/admin-console/src/App.tsx`
+   - Remaining plugin limitations:
+     - quick actions, pick mode, and locator candidates remain display-only demo content
+     - no real extension/native-message wiring yet (that is future work, not P0 scope)
+     - page section still shows mock forms/buttons count badge — real content-script integration is post-P0
