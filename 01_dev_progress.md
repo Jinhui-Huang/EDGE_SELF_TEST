@@ -2398,8 +2398,68 @@ Implementation expectations:
 
 ## Next Step
 - P0 chain is complete (P0-1, P0-2, P0-3).
+- P1-1 is complete (aiGenerate generation flow).
 - Next priority is P1 from `docs/phase3/interface/review-backlog.md`:
-  - P1-1: Complete real `aiGenerate` generation flow.
   - P1-2: Make report pages read real report artifacts.
   - P1-3: Add real data-template registry.
   - P1-4: Convert local-only connection tests into real validation interfaces.
+
+---
+
+# P1-1: Complete real aiGenerate generation flow (2026-04-21)
+
+## Summary
+Wired the docParse → aiGenerate → cases chain with real API calls. AI generates case candidates, DSL, state machine, and flow tree. Operator reviews results as drafts before committing to cases.
+
+## Changes
+
+### Backend
+- New `AgentGenerateService.java` with three public methods:
+  - `generateCase(body)` — returns generatedCases, reasoning, selectedDsl, stateMachine, flowTree (deterministic mock shaped by input)
+  - `validateDsl(body)` — checks empty DSL, missing `case` block; returns VALID/INVALID with errors/warnings
+  - `dryRun(body)` — validates DSL first, then returns runtime checks (restorePlanRef, comparisonPlanRef, environmentAccess)
+- Registered 3 new endpoints in `LocalAdminApiServer.java` (dry-run registered before generate-case due to HttpServer prefix matching):
+  - `POST /api/phase3/agent/generate-case/dry-run`
+  - `POST /api/phase3/agent/generate-case`
+  - `POST /api/phase3/cases/dsl/validate`
+- Reuses existing `POST /api/phase3/catalog/case` for final save-as-case.
+- Updated `LocalAdminApiApp.java` to inject `AgentGenerateService`.
+- Updated all 7 test constructor calls in `LocalAdminApiServerTest.java`.
+
+### Frontend
+- Added P1-1 types to `types.ts`: GenerateCaseRequest, GeneratedCaseCandidate, GenerateCaseResponse, DslValidateRequest, DslValidateResponse, DryRunRequest, DryRunResponse.
+- Rewrote `AiGenerateScreen.tsx`:
+  - New props: `apiBaseUrl`, `onSaveSuccess`
+  - `doGenerate("GENERATE"|"REGENERATE")` → POST /api/phase3/agent/generate-case
+  - `doValidate()` → POST /api/phase3/cases/dsl/validate
+  - `doDryRun()` → validate first, then POST /api/phase3/agent/generate-case/dry-run
+  - `doSave()` → validate first, then POST /api/phase3/catalog/case, then onSaveSuccess()
+  - Auto-generate on mount when focus exists via useEffect
+  - Renders real state machine, flow tree, DSL from generation result
+  - Shows dry-run result inline in DSL panel
+  - All buttons disabled during pending states with localized loading text
+- Exported `AiGenerateFocus` type from `AiGenerateScreen.tsx`; removed duplicate definition from `App.tsx`.
+- Updated `App.tsx` to pass `apiBaseUrl={apiBaseUrl}` and `onSaveSuccess={loadSnapshot}` to AiGenerateScreen.
+- Review hardening: save-as-case now sends generated `dsl`, `sourceDocumentId`, and `generationMeta`; catalog persistence preserves these draft fields instead of dropping the generated artifact payload.
+
+## Modified Files
+- New: `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/AgentGenerateService.java`
+- Modified: `apps/local-admin-api/src/main/java/com/example/webtest/admin/http/LocalAdminApiServer.java`
+- Modified: `apps/local-admin-api/src/main/java/com/example/webtest/admin/LocalAdminApiApp.java`
+- Modified: `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/CatalogPersistenceService.java`
+- Modified: `apps/local-admin-api/src/test/java/com/example/webtest/admin/http/LocalAdminApiServerTest.java`
+- Modified: `ui/admin-console/src/types.ts`
+- Modified: `ui/admin-console/src/screens/AiGenerateScreen.tsx`
+- Modified: `ui/admin-console/src/App.tsx`
+- Modified: `memory.txt`
+- Modified: `01_dev_progress.md`
+
+## Verification
+- Passed: `npm run build` in `ui/admin-console`
+- Ran: `npm test -- --run` in `ui/admin-console` — 11/13 passed; command still exits non-zero because of 2 pre-existing failures unrelated to P1-1
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl apps/local-admin-api -am test`
+
+## Design Decisions
+- AI role boundary: AI only generates/explains/suggests — never acts as executor. Generated results are reviewable drafts before saving.
+- HttpServer prefix matching: `/api/phase3/agent/generate-case/dry-run` registered before `/api/phase3/agent/generate-case` to prevent prefix capture.
+- `AiGenerateFocus` type deduplicated: single source of truth in `AiGenerateScreen.tsx`, imported by `App.tsx`.

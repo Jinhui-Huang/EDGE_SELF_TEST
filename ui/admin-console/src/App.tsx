@@ -6,7 +6,7 @@ import { DataDiffScreen } from "./screens/DataDiffScreen";
 import { DataTemplatesScreen } from "./screens/DataTemplatesScreen";
 import { DocParseScreen } from "./screens/DocParseScreen";
 import { ExecutionScreen } from "./screens/ExecutionScreen";
-import { AiGenerateScreen } from "./screens/AiGenerateScreen";
+import { AiGenerateScreen, AiGenerateFocus } from "./screens/AiGenerateScreen";
 import { ModelConfigScreen } from "./screens/ModelConfigScreen";
 import { formatCopy, sharedCopy } from "./i18n";
 import { MonitorScreen } from "./screens/MonitorScreen";
@@ -1165,25 +1165,6 @@ function translate(locale: Locale, value: CopyValue): string {
   return typeof value === "string" ? value : value[locale] ?? value.en ?? value.zh ?? value.ja;
 }
 
-type AiGenerateFocus = {
-  projectKey: string;
-  projectName: string;
-  documentId: string;
-  documentName: string;
-  caseId: string;
-  caseName: string;
-  generatedCases: Array<{
-    id: string;
-    name: string;
-    category: string;
-    confidence: string;
-  }>;
-  reasoning: Array<{
-    label: string;
-    body: string;
-  }>;
-};
-
 export function App() {
   const [snapshot, setSnapshot] = useState<AdminConsoleSnapshot>(fallbackSnapshot);
   const [sourceLabel, setSourceLabel] = useState(translate("en", sharedCopy.sourceFallback));
@@ -1904,6 +1885,8 @@ export function App() {
             title={t(localizedScreenCopy.aiGenerate.title)}
             locale={locale}
             focus={aiGenerateFocus}
+            apiBaseUrl={apiBaseUrl}
+            onSaveSuccess={loadSnapshot}
           />
         );
       case "execution":

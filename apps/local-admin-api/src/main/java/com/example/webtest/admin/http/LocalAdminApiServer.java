@@ -1,5 +1,6 @@
 package com.example.webtest.admin.http;
 
+import com.example.webtest.admin.service.AgentGenerateService;
 import com.example.webtest.admin.service.CatalogPersistenceService;
 import com.example.webtest.admin.service.ConfigPersistenceService;
 import com.example.webtest.admin.service.RunStatusService;
@@ -26,7 +27,8 @@ public final class LocalAdminApiServer implements AutoCloseable {
             SchedulerPersistenceService schedulerPersistenceService,
             ConfigPersistenceService configPersistenceService,
             CatalogPersistenceService catalogPersistenceService,
-            RunStatusService runStatusService)
+            RunStatusService runStatusService,
+            AgentGenerateService agentGenerateService)
             throws IOException {
         server = HttpServer.create(address, 0);
         server.createContext("/health", jsonHandler(Map.of("status", "UP")));
@@ -50,6 +52,15 @@ public final class LocalAdminApiServer implements AutoCloseable {
         server.createContext(
                 "/api/phase3/catalog/case",
                 exchange -> handleMutation(exchange, catalogPersistenceService::upsertCase));
+        server.createContext(
+                "/api/phase3/agent/generate-case/dry-run",
+                exchange -> handleMutation(exchange, agentGenerateService::dryRun));
+        server.createContext(
+                "/api/phase3/agent/generate-case",
+                exchange -> handleMutation(exchange, agentGenerateService::generateCase));
+        server.createContext(
+                "/api/phase3/cases/dsl/validate",
+                exchange -> handleMutation(exchange, agentGenerateService::validateDsl));
         server.createContext("/api/phase3/runs/", exchange -> handleRunEndpoint(exchange, runStatusService));
         server.createContext("/", exchange -> writeJson(exchange, 404, Map.of(
                 "error", "NOT_FOUND",

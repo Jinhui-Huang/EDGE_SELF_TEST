@@ -102,6 +102,9 @@ public final class CatalogPersistenceService {
         entry.put("status", status);
         entry.put("updatedAt", updatedAt);
         entry.put("archived", archived);
+        copyOptional(payload, entry, "dsl");
+        copyOptional(payload, entry, "sourceDocumentId");
+        copyOptional(payload, entry, "generationMeta");
 
         boolean updated = false;
         for (int index = 0; index < cases.size(); index++) {
@@ -228,6 +231,12 @@ public final class CatalogPersistenceService {
             return Boolean.parseBoolean(text.trim());
         }
         return false;
+    }
+
+    private void copyOptional(Map<String, Object> source, Map<String, Object> target, String key) {
+        if (source.containsKey(key) && source.get(key) != null) {
+            target.put(key, source.get(key));
+        }
     }
 
     private record CatalogSnapshot(List<Map<String, Object>> projects, List<Map<String, Object>> cases) {

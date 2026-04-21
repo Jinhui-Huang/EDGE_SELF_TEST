@@ -685,3 +685,36 @@
      - quick actions, pick mode, and locator candidates remain display-only demo content
      - no real extension/native-message wiring yet (that is future work, not P0 scope)
      - page section still shows mock forms/buttons count badge — real content-script integration is post-P0
+44. 2026-04-21 P1-1 aiGenerate generation flow completed
+   - Complete real AI generation chain: docParse → aiGenerate → cases.
+   - Backend: new `AgentGenerateService` with three methods:
+     - `generateCase(body)` → returns generatedCases, reasoning, selectedDsl, stateMachine, flowTree (deterministic mock shaped by input context)
+     - `validateDsl(body)` → checks empty DSL, missing case block; returns VALID/INVALID with errors/warnings
+     - `dryRun(body)` → validates DSL first, then returns runtime checks (restorePlanRef, comparisonPlanRef, environmentAccess)
+   - Three new endpoints registered (dry-run before generate-case due to HttpServer prefix matching):
+     - `POST /api/phase3/agent/generate-case/dry-run`
+     - `POST /api/phase3/agent/generate-case`
+     - `POST /api/phase3/cases/dsl/validate`
+   - Reuses existing `POST /api/phase3/catalog/case` for final save-as-case.
+   - Frontend types added: GenerateCaseRequest, GeneratedCaseCandidate, GenerateCaseResponse, DslValidateRequest, DslValidateResponse, DryRunRequest, DryRunResponse.
+   - AiGenerateScreen.tsx fully rewritten:
+     - Accepts `apiBaseUrl` and `onSaveSuccess` props
+     - doGenerate → POST generate-case; doValidate → POST validate; doDryRun → validate then POST dry-run; doSave → validate then POST catalog/case then onSaveSuccess
+     - Auto-generate on mount when focus exists
+     - Renders real state machine, flow tree, DSL from generation result
+     - Shows dry-run result inline in DSL panel
+     - All buttons disabled during pending states
+   - AiGenerateFocus type exported from AiGenerateScreen.tsx; duplicate removed from App.tsx.
+   - App.tsx updated to pass `apiBaseUrl={apiBaseUrl}` and `onSaveSuccess={loadSnapshot}` to AiGenerateScreen.
+   - Review hardening:
+     - save-as-case now sends generated `dsl`, `sourceDocumentId`, and `generationMeta`
+     - `CatalogPersistenceService.upsertCase()` preserves those generated draft fields in `config/phase3/project-catalog.json`
+   - Modified files:
+     - New: `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/AgentGenerateService.java`
+     - Modified: `LocalAdminApiServer.java`, `LocalAdminApiApp.java`, `CatalogPersistenceService.java`, `LocalAdminApiServerTest.java`
+     - Modified: `ui/admin-console/src/types.ts`, `ui/admin-console/src/screens/AiGenerateScreen.tsx`, `ui/admin-console/src/App.tsx`
+   - Verification:
+     - Frontend build passed
+     - Frontend tests: 11/13 passed; command still exits non-zero because of 2 pre-existing failures unrelated to P1-1
+     - Maven local-admin-api test command passed
+   - AI role boundary: AI only generates/explains/suggests — not acts as executor. Generated results are reviewable drafts before saving.

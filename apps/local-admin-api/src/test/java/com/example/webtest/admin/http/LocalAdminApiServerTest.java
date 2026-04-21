@@ -3,6 +3,7 @@ package com.example.webtest.admin.http;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.example.webtest.admin.service.AgentGenerateService;
 import com.example.webtest.admin.service.CatalogPersistenceService;
 import com.example.webtest.admin.service.ConfigPersistenceService;
 import com.example.webtest.admin.service.Phase3MockDataService;
@@ -218,7 +219,8 @@ class LocalAdminApiServerTest {
                         modelConfigFile,
                         environmentConfigFile),
                 new CatalogPersistenceService(catalogFile, Clock.fixed(Instant.parse("2026-04-18T11:00:00Z"), ZoneOffset.UTC)),
-                new RunStatusService(schedulerRequestsFile, schedulerEventsFile, new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, Clock.fixed(Instant.parse("2026-04-18T11:00:00Z"), ZoneOffset.UTC)), Clock.fixed(Instant.parse("2026-04-18T11:00:00Z"), ZoneOffset.UTC)))) {
+                new RunStatusService(schedulerRequestsFile, schedulerEventsFile, new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, Clock.fixed(Instant.parse("2026-04-18T11:00:00Z"), ZoneOffset.UTC)), Clock.fixed(Instant.parse("2026-04-18T11:00:00Z"), ZoneOffset.UTC)),
+                new AgentGenerateService())) {
             server.start();
             HttpClient client = HttpClient.newHttpClient();
 
@@ -371,7 +373,8 @@ class LocalAdminApiServerTest {
                         modelConfigFile,
                         environmentConfigFile),
                 new CatalogPersistenceService(catalogFile, Clock.fixed(Instant.parse("2026-04-18T11:00:00Z"), ZoneOffset.UTC)),
-                new RunStatusService(schedulerRequestsFile, schedulerEventsFile, new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, Clock.fixed(Instant.parse("2026-04-18T11:00:00Z"), ZoneOffset.UTC)), Clock.fixed(Instant.parse("2026-04-18T11:00:00Z"), ZoneOffset.UTC)))) {
+                new RunStatusService(schedulerRequestsFile, schedulerEventsFile, new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, Clock.fixed(Instant.parse("2026-04-18T11:00:00Z"), ZoneOffset.UTC)), Clock.fixed(Instant.parse("2026-04-18T11:00:00Z"), ZoneOffset.UTC)),
+                new AgentGenerateService())) {
             server.start();
             HttpClient client = HttpClient.newHttpClient();
 
@@ -441,7 +444,8 @@ class LocalAdminApiServerTest {
                         modelConfigFile,
                         environmentConfigFile),
                 new CatalogPersistenceService(catalogFile, clock),
-                new RunStatusService(schedulerRequestsFile, schedulerEventsFile, new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, clock), clock))) {
+                new RunStatusService(schedulerRequestsFile, schedulerEventsFile, new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, clock), clock),
+                new AgentGenerateService())) {
             server.start();
             HttpClient client = HttpClient.newHttpClient();
 
@@ -542,7 +546,8 @@ class LocalAdminApiServerTest {
                         modelConfigFile,
                         environmentConfigFile),
                 new CatalogPersistenceService(catalogFile, clock),
-                new RunStatusService(schedulerRequestsFile, schedulerEventsFile, new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, clock), clock))) {
+                new RunStatusService(schedulerRequestsFile, schedulerEventsFile, new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, clock), clock),
+                new AgentGenerateService())) {
             server.start();
             HttpClient client = HttpClient.newHttpClient();
 
@@ -644,7 +649,8 @@ class LocalAdminApiServerTest {
                         modelConfigFile,
                         environmentConfigFile),
                 new CatalogPersistenceService(catalogFile, clock),
-                new RunStatusService(schedulerRequestsFile, schedulerEventsFile, new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, clock), clock))) {
+                new RunStatusService(schedulerRequestsFile, schedulerEventsFile, new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, clock), clock),
+                new AgentGenerateService())) {
             server.start();
             HttpClient client = HttpClient.newHttpClient();
 
@@ -742,7 +748,8 @@ class LocalAdminApiServerTest {
                         modelConfigFile,
                         environmentConfigFile),
                 new CatalogPersistenceService(catalogFile, clock),
-                new RunStatusService(schedulerRequestsFile, schedulerEventsFile, new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, clock), clock))) {
+                new RunStatusService(schedulerRequestsFile, schedulerEventsFile, new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, clock), clock),
+                new AgentGenerateService())) {
             server.start();
             HttpClient client = HttpClient.newHttpClient();
 
@@ -762,7 +769,13 @@ class LocalAdminApiServerTest {
                             "name", "Checkout card regression",
                             "tags", "regression, locator-repair-needed",
                             "status", "ACTIVE",
-                            "archived", false))),
+                            "archived", false,
+                            "dsl", "case \"Checkout card regression\" {}",
+                            "sourceDocumentId", "checkout-doc-v3",
+                            "generationMeta", Map.of(
+                                    "candidateId", "gen-checkout-regression-card-a",
+                                    "confidence", "0.94",
+                                    "generator", "agent.generate-case")))),
                     HttpResponse.BodyHandlers.ofString());
             HttpResponse<String> admin = client.send(
                     request(server, "/api/phase3/admin-console"),
@@ -781,6 +794,10 @@ class LocalAdminApiServerTest {
             assertTrue(persistedCatalog.contains("\"audit-ready\""));
             assertTrue(persistedCatalog.contains("\"checkout-regression-card\""));
             assertTrue(persistedCatalog.contains("\"2026-04-18T11:00:00Z\""));
+            assertTrue(persistedCatalog.contains("\"dsl\""));
+            assertTrue(persistedCatalog.contains("\"sourceDocumentId\""));
+            assertTrue(persistedCatalog.contains("\"generationMeta\""));
+            assertTrue(persistedCatalog.contains("\"agent.generate-case\""));
 
             assertEquals(200, admin.statusCode());
             assertTrue(admin.body().contains("\"Checkout smoke / audited\""));
@@ -831,7 +848,8 @@ class LocalAdminApiServerTest {
                 new ConfigPersistenceService(modelConfigFile, environmentConfigFile),
                 new CatalogPersistenceService(catalogFile, clock),
                 new RunStatusService(schedulerRequestsFile, schedulerEventsFile,
-                        new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, clock), clock))) {
+                        new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, clock), clock),
+                new AgentGenerateService())) {
             server.start();
             HttpClient client = HttpClient.newHttpClient();
 

@@ -291,6 +291,66 @@ export type RunControlResponse = {
   message: string;
 };
 
+// ---- AI generation flow types (P1-1) ----
+
+export type GenerateCaseRequest = {
+  projectKey: string;
+  documentId: string;
+  caseId: string;
+  promptMode: "GENERATE" | "REGENERATE";
+  operator: string;
+};
+
+export type GeneratedCaseCandidate = {
+  id: string;
+  name: string;
+  category: string;
+  confidence: string;
+  summary: string;
+};
+
+export type GenerateCaseResponse = {
+  documentId: string;
+  selectedCaseId: string;
+  generatedCases: GeneratedCaseCandidate[];
+  reasoning: Array<{ label: string; body: string }>;
+  selectedDsl: { format: string; content: string };
+  stateMachine: {
+    states: Array<{ id: string; label: string }>;
+    edges: Array<{ from: string; to: string; trigger: string }>;
+  };
+  flowTree: Array<{ label: string; tone: string; indent: number }>;
+};
+
+export type DslValidateRequest = {
+  projectKey: string;
+  documentId: string;
+  candidateId: string;
+  dsl: string;
+};
+
+export type DslValidateResponse = {
+  status: "VALID" | "INVALID";
+  errors: Array<{ code: string; message: string }>;
+  warnings: Array<{ code: string; message: string }>;
+  normalizedDsl?: string;
+};
+
+export type DryRunRequest = {
+  projectKey: string;
+  documentId: string;
+  candidateId: string;
+  dsl: string;
+  environment: string;
+};
+
+export type DryRunResponse = {
+  status: "PASSED" | "FAILED";
+  parser: { status: string; errors: Array<{ code: string; message: string }> };
+  runtimeChecks: Array<{ name: string; status: string }>;
+  suggestedLaunchForm?: { projectKey: string; environment: string };
+};
+
 // ---- Extension popup snapshot (P0-3) ----
 
 export type ExtensionPopupSnapshot = {

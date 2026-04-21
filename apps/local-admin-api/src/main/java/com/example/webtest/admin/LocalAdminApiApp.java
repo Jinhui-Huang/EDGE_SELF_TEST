@@ -1,5 +1,6 @@
 package com.example.webtest.admin;
 
+import com.example.webtest.admin.service.AgentGenerateService;
 import com.example.webtest.admin.service.CatalogPersistenceService;
 import com.example.webtest.admin.http.LocalAdminApiServer;
 import com.example.webtest.admin.service.ConfigPersistenceService;
@@ -104,7 +105,8 @@ public final class LocalAdminApiApp {
                         schedulerRequestsFile,
                         schedulerEventsFile,
                         schedulerPersistence,
-                        clock))) {
+                        clock),
+                new AgentGenerateService())) {
             server.start();
             System.out.println("Local admin API listening on http://127.0.0.1:" + server.port());
             new CountDownLatch(1).await();
