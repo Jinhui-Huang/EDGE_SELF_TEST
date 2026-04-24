@@ -2848,8 +2848,53 @@ button:disabled {
   color: var(--success);
 }
 
+.actionStatus.warning {
+  color: var(--warning);
+}
+
 .actionStatus.error {
   color: var(--danger);
+}
+
+.actionStatusDetails {
+  margin-top: 10px;
+  display: grid;
+  gap: 10px;
+}
+
+.actionStatusMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.actionStatusMeta span {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.actionStatusChecks,
+.actionStatusWarnings {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+}
+
+.actionStatusChecks li,
+.actionStatusWarnings li {
+  color: var(--text);
+}
+
+.actionStatusChecks li span,
+.actionStatusChecks li strong {
+  margin-right: 8px;
 }
 
 .pillRow {

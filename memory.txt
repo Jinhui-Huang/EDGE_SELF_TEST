@@ -792,3 +792,56 @@
      - `mvn "-Dmaven.repo.local=.m2/repository" -pl apps/local-admin-api -am test` still not used as release gate because of the pre-existing unrelated `report-engine` failure
    - Next recommended phase task:
      - P1-4 real connection validation for `models` and `environments`
+48. 2026-04-25 P1-4 real connection validation completed
+   - `models` and `environments` no longer use `setTimeout` local-only field presence checks for `Test connection`.
+   - Backend added deterministic validation service:
+     - new `ConnectionValidationService`
+     - `POST /api/phase3/config/model/test-connection`
+     - `POST /api/phase3/datasources/test-connection`
+   - Validation stays within Phase 3 boundary:
+     - no real outbound model-provider call
+     - no real JDBC connection
+     - structured mock-realistic validation only
+   - Model validation now checks:
+     - provider name
+     - model id shape
+     - endpoint format
+     - timeout range
+     - apiKey missing / placeholder
+     - role / status legality
+   - Datasource validation now checks:
+     - datasource type
+     - JDBC URL shape
+     - driver / type match
+     - schema identifier
+     - username / password presence
+     - mybatisEnv legality
+   - Frontend `App.tsx` now posts both test actions to the real backend endpoints.
+   - Frontend added basic response shape validation before accepting the result payload.
+   - API unavailable behavior changed:
+     - UI no longer reports fake success
+     - warning-state fallback shows local-only draft completeness checks for operator reference
+   - Shared UI status surface upgraded:
+     - `MutationState` now supports `warning`
+     - `MutationStatus` can render structured checks / warnings / latency / resolved model / resolved driver
+   - Verification completed successfully:
+     - `npm run build` in `ui/admin-console`
+     - `npm test -- --run` in `ui/admin-console`
+     - `mvn "-Dmaven.repo.local=.m2/repository" -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+   - Current known limit:
+     - validation remains deterministic simulation and is not a real connectivity probe by design for Phase 3
+49. 2026-04-25 P1-4 docs baseline synchronized
+   - Follow-up review found a state mismatch:
+     - `01_dev_progress.md` and `memory.txt` marked P1-4 complete
+     - several `docs/phase3/interface/*` baseline docs still said model/datasource connection tests were local-only
+   - Synced the docs baseline to current implementation for:
+     - `docs/phase3/interface/ui-control-interface-overview.md`
+     - `docs/phase3/interface/models/functional-spec.md`
+     - `docs/phase3/interface/models/interface-spec.md`
+     - `docs/phase3/interface/environments/functional-spec.md`
+     - `docs/phase3/interface/environments/interface-spec.md`
+   - New doc state now consistently says:
+     - model test connection is implemented via `POST /api/phase3/config/model/test-connection`
+     - datasource test connection is implemented via `POST /api/phase3/datasources/test-connection`
+     - both remain deterministic validation only and do not perform real external connectivity in Phase 3
+   - This sync unblocks review of the completed P1-4 implementation without changing the code path itself.

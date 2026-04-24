@@ -193,10 +193,10 @@ Conventions used here:
 |---|---|---|---|
 | `Add provider` | button | Local draft modal only | Persist later via footer save |
 | Provider card | clickable card | Local modal open only | Keep local |
-| Provider `Test` | button | Local-only field presence check | `POST /api/phase3/config/model/test-connection` |
+| Provider `Test` | button | Implemented: `POST /api/phase3/config/model/test-connection` | Keep current deterministic backend validation; do not expand to real outbound provider calls in Phase 3 |
 | Provider edit icon | button | Local modal open only | Keep local |
 | Routing-rule edit icon | button | Visual only | Local routing edit drawer; persist through current model save pipeline |
-| Modal `Test connection` | button | Local-only field presence check | `POST /api/phase3/config/model/test-connection` |
+| Modal `Test connection` | button | Implemented: `POST /api/phase3/config/model/test-connection` | Keep current deterministic backend validation; do not expand to real outbound provider calls in Phase 3 |
 | Modal `Delete` | button | Local draft delete only | Persist after footer save |
 | Modal `Add provider` / `Update` | button | Local draft update only | Persist after footer save |
 | `Save model config` | button | Implemented: repeated `POST /api/phase3/config/model` | Keep current; future typed save could become `PUT /api/phase3/models` |
@@ -209,8 +209,8 @@ Conventions used here:
 |---|---|---|---|
 | `New database` | button | Opens dialog only | Save in dialog persists immediately |
 | Database card | clickable card | Opens edit dialog only | Keep local open behavior |
-| Card `Test connection` | button | Local-only field presence check | `POST /api/phase3/datasources/test-connection` |
-| Dialog `Test connection` | button | Local-only field presence check | `POST /api/phase3/datasources/test-connection` |
+| Card `Test connection` | button | Implemented: `POST /api/phase3/datasources/test-connection` | Keep current deterministic backend validation; do not expand to real JDBC connectivity in Phase 3 |
+| Dialog `Test connection` | button | Implemented: `POST /api/phase3/datasources/test-connection` | Keep current deterministic backend validation; do not expand to real JDBC connectivity in Phase 3 |
 | Dialog `Save database` | button | Implemented: repeated `POST /api/phase3/config/environment` | Future typed save could become `PUT /api/phase3/datasources` |
 | Dialog `Delete` | button | Implemented: resubmits remaining list through repeated `POST /api/phase3/config/environment` | Keep immediate-persist behavior |
 
@@ -245,4 +245,4 @@ The highest-signal unresolved controls across the package are:
 - `aiGenerate` still lacks real generate / dry-run / save actions
 - `monitor` still lacks all live runtime APIs
 - `dataTemplates` still lacks a real backend template registry
-- `models` and `environments` still use local-only test actions instead of real connection-test interfaces
+- `models` and `environments` have switched to real backend validation interfaces, but the validation remains deterministic and non-connective by Phase 3 design

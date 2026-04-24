@@ -2620,3 +2620,110 @@ Reports / ReportDetail / DataDiff screens now consume backend report artifact AP
 
 ## Next Step
 - Continue with P1-4: convert model/datasource local-only connection tests into real backend validation interfaces.
+
+## 2026-04-25 P1-4 convert local-only connection tests into real validation interfaces completed
+
+## Task
+- Replace the local-only `Test connection` behavior in `models` and `environments` with real backend validation endpoints.
+- Keep the implementation deterministic and mock-realistic without calling real external model providers or databases.
+
+## Changes
+
+### Backend
+- Added `ConnectionValidationService.java`:
+  - `testModelConnection(body)` for `POST /api/phase3/config/model/test-connection`
+  - `testDatasourceConnection(body)` for `POST /api/phase3/datasources/test-connection`
+- Validation remains Phase 3 file/local boundary safe:
+  - no real outbound network call
+  - no real JDBC connection
+  - deterministic structured validation only
+- Model validation now returns structured results with:
+  - `status`
+  - `checks`
+  - `latencyMs`
+  - `resolvedModel`
+  - `message`
+  - `warnings`
+- Datasource validation now returns structured results with:
+  - `status`
+  - `checks`
+  - `resolvedDriver`
+  - `message`
+  - `warnings`
+- Validation focus implemented per review backlog:
+  - model: provider name / model id / endpoint format / timeout range / apiKey missing-or-placeholder / role-status legality
+  - datasource: db type / JDBC URL shape / driver-type match / schema format / username/password presence / mybatisEnv legality
+- `LocalAdminApiServer.java`
+  - added `POST /api/phase3/config/model/test-connection`
+  - added `POST /api/phase3/datasources/test-connection`
+  - kept existing config save endpoints unchanged
+- `LocalAdminApiServerTest.java`
+  - added dedicated coverage for both new validation endpoints and their structured response fields
+
+### Frontend
+- `App.tsx`
+  - replaced `setTimeout`-based local model test with real `POST /api/phase3/config/model/test-connection`
+  - replaced `setTimeout`-based local datasource test with real `POST /api/phase3/datasources/test-connection`
+  - added response shape validation before accepting API data
+  - when API is unavailable or malformed, UI now shows a warning-state fallback with explicit local-only draft checks; it no longer reports fake success
+- `types.ts`
+  - added typed connection validation result/check shapes
+  - extended `MutationState` with `warning` kind and optional validation payload
+- `MutationStatus.tsx`
+  - now renders structured validation output:
+    - status
+    - latency / resolved model / resolved driver when present
+    - per-check results
+    - warnings
+- `styles.css`
+  - added warning and structured validation status styling
+
+## Modified Files
+- New: `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/ConnectionValidationService.java`
+- Modified: `apps/local-admin-api/src/main/java/com/example/webtest/admin/http/LocalAdminApiServer.java`
+- Modified: `apps/local-admin-api/src/test/java/com/example/webtest/admin/http/LocalAdminApiServerTest.java`
+- Modified: `ui/admin-console/src/App.tsx`
+- Modified: `ui/admin-console/src/types.ts`
+- Modified: `ui/admin-console/src/ui-kit/MutationStatus.tsx`
+- Modified: `ui/admin-console/src/styles.css`
+- Modified: `01_dev_progress.md`
+- Modified: `memory.txt`
+
+## Verification
+- Passed: `npm run build` in `ui/admin-console`
+- Passed: `npm test -- --run` in `ui/admin-console`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+
+## Known Limits
+- Validation remains deterministic only; no real provider reachability and no real JDBC connectivity is attempted in Phase 3.
+- Current save flows remain unchanged:
+  - model config is still footer-save
+  - datasource config is still immediate persist
+- Structured validation is displayed through the shared mutation-status surface rather than a new dedicated detail drawer.
+
+## Next Step
+- Continue with the next `docs/phase3/interface/review-backlog.md` priority after P1-4, while preserving the current Phase 3 platform-management boundary.
+
+## 2026-04-25 P1-4 documentation sync follow-up
+
+## Task
+- Fix the Phase 3 docs baseline so it no longer contradicts the completed P1-4 implementation state.
+
+## Completed
+- Updated these docs to reflect that P1-4 is implemented:
+  - `docs/phase3/interface/ui-control-interface-overview.md`
+  - `docs/phase3/interface/models/functional-spec.md`
+  - `docs/phase3/interface/models/interface-spec.md`
+  - `docs/phase3/interface/environments/functional-spec.md`
+  - `docs/phase3/interface/environments/interface-spec.md`
+- Replaced stale `local-only` / `future interface` wording for model and datasource connection testing with current-state wording:
+  - backend validation interface is implemented
+  - current UI uses the real POST validation endpoints
+  - validation remains deterministic and non-connective by Phase 3 boundary
+- Kept the remaining future-scope language only for work that is still truly unfinished, such as routing-rule editing and broader environment scope.
+
+## Verification
+- Doc consistency pass completed against the implemented P1-4 code and the current review finding.
+
+## Next Step
+- After doc re-review, the next recommended backlog item is `P2-1 dashboard control wiring`.

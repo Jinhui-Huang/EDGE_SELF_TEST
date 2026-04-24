@@ -1051,6 +1051,105 @@ class LocalAdminApiServerTest {
     }
 
     @Test
+    void connectionValidationEndpointsReturnStructuredResults(@TempDir Path tempDir) throws Exception {
+        Path runsDir = tempDir.resolve("runs");
+        Files.createDirectories(runsDir);
+        Path schedulerRequestsFile = tempDir.resolve("scheduler-requests.json");
+        Path schedulerEventsFile = tempDir.resolve("scheduler-events.json");
+        Path schedulerStateFile = tempDir.resolve("scheduler-state.json");
+        Path queueFile = tempDir.resolve("execution-queue.json");
+        Path catalogFile = tempDir.resolve("project-catalog.json");
+        Path executionHistoryFile = tempDir.resolve("execution-history.json");
+        Path modelConfigFile = tempDir.resolve("model-config.json");
+        Path environmentConfigFile = tempDir.resolve("environment-config.json");
+        Files.writeString(queueFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(catalogFile, Jsons.writeValueAsString(Map.of("projects", List.of(), "cases", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(executionHistoryFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(modelConfigFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(environmentConfigFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+
+        Clock clock = Clock.fixed(Instant.parse("2026-04-25T09:00:00Z"), ZoneOffset.UTC);
+        try (LocalAdminApiServer server = new LocalAdminApiServer(
+                new InetSocketAddress("127.0.0.1", 0),
+                new Phase3MockDataService(runsDir, schedulerRequestsFile, schedulerEventsFile, schedulerStateFile,
+                        queueFile, catalogFile, executionHistoryFile, modelConfigFile, environmentConfigFile, clock),
+                new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, clock),
+                new ConfigPersistenceService(modelConfigFile, environmentConfigFile),
+                new CatalogPersistenceService(catalogFile, clock),
+                new RunStatusService(schedulerRequestsFile, schedulerEventsFile,
+                        new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, clock), clock),
+                new AgentGenerateService(),
+                new ReportArtifactService(runsDir),
+                new DataTemplatePersistenceService(tempDir.resolve("data-templates.json"), clock))) {
+            server.start();
+            HttpClient client = HttpClient.newHttpClient();
+
+            HttpResponse<String> modelPassed = client.send(
+                    request(server, "/api/phase3/config/model/test-connection", "POST", Jsons.writeValueAsString(Map.of(
+                            "name", "OpenAI",
+                            "model", "gpt-4.1-mini",
+                            "endpoint", "https://api.openai.com/v1",
+                            "apiKey", "sk-live-demo-key",
+                            "timeoutMs", "45000",
+                            "role", "primary",
+                            "status", "active"))),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, modelPassed.statusCode());
+            assertTrue(modelPassed.body().contains("\"status\":\"PASSED\""));
+            assertTrue(modelPassed.body().contains("\"resolvedModel\":\"gpt-4.1-mini\""));
+            assertTrue(modelPassed.body().contains("\"checks\""));
+            assertTrue(modelPassed.body().contains("\"latencyMs\""));
+
+            HttpResponse<String> modelFailed = client.send(
+                    request(server, "/api/phase3/config/model/test-connection", "POST", Jsons.writeValueAsString(Map.of(
+                            "name", "OpenAI",
+                            "model", "bad model",
+                            "endpoint", "not-a-url",
+                            "apiKey", "******",
+                            "timeoutMs", "10",
+                            "role", "primary",
+                            "status", "disabled"))),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, modelFailed.statusCode());
+            assertTrue(modelFailed.body().contains("\"status\":\"FAILED\""));
+            assertTrue(modelFailed.body().contains("\"api-key\""));
+            assertTrue(modelFailed.body().contains("API key looks like a placeholder value."));
+            assertTrue(modelFailed.body().contains("\"provider-lifecycle\""));
+
+            HttpResponse<String> datasourcePassed = client.send(
+                    request(server, "/api/phase3/datasources/test-connection", "POST", Jsons.writeValueAsString(Map.of(
+                            "type", "PostgreSQL",
+                            "driver", "org.postgresql.Driver",
+                            "url", "jdbc:postgresql://db.internal:5432/checkout",
+                            "schema", "checkout_app",
+                            "username", "qa_reader",
+                            "password", "real-pass-123",
+                            "mybatisEnv", "qa-postgres"))),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, datasourcePassed.statusCode());
+            assertTrue(datasourcePassed.body().contains("\"status\":\"PASSED\""));
+            assertTrue(datasourcePassed.body().contains("\"resolvedDriver\":\"org.postgresql.Driver\""));
+            assertTrue(datasourcePassed.body().contains("\"jdbc-url-shape\""));
+
+            HttpResponse<String> datasourceFailed = client.send(
+                    request(server, "/api/phase3/datasources/test-connection", "POST", Jsons.writeValueAsString(Map.of(
+                            "type", "PostgreSQL",
+                            "driver", "com.mysql.cj.jdbc.Driver",
+                            "url", "jdbc:mysql://db.internal:3306/member_center",
+                            "schema", "bad schema",
+                            "username", "qa_reader",
+                            "password", "******",
+                            "mybatisEnv", "qa-mysql"))),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, datasourceFailed.statusCode());
+            assertTrue(datasourceFailed.body().contains("\"status\":\"FAILED\""));
+            assertTrue(datasourceFailed.body().contains("\"driver-type-match\""));
+            assertTrue(datasourceFailed.body().contains("\"jdbc-url-shape\""));
+            assertTrue(datasourceFailed.body().contains("\"mybatis-type-hint\""));
+        }
+    }
+
+    @Test
     void dataTemplateCrudAndDryRunEndpoints(@TempDir Path tempDir) throws Exception {
         Path runsDir = tempDir.resolve("runs");
         Files.createDirectories(runsDir);

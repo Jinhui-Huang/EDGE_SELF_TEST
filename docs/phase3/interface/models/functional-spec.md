@@ -66,7 +66,7 @@ Current implementation facts:
 - provider create/edit/delete are implemented only in front-end draft state.
 - provider modal is implemented.
 - provider card click opens edit modal.
-- provider `Test` action is implemented, but only as local front-end validation.
+- provider `Test` action is implemented and calls backend validation through local-admin-api.
 - routing rules are displayed.
 - routing-rule edit icon is visible but not wired.
 - `Save` is implemented and persists model config through local-admin-api.
@@ -75,7 +75,7 @@ This matters for review:
 
 - this page has a real persistence path
 - but most edits are staged locally until `Save`
-- connection testing is not a backend connectivity test yet
+- connection testing is now backend-driven, but remains deterministic validation rather than real outbound provider connectivity
 
 ## 6. Functional Areas
 
@@ -121,7 +121,7 @@ Functional role:
 Current behavior:
 
 - card click opens edit modal
-- `Test` triggers local-only front-end validation
+- `Test` triggers backend validation and shows structured checks/warnings in the current page surface
 - edit icon opens edit modal
 
 ### 6.3 Routing Rule Board
@@ -248,7 +248,7 @@ The screen currently produces:
   - modal open/close state
 - backend persistence output
   - model config save
-- local-only validation output
+- backend validation output
   - test connection result
 
 ## 9. User Actions
@@ -272,11 +272,10 @@ Current implementation summary:
 - implemented:
   - add/edit provider modal flow
   - provider delete in local state
-  - provider local test
+  - provider backend validation test
   - save mutation
 - visible but not implemented:
   - routing-rule edit action
-  - real backend connection test
 
 ## 10. Functional Control Responsibility Matrix
 
@@ -291,9 +290,9 @@ Current implementation summary:
   - output type: local modal state
   - current implementation: implemented
 - provider `Test`
-  - function: check minimum connection fields
-  - output type: local validation state
-  - current implementation: implemented as local-only check
+  - function: run backend validation for current provider draft
+  - output type: backend validation state
+  - current implementation: implemented through `POST /api/phase3/config/model/test-connection`
 - provider edit icon
   - function: open edit modal
   - output type: local modal state
@@ -309,9 +308,9 @@ Current implementation summary:
 ### 10.3 Modal Controls
 
 - `Test connection`
-  - function: test provider credentials and endpoint
-  - output type: local validation today; future backend test mutation
-  - current implementation: local-only check
+  - function: test provider credentials and endpoint through local-admin-api validation
+  - output type: backend validation state
+  - current implementation: implemented through `POST /api/phase3/config/model/test-connection`
 - `Delete`
   - function: remove current provider from draft
   - output type: local draft state
@@ -362,11 +361,17 @@ Current implemented rules:
 - provider id is auto-generated if blank on create
 - display name falls back to provider name
 - modal reset occurs when closed
-- connection test currently passes only when endpoint, API key, and model id are all non-empty
+- connection test now returns structured backend validation output for:
+  - provider name presence
+  - model id shape
+  - endpoint format
+  - timeout legality
+  - apiKey missing / placeholder detection
+  - role / status legality
 
 Current missing validation:
 
-- no backend endpoint reachability test
+- no real outbound endpoint reachability test
 - no duplicate provider-id conflict handling
 - no routing-rule edit validation path
 
@@ -417,7 +422,7 @@ The `models` screen is not currently responsible for:
 Review items discovered while documenting:
 
 - routing-rule edit icon is visible but unwired.
-- provider connection testing is only a local field-presence check, not a backend reachability test.
+- provider connection testing now uses a real backend validation interface, but it still does not perform real outbound provider connectivity in Phase 3.
 - provider delete/update changes remain local until footer save, which may be easy to misread in the UI.
 - the persistence layer is generic label/value config storage rather than a typed provider/routing API.
 

@@ -2,6 +2,7 @@ package com.example.webtest.admin.http;
 
 import com.example.webtest.admin.service.AgentGenerateService;
 import com.example.webtest.admin.service.CatalogPersistenceService;
+import com.example.webtest.admin.service.ConnectionValidationService;
 import com.example.webtest.admin.service.ConfigPersistenceService;
 import com.example.webtest.admin.service.DataTemplatePersistenceService;
 import com.example.webtest.admin.service.ReportArtifactService;
@@ -34,6 +35,31 @@ public final class LocalAdminApiServer implements AutoCloseable {
             ReportArtifactService reportArtifactService,
             DataTemplatePersistenceService dataTemplatePersistenceService)
             throws IOException {
+        this(
+                address,
+                mockDataService,
+                schedulerPersistenceService,
+                configPersistenceService,
+                catalogPersistenceService,
+                runStatusService,
+                agentGenerateService,
+                reportArtifactService,
+                dataTemplatePersistenceService,
+                new ConnectionValidationService());
+    }
+
+    public LocalAdminApiServer(
+            InetSocketAddress address,
+            Phase3MockDataService mockDataService,
+            SchedulerPersistenceService schedulerPersistenceService,
+            ConfigPersistenceService configPersistenceService,
+            CatalogPersistenceService catalogPersistenceService,
+            RunStatusService runStatusService,
+            AgentGenerateService agentGenerateService,
+            ReportArtifactService reportArtifactService,
+            DataTemplatePersistenceService dataTemplatePersistenceService,
+            ConnectionValidationService connectionValidationService)
+            throws IOException {
         server = HttpServer.create(address, 0);
         server.createContext("/health", jsonHandler(Map.of("status", "UP")));
         server.createContext("/api/phase3/admin-console", jsonHandler(mockDataService::buildAdminConsoleSnapshot));
@@ -45,11 +71,17 @@ public final class LocalAdminApiServer implements AutoCloseable {
                 "/api/phase3/scheduler/events",
                 exchange -> handleMutation(exchange, schedulerPersistenceService::appendEvent));
         server.createContext(
+                "/api/phase3/config/model/test-connection",
+                exchange -> handleValidation(exchange, connectionValidationService::testModelConnection));
+        server.createContext(
                 "/api/phase3/config/model",
                 exchange -> handleMutation(exchange, configPersistenceService::upsertModelConfigItem));
         server.createContext(
                 "/api/phase3/config/environment",
                 exchange -> handleMutation(exchange, configPersistenceService::upsertEnvironmentConfigItem));
+        server.createContext(
+                "/api/phase3/datasources/test-connection",
+                exchange -> handleValidation(exchange, connectionValidationService::testDatasourceConnection));
         server.createContext(
                 "/api/phase3/catalog/project",
                 exchange -> handleMutation(exchange, catalogPersistenceService::upsertProject));
@@ -312,6 +344,25 @@ public final class LocalAdminApiServer implements AutoCloseable {
         try {
             String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
             writeJson(exchange, 202, mutation.apply(body));
+        } catch (IllegalArgumentException e) {
+            writeJson(exchange, 400, Map.of(
+                    "error", "BAD_REQUEST",
+                    "message", e.getMessage()));
+        }
+    }
+
+    private static void handleValidation(HttpExchange exchange, JsonBodyMutation mutation) throws IOException {
+        if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
+            writeEmptyResponse(exchange);
+            return;
+        }
+        if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+            writeJson(exchange, 405, Map.of("error", "METHOD_NOT_ALLOWED"));
+            return;
+        }
+        try {
+            String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+            writeJson(exchange, 200, mutation.apply(body));
         } catch (IllegalArgumentException e) {
             writeJson(exchange, 400, Map.of(
                     "error", "BAD_REQUEST",

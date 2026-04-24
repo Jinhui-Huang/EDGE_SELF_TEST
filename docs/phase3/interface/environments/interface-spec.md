@@ -20,7 +20,7 @@ This document distinguishes:
 
 - current snapshot read context
 - current generic environment-config persistence path
-- current local-only datasource connection test
+- current backend datasource connection-test interface
 - future typed datasource/environment interfaces implied by the design docs
 
 ## 2. Interface Summary
@@ -31,8 +31,8 @@ Current `environments` screen conclusion:
   - `GET /api/phase3/admin-console`
 - current direct write source:
   - `POST /api/phase3/config/environment`
-- current local-only action:
-  - datasource connection test
+- current backend validation action:
+  - `POST /api/phase3/datasources/test-connection`
 - current UI scope:
   - datasource/database configs only
 - current non-UI environment config still present in file contract:
@@ -137,25 +137,33 @@ Example:
 }
 ```
 
-## 5. Current Local-Only Datasource Test Interface
+## 5. Current Datasource Test Interface
 
 ### 5.1 Current Behavior
 
-Card `Test connection` and dialog `Test connection` do not call the backend.
+Card `Test connection` and dialog `Test connection` both call the backend.
 
 `handleDatabaseConnectionTest(item)`:
 
 - sets pending state
-- waits 500ms via `window.setTimeout`
-- passes only if:
-  - URL is non-empty
-  - username is non-empty
-  - password is non-empty
-  - driver is non-empty
+- posts the current datasource draft to:
+  - `POST /api/phase3/datasources/test-connection`
+- validates the response shape before accepting it in UI state
+- renders structured `status`, `checks`, `warnings`, and `resolvedDriver`
+- if the API is unavailable or malformed:
+  - shows warning-state fallback
+  - shows local-only completeness checks for operator reference
+  - does not report fake success
 
 ### 5.2 Interface Meaning
 
-This is not a real JDBC connectivity check. It is only a client-side completeness check.
+This is a real backend validation interface, but not a real JDBC connectivity check.
+The current Phase 3 implementation is deterministic and mock-realistic:
+
+- validates request completeness and field shape
+- checks JDBC URL / driver / schema / MyBatis env consistency
+- detects placeholder credentials
+- does not open a real database connection
 
 ## 6. Immediate Persist vs Draft-Only Boundary
 
@@ -199,20 +207,18 @@ This differs from `models`, where edits remain draft-only until footer save.
 #### Card `Test connection`
 
 - user action: click
-- request: none today
-- owner: local test state
-- intended future interface:
-  - datasource connection-test mutation
-- current state: implemented as local-only check
+- request:
+  - `POST /api/phase3/datasources/test-connection`
+- owner: backend validation state
+- current state: implemented
 
 #### Dialog `Test connection`
 
 - user action: click
-- request: none today
-- owner: local test state
-- intended future interface:
-  - datasource connection-test mutation
-- current state: implemented as local-only check
+- request:
+  - `POST /api/phase3/datasources/test-connection`
+- owner: backend validation state
+- current state: implemented
 
 ### 7.3 Persistence Controls
 
@@ -234,7 +240,7 @@ This differs from `models`, where edits remain draft-only until footer save.
   - `App.tsx` config persistence flow
 - current state: implemented
 
-## 8. Recommended Future Datasource / Environment Interfaces
+## 8. Current And Future Datasource / Environment Interfaces
 
 The design docs distinguish environment and datasource domains more explicitly than the current screen does.
 
@@ -310,7 +316,7 @@ Response body:
 
 Purpose:
 
-- verify real datasource connectivity for one database draft
+- validate one datasource draft through deterministic backend checks before save
 
 Request body:
 
@@ -330,10 +336,24 @@ Response body:
 ```json
 {
   "status": "PASSED",
-  "latencyMs": 180,
-  "message": "Datasource connection validated."
+  "checks": [
+    {
+      "name": "jdbc-url-shape",
+      "status": "PASSED",
+      "message": "JDBC URL shape matches the datasource type."
+    }
+  ],
+  "resolvedDriver": "org.postgresql.Driver",
+  "message": "Datasource validation passed.",
+  "warnings": []
 }
 ```
+
+Current Phase 3 behavior:
+
+- implemented in local-admin-api
+- consumed by `DatabaseConfigScreen`
+- deterministic only; no real JDBC connection
 
 ### 8.4 Environment Metadata Interface
 
@@ -376,9 +396,9 @@ Concrete implementation design:
    - `POST /api/phase3/datasources/test-connection`
 2. request uses current datasource draft values
 3. success behavior:
-   - show real pass result and latency
+   - show backend-returned structured pass result
 4. failure behavior:
-   - show JDBC/auth/network failure detail instead of local field-presence message
+   - show backend checks/warnings instead of local field-presence message
 
 ### 9.2 `Save database`
 
@@ -415,7 +435,7 @@ Reasoning:
 Current implementation:
 
 - save/delete return backend mutation status from `/api/phase3/config/environment`
-- connection test returns only local synthetic status
+- connection test returns structured backend validation status
 
 Current persistence error cases:
 
@@ -426,11 +446,11 @@ Current persistence error cases:
 
 Recommended future test errors:
 
-- JDBC driver missing
-- authentication failure
-- database unreachable
-- schema inaccessible
-- timeout
+- JDBC URL shape mismatch
+- driver/type mismatch
+- missing or placeholder password
+- invalid schema identifier
+- invalid MyBatis environment id
 
 ## 11. Relationship to Other Interfaces
 
@@ -452,7 +472,7 @@ Review-only findings:
 
 - The page is a true config screen with real persistence, not a demo shell.
 - The current page name overstates scope: it manages datasources, not the full environment domain.
-- Connection testing is currently misleading if interpreted as real connectivity verification.
+- Connection testing is now backend-driven, but it is still deterministic validation rather than real JDBC connectivity.
 - The generic config-item contract works but hides the conceptual distinction between environment metadata and datasource registry entries.
 
 These are documentation findings only. No implementation change is made in this stage.

@@ -18,6 +18,8 @@ import { screenOrder } from "./tokens/shell";
 import {
   AdminConsoleSnapshot,
   CaseItem,
+  ConnectionValidationCheck,
+  ConnectionValidationResult,
   ConfigItem,
   CopyValue,
   DatabaseConfig,
@@ -576,6 +578,90 @@ function isAdminConsoleSnapshot(value: unknown): value is AdminConsoleSnapshot {
     Boolean(candidate.summary) &&
     typeof candidate.summary?.title === "string"
   );
+}
+
+function isConnectionValidationCheck(value: unknown): value is ConnectionValidationCheck {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const candidate = value as Partial<ConnectionValidationCheck>;
+  return (
+    typeof candidate.name === "string" &&
+    typeof candidate.status === "string" &&
+    typeof candidate.message === "string"
+  );
+}
+
+function isConnectionValidationResult(value: unknown): value is ConnectionValidationResult {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const candidate = value as Partial<ConnectionValidationResult>;
+  return (
+    typeof candidate.status === "string" &&
+    typeof candidate.message === "string" &&
+    Array.isArray(candidate.checks) &&
+    candidate.checks.every(isConnectionValidationCheck) &&
+    Array.isArray(candidate.warnings) &&
+    candidate.warnings.every((item) => typeof item === "string")
+  );
+}
+
+function buildLocalModelFallbackValidation(item: ModelProvider): ConnectionValidationResult {
+  return {
+    status: "API_UNAVAILABLE",
+    checks: [
+      {
+        name: "endpoint-present",
+        status: item.endpoint.trim() ? "PASSED" : "FAILED",
+        message: item.endpoint.trim() ? "Endpoint field is present." : "Endpoint field is missing."
+      },
+      {
+        name: "model-present",
+        status: item.model.trim() ? "PASSED" : "FAILED",
+        message: item.model.trim() ? "Model id field is present." : "Model id field is missing."
+      },
+      {
+        name: "api-key-present",
+        status: item.apiKey.trim() ? "PASSED" : "FAILED",
+        message: item.apiKey.trim() ? "API key field is present." : "API key field is missing."
+      }
+    ],
+    resolvedModel: item.model.trim(),
+    message: "Backend validation is unavailable. Only local draft completeness checks are shown.",
+    warnings: ["No real backend validation result was returned."]
+  };
+}
+
+function buildLocalDatasourceFallbackValidation(item: DatabaseConfig): ConnectionValidationResult {
+  return {
+    status: "API_UNAVAILABLE",
+    checks: [
+      {
+        name: "url-present",
+        status: item.url.trim() ? "PASSED" : "FAILED",
+        message: item.url.trim() ? "JDBC URL field is present." : "JDBC URL field is missing."
+      },
+      {
+        name: "driver-present",
+        status: item.driver.trim() ? "PASSED" : "FAILED",
+        message: item.driver.trim() ? "Driver field is present." : "Driver field is missing."
+      },
+      {
+        name: "username-present",
+        status: item.username.trim() ? "PASSED" : "FAILED",
+        message: item.username.trim() ? "Username field is present." : "Username field is missing."
+      },
+      {
+        name: "password-present",
+        status: item.password.trim() ? "PASSED" : "FAILED",
+        message: item.password.trim() ? "Password field is present." : "Password field is missing."
+      }
+    ],
+    resolvedDriver: item.driver.trim(),
+    message: "Backend validation is unavailable. Only local draft completeness checks are shown.",
+    warnings: ["No real backend validation result was returned."]
+  };
 }
 
 const screenCopy: Record<ScreenId, { title: CopyValue; description: CopyValue }> = {
@@ -1697,31 +1783,95 @@ export function App() {
     void postConfigItems("/api/phase3/config/environment", payload, setEnvironmentConfigState, t(sharedCopy.savedEnvironmentConfig));
   }
 
-  function handleModelConnectionTest(item: ModelProvider) {
-    const label = item.name.trim() || item.model;
-    setModelTestState({ kind: "pending", message: `Testing connection for ${label}...` });
-    window.setTimeout(() => {
-      const passed = Boolean(item.endpoint.trim() && item.apiKey.trim() && item.model.trim());
-      setModelTestState({
-        kind: passed ? "success" : "error",
-        message: passed
-          ? `Connection check passed for ${label}.`
-          : `Connection check failed for ${label}. Fill endpoint, API key, and model id.`
+  async function postConnectionValidation(
+    path: string,
+    payload: Record<string, string>,
+    label: string,
+    setState: (state: MutationState) => void,
+    fallback: ConnectionValidationResult
+  ) {
+    setState({ kind: "pending", message: `Testing connection for ${label}...` });
+    try {
+      const response = await fetch(`${apiBaseUrl}${path}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
       });
-    }, 500);
+      const raw = await response.text();
+      let parsed: unknown = null;
+      try {
+        parsed = raw ? JSON.parse(raw) : null;
+      } catch {
+        parsed = null;
+      }
+
+      if (!response.ok) {
+        const message =
+          parsed && isConnectionValidationResult(parsed)
+            ? parsed.message
+            : raw || `HTTP ${response.status}`;
+        throw new Error(message);
+      }
+      if (!isConnectionValidationResult(parsed)) {
+        throw new Error("Invalid validation response shape.");
+      }
+
+      setState({
+        kind: parsed.status === "PASSED" ? "success" : parsed.status === "WARNING" ? "warning" : "error",
+        message: parsed.message,
+        validationResult: parsed
+      });
+    } catch (error) {
+      setState({
+        kind: "warning",
+        message: `Backend validation unavailable for ${label}: ${error instanceof Error ? error.message : String(error)}`,
+        validationResult: fallback
+      });
+    }
+  }
+
+  function handleModelConnectionTest(item: ModelProvider) {
+    const label = item.name.trim() || item.model || "provider";
+    void postConnectionValidation(
+      "/api/phase3/config/model/test-connection",
+      {
+        id: item.id,
+        name: item.name,
+        displayName: item.displayName,
+        model: item.model,
+        endpoint: item.endpoint,
+        apiKey: item.apiKey,
+        timeoutMs: item.timeoutMs,
+        role: item.role,
+        status: item.status
+      },
+      label,
+      setModelTestState,
+      buildLocalModelFallbackValidation(item)
+    );
   }
 
   function handleDatabaseConnectionTest(item: DatabaseConfig) {
     const label = item.name.trim() || item.type;
-    setDatabaseTestState({ kind: "pending", message: `Testing connection for ${label}...` });
-
-    window.setTimeout(() => {
-      const passed = Boolean(item.url.trim() && item.username.trim() && item.password.trim() && item.driver.trim());
-      setDatabaseTestState({
-        kind: passed ? "success" : "error",
-        message: passed ? `Connection check passed for ${label}.` : `Connection check failed for ${label}. Fill URL, driver, username, and password.`
-      });
-    }, 500);
+    void postConnectionValidation(
+      "/api/phase3/datasources/test-connection",
+      {
+        id: item.id,
+        name: item.name,
+        type: item.type,
+        driver: item.driver,
+        url: item.url,
+        schema: item.schema,
+        username: item.username,
+        password: item.password,
+        mybatisEnv: item.mybatisEnv
+      },
+      label,
+      setDatabaseTestState,
+      buildLocalDatasourceFallbackValidation(item)
+    );
   }
 
   function updateProjectDraft(index: number, key: keyof ProjectItem, value: string) {

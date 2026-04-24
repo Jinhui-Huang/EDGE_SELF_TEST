@@ -150,9 +150,26 @@ export type DataTemplateItem = {
   compareSummary: string;
 };
 
-export type MutationState = {
-  kind: "idle" | "pending" | "success" | "error";
+export type ConnectionValidationCheck = {
+  name: string;
+  status: string;
   message: string;
+};
+
+export type ConnectionValidationResult = {
+  status: string;
+  checks: ConnectionValidationCheck[];
+  latencyMs?: number;
+  resolvedModel?: string;
+  resolvedDriver?: string;
+  message: string;
+  warnings: string[];
+};
+
+export type MutationState = {
+  kind: "idle" | "pending" | "success" | "warning" | "error";
+  message: string;
+  validationResult?: ConnectionValidationResult;
 };
 
 export type ConfigItem = {

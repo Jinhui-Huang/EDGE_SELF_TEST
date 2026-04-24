@@ -66,8 +66,8 @@ Current implementation facts:
 - database create and edit dialog is implemented.
 - dialog `Save database` immediately persists through local-admin-api.
 - dialog `Delete` immediately persists through local-admin-api.
-- card `Test connection` is implemented, but only as local front-end validation.
-- dialog `Test connection` is implemented, but only as local front-end validation.
+- card `Test connection` is implemented and calls backend validation through local-admin-api.
+- dialog `Test connection` is implemented and calls backend validation through local-admin-api.
 - there is no broader environment editor for browser pool, account slots, or network zone on this page.
 
 This matters for review:
@@ -117,7 +117,7 @@ Functional role:
 Current behavior:
 
 - card click opens edit dialog
-- card `Test connection` triggers local-only validation
+- card `Test connection` triggers backend validation and shows structured checks/warnings in the current page surface
 
 ### 6.3 Database Dialog
 
@@ -147,7 +147,7 @@ Current behavior:
 
 - `Save database` persists immediately
 - `Delete` persists immediately
-- `Test connection` is local-only validation
+- `Test connection` is backend-driven validation
 
 ## 7. Data Semantics by Area
 
@@ -199,7 +199,7 @@ The screen currently produces:
   - create database
   - update database
   - delete database
-- local-only validation output
+- backend validation output
   - connection-test result
 
 ## 9. User Actions
@@ -221,9 +221,8 @@ Current implementation summary:
   - edit dialog
   - immediate save mutation
   - immediate delete mutation
-  - local test action
+  - backend validation test action
 - visible but not implemented:
-  - real backend connection test
   - broader non-database environment editing
 
 ## 10. Functional Control Responsibility Matrix
@@ -242,13 +241,13 @@ Current implementation summary:
 ### 10.2 Test Controls
 
 - card `Test connection`
-  - function: validate connection completeness
-  - output type: local test state
-  - current implementation: implemented as local-only check
+  - function: run backend validation for current datasource draft
+  - output type: backend validation state
+  - current implementation: implemented through `POST /api/phase3/datasources/test-connection`
 - dialog `Test connection`
-  - function: validate current form values
-  - output type: local test state
-  - current implementation: implemented as local-only check
+  - function: validate current form values through local-admin-api validation
+  - output type: backend validation state
+  - current implementation: implemented through `POST /api/phase3/datasources/test-connection`
 
 ### 10.3 Persistence Controls
 
@@ -280,7 +279,7 @@ Current implementation status:
 
 - dialog state is implemented
 - immediate save/delete mutation state is implemented
-- local test state is implemented
+- backend validation state is implemented
 - full environment-scope state is not implemented
 
 ## 12. Validation and Rules
@@ -290,11 +289,17 @@ Current implemented rules:
 - created ids fall back to `db-{timestamp}` when id is blank
 - save normalizes name, driver, url, schema, username, mybatis env, and note
 - persisted list filters out entries with blank name
-- local test passes only when URL, username, password, and driver are all non-empty
+- backend validation now returns structured checks for:
+  - datasource type legality
+  - JDBC URL shape
+  - driver / type match
+  - schema identifier validity
+  - username / password presence and placeholder detection
+  - MyBatis environment legality
 
 Current missing validation:
 
-- no backend reachability test
+- no real JDBC reachability test
 - no duplicate datasource-id conflict handling
 - no validation for schema or MyBatis env consistency
 
@@ -345,7 +350,7 @@ The `environments` screen is not currently responsible for:
 Review items discovered while documenting:
 
 - The page name suggests full environment management, but the implemented UI only manages datasource/database connections.
-- Connection testing is only a local field-presence check, not a backend reachability test.
+- Connection testing now uses a real backend validation interface, but it still does not perform real JDBC connectivity in Phase 3.
 - The persistence layer is generic label/value config storage rather than a typed datasource API.
 - Generic environment config items such as browser pool and account slots exist in the file contract but are not editable on this page.
 

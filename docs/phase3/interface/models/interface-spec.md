@@ -20,7 +20,7 @@ This document distinguishes:
 
 - current snapshot read context
 - current generic model-config persistence path
-- current local-only provider connection test
+- current backend provider connection-test interface
 - future interfaces required by visible but unwired routing controls
 
 ## 2. Interface Summary
@@ -31,8 +31,8 @@ Current `models` screen conclusion:
   - `GET /api/phase3/admin-console`
 - current direct write source:
   - `POST /api/phase3/config/model`
-- current local-only action:
-  - provider connection test
+- current backend validation action:
+  - `POST /api/phase3/config/model/test-connection`
 - current provider/routing objects are serialized into generic config-item records rather than sent as typed provider API payloads
 
 ## 3. Current Read Context: GET /api/phase3/admin-console
@@ -144,24 +144,33 @@ Persisted file shape:
 }
 ```
 
-## 5. Current Local-Only Provider Test Interface
+## 5. Current Provider Test Interface
 
 ### 5.1 Current Behavior
 
-Provider `Test` and modal `Test connection` do not call the backend.
+Provider `Test` and modal `Test connection` both call the backend.
 
 `handleModelConnectionTest(item)`:
 
 - sets pending state
-- waits 500ms via `window.setTimeout`
-- passes only if:
-  - endpoint is non-empty
-  - API key is non-empty
-  - model id is non-empty
+- posts the current provider draft to:
+  - `POST /api/phase3/config/model/test-connection`
+- validates the response shape before accepting it in UI state
+- renders structured `status`, `checks`, `warnings`, `latencyMs`, and `resolvedModel`
+- if the API is unavailable or malformed:
+  - shows warning-state fallback
+  - shows local-only completeness checks for operator reference
+  - does not report fake success
 
 ### 5.2 Interface Meaning
 
-This is not a real network reachability check. It is only a client-side completeness check.
+This is a real backend validation interface, but not a real outbound provider reachability check.
+The current Phase 3 implementation is deterministic and mock-realistic:
+
+- validates request completeness and field shape
+- detects placeholder credentials
+- returns structured checks and warnings
+- does not call an external model-provider endpoint
 
 ## 6. Local Draft vs Persisted State Boundary
 
@@ -200,11 +209,10 @@ This boundary must be explicit in review because the UI presents local edits and
 #### Provider `Test`
 
 - user action: click
-- request: none today
-- owner: local test state
-- intended future interface:
-  - provider connection-test mutation
-- current state: implemented as local-only check
+- request:
+  - `POST /api/phase3/config/model/test-connection`
+- owner: backend validation state
+- current state: implemented
 
 #### Provider edit icon
 
@@ -229,11 +237,10 @@ This boundary must be explicit in review because the UI presents local edits and
 #### `Test connection`
 
 - user action: click
-- request: none today
-- owner: local test state
-- intended future interface:
-  - provider connection-test mutation
-- current state: local-only check
+- request:
+  - `POST /api/phase3/config/model/test-connection`
+- owner: backend validation state
+- current state: implemented
 
 #### `Delete`
 
@@ -260,7 +267,7 @@ This boundary must be explicit in review because the UI presents local edits and
   - `App.tsx` batch config persistence flow
 - current state: implemented
 
-## 8. Recommended Future Model Interfaces
+## 8. Current And Future Model Interfaces
 
 The visible controls suggest a more explicit typed model-management layer, even though current persistence works through config items.
 
@@ -270,7 +277,7 @@ The visible controls suggest a more explicit typed model-management layer, even 
 
 Purpose:
 
-- verify endpoint reachability and credential validity for one provider draft
+- validate one provider draft through deterministic backend checks before save
 
 Request body:
 
@@ -290,11 +297,25 @@ Response body:
 ```json
 {
   "status": "PASSED",
-  "providerId": "openai-responses",
-  "latencyMs": 420,
-  "message": "Provider connection validated."
+  "checks": [
+    {
+      "name": "endpoint-format",
+      "status": "PASSED",
+      "message": "Endpoint format looks valid."
+    }
+  ],
+  "latencyMs": 142,
+  "resolvedModel": "gpt-4.1",
+  "message": "Provider validation passed.",
+  "warnings": []
 }
 ```
+
+Current Phase 3 behavior:
+
+- implemented in local-admin-api
+- consumed by `ModelConfigScreen`
+- deterministic only; no real outbound connectivity
 
 ### 8.2 Typed Model Read Interface
 
@@ -386,9 +407,9 @@ Concrete implementation design:
    - `POST /api/phase3/config/model/test-connection`
 2. request uses current provider draft values
 3. success behavior:
-   - show real latency and pass status
+   - show backend-returned latency and structured pass status
 4. failure behavior:
-   - show backend error instead of local field-presence message
+   - show backend checks/warnings instead of local field-presence message
 
 ### 9.2 Routing-Rule Edit Icon
 
@@ -430,7 +451,7 @@ Concrete implementation design:
 Current implementation:
 
 - save returns backend mutation status from `/api/phase3/config/model`
-- connection test only returns local synthetic status
+- connection test returns structured backend validation status
 
 Current persistence error cases:
 
@@ -441,10 +462,11 @@ Current persistence error cases:
 
 Recommended future test errors:
 
-- endpoint unreachable
-- authentication failure
-- timeout
+- invalid endpoint format
+- placeholder or missing API key
+- timeout outside accepted range
 - invalid model id
+- unsupported role/status combination
 
 ## 11. Relationship to Other Interfaces
 
@@ -467,7 +489,7 @@ Recommended future test errors:
 Review-only findings:
 
 - The page already has a real save path and should be documented as a true config screen, not a demo shell.
-- Provider connection testing is currently misleading if interpreted as real connectivity verification.
+- Provider connection testing is now backend-driven, but it is still deterministic validation rather than real provider connectivity.
 - Routing rules are structurally persistable today, but the page lacks any editing UI for them.
 - The config-item contract works but is weaker and less explicit than a typed provider/routing API.
 
