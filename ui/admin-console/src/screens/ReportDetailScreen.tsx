@@ -69,6 +69,19 @@ export function ReportDetailScreen({
   const hasApiData = apiReport !== null;
   const hasFallback = fallbackReport !== null;
 
+  if (!selectedRunName) {
+    return (
+      <section className="sectionCard">
+        <div className="sectionHeader">
+          <div>
+            <p className="eyebrow">{title}</p>
+            <h3>{t(copy("No run selected", "未选择运行记录", "実行が選択されていません"))}</h3>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   if (!hasApiData && !hasFallback && fetchFailed) {
     return (
       <section className="sectionCard">

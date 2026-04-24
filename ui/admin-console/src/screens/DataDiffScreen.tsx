@@ -50,7 +50,20 @@ export function DataDiffScreen({ snapshot, title, locale, selectedRunName, apiBa
       .catch(() => setFetchFailed(true));
   }, [apiBaseUrl, selectedRunName]);
 
-  const fallbackReport = (fetchFailed || !selectedRunName) ? selectReportViewModel(snapshot, selectedRunName) : null;
+  const fallbackReport = fetchFailed && selectedRunName ? selectReportViewModel(snapshot, selectedRunName) : null;
+
+  if (!selectedRunName) {
+    return (
+      <section className="sectionCard">
+        <div className="sectionHeader">
+          <div>
+            <p className="eyebrow">{l(locale, "Data comparison", "数据对比", "データ比較")}</p>
+            <h3>{l(locale, "No run selected", "未选择运行记录", "実行が選択されていません")}</h3>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   // Determine data source
   const rows: DataDiffRow[] = apiDiff?.rows ?? (fallbackReport ? makeFallbackDiffRows(fallbackReport) : []);
@@ -90,7 +103,7 @@ export function DataDiffScreen({ snapshot, title, locale, selectedRunName, apiBa
 
   // Context labels
   const report = fallbackReport ?? selectReportViewModel(snapshot, selectedRunName);
-  const runName = selectedRunName ?? "";
+  const runName = selectedRunName;
 
   const dbName = (() => {
     try {

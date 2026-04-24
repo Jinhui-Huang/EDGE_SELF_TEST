@@ -2514,3 +2514,38 @@ Reports / ReportDetail / DataDiff screens now consume backend report artifact AP
 - [x] No breakage to monitor/aiGenerate/plugin chains
 - [x] Path traversal security in resolveRunDir
 - [x] Test coverage for P1-2 endpoints
+
+## 2026-04-25 P1-2 Review Follow-up Fix
+
+## Task
+- Review the committed P1-2 report artifact integration before push.
+- Fix any blocking regression found during review.
+
+## Finding
+- Found a real sidebar navigation bug:
+  - `reportDetail` and `dataDiff` can both be opened directly from the shell sidebar.
+  - When `selectedRunName` was null, `ReportDetailScreen` could stay in a loading state.
+  - When `selectedRunName` was null, `DataDiffScreen` could incorrectly fall back to `selectReportViewModel(snapshot, null)` and render the first synthetic report instead of an empty state.
+
+## Fix
+- `ui/admin-console/src/screens/ReportDetailScreen.tsx`
+  - Added explicit `No run selected` empty state when no run context exists.
+- `ui/admin-console/src/screens/DataDiffScreen.tsx`
+  - Added explicit `No run selected` empty state when no run context exists.
+  - Tightened fallback gating so synthetic diff fallback is only allowed for `fetchFailed && selectedRunName`.
+
+## Modified Files
+- `ui/admin-console/src/screens/ReportDetailScreen.tsx`
+- `ui/admin-console/src/screens/DataDiffScreen.tsx`
+
+## Verification
+- Passed: `npm run build` in `ui/admin-console`
+- Ran: `npm test -- --run` in `ui/admin-console` — still the same 2 pre-existing failures unrelated to this review fix:
+  - `shows prepared case count in Execution after pre-execution from Cases`
+  - `posts editable config updates and refreshes the snapshot`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+- Ran: `mvn "-Dmaven.repo.local=.m2/repository" -pl apps/local-admin-api -am test` — still blocked by the known pre-existing unrelated `report-engine` failure:
+  - `DefaultReportEngineTest.diagnoseReportStorageSummarizesArtifactsByRunAndType`
+
+## Next Step
+- If verification passes, push the P1-2 commit set and continue with P1-3 data-template registry.

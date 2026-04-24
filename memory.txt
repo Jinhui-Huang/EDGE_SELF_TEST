@@ -746,3 +746,19 @@
      - Frontend build passed
      - Frontend tests: 11/13 passed (2 pre-existing failures unrelated to P1-2)
      - Maven tests: 8/8 passed (including new P1-2 endpoint test)
+46. 2026-04-25 P1-2 review follow-up fix
+   - Review 发现一个真实导航边界问题：
+     - `reportDetail` 和 `dataDiff` 都在 sidebar 中可直接进入
+     - 但当没有选中 run 时，P1-2 新实现没有统一处理空上下文
+   - 修复内容：
+     - `ReportDetailScreen.tsx`：`selectedRunName == null` 时不再停在 loading，而是显示明确的 `No run selected` 空状态
+     - `DataDiffScreen.tsx`：`selectedRunName == null` 时不再通过 `selectReportViewModel(snapshot, null)` 错误回退到第一条报告，而是显示明确空状态
+     - `DataDiffScreen.tsx`：fallback 到 snapshot synthetic diff 的条件收紧为 `fetchFailed && selectedRunName`，只在“有明确 run 且 API 失败”时启用兜底
+   - 影响：
+     - sidebar 直接进 `reportDetail` / `dataDiff` 的语义现在正确，不会误展示第一条 run 的内容
+     - 这是一条 review-harden fix，不改变 P1-2 的主接口设计
+   - 验证：
+     - `npm run build` in `ui/admin-console` passed
+     - `npm test -- --run` in `ui/admin-console` 仍是同样 2 个 pre-existing 失败，与本次 fix 无关
+     - `mvn "-Dmaven.repo.local=.m2/repository" -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test` passed
+     - `mvn "-Dmaven.repo.local=.m2/repository" -pl apps/local-admin-api -am test` 仍被既有 `report-engine` 失败阻塞，与本次 fix 无关
