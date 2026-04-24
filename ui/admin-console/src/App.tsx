@@ -555,6 +555,29 @@ function buildModelConfigItems(providers: ModelProvider[], routingRules: ModelRo
   ];
 }
 
+function isAdminConsoleSnapshot(value: unknown): value is AdminConsoleSnapshot {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const candidate = value as Partial<AdminConsoleSnapshot>;
+  return (
+    typeof candidate.generatedAt === "string" &&
+    typeof candidate.apiBasePath === "string" &&
+    Array.isArray(candidate.navigation) &&
+    Array.isArray(candidate.projects) &&
+    Array.isArray(candidate.cases) &&
+    Array.isArray(candidate.workQueue) &&
+    Array.isArray(candidate.reports) &&
+    Array.isArray(candidate.modelConfig) &&
+    Array.isArray(candidate.environmentConfig) &&
+    Array.isArray(candidate.timeline) &&
+    Array.isArray(candidate.constraints) &&
+    Array.isArray(candidate.caseTags) &&
+    Boolean(candidate.summary) &&
+    typeof candidate.summary?.title === "string"
+  );
+}
+
 const screenCopy: Record<ScreenId, { title: CopyValue; description: CopyValue }> = {
   dashboard: {
     title: {
@@ -1308,7 +1331,11 @@ export function App() {
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
-    return (await response.json()) as AdminConsoleSnapshot;
+    const payload: unknown = await response.json();
+    if (!isAdminConsoleSnapshot(payload)) {
+      throw new Error("Invalid admin snapshot response");
+    }
+    return payload;
   }
 
   async function loadSnapshot() {
@@ -1921,6 +1948,7 @@ export function App() {
             monitorLinkHint={t({ en: "Runtime handoff", zh: "运行期接力", ja: "ランタイム連携" })}
             locale={locale}
             modelProviders={modelProviders}
+            apiBaseUrl={apiBaseUrl}
             databaseConfigs={databaseConfigs}
             selectedDatabaseId={launchForm.databaseId}
             onLaunchFormChange={setLaunchForm}
@@ -2035,6 +2063,7 @@ export function App() {
             title={t(localizedScreenCopy.dataTemplates.title)}
             locale={locale}
             dataTemplates={defaultDataTemplates}
+            apiBaseUrl={apiBaseUrl}
           />
         );
       case "plugin":

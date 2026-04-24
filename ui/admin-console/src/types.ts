@@ -430,6 +430,63 @@ export type DataDiffResponse = {
   rows: DataDiffRow[];
 };
 
+// ---- Data template registry (P1-3) ----
+
+export type DataTemplateListResponse = {
+  items: DataTemplateItem[];
+};
+
+export type DataTemplateCreateResponse = {
+  status: string;
+  kind: string;
+  templateId: string;
+  updated: boolean;
+};
+
+export type DataTemplateUpdateResponse = {
+  status: string;
+  kind: string;
+  templateId: string;
+  updated: boolean;
+};
+
+export type DataTemplateDeleteResponse = {
+  status: string;
+  kind: string;
+  templateId: string;
+  remaining: number;
+};
+
+export type DataTemplateImportPreviewItem = {
+  name: string;
+  result: string;
+  warnings: string[];
+};
+
+export type DataTemplateImportPreviewResponse = {
+  status: string;
+  previewId: string;
+  items: DataTemplateImportPreviewItem[];
+};
+
+export type DataTemplateImportCommitResponse = {
+  status: string;
+  created: number;
+  updated: number;
+};
+
+export type DataTemplateDryRunCheck = {
+  name: string;
+  status: string;
+};
+
+export type DataTemplateDryRunResponse = {
+  status: string;
+  templateId: string;
+  checks: DataTemplateDryRunCheck[];
+  auditRef: string;
+};
+
 // ---- Extension popup snapshot (P0-3) ----
 
 export type ExtensionPopupSnapshot = {

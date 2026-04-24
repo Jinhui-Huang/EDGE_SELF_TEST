@@ -1,9 +1,10 @@
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { sharedCopy, translate } from "../i18n";
 import {
   AdminConsoleSnapshot,
   DatabaseConfig,
   DataTemplateItem,
+  DataTemplateListResponse,
   Locale,
   ModelProvider,
   MutationState,
@@ -44,6 +45,7 @@ type ExecutionScreenProps = {
   monitorLinkHint: string;
   locale: Locale;
   modelProviders: ModelProvider[];
+  apiBaseUrl: string;
   onLaunchFormChange: (updater: (current: SchedulerMutationForm) => SchedulerMutationForm) => void;
   onReviewFormChange: (updater: (current: SchedulerMutationForm) => SchedulerMutationForm) => void;
   onSelectedTemplateIdsChange: (ids: string[]) => void;
@@ -67,7 +69,7 @@ export function ExecutionScreen({
   launchForm,
   reviewForm,
   preparedCases,
-  dataTemplates,
+  dataTemplates: fallbackTemplates,
   databaseConfigs,
   selectedTemplateIds,
   selectedDatabaseId,
@@ -94,6 +96,7 @@ export function ExecutionScreen({
   monitorLinkHint,
   locale,
   modelProviders,
+  apiBaseUrl,
   onLaunchFormChange,
   onReviewFormChange,
   onSelectedTemplateIdsChange,
@@ -106,7 +109,28 @@ export function ExecutionScreen({
   const t = (value: Copy) => translate(locale, value);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const [apiTemplates, setApiTemplates] = useState<DataTemplateItem[] | null>(null);
   const primaryProject = snapshot.projects.find((item) => item.key === launchForm.projectKey) ?? snapshot.projects[0];
+
+  const dataTemplates = apiTemplates ?? fallbackTemplates;
+
+  const loadApiTemplates = useCallback(async () => {
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/phase3/data-templates`);
+      if (!response.ok) return;
+      const data: unknown = await response.json();
+      if (data && typeof data === "object" && "items" in data && Array.isArray((data as DataTemplateListResponse).items)) {
+        const items = (data as DataTemplateListResponse).items;
+        setApiTemplates(items);
+      }
+    } catch {
+      // keep fallback
+    }
+  }, [apiBaseUrl]);
+
+  useEffect(() => {
+    loadApiTemplates();
+  }, [loadApiTemplates]);
   const queueLead = snapshot.workQueue[0];
   const modelPolicy = snapshot.modelConfig[1]?.value ?? snapshot.summary.runtimeStrategy;
   const environmentPolicy = snapshot.environmentConfig[2]?.value ?? snapshot.constraints[0];

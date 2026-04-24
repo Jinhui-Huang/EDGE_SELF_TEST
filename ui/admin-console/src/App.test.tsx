@@ -102,6 +102,25 @@ function jsonResponse(body: unknown, status = 200) {
   );
 }
 
+const dataTemplatesResponse = {
+  items: [
+    {
+      id: "order-seed-v2",
+      name: "order.seed.v2",
+      type: "composite",
+      envAllowed: "dev, staging",
+      risk: "medium",
+      uses: 128,
+      rollback: "sql",
+      projectKey: "checkout-web",
+      steps: ["INSERT orders", "INSERT order_items"],
+      guards: ["prod environment blocked"],
+      params: [{ key: "user_id", type: "uuid", required: true }],
+      compareSummary: "Compare order deltas before and after execution."
+    }
+  ]
+};
+
 describe("App", () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -123,6 +142,7 @@ describe("App", () => {
     const fetchMock = vi
       .fn()
       .mockImplementationOnce(() => jsonResponse(snapshot))
+      .mockImplementationOnce(() => jsonResponse(dataTemplatesResponse))
       .mockImplementationOnce(() => jsonResponse({ status: "ACCEPTED" }, 202))
       .mockImplementationOnce(() =>
         jsonResponse({
@@ -167,6 +187,7 @@ describe("App", () => {
     const fetchMock = vi
       .fn()
       .mockImplementationOnce(() => jsonResponse(snapshot))
+      .mockImplementationOnce(() => jsonResponse(dataTemplatesResponse))
       .mockImplementationOnce(() => jsonResponse({ status: "ACCEPTED" }, 202))
       .mockImplementationOnce(() => jsonResponse(snapshot))
       .mockImplementationOnce(() => jsonResponse({ status: "ACCEPTED" }, 202))
@@ -208,7 +229,10 @@ describe("App", () => {
   });
 
   it("shows prepared case count in Execution after pre-execution from Cases", async () => {
-    const fetchMock = vi.fn().mockImplementation(() => jsonResponse(snapshot));
+    const fetchMock = vi
+      .fn()
+      .mockImplementationOnce(() => jsonResponse(snapshot))
+      .mockImplementationOnce(() => jsonResponse(dataTemplatesResponse));
     vi.stubGlobal("fetch", fetchMock);
 
     render(<App />);
@@ -220,29 +244,72 @@ describe("App", () => {
     await userEvent.click((await screen.findAllByRole("button", { name: /Execution/ }))[0]);
 
     expect((await screen.findAllByText("Prepared cases")).length).toBeGreaterThan(0);
-    expect(await screen.findByText("1 prepared case will start when you click Execution.")).toBeInTheDocument();
+    expect((await screen.findAllByText(/^1$/)).length).toBeGreaterThan(0);
+    expect(await screen.findByText("Only prepared cases join this run.")).toBeInTheDocument();
     expect(await screen.findByText("Checkout smoke")).toBeInTheDocument();
   });
 
   it("posts editable config updates and refreshes the snapshot", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockImplementationOnce(() => jsonResponse(snapshot))
-      .mockImplementationOnce(() => jsonResponse({ status: "ACCEPTED" }, 202))
-      .mockImplementationOnce(() =>
-        jsonResponse({
-          ...snapshot,
-          modelConfig: [{ label: "Provider", value: "OpenAI Responses API / audited" }]
-        })
-      );
+    const modelProvider = {
+      id: "openai-responses",
+      name: "OpenAI Responses API",
+      displayName: "OpenAI Responses API",
+      model: "gpt-4.1-mini",
+      endpoint: "https://api.openai.com/v1",
+      apiKey: "",
+      modality: "browser automation",
+      contextWindow: "128k",
+      maxOutputTokens: "4096",
+      temperature: "0.2",
+      timeoutMs: "45000",
+      status: "active",
+      role: "primary",
+      region: "global",
+      notes: "Primary provider.",
+      usage: "24%",
+      latency: "640ms",
+      cost: "$0.009/call",
+      accent: "accent"
+    };
+    const snapshotWithProvider = {
+      ...snapshot,
+      modelConfig: [
+        { label: "Provider", value: "OpenAI Responses API" },
+        { label: "provider:openai-responses", value: JSON.stringify(modelProvider) }
+      ]
+    };
+    const refreshedSnapshot = {
+      ...snapshotWithProvider,
+      modelConfig: [
+        { label: "Provider", value: "OpenAI Responses API / audited" },
+        {
+          label: "provider:openai-responses",
+          value: JSON.stringify({ ...modelProvider, name: "OpenAI Responses API / audited", displayName: "OpenAI Responses API / audited" })
+        }
+      ]
+    };
+    let saveTriggered = false;
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) {
+        return jsonResponse(saveTriggered ? refreshedSnapshot : snapshotWithProvider);
+      }
+      if (url.endsWith("/api/phase3/config/model")) {
+        saveTriggered = true;
+        return jsonResponse({ status: "ACCEPTED" }, 202);
+      }
+      throw new Error(`Unexpected fetch: ${url} ${init?.method ?? "GET"}`);
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     render(<App />);
 
     await userEvent.click(await screen.findByRole("button", { name: /Model Config/ }));
-    const providerTextareas = await screen.findAllByDisplayValue("OpenAI Responses API");
-    await userEvent.clear(providerTextareas[0]);
-    await userEvent.type(providerTextareas[0], "OpenAI Responses API / audited");
+    await userEvent.click(await screen.findByText("OpenAI Responses API"));
+    const providerNameInput = await screen.findByLabelText("Provider name");
+    await userEvent.clear(providerNameInput);
+    await userEvent.type(providerNameInput, "OpenAI Responses API / audited");
+    await userEvent.click(screen.getByRole("button", { name: "Update" }));
 
     await userEvent.click(screen.getByRole("button", { name: "Save model config" }));
 
@@ -255,7 +322,7 @@ describe("App", () => {
       );
     });
     expect(await screen.findByText("Saved model configuration.")).toBeInTheDocument();
-    expect(await screen.findByDisplayValue("OpenAI Responses API / audited")).toBeInTheDocument();
+    expect(await screen.findByText("OpenAI Responses API / audited")).toBeInTheDocument();
   });
 
   it("posts editable project catalog updates and refreshes the snapshot", async () => {

@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.example.webtest.admin.service.AgentGenerateService;
 import com.example.webtest.admin.service.CatalogPersistenceService;
 import com.example.webtest.admin.service.ConfigPersistenceService;
+import com.example.webtest.admin.service.DataTemplatePersistenceService;
 import com.example.webtest.admin.service.Phase3MockDataService;
 import com.example.webtest.admin.service.ReportArtifactService;
 import com.example.webtest.admin.service.RunStatusService;
@@ -222,7 +223,8 @@ class LocalAdminApiServerTest {
                 new CatalogPersistenceService(catalogFile, Clock.fixed(Instant.parse("2026-04-18T11:00:00Z"), ZoneOffset.UTC)),
                 new RunStatusService(schedulerRequestsFile, schedulerEventsFile, new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, Clock.fixed(Instant.parse("2026-04-18T11:00:00Z"), ZoneOffset.UTC)), Clock.fixed(Instant.parse("2026-04-18T11:00:00Z"), ZoneOffset.UTC)),
                 new AgentGenerateService(),
-                new ReportArtifactService(runsDir))) {
+                new ReportArtifactService(runsDir),
+                new DataTemplatePersistenceService(tempDir.resolve("data-templates.json")))) {
             server.start();
             HttpClient client = HttpClient.newHttpClient();
 
@@ -377,7 +379,8 @@ class LocalAdminApiServerTest {
                 new CatalogPersistenceService(catalogFile, Clock.fixed(Instant.parse("2026-04-18T11:00:00Z"), ZoneOffset.UTC)),
                 new RunStatusService(schedulerRequestsFile, schedulerEventsFile, new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, Clock.fixed(Instant.parse("2026-04-18T11:00:00Z"), ZoneOffset.UTC)), Clock.fixed(Instant.parse("2026-04-18T11:00:00Z"), ZoneOffset.UTC)),
                 new AgentGenerateService(),
-                new ReportArtifactService(runsDir))) {
+                new ReportArtifactService(runsDir),
+                new DataTemplatePersistenceService(tempDir.resolve("data-templates.json")))) {
             server.start();
             HttpClient client = HttpClient.newHttpClient();
 
@@ -449,7 +452,8 @@ class LocalAdminApiServerTest {
                 new CatalogPersistenceService(catalogFile, clock),
                 new RunStatusService(schedulerRequestsFile, schedulerEventsFile, new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, clock), clock),
                 new AgentGenerateService(),
-                new ReportArtifactService(runsDir))) {
+                new ReportArtifactService(runsDir),
+                new DataTemplatePersistenceService(tempDir.resolve("data-templates.json"), clock))) {
             server.start();
             HttpClient client = HttpClient.newHttpClient();
 
@@ -552,7 +556,8 @@ class LocalAdminApiServerTest {
                 new CatalogPersistenceService(catalogFile, clock),
                 new RunStatusService(schedulerRequestsFile, schedulerEventsFile, new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, clock), clock),
                 new AgentGenerateService(),
-                new ReportArtifactService(runsDir))) {
+                new ReportArtifactService(runsDir),
+                new DataTemplatePersistenceService(tempDir.resolve("data-templates.json"), clock))) {
             server.start();
             HttpClient client = HttpClient.newHttpClient();
 
@@ -656,7 +661,8 @@ class LocalAdminApiServerTest {
                 new CatalogPersistenceService(catalogFile, clock),
                 new RunStatusService(schedulerRequestsFile, schedulerEventsFile, new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, clock), clock),
                 new AgentGenerateService(),
-                new ReportArtifactService(runsDir))) {
+                new ReportArtifactService(runsDir),
+                new DataTemplatePersistenceService(tempDir.resolve("data-templates.json"), clock))) {
             server.start();
             HttpClient client = HttpClient.newHttpClient();
 
@@ -756,7 +762,8 @@ class LocalAdminApiServerTest {
                 new CatalogPersistenceService(catalogFile, clock),
                 new RunStatusService(schedulerRequestsFile, schedulerEventsFile, new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, clock), clock),
                 new AgentGenerateService(),
-                new ReportArtifactService(runsDir))) {
+                new ReportArtifactService(runsDir),
+                new DataTemplatePersistenceService(tempDir.resolve("data-templates.json"), clock))) {
             server.start();
             HttpClient client = HttpClient.newHttpClient();
 
@@ -857,7 +864,8 @@ class LocalAdminApiServerTest {
                 new RunStatusService(schedulerRequestsFile, schedulerEventsFile,
                         new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, clock), clock),
                 new AgentGenerateService(),
-                new ReportArtifactService(runsDir))) {
+                new ReportArtifactService(runsDir),
+                new DataTemplatePersistenceService(tempDir.resolve("data-templates.json"), clock))) {
             server.start();
             HttpClient client = HttpClient.newHttpClient();
 
@@ -977,7 +985,8 @@ class LocalAdminApiServerTest {
                 new RunStatusService(schedulerRequestsFile, schedulerEventsFile,
                         new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, clock), clock),
                 new AgentGenerateService(),
-                new ReportArtifactService(runsDir))) {
+                new ReportArtifactService(runsDir),
+                new DataTemplatePersistenceService(tempDir.resolve("data-templates.json"), clock))) {
             server.start();
             HttpClient client = HttpClient.newHttpClient();
 
@@ -1038,6 +1047,175 @@ class LocalAdminApiServerTest {
             assertEquals(200, fallback.statusCode());
             assertTrue(fallback.body().contains("\"UNKNOWN\""));
             assertTrue(fallback.body().contains("\"nonexistent-run\""));
+        }
+    }
+
+    @Test
+    void dataTemplateCrudAndDryRunEndpoints(@TempDir Path tempDir) throws Exception {
+        Path runsDir = tempDir.resolve("runs");
+        Files.createDirectories(runsDir);
+        Path schedulerRequestsFile = tempDir.resolve("scheduler-requests.json");
+        Path schedulerEventsFile = tempDir.resolve("scheduler-events.json");
+        Path schedulerStateFile = tempDir.resolve("scheduler-state.json");
+        Path queueFile = tempDir.resolve("execution-queue.json");
+        Path catalogFile = tempDir.resolve("project-catalog.json");
+        Path executionHistoryFile = tempDir.resolve("execution-history.json");
+        Path modelConfigFile = tempDir.resolve("model-config.json");
+        Path environmentConfigFile = tempDir.resolve("environment-config.json");
+        Path dataTemplateFile = tempDir.resolve("data-templates.json");
+        Files.writeString(queueFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(catalogFile, Jsons.writeValueAsString(Map.of("projects", List.of(), "cases", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(executionHistoryFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(modelConfigFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(environmentConfigFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+
+        Clock clock = Clock.fixed(Instant.parse("2026-04-25T09:00:00Z"), ZoneOffset.UTC);
+        try (LocalAdminApiServer server = new LocalAdminApiServer(
+                new InetSocketAddress("127.0.0.1", 0),
+                new Phase3MockDataService(runsDir, schedulerRequestsFile, schedulerEventsFile, schedulerStateFile,
+                        queueFile, catalogFile, executionHistoryFile, modelConfigFile, environmentConfigFile, clock),
+                new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, clock),
+                new ConfigPersistenceService(modelConfigFile, environmentConfigFile),
+                new CatalogPersistenceService(catalogFile, clock),
+                new RunStatusService(schedulerRequestsFile, schedulerEventsFile,
+                        new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, clock), clock),
+                new AgentGenerateService(),
+                new ReportArtifactService(runsDir),
+                new DataTemplatePersistenceService(dataTemplateFile, clock))) {
+            server.start();
+            HttpClient client = HttpClient.newHttpClient();
+
+            // 1. List — empty initially
+            HttpResponse<String> emptyList = client.send(
+                    request(server, "/api/phase3/data-templates"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, emptyList.statusCode());
+            assertTrue(emptyList.body().contains("\"items\""));
+
+            // 2. Create a template via POST
+            HttpResponse<String> create = client.send(
+                    request(server, "/api/phase3/data-templates", "POST", Jsons.writeValueAsString(Map.of(
+                            "name", "order.seed.v2",
+                            "type", "composite",
+                            "envAllowed", "dev, staging",
+                            "risk", "medium",
+                            "rollback", "sql",
+                            "projectKey", "checkout-web",
+                            "steps", List.of("INSERT orders", "INSERT order_items"),
+                            "guards", List.of("prod environment blocked"),
+                            "params", List.of(Map.of("key", "user_id", "type", "uuid", "required", true)),
+                            "compareSummary", "Compare order deltas."))),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(202, create.statusCode());
+            assertTrue(create.body().contains("\"ACCEPTED\""));
+            assertTrue(create.body().contains("\"order-seed-v2\""));
+
+            // 3. List — now has one item
+            HttpResponse<String> oneItemList = client.send(
+                    request(server, "/api/phase3/data-templates"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, oneItemList.statusCode());
+            assertTrue(oneItemList.body().contains("\"order.seed.v2\""));
+            assertTrue(oneItemList.body().contains("\"composite\""));
+
+            // 4. Get single template
+            HttpResponse<String> getOne = client.send(
+                    request(server, "/api/phase3/data-templates/order-seed-v2"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, getOne.statusCode());
+            assertTrue(getOne.body().contains("\"order-seed-v2\""));
+            assertTrue(getOne.body().contains("\"INSERT orders\""));
+
+            // 5. Update via PUT
+            HttpResponse<String> update = client.send(
+                    request(server, "/api/phase3/data-templates/order-seed-v2", "PUT", Jsons.writeValueAsString(Map.of(
+                            "name", "order.seed.v2",
+                            "type", "composite",
+                            "envAllowed", "dev, staging, uat",
+                            "risk", "high",
+                            "rollback", "sql",
+                            "projectKey", "checkout-web",
+                            "steps", List.of("INSERT orders", "INSERT order_items", "UPDATE stock"),
+                            "guards", List.of("prod environment blocked", "snapshot required"),
+                            "params", List.of(Map.of("key", "user_id", "type", "uuid", "required", true)),
+                            "compareSummary", "Compare order and stock deltas."))),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(202, update.statusCode());
+            assertTrue(update.body().contains("\"updated\":true"));
+
+            // 6. Verify update persisted
+            HttpResponse<String> afterUpdate = client.send(
+                    request(server, "/api/phase3/data-templates/order-seed-v2"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertTrue(afterUpdate.body().contains("\"high\""));
+            assertTrue(afterUpdate.body().contains("\"UPDATE stock\""));
+
+            // 7. Dry-run
+            HttpResponse<String> dryRun = client.send(
+                    request(server, "/api/phase3/data-templates/order-seed-v2/dry-run", "POST", Jsons.writeValueAsString(Map.of(
+                            "environment", "staging",
+                            "params", Map.of("user_id", "test-uuid")))),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, dryRun.statusCode());
+            assertTrue(dryRun.body().contains("\"PASSED\""));
+            assertTrue(dryRun.body().contains("\"environment-whitelist\""));
+            assertTrue(dryRun.body().contains("\"rollback-strategy\""));
+
+            // 8. Import preview
+            HttpResponse<String> importPreview = client.send(
+                    request(server, "/api/phase3/data-templates/import/preview", "POST", Jsons.writeValueAsString(Map.of(
+                            "sourceType", "json",
+                            "payload", Map.of("items", List.of(
+                                    Map.of("name", "coupon.single_use", "type", "sql", "projectKey", "checkout-web"),
+                                    Map.of("name", "audit.clear", "type", "sql")))))),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(202, importPreview.statusCode());
+            assertTrue(importPreview.body().contains("\"PREVIEW_READY\""));
+            assertTrue(importPreview.body().contains("\"coupon.single_use\""));
+
+            // 9. Import commit
+            HttpResponse<String> importCommit = client.send(
+                    request(server, "/api/phase3/data-templates/import/commit", "POST", Jsons.writeValueAsString(Map.of(
+                            "items", List.of(
+                                    Map.of("name", "coupon.single_use", "type", "sql", "projectKey", "checkout-web",
+                                            "envAllowed", "dev", "risk", "low", "rollback", "snapshot"),
+                                    Map.of("name", "audit.clear", "type", "sql", "projectKey", "ops-console",
+                                            "envAllowed", "dev", "risk", "high", "rollback", "snapshot"))))),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(202, importCommit.statusCode());
+            assertTrue(importCommit.body().contains("\"ACCEPTED\""));
+            assertTrue(importCommit.body().contains("\"created\":2"));
+
+            // 10. List now has 3 items
+            HttpResponse<String> threeItemList = client.send(
+                    request(server, "/api/phase3/data-templates"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertTrue(threeItemList.body().contains("\"order.seed.v2\""));
+            assertTrue(threeItemList.body().contains("\"coupon.single_use\""));
+            assertTrue(threeItemList.body().contains("\"audit.clear\""));
+
+            // 11. Delete
+            HttpResponse<String> delete = client.send(
+                    request(server, "/api/phase3/data-templates/coupon-single_use", "DELETE", null),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, delete.statusCode());
+            assertTrue(delete.body().contains("\"ACCEPTED\""));
+            assertTrue(delete.body().contains("\"remaining\":2"));
+
+            // 12. Verify deleted
+            HttpResponse<String> afterDelete = client.send(
+                    request(server, "/api/phase3/data-templates"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertTrue(!afterDelete.body().contains("\"coupon.single_use\""));
+            assertTrue(afterDelete.body().contains("\"order.seed.v2\""));
+            assertTrue(afterDelete.body().contains("\"audit.clear\""));
+
+            // 13. Get nonexistent template
+            HttpResponse<String> notFound = client.send(
+                    request(server, "/api/phase3/data-templates/nonexistent"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, notFound.statusCode());
+            assertTrue(notFound.body().contains("\"NOT_FOUND\""));
         }
     }
 

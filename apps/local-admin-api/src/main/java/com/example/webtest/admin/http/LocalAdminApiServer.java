@@ -3,6 +3,7 @@ package com.example.webtest.admin.http;
 import com.example.webtest.admin.service.AgentGenerateService;
 import com.example.webtest.admin.service.CatalogPersistenceService;
 import com.example.webtest.admin.service.ConfigPersistenceService;
+import com.example.webtest.admin.service.DataTemplatePersistenceService;
 import com.example.webtest.admin.service.ReportArtifactService;
 import com.example.webtest.admin.service.RunStatusService;
 import com.example.webtest.admin.service.SchedulerPersistenceService;
@@ -30,7 +31,8 @@ public final class LocalAdminApiServer implements AutoCloseable {
             CatalogPersistenceService catalogPersistenceService,
             RunStatusService runStatusService,
             AgentGenerateService agentGenerateService,
-            ReportArtifactService reportArtifactService)
+            ReportArtifactService reportArtifactService,
+            DataTemplatePersistenceService dataTemplatePersistenceService)
             throws IOException {
         server = HttpServer.create(address, 0);
         server.createContext("/health", jsonHandler(Map.of("status", "UP")));
@@ -63,6 +65,16 @@ public final class LocalAdminApiServer implements AutoCloseable {
         server.createContext(
                 "/api/phase3/cases/dsl/validate",
                 exchange -> handleMutation(exchange, agentGenerateService::validateDsl));
+        server.createContext(
+                "/api/phase3/data-templates/import/preview",
+                exchange -> handleMutation(exchange, dataTemplatePersistenceService::importPreview));
+        server.createContext(
+                "/api/phase3/data-templates/import/commit",
+                exchange -> handleMutation(exchange, dataTemplatePersistenceService::importCommit));
+        server.createContext("/api/phase3/data-templates/",
+                exchange -> handleDataTemplateEndpoint(exchange, dataTemplatePersistenceService));
+        server.createContext("/api/phase3/data-templates",
+                exchange -> handleDataTemplateEndpoint(exchange, dataTemplatePersistenceService));
         server.createContext("/api/phase3/runs/", exchange -> handleRunEndpoint(exchange, runStatusService, reportArtifactService));
         server.createContext("/", exchange -> writeJson(exchange, 404, Map.of(
                 "error", "NOT_FOUND",
@@ -81,6 +93,80 @@ public final class LocalAdminApiServer implements AutoCloseable {
     @Override
     public void close() {
         server.stop(0);
+    }
+
+    private static void handleDataTemplateEndpoint(HttpExchange exchange,
+            DataTemplatePersistenceService service) throws IOException {
+        if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
+            writeEmptyResponse(exchange);
+            return;
+        }
+        String path = exchange.getRequestURI().getPath();
+        // /api/phase3/data-templates            -> list or create
+        // /api/phase3/data-templates/            -> list or create
+        // /api/phase3/data-templates/{id}        -> get, update, or delete
+        // /api/phase3/data-templates/{id}/dry-run -> dry-run
+        String[] segments = path.split("/");
+        // segments: ["", "api", "phase3", "data-templates", "{id?}", "{action?}"]
+
+        String method = exchange.getRequestMethod().toUpperCase();
+        String templateId = segments.length > 4 ? segments[4] : "";
+        String action = segments.length > 5 ? segments[5] : "";
+
+        try {
+            if (templateId.isEmpty()) {
+                if ("GET".equals(method)) {
+                    writeJson(exchange, 200, service.listTemplates());
+                } else if ("POST".equals(method)) {
+                    String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+                    writeJson(exchange, 202, service.createTemplate(body));
+                } else {
+                    writeJson(exchange, 405, Map.of("error", "METHOD_NOT_ALLOWED"));
+                }
+                return;
+            }
+
+            if ("dry-run".equals(action)) {
+                if (!"POST".equals(method)) {
+                    writeJson(exchange, 405, Map.of("error", "METHOD_NOT_ALLOWED"));
+                    return;
+                }
+                String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+                writeJson(exchange, 200, service.dryRun(templateId, body));
+                return;
+            }
+
+            if (action.isEmpty()) {
+                switch (method) {
+                    case "GET" -> writeJson(exchange, 200, service.getTemplate(templateId));
+                    case "PUT" -> {
+                        String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+                        Object result = service.updateTemplate(templateId, body);
+                        int status = isErrorResult(result) ? 404 : 202;
+                        writeJson(exchange, status, result);
+                    }
+                    case "DELETE" -> {
+                        Object result = service.deleteTemplate(templateId);
+                        int status = isErrorResult(result) ? 404 : 200;
+                        writeJson(exchange, status, result);
+                    }
+                    default -> writeJson(exchange, 405, Map.of("error", "METHOD_NOT_ALLOWED"));
+                }
+                return;
+            }
+
+            writeJson(exchange, 404, Map.of("error", "NOT_FOUND", "action", action));
+        } catch (IllegalArgumentException e) {
+            writeJson(exchange, 400, Map.of("error", "BAD_REQUEST", "message", e.getMessage()));
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static boolean isErrorResult(Object result) {
+        if (result instanceof Map<?, ?> m) {
+            return m.containsKey("error");
+        }
+        return false;
     }
 
     private static void handleRunEndpoint(HttpExchange exchange, RunStatusService service,
@@ -251,7 +337,7 @@ public final class LocalAdminApiServer implements AutoCloseable {
 
     private static void applyCommonHeaders(Headers headers) {
         headers.set("Access-Control-Allow-Origin", "*");
-        headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+        headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
         headers.set("Access-Control-Allow-Headers", "Content-Type");
     }
 

@@ -2,6 +2,7 @@ package com.example.webtest.admin;
 
 import com.example.webtest.admin.service.AgentGenerateService;
 import com.example.webtest.admin.service.CatalogPersistenceService;
+import com.example.webtest.admin.service.DataTemplatePersistenceService;
 import com.example.webtest.admin.http.LocalAdminApiServer;
 import com.example.webtest.admin.service.ConfigPersistenceService;
 import com.example.webtest.admin.service.Phase3MockDataService;
@@ -28,6 +29,7 @@ public final class LocalAdminApiApp {
         Path executionHistoryFile = Path.of("config", "phase3", "execution-history.json");
         Path modelConfigFile = Path.of("config", "phase3", "model-config.json");
         Path environmentConfigFile = Path.of("config", "phase3", "environment-config.json");
+        Path dataTemplateFile = Path.of("config", "phase3", "data-templates.json");
         for (int index = 0; index < args.length; index++) {
             String arg = args[index];
             if ("--port".equals(arg)) {
@@ -70,9 +72,13 @@ public final class LocalAdminApiApp {
                 environmentConfigFile = Path.of(args[++index]);
             } else if (arg.startsWith("--environment-config-file=")) {
                 environmentConfigFile = Path.of(arg.substring("--environment-config-file=".length()));
+            } else if ("--data-template-file".equals(arg)) {
+                dataTemplateFile = Path.of(args[++index]);
+            } else if (arg.startsWith("--data-template-file=")) {
+                dataTemplateFile = Path.of(arg.substring("--data-template-file=".length()));
             } else if ("--help".equals(arg) || "-h".equals(arg)) {
                 System.out.println(
-                        "Usage: local-admin-api [--port 8787] [--scheduler-requests-file config/phase3/scheduler-requests.json] [--scheduler-events-file config/phase3/scheduler-events.json] [--scheduler-state-file config/phase3/scheduler-state.json] [--report-root runs] [--queue-file config/phase3/execution-queue.json] [--catalog-file config/phase3/project-catalog.json] [--execution-history-file config/phase3/execution-history.json] [--model-config-file config/phase3/model-config.json] [--environment-config-file config/phase3/environment-config.json]");
+                        "Usage: local-admin-api [--port 8787] [--scheduler-requests-file config/phase3/scheduler-requests.json] [--scheduler-events-file config/phase3/scheduler-events.json] [--scheduler-state-file config/phase3/scheduler-state.json] [--report-root runs] [--queue-file config/phase3/execution-queue.json] [--catalog-file config/phase3/project-catalog.json] [--execution-history-file config/phase3/execution-history.json] [--model-config-file config/phase3/model-config.json] [--environment-config-file config/phase3/environment-config.json] [--data-template-file config/phase3/data-templates.json]");
                 return;
             } else {
                 throw new IllegalArgumentException("Unknown option: " + arg);
@@ -108,7 +114,8 @@ public final class LocalAdminApiApp {
                         schedulerPersistence,
                         clock),
                 new AgentGenerateService(),
-                new ReportArtifactService(reportRoot))) {
+                new ReportArtifactService(reportRoot),
+                new DataTemplatePersistenceService(dataTemplateFile, clock))) {
             server.start();
             System.out.println("Local admin API listening on http://127.0.0.1:" + server.port());
             new CountDownLatch(1).await();

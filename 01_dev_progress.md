@@ -2549,3 +2549,74 @@ Reports / ReportDetail / DataDiff screens now consume backend report artifact AP
 
 ## Next Step
 - If verification passes, push the P1-2 commit set and continue with P1-3 data-template registry.
+
+## 2026-04-25 P1-3 data-template registry completed
+
+## Task
+- Replace front-end seeded `dataTemplates` usage with a shared backend-backed registry for `execution` and `dataTemplates`.
+- Complete minimal real CRUD/import/dry-run flow required by `docs/phase3/interface/review-backlog.md`.
+
+## Changes
+
+### Backend
+- Added new file-backed service: `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/DataTemplatePersistenceService.java`
+  - Persists to `config/phase3/data-templates.json`
+  - Supports list/get/create/update/delete/import preview/import commit/dry-run
+- `LocalAdminApiServer.java`
+  - Added:
+    - `GET /api/phase3/data-templates`
+    - `GET /api/phase3/data-templates/{templateId}`
+    - `POST /api/phase3/data-templates`
+    - `PUT /api/phase3/data-templates/{templateId}`
+    - `DELETE /api/phase3/data-templates/{templateId}`
+    - `POST /api/phase3/data-templates/import/preview`
+    - `POST /api/phase3/data-templates/import/commit`
+    - `POST /api/phase3/data-templates/{templateId}/dry-run`
+  - Extended CORS allow methods to include `PUT` and `DELETE`
+- `LocalAdminApiApp.java`
+  - Wires `DataTemplatePersistenceService`
+  - Adds `--data-template-file` CLI option and usage text
+- `LocalAdminApiServerTest.java`
+  - Added dedicated P1-3 endpoint coverage for CRUD and dry-run path
+
+### Frontend
+- `ExecutionScreen.tsx`
+  - Reads compare-template options from `GET /api/phase3/data-templates`
+  - Uses validated backend items as the primary source and keeps fallback only for API-unavailable cases
+- `DataTemplatesScreen.tsx`
+  - Reads the same registry from `GET /api/phase3/data-templates`
+  - Added create/edit/save/delete wiring
+  - Added import preview / import commit wiring
+  - Added dry-run wiring
+  - Empty backend list now renders as empty instead of silently reverting to seeded constants
+- `App.tsx`
+  - Passes `apiBaseUrl` into `ExecutionScreen` and `DataTemplatesScreen`
+  - Added admin snapshot response shape validation to avoid writing unrelated JSON into app state
+- `App.test.tsx`
+  - Updated mocked request sequencing for the new data-template fetches
+  - Refreshed stale model/execution assertions to match current UI behavior
+
+## Review Follow-up Fixes
+- Fixed a real regression in the initial P1-3 draft:
+  - `ExecutionScreen` and `DataTemplatesScreen` were not receiving `apiBaseUrl` from `App.tsx`
+- Fixed fallback correctness:
+  - empty `items: []` from backend is now treated as a valid registry response
+- Hardened the shell against malformed snapshot payloads:
+  - `fetchSnapshot()` now rejects non-`AdminConsoleSnapshot` JSON instead of crashing on `snapshot.navigation.find(...)`
+
+## Modified Files
+- New: `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/DataTemplatePersistenceService.java`
+- Modified: `LocalAdminApiApp.java`, `LocalAdminApiServer.java`, `LocalAdminApiServerTest.java`
+- Modified: `ui/admin-console/src/App.tsx`, `ui/admin-console/src/App.test.tsx`
+- Modified: `ui/admin-console/src/screens/ExecutionScreen.tsx`, `ui/admin-console/src/screens/DataTemplatesScreen.tsx`
+- Modified: `ui/admin-console/src/types.ts`
+
+## Verification
+- Passed: `npm run build` in `ui/admin-console`
+- Passed: `npm test -- --run` in `ui/admin-console` (13/13)
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+- Not rerun in this step: `mvn "-Dmaven.repo.local=.m2/repository" -pl apps/local-admin-api -am test`
+  - known repo-level unrelated blocker still exists from prior work: `report-engine` failure
+
+## Next Step
+- Continue with P1-4: convert model/datasource local-only connection tests into real backend validation interfaces.

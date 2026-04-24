@@ -762,3 +762,33 @@
      - `npm test -- --run` in `ui/admin-console` 仍是同样 2 个 pre-existing 失败，与本次 fix 无关
      - `mvn "-Dmaven.repo.local=.m2/repository" -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test` passed
      - `mvn "-Dmaven.repo.local=.m2/repository" -pl apps/local-admin-api -am test` 仍被既有 `report-engine` 失败阻塞，与本次 fix 无关
+47. 2026-04-25 P1-3 data-template registry completed
+   - Replaced front-end seeded `dataTemplates` flow with a backend-backed registry shared by `execution` and `dataTemplates`.
+   - Backend:
+     - new `DataTemplatePersistenceService`
+     - file-backed store at `config/phase3/data-templates.json`
+     - endpoints added:
+       - `GET /api/phase3/data-templates`
+       - `GET /api/phase3/data-templates/{templateId}`
+       - `POST /api/phase3/data-templates`
+       - `PUT /api/phase3/data-templates/{templateId}`
+       - `DELETE /api/phase3/data-templates/{templateId}`
+       - `POST /api/phase3/data-templates/import/preview`
+       - `POST /api/phase3/data-templates/import/commit`
+       - `POST /api/phase3/data-templates/{templateId}/dry-run`
+   - Frontend:
+     - `ExecutionScreen.tsx` now fetches compare-template options from the registry API
+     - `DataTemplatesScreen.tsx` now fetches the same registry and supports create/edit/delete/import preview/import commit/dry-run
+     - empty backend lists are now treated as valid responses instead of silently falling back to seeded constants
+   - Review hardening:
+     - fixed missing `apiBaseUrl` wiring from `App.tsx` into `ExecutionScreen` and `DataTemplatesScreen`
+     - added admin snapshot response shape validation so unrelated JSON cannot be written into shell state
+     - refreshed `App.test.tsx` for the new fetch sequence and current UI interaction model
+   - Verification:
+     - `npm run build` in `ui/admin-console` passed
+     - `npm test -- --run` in `ui/admin-console` passed (`13/13`)
+     - `mvn "-Dmaven.repo.local=.m2/repository" -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test` passed
+   - Remaining known repo-wide issue:
+     - `mvn "-Dmaven.repo.local=.m2/repository" -pl apps/local-admin-api -am test` still not used as release gate because of the pre-existing unrelated `report-engine` failure
+   - Next recommended phase task:
+     - P1-4 real connection validation for `models` and `environments`
