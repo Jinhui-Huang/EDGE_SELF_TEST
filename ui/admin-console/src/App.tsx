@@ -1972,6 +1972,7 @@ export function App() {
             locale={locale}
             selectedRunName={selectedReportRunName}
             onOpenDetail={openReportDetail}
+            apiBaseUrl={apiBaseUrl}
           />
         );
       case "reportDetail":
@@ -1983,6 +1984,7 @@ export function App() {
             selectedRunName={selectedReportRunName}
             onBackToReports={() => handleScreenChange("reports")}
             onOpenDataDiff={() => openDataDiff(selectedReportRunName)}
+            apiBaseUrl={apiBaseUrl}
           />
         );
       case "models":
@@ -2023,6 +2025,7 @@ export function App() {
             title={t(localizedScreenCopy.dataDiff.title)}
             locale={locale}
             selectedRunName={selectedReportRunName}
+            apiBaseUrl={apiBaseUrl}
           />
         );
       case "dataTemplates":

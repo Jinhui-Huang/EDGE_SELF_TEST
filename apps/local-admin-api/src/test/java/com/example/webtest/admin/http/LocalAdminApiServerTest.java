@@ -7,6 +7,7 @@ import com.example.webtest.admin.service.AgentGenerateService;
 import com.example.webtest.admin.service.CatalogPersistenceService;
 import com.example.webtest.admin.service.ConfigPersistenceService;
 import com.example.webtest.admin.service.Phase3MockDataService;
+import com.example.webtest.admin.service.ReportArtifactService;
 import com.example.webtest.admin.service.RunStatusService;
 import com.example.webtest.admin.service.SchedulerPersistenceService;
 import com.example.webtest.json.Jsons;
@@ -220,7 +221,8 @@ class LocalAdminApiServerTest {
                         environmentConfigFile),
                 new CatalogPersistenceService(catalogFile, Clock.fixed(Instant.parse("2026-04-18T11:00:00Z"), ZoneOffset.UTC)),
                 new RunStatusService(schedulerRequestsFile, schedulerEventsFile, new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, Clock.fixed(Instant.parse("2026-04-18T11:00:00Z"), ZoneOffset.UTC)), Clock.fixed(Instant.parse("2026-04-18T11:00:00Z"), ZoneOffset.UTC)),
-                new AgentGenerateService())) {
+                new AgentGenerateService(),
+                new ReportArtifactService(runsDir))) {
             server.start();
             HttpClient client = HttpClient.newHttpClient();
 
@@ -374,7 +376,8 @@ class LocalAdminApiServerTest {
                         environmentConfigFile),
                 new CatalogPersistenceService(catalogFile, Clock.fixed(Instant.parse("2026-04-18T11:00:00Z"), ZoneOffset.UTC)),
                 new RunStatusService(schedulerRequestsFile, schedulerEventsFile, new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, Clock.fixed(Instant.parse("2026-04-18T11:00:00Z"), ZoneOffset.UTC)), Clock.fixed(Instant.parse("2026-04-18T11:00:00Z"), ZoneOffset.UTC)),
-                new AgentGenerateService())) {
+                new AgentGenerateService(),
+                new ReportArtifactService(runsDir))) {
             server.start();
             HttpClient client = HttpClient.newHttpClient();
 
@@ -445,7 +448,8 @@ class LocalAdminApiServerTest {
                         environmentConfigFile),
                 new CatalogPersistenceService(catalogFile, clock),
                 new RunStatusService(schedulerRequestsFile, schedulerEventsFile, new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, clock), clock),
-                new AgentGenerateService())) {
+                new AgentGenerateService(),
+                new ReportArtifactService(runsDir))) {
             server.start();
             HttpClient client = HttpClient.newHttpClient();
 
@@ -547,7 +551,8 @@ class LocalAdminApiServerTest {
                         environmentConfigFile),
                 new CatalogPersistenceService(catalogFile, clock),
                 new RunStatusService(schedulerRequestsFile, schedulerEventsFile, new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, clock), clock),
-                new AgentGenerateService())) {
+                new AgentGenerateService(),
+                new ReportArtifactService(runsDir))) {
             server.start();
             HttpClient client = HttpClient.newHttpClient();
 
@@ -650,7 +655,8 @@ class LocalAdminApiServerTest {
                         environmentConfigFile),
                 new CatalogPersistenceService(catalogFile, clock),
                 new RunStatusService(schedulerRequestsFile, schedulerEventsFile, new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, clock), clock),
-                new AgentGenerateService())) {
+                new AgentGenerateService(),
+                new ReportArtifactService(runsDir))) {
             server.start();
             HttpClient client = HttpClient.newHttpClient();
 
@@ -749,7 +755,8 @@ class LocalAdminApiServerTest {
                         environmentConfigFile),
                 new CatalogPersistenceService(catalogFile, clock),
                 new RunStatusService(schedulerRequestsFile, schedulerEventsFile, new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, clock), clock),
-                new AgentGenerateService())) {
+                new AgentGenerateService(),
+                new ReportArtifactService(runsDir))) {
             server.start();
             HttpClient client = HttpClient.newHttpClient();
 
@@ -849,7 +856,8 @@ class LocalAdminApiServerTest {
                 new CatalogPersistenceService(catalogFile, clock),
                 new RunStatusService(schedulerRequestsFile, schedulerEventsFile,
                         new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, clock), clock),
-                new AgentGenerateService())) {
+                new AgentGenerateService(),
+                new ReportArtifactService(runsDir))) {
             server.start();
             HttpClient client = HttpClient.newHttpClient();
 
@@ -915,6 +923,121 @@ class LocalAdminApiServerTest {
                     HttpResponse.BodyHandlers.ofString());
             assertEquals(409, pauseAgain.statusCode());
             assertTrue(pauseAgain.body().contains("\"ALREADY_PAUSED\""));
+        }
+    }
+
+    @Test
+    void reportArtifactEndpointsReadRealRunFiles(@TempDir Path tempDir) throws Exception {
+        Path runsDir = tempDir.resolve("runs");
+        Path runDir = runsDir.resolve("order-smoke-20260425");
+        Files.createDirectories(runDir);
+        Map<String, Object> reportPayload = Map.of(
+                "runId", "order-smoke-20260425",
+                "startedAt", "2026-04-25T08:00:00Z",
+                "finishedAt", "2026-04-25T08:05:00Z",
+                "outputDir", "/output/order-smoke-20260425",
+                "summary", Map.of(
+                        "total", 5,
+                        "passed", 4,
+                        "failed", 1,
+                        "skipped", 0,
+                        "durationMs", 300_000),
+                "steps", List.of(
+                        Map.of("stepName", "Navigate to cart", "action", "GOTO", "status", "SUCCESS"),
+                        Map.of("stepName", "Assert title matches", "action", "ASSERT_TEXT", "status", "SUCCESS", "message", "OK"),
+                        Map.of("stepName", "Assert price visible", "action", "ASSERT_VISIBLE", "status", "FAILURE", "message", "Element not found"),
+                        Map.of("stepName", "Click checkout", "action", "CLICK", "status", "SUCCESS", "artifactPath", "checkout.png")));
+        Files.writeString(runDir.resolve("report.json"), Jsons.writeValueAsString(reportPayload), StandardCharsets.UTF_8);
+        Files.writeString(runDir.resolve("report.html"), "<html>report</html>", StandardCharsets.UTF_8);
+        Files.writeString(runDir.resolve("screenshot.png"), "fake-png", StandardCharsets.UTF_8);
+
+        // minimal scaffolding for server construction
+        Path schedulerRequestsFile = tempDir.resolve("scheduler-requests.json");
+        Path schedulerEventsFile = tempDir.resolve("scheduler-events.json");
+        Path schedulerStateFile = tempDir.resolve("scheduler-state.json");
+        Path queueFile = tempDir.resolve("execution-queue.json");
+        Path catalogFile = tempDir.resolve("project-catalog.json");
+        Path executionHistoryFile = tempDir.resolve("execution-history.json");
+        Path modelConfigFile = tempDir.resolve("model-config.json");
+        Path environmentConfigFile = tempDir.resolve("environment-config.json");
+        Files.writeString(queueFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(catalogFile, Jsons.writeValueAsString(Map.of("projects", List.of(), "cases", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(executionHistoryFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(modelConfigFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(environmentConfigFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+
+        Clock clock = Clock.fixed(Instant.parse("2026-04-25T09:00:00Z"), ZoneOffset.UTC);
+        try (LocalAdminApiServer server = new LocalAdminApiServer(
+                new InetSocketAddress("127.0.0.1", 0),
+                new Phase3MockDataService(runsDir, schedulerRequestsFile, schedulerEventsFile, schedulerStateFile,
+                        queueFile, catalogFile, executionHistoryFile, modelConfigFile, environmentConfigFile, clock),
+                new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, clock),
+                new ConfigPersistenceService(modelConfigFile, environmentConfigFile),
+                new CatalogPersistenceService(catalogFile, clock),
+                new RunStatusService(schedulerRequestsFile, schedulerEventsFile,
+                        new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, clock), clock),
+                new AgentGenerateService(),
+                new ReportArtifactService(runsDir))) {
+            server.start();
+            HttpClient client = HttpClient.newHttpClient();
+
+            // GET /api/phase3/runs/ — list runs
+            HttpResponse<String> listRuns = client.send(
+                    request(server, "/api/phase3/runs/"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, listRuns.statusCode());
+            assertTrue(listRuns.body().contains("\"order-smoke-20260425\""));
+            assertTrue(listRuns.body().contains("\"items\""));
+            assertTrue(listRuns.body().contains("\"FAILED\""));
+
+            // GET /api/phase3/runs/order-smoke-20260425/report — full report
+            HttpResponse<String> report = client.send(
+                    request(server, "/api/phase3/runs/order-smoke-20260425/report"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, report.statusCode());
+            assertTrue(report.body().contains("\"order-smoke-20260425\""));
+            assertTrue(report.body().contains("\"steps\""));
+            assertTrue(report.body().contains("\"assertions\""));
+            assertTrue(report.body().contains("\"artifacts\""));
+            assertTrue(report.body().contains("\"ASSERT_TEXT\""));
+            assertTrue(report.body().contains("\"stepsTotal\""));
+
+            // GET /api/phase3/runs/order-smoke-20260425/data-diff — data diff (mock fallback)
+            HttpResponse<String> dataDiff = client.send(
+                    request(server, "/api/phase3/runs/order-smoke-20260425/data-diff"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, dataDiff.statusCode());
+            assertTrue(dataDiff.body().contains("\"order-smoke-20260425\""));
+            assertTrue(dataDiff.body().contains("\"rows\""));
+            assertTrue(dataDiff.body().contains("\"summary\""));
+
+            // GET /api/phase3/runs/order-smoke-20260425/assertions — assertions
+            HttpResponse<String> assertions = client.send(
+                    request(server, "/api/phase3/runs/order-smoke-20260425/assertions"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, assertions.statusCode());
+            assertTrue(assertions.body().contains("\"order-smoke-20260425\""));
+            assertTrue(assertions.body().contains("\"ASSERT_TEXT\""));
+            assertTrue(assertions.body().contains("\"ASSERT_VISIBLE\""));
+            assertTrue(assertions.body().contains("\"items\""));
+
+            // GET /api/phase3/runs/order-smoke-20260425/artifacts — artifacts
+            HttpResponse<String> artifacts = client.send(
+                    request(server, "/api/phase3/runs/order-smoke-20260425/artifacts"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, artifacts.statusCode());
+            assertTrue(artifacts.body().contains("\"order-smoke-20260425\""));
+            assertTrue(artifacts.body().contains("\"report-json\""));
+            assertTrue(artifacts.body().contains("\"report-html\""));
+            assertTrue(artifacts.body().contains("\"screenshot\""));
+
+            // GET /api/phase3/runs/nonexistent-run/report — fallback report
+            HttpResponse<String> fallback = client.send(
+                    request(server, "/api/phase3/runs/nonexistent-run/report"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, fallback.statusCode());
+            assertTrue(fallback.body().contains("\"UNKNOWN\""));
+            assertTrue(fallback.body().contains("\"nonexistent-run\""));
         }
     }
 

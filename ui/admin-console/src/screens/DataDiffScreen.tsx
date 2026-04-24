@@ -1,123 +1,61 @@
+import { useEffect, useState } from "react";
 import { translate } from "../i18n";
-import { AdminConsoleSnapshot, Locale } from "../types";
-import { ReportViewModel, selectReportViewModel } from "./reportViewModel";
+import { AdminConsoleSnapshot, DataDiffResponse, DataDiffRow, Locale } from "../types";
+import { selectReportViewModel, ReportViewModel } from "./reportViewModel";
 
 type DataDiffScreenProps = {
   snapshot: AdminConsoleSnapshot;
   title: string;
   locale: Locale;
   selectedRunName: string | null;
-};
-
-type DiffRow = {
-  table: string;
-  pk: string;
-  field: string;
-  before: string;
-  after: string;
-  afterRestore: string;
-  expected: boolean;
-  restored: boolean;
+  apiBaseUrl: string;
 };
 
 function l(locale: Locale, en: string, zh: string, ja: string) {
   return translate(locale, { en, zh, ja });
 }
 
-function makeDiffRows(report: ReportViewModel): DiffRow[] {
+function makeFallbackDiffRows(report: ReportViewModel): DataDiffRow[] {
   const failed = /fail/i.test(report.status);
   const infoOnly = /info/i.test(report.status);
-
-  const rows: DiffRow[] = [
-    {
-      table: "orders",
-      pk: "ord_8821",
-      field: "status",
-      before: "null",
-      after: failed ? '"pending"' : '"paid"',
-      afterRestore: infoOnly ? (failed ? '"pending"' : '"paid"') : "null",
-      expected: true,
-      restored: !infoOnly
-    },
-    {
-      table: "orders",
-      pk: "ord_8821",
-      field: "total_cents",
-      before: "null",
-      after: "8910",
-      afterRestore: infoOnly ? "8910" : "null",
-      expected: true,
-      restored: !infoOnly
-    },
-    {
-      table: "order_items",
-      pk: "oi_9104",
-      field: "(row)",
-      before: "-",
-      after: "inserted",
-      afterRestore: "-",
-      expected: true,
-      restored: true
-    },
-    {
-      table: "order_items",
-      pk: "oi_9105",
-      field: "(row)",
-      before: "-",
-      after: "inserted",
-      afterRestore: "-",
-      expected: true,
-      restored: true
-    },
-    {
-      table: "products",
-      pk: "sku_A",
-      field: "stock",
-      before: "50",
-      after: failed ? "50" : "49",
-      afterRestore: "50",
-      expected: true,
-      restored: true
-    },
-    {
-      table: "products",
-      pk: "sku_B",
-      field: "stock",
-      before: "28",
-      after: failed ? "28" : "27",
-      afterRestore: "28",
-      expected: true,
-      restored: true
-    },
-    {
-      table: "coupons",
-      pk: "SAVE10",
-      field: "used_count",
-      before: "142",
-      after: failed ? "142" : "143",
-      afterRestore: "142",
-      expected: true,
-      restored: true
-    },
-    {
-      table: "audit_log",
-      pk: `log_${report.runName.slice(0, 6)}`,
-      field: "(row)",
-      before: "-",
-      after: "inserted",
-      afterRestore: "kept",
-      expected: false,
-      restored: false
-    }
+  return [
+    { table: "orders", pk: "ord_8821", field: "status", before: "null", after: failed ? '"pending"' : '"paid"', afterRestore: infoOnly ? (failed ? '"pending"' : '"paid"') : "null", expected: true, restored: !infoOnly },
+    { table: "orders", pk: "ord_8821", field: "total_cents", before: "null", after: "8910", afterRestore: infoOnly ? "8910" : "null", expected: true, restored: !infoOnly },
+    { table: "order_items", pk: "oi_9104", field: "(row)", before: "-", after: "inserted", afterRestore: "-", expected: true, restored: true },
+    { table: "order_items", pk: "oi_9105", field: "(row)", before: "-", after: "inserted", afterRestore: "-", expected: true, restored: true },
+    { table: "products", pk: "sku_A", field: "stock", before: "50", after: failed ? "50" : "49", afterRestore: "50", expected: true, restored: true },
+    { table: "products", pk: "sku_B", field: "stock", before: "28", after: failed ? "28" : "27", afterRestore: "28", expected: true, restored: true },
+    { table: "coupons", pk: "SAVE10", field: "used_count", before: "142", after: failed ? "142" : "143", afterRestore: "142", expected: true, restored: true },
+    { table: "audit_log", pk: `log_${report.runName.slice(0, 6)}`, field: "(row)", before: "-", after: "inserted", afterRestore: "kept", expected: false, restored: false }
   ];
-
-  return rows;
 }
 
-export function DataDiffScreen({ snapshot, title, locale, selectedRunName }: DataDiffScreenProps) {
-  const report = selectReportViewModel(snapshot, selectedRunName);
+export function DataDiffScreen({ snapshot, title, locale, selectedRunName, apiBaseUrl }: DataDiffScreenProps) {
+  const [apiDiff, setApiDiff] = useState<DataDiffResponse | null>(null);
+  const [fetchFailed, setFetchFailed] = useState(false);
 
-  if (!report) {
+  useEffect(() => {
+    if (!selectedRunName) return;
+    setApiDiff(null);
+    setFetchFailed(false);
+    fetch(`${apiBaseUrl}/api/phase3/runs/${encodeURIComponent(selectedRunName)}/data-diff`)
+      .then((r) => r.ok ? r.json() as Promise<DataDiffResponse> : Promise.reject(r.status))
+      .then((data) => {
+        if (data.runId && Array.isArray(data.rows)) {
+          setApiDiff(data);
+        } else {
+          setFetchFailed(true);
+        }
+      })
+      .catch(() => setFetchFailed(true));
+  }, [apiBaseUrl, selectedRunName]);
+
+  const fallbackReport = (fetchFailed || !selectedRunName) ? selectReportViewModel(snapshot, selectedRunName) : null;
+
+  // Determine data source
+  const rows: DataDiffRow[] = apiDiff?.rows ?? (fallbackReport ? makeFallbackDiffRows(fallbackReport) : []);
+
+  if (rows.length === 0 && !apiDiff && !fallbackReport) {
     return (
       <section className="sectionCard">
         <div className="sectionHeader">
@@ -130,11 +68,29 @@ export function DataDiffScreen({ snapshot, title, locale, selectedRunName }: Dat
     );
   }
 
-  const rows = makeDiffRows(report);
-  const expectedChanges = rows.filter((row) => row.expected).length;
-  const unexpectedChanges = rows.length - expectedChanges;
-  const restoredCount = rows.filter((row) => row.restored).length;
-  const affectedTables = new Set(rows.map((row) => row.table)).size;
+  // Loading state
+  if (!apiDiff && !fetchFailed && selectedRunName) {
+    return (
+      <section className="sectionCard">
+        <div className="sectionHeader">
+          <div>
+            <p className="eyebrow">{l(locale, "Data comparison", "数据对比", "データ比較")}</p>
+            <h3>{l(locale, "Loading diff...", "加载对比数据...", "差分データを読み込み中...")}</h3>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  // Stats: prefer API summary, or compute from rows
+  const expectedChanges = apiDiff?.summary?.expectedChanges ?? rows.filter((r) => r.expected).length;
+  const unexpectedChanges = apiDiff?.summary?.unexpectedChanges ?? rows.filter((r) => !r.expected).length;
+  const restoredCount = apiDiff?.summary?.restoredCount ?? rows.filter((r) => r.restored).length;
+  const affectedTables = apiDiff?.summary?.affectedTables ?? new Set(rows.map((r) => r.table)).size;
+
+  // Context labels
+  const report = fallbackReport ?? selectReportViewModel(snapshot, selectedRunName);
+  const runName = selectedRunName ?? "";
 
   const dbName = (() => {
     try {
@@ -150,7 +106,7 @@ export function DataDiffScreen({ snapshot, title, locale, selectedRunName }: Dat
       <div className="dataDiffBreadcrumb">
         <span>{l(locale, "Reports", "报告", "レポート")}</span>
         <span>/</span>
-        <span>{report.runName}</span>
+        <span>{runName}</span>
         <span>/</span>
         <span>{l(locale, "Data diff", "数据差异", "データ差分")}</span>
       </div>
@@ -165,11 +121,11 @@ export function DataDiffScreen({ snapshot, title, locale, selectedRunName }: Dat
             </span>
             <span>
               <i>{l(locale, "Project", "项目", "プロジェクト")}</i>
-              <strong>{report.projectName}</strong>
+              <strong>{report?.projectName ?? runName}</strong>
             </span>
             <span>
               <i>{l(locale, "Case", "用例", "ケース")}</i>
-              <strong>{report.caseName}</strong>
+              <strong>{report?.caseName ?? runName}</strong>
             </span>
           </div>
         </div>

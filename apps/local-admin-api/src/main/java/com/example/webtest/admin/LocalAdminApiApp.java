@@ -5,6 +5,7 @@ import com.example.webtest.admin.service.CatalogPersistenceService;
 import com.example.webtest.admin.http.LocalAdminApiServer;
 import com.example.webtest.admin.service.ConfigPersistenceService;
 import com.example.webtest.admin.service.Phase3MockDataService;
+import com.example.webtest.admin.service.ReportArtifactService;
 import com.example.webtest.admin.service.RunStatusService;
 import com.example.webtest.admin.service.SchedulerPersistenceService;
 import java.net.InetSocketAddress;
@@ -106,7 +107,8 @@ public final class LocalAdminApiApp {
                         schedulerEventsFile,
                         schedulerPersistence,
                         clock),
-                new AgentGenerateService())) {
+                new AgentGenerateService(),
+                new ReportArtifactService(reportRoot))) {
             server.start();
             System.out.println("Local admin API listening on http://127.0.0.1:" + server.port());
             new CountDownLatch(1).await();

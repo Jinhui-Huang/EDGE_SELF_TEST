@@ -3,6 +3,7 @@ package com.example.webtest.admin.http;
 import com.example.webtest.admin.service.AgentGenerateService;
 import com.example.webtest.admin.service.CatalogPersistenceService;
 import com.example.webtest.admin.service.ConfigPersistenceService;
+import com.example.webtest.admin.service.ReportArtifactService;
 import com.example.webtest.admin.service.RunStatusService;
 import com.example.webtest.admin.service.SchedulerPersistenceService;
 import com.example.webtest.admin.service.Phase3MockDataService;
@@ -28,7 +29,8 @@ public final class LocalAdminApiServer implements AutoCloseable {
             ConfigPersistenceService configPersistenceService,
             CatalogPersistenceService catalogPersistenceService,
             RunStatusService runStatusService,
-            AgentGenerateService agentGenerateService)
+            AgentGenerateService agentGenerateService,
+            ReportArtifactService reportArtifactService)
             throws IOException {
         server = HttpServer.create(address, 0);
         server.createContext("/health", jsonHandler(Map.of("status", "UP")));
@@ -61,7 +63,7 @@ public final class LocalAdminApiServer implements AutoCloseable {
         server.createContext(
                 "/api/phase3/cases/dsl/validate",
                 exchange -> handleMutation(exchange, agentGenerateService::validateDsl));
-        server.createContext("/api/phase3/runs/", exchange -> handleRunEndpoint(exchange, runStatusService));
+        server.createContext("/api/phase3/runs/", exchange -> handleRunEndpoint(exchange, runStatusService, reportArtifactService));
         server.createContext("/", exchange -> writeJson(exchange, 404, Map.of(
                 "error", "NOT_FOUND",
                 "path", exchange.getRequestURI().getPath())));
@@ -81,19 +83,31 @@ public final class LocalAdminApiServer implements AutoCloseable {
         server.stop(0);
     }
 
-    private static void handleRunEndpoint(HttpExchange exchange, RunStatusService service) throws IOException {
+    private static void handleRunEndpoint(HttpExchange exchange, RunStatusService service,
+            ReportArtifactService reportService) throws IOException {
         if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
             writeEmptyResponse(exchange);
             return;
         }
         String path = exchange.getRequestURI().getPath();
-        // Expected: /api/phase3/runs/{runId}/{action}
         String[] segments = path.split("/");
         // segments: ["", "api", "phase3", "runs", "{runId}", "{action}"]
+
+        // Handle list request: /api/phase3/runs/ with no runId/action
         if (segments.length < 6) {
+            if ("GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+                String possibleRunId = segments.length > 4 ? segments[4] : "";
+                if (possibleRunId.isEmpty()) {
+                    writeJson(exchange, 200, reportService.listRuns());
+                } else {
+                    writeJson(exchange, 200, reportService.getReport(possibleRunId));
+                }
+                return;
+            }
             writeJson(exchange, 400, Map.of("error", "BAD_REQUEST", "message", "Invalid run endpoint path: " + path));
             return;
         }
+
         String runId = segments[4];
         String action = segments[5];
 
@@ -126,6 +140,34 @@ public final class LocalAdminApiServer implements AutoCloseable {
                         return;
                     }
                     writeJson(exchange, 200, service.getRunLivePage(runId));
+                }
+                case "report" -> {
+                    if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+                        writeJson(exchange, 405, Map.of("error", "METHOD_NOT_ALLOWED"));
+                        return;
+                    }
+                    writeJson(exchange, 200, reportService.getReport(runId));
+                }
+                case "data-diff" -> {
+                    if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+                        writeJson(exchange, 405, Map.of("error", "METHOD_NOT_ALLOWED"));
+                        return;
+                    }
+                    writeJson(exchange, 200, reportService.getDataDiff(runId));
+                }
+                case "assertions" -> {
+                    if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+                        writeJson(exchange, 405, Map.of("error", "METHOD_NOT_ALLOWED"));
+                        return;
+                    }
+                    writeJson(exchange, 200, reportService.getAssertions(runId));
+                }
+                case "artifacts" -> {
+                    if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+                        writeJson(exchange, 405, Map.of("error", "METHOD_NOT_ALLOWED"));
+                        return;
+                    }
+                    writeJson(exchange, 200, reportService.getArtifacts(runId));
                 }
                 case "pause" -> {
                     if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {

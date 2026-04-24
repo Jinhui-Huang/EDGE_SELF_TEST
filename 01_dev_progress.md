@@ -2463,3 +2463,54 @@ Wired the docParse → aiGenerate → cases chain with real API calls. AI genera
 - AI role boundary: AI only generates/explains/suggests — never acts as executor. Generated results are reviewable drafts before saving.
 - HttpServer prefix matching: `/api/phase3/agent/generate-case/dry-run` registered before `/api/phase3/agent/generate-case` to prevent prefix capture.
 - `AiGenerateFocus` type deduplicated: single source of truth in `AiGenerateScreen.tsx`, imported by `App.tsx`.
+
+---
+
+# P1-2: Report pages read real report artifacts (2026-04-21, reviewed 2026-04-25)
+
+## Summary
+Reports / ReportDetail / DataDiff screens now consume backend report artifact APIs (`ReportArtifactService`) instead of front-end synthesized summaries. API-first with snapshot fallback pattern. Canonical `runId` flows consistently across reports → reportDetail → dataDiff.
+
+## Changes
+
+### Backend
+- New `ReportArtifactService.java` reads real `runs/*/report.json`:
+  - `listRuns()` → `GET /api/phase3/runs/` — run list with real step/assertion counts and duration
+  - `getReport(runId)` → `GET /api/phase3/runs/{runId}/report` — full report with steps, assertions, artifacts
+  - `getDataDiff(runId)` → `GET /api/phase3/runs/{runId}/data-diff` — reads `data-diff.json` or returns mock shaped by report status
+  - `getAssertions(runId)` → `GET /api/phase3/runs/{runId}/assertions` — assertion steps extracted from report.json
+  - `getArtifacts(runId)` → `GET /api/phase3/runs/{runId}/artifacts` — file listing from run directory
+- `handleRunEndpoint` in `LocalAdminApiServer.java` extended to dispatch new actions alongside P0-2 monitor actions (status, steps, runtime-log, live-page, pause, abort)
+- `LocalAdminApiApp.java` wires `new ReportArtifactService(reportRoot)` and passes to server constructor
+
+### Frontend
+- New types in `types.ts`: RunSummaryItem, RunListResponse, RunReportStep, RunReportAssertion, RunReportArtifact, RunReport, DataDiffRow, DataDiffResponse
+- ReportsScreen: fetches `/api/phase3/runs/`, validates `Array.isArray(data.items)`, maps to ReportViewModel, falls back to snapshot
+- ReportDetailScreen: fetches `/api/phase3/runs/{runId}/report`, validates `data.runId && typeof data.stepsTotal === "number"`, falls back to snapshot
+- DataDiffScreen: fetches `/api/phase3/runs/{runId}/data-diff`, validates `data.runId && Array.isArray(data.rows)`, falls back to synthetic rows
+- App.tsx passes `apiBaseUrl` to all three report screens
+
+### Review Hardening (2026-04-25)
+- **Security fix**: Path traversal vulnerability in `resolveRunDir()` — added `.normalize()` + `.startsWith(root)` check to prevent `../../` escape from `reportRoot`
+- **Test coverage**: Added dedicated `reportArtifactEndpointsReadRealRunFiles` test covering all 5 endpoints + fallback report for nonexistent runId
+
+## Modified Files
+- New: `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/ReportArtifactService.java`
+- Modified: `LocalAdminApiServer.java`, `LocalAdminApiApp.java`, `LocalAdminApiServerTest.java`
+- Modified: `ui/admin-console/src/types.ts`, `ReportsScreen.tsx`, `ReportDetailScreen.tsx`, `DataDiffScreen.tsx`, `App.tsx`
+
+## Verification
+- `npm run build` in `ui/admin-console` — passed
+- `npm test -- --run` in `ui/admin-console` — 11/13 passed (2 pre-existing failures unrelated to P1-2)
+- `mvn -pl apps/local-admin-api -am test` — 8/8 passed (including new P1-2 endpoint test)
+- Pre-existing failure in `report-engine` module (`DefaultReportEngineTest.diagnoseReportStorageSummarizesArtifactsByRunAndType`) — unrelated to P1-2
+
+## Review Checklist
+- [x] API-first consumption pattern — all three screens fetch real API, validate shape, fallback only on failure
+- [x] Canonical runId consistency — runId flows correctly across reports → reportDetail → dataDiff chain
+- [x] Response shape validation strictness — each screen checks specific fields before accepting
+- [x] Fallback-only-as-backup logic — fallback properly gated behind API failure conditions
+- [x] No route prefix conflicts in handleRunEndpoint
+- [x] No breakage to monitor/aiGenerate/plugin chains
+- [x] Path traversal security in resolveRunDir
+- [x] Test coverage for P1-2 endpoints

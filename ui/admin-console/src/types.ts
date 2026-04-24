@@ -351,6 +351,85 @@ export type DryRunResponse = {
   suggestedLaunchForm?: { projectKey: string; environment: string };
 };
 
+// ---- Report artifact types (P1-2) ----
+
+export type RunSummaryItem = {
+  runId: string;
+  status: string;
+  startedAt: string;
+  finishedAt: string;
+  durationMs: number;
+  stepsTotal: number;
+  stepsPassed: number;
+  assertionsTotal: number;
+  assertionsPassed: number;
+  artifactCount: number;
+  outputDir: string;
+};
+
+export type RunListResponse = {
+  items: RunSummaryItem[];
+};
+
+export type RunReportStep = {
+  stepId: string;
+  stepName: string;
+  action: string;
+  status: string;
+  message: string | null;
+  durationMs: number;
+  artifactPath: string | null;
+};
+
+export type RunReportAssertion = {
+  name: string;
+  action: string;
+  status: string;
+  message: string;
+  pass: boolean;
+};
+
+export type RunReportArtifact = {
+  kind: string;
+  label: string;
+  path: string;
+};
+
+export type RunReport = RunSummaryItem & {
+  summary: {
+    total: number;
+    passed: number;
+    failed: number;
+    skipped: number;
+  };
+  steps: RunReportStep[];
+  assertions: RunReportAssertion[];
+  artifacts: RunReportArtifact[];
+};
+
+export type DataDiffRow = {
+  table: string;
+  pk: string;
+  field: string;
+  before: string;
+  after: string;
+  afterRestore: string;
+  expected: boolean;
+  restored: boolean;
+};
+
+export type DataDiffResponse = {
+  runId: string;
+  summary: {
+    expectedChanges: number;
+    unexpectedChanges: number;
+    restoredCount: number;
+    totalRows: number;
+    affectedTables: number;
+  };
+  rows: DataDiffRow[];
+};
+
 // ---- Extension popup snapshot (P0-3) ----
 
 export type ExtensionPopupSnapshot = {

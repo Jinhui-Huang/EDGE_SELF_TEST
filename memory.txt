@@ -718,3 +718,31 @@
      - Frontend tests: 11/13 passed; command still exits non-zero because of 2 pre-existing failures unrelated to P1-1
      - Maven local-admin-api test command passed
    - AI role boundary: AI only generates/explains/suggests — not acts as executor. Generated results are reviewable drafts before saving.
+45. 2026-04-21 P1-2 report pages read real report artifacts completed
+   - Reports / reportDetail / dataDiff now consume backend report artifact APIs instead of front-end synthesized summaries.
+   - Backend: new `ReportArtifactService` reads real `runs/*/report.json` and derives:
+     - `GET /api/phase3/runs/` — run list with real step/assertion counts and duration from report.json
+     - `GET /api/phase3/runs/{runId}/report` — full report with steps, assertions, artifacts
+     - `GET /api/phase3/runs/{runId}/data-diff` — data diff (reads data-diff.json if present, else returns mock shaped by report status)
+     - `GET /api/phase3/runs/{runId}/assertions` — assertion steps extracted from report.json
+     - `GET /api/phase3/runs/{runId}/artifacts` — file listing from run directory
+   - `handleRunEndpoint` extended to dispatch new actions: report, data-diff, assertions, artifacts
+   - Also handles `GET /api/phase3/runs/` (list) and `GET /api/phase3/runs/{runId}` (direct report) when segments < 6
+   - Frontend changes:
+     - New types: RunSummaryItem, RunListResponse, RunReportStep, RunReportAssertion, RunReportArtifact, RunReport, DataDiffRow, DataDiffResponse
+     - ReportsScreen: fetches `/api/phase3/runs/`, maps API items to ReportViewModel for rendering, falls back to snapshot-derived buildReportViewModels when API unavailable
+     - ReportDetailScreen: fetches `/api/phase3/runs/{runId}/report`, uses real steps/assertions/artifacts, falls back to selectReportViewModel
+     - DataDiffScreen: fetches `/api/phase3/runs/{runId}/data-diff`, uses real diff rows/summary, falls back to synthetic makeDiffRows
+     - All three screens validate API response shape before accepting (prevents misinterpretation of unrelated JSON)
+   - App.tsx passes `apiBaseUrl` to all three report screens
+   - Modified files:
+     - New: `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/ReportArtifactService.java`
+     - Modified: `LocalAdminApiServer.java`, `LocalAdminApiApp.java`, `LocalAdminApiServerTest.java`
+     - Modified: `ui/admin-console/src/types.ts`, `ReportsScreen.tsx`, `ReportDetailScreen.tsx`, `DataDiffScreen.tsx`, `App.tsx`
+   - Review hardening (2026-04-25):
+     - Fixed path traversal vulnerability in `resolveRunDir()`: added `.normalize()` + `.startsWith(root)` check to prevent `../../` escape from `reportRoot`
+     - Added dedicated P1-2 endpoint test `reportArtifactEndpointsReadRealRunFiles` covering all 5 report artifact endpoints + fallback report
+   - Verification:
+     - Frontend build passed
+     - Frontend tests: 11/13 passed (2 pre-existing failures unrelated to P1-2)
+     - Maven tests: 8/8 passed (including new P1-2 endpoint test)

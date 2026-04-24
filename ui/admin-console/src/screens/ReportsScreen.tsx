@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { translate } from "../i18n";
-import { AdminConsoleSnapshot, Locale } from "../types";
+import { AdminConsoleSnapshot, Locale, RunListResponse, RunSummaryItem } from "../types";
 import { buildReportViewModels, ReportViewModel } from "./reportViewModel";
 
 type ReportsScreenProps = {
@@ -10,6 +10,7 @@ type ReportsScreenProps = {
   locale: Locale;
   selectedRunName: string | null;
   onOpenDetail: (runName: string) => void;
+  apiBaseUrl: string;
 };
 
 type LocalizedCopy = {
@@ -29,27 +30,65 @@ function copy(en: string, zh: string, ja: string): LocalizedCopy {
   return { en, zh, ja };
 }
 
-function statusClass(status: string) {
-  if (/fail/i.test(status)) {
-    return "status-failed";
-  }
-  if (/success|ok|pass/i.test(status)) {
-    return "status-success";
-  }
-  return "status-info";
+function formatDuration(ms: number): string {
+  if (ms <= 0) return "—";
+  const seconds = Math.floor(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return `${minutes}m ${String(remainingSeconds).padStart(2, "0")}s`;
 }
 
-function buildReportProjects(snapshot: AdminConsoleSnapshot): ReportProjectNode[] {
-  const reports = buildReportViewModels(snapshot);
-  const grouped = new Map<string, ReportProjectNode>();
+function mapApiToViewModels(items: RunSummaryItem[], snapshot: AdminConsoleSnapshot): ReportViewModel[] {
+  return items.map((item, index) => {
+    const normalizedRunId = item.runId.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    const matchedCase = snapshot.cases.find((c) => {
+      const nId = c.id.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+      const nName = c.name.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+      return normalizedRunId.includes(nId) || normalizedRunId.includes(nName);
+    }) ?? snapshot.cases[index % snapshot.cases.length] ?? null;
 
+    const matchedProject = matchedCase
+      ? snapshot.projects.find((p) => p.key === matchedCase.projectKey)
+      : snapshot.projects[0];
+
+    return {
+      runName: item.runId,
+      status: item.status,
+      finishedAt: item.finishedAt,
+      entry: "",
+      projectKey: matchedProject?.key ?? matchedCase?.projectKey ?? "unknown",
+      projectName: matchedProject?.name ?? item.runId,
+      caseId: matchedCase?.id ?? "",
+      caseName: matchedCase?.name ?? item.runId,
+      caseTags: matchedCase?.tags ?? [],
+      duration: formatDuration(item.durationMs),
+      environment: "",
+      operator: "",
+      model: "",
+      stepsPassed: item.stepsPassed,
+      stepsTotal: item.stepsTotal,
+      assertionsPassed: item.assertionsPassed,
+      assertionsTotal: item.assertionsTotal,
+      aiCalls: 0,
+      aiCost: "",
+      heals: 0,
+      recovery: "",
+      artifacts: item.artifactCount,
+      screenshots: [],
+      assertions: []
+    };
+  });
+}
+
+function groupReportProjects(reports: ReportViewModel[]): ReportProjectNode[] {
+  const grouped = new Map<string, ReportProjectNode>();
   reports.forEach((report) => {
     const existing = grouped.get(report.projectKey);
     if (existing) {
       existing.reports.push(report);
       return;
     }
-
     grouped.set(report.projectKey, {
       projectKey: report.projectKey,
       projectName: report.projectName,
@@ -57,7 +96,6 @@ function buildReportProjects(snapshot: AdminConsoleSnapshot): ReportProjectNode[
       totalCases: 0
     });
   });
-
   return Array.from(grouped.values()).map((project) => ({
     ...project,
     totalCases: new Set(project.reports.map((report) => report.caseId)).size
@@ -70,10 +108,30 @@ export function ReportsScreen({
   reportListLabel,
   locale,
   selectedRunName,
-  onOpenDetail
+  onOpenDetail,
+  apiBaseUrl
 }: ReportsScreenProps) {
   const t = (value: LocalizedCopy) => translate(locale, value);
-  const reportProjects = useMemo(() => buildReportProjects(snapshot), [snapshot]);
+  const [apiRuns, setApiRuns] = useState<RunSummaryItem[] | null>(null);
+
+  useEffect(() => {
+    fetch(`${apiBaseUrl}/api/phase3/runs/`)
+      .then((r) => r.ok ? r.json() as Promise<RunListResponse> : Promise.reject(r.status))
+      .then((data) => {
+        if (Array.isArray(data.items)) {
+          setApiRuns(data.items);
+        }
+      })
+      .catch(() => {});
+  }, [apiBaseUrl]);
+
+  const reportProjects = useMemo(() => {
+    const models = apiRuns
+      ? mapApiToViewModels(apiRuns, snapshot)
+      : buildReportViewModels(snapshot);
+    return groupReportProjects(models);
+  }, [apiRuns, snapshot]);
+
   const selectedReport = useMemo(
     () =>
       reportProjects
@@ -179,7 +237,7 @@ export function ReportsScreen({
                   >
                     <div className="docParseDocumentIdentity reportOverviewIdentity">
                       <strong>{report.runName}</strong>
-                      <p>{`${report.caseName} / ${report.environment} / ${report.finishedAt}`}</p>
+                      <p>{`${report.caseName} / ${report.environment || "—"} / ${report.finishedAt}`}</p>
                     </div>
                     <div className="docParseDocumentMeta reportOverviewMeta">
                       <span className={`docParseDocumentBadge ${/fail/i.test(report.status) ? "warning" : "info"}`}>
