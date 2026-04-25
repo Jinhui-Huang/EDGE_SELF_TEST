@@ -7,6 +7,7 @@ type CasesScreenProps = {
   snapshot: AdminConsoleSnapshot;
   caseDraft: CaseItem[];
   caseState: MutationState;
+  initialProjectKey?: string | null;
   title: string;
   saveHint: string;
   caseTagsLabel: string;
@@ -77,6 +78,7 @@ export function CasesScreen({
   snapshot,
   caseDraft,
   caseState,
+  initialProjectKey,
   title,
   saveHint,
   caseTagsLabel,
@@ -85,9 +87,21 @@ export function CasesScreen({
   onPrepareCase
 }: CasesScreenProps) {
   const t = (value: LocalizedCopy) => translate(locale, value);
-  const [selectedProjectKey, setSelectedProjectKey] = useState(snapshot.projects[0]?.key ?? caseDraft[0]?.projectKey ?? "all");
+  const initialSelection = initialProjectKey?.trim() || snapshot.projects[0]?.key || caseDraft[0]?.projectKey || "all";
+  const [selectedProjectKey, setSelectedProjectKey] = useState(initialSelection);
   const [openedCaseId, setOpenedCaseId] = useState<string | null>(null);
   const [overviewCollapsed, setOverviewCollapsed] = useState(true);
+
+  useEffect(() => {
+    const normalizedProjectKey = initialProjectKey?.trim();
+    if (!normalizedProjectKey) {
+      return;
+    }
+    if (snapshot.projects.some((project) => project.key === normalizedProjectKey) && normalizedProjectKey !== selectedProjectKey) {
+      setSelectedProjectKey(normalizedProjectKey);
+      setOpenedCaseId(null);
+    }
+  }, [initialProjectKey, selectedProjectKey, snapshot.projects]);
 
   useEffect(() => {
     if (selectedProjectKey === "all") {

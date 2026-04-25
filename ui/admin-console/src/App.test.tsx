@@ -259,6 +259,38 @@ const monitorLivePageResponse = {
   screenshotPath: null
 };
 
+const projectImportPreviewResponse = {
+  status: "PREVIEW_READY",
+  kind: "catalog-project-import-preview",
+  summary: {
+    totalRows: 1,
+    createCount: 1,
+    updateCount: 0,
+    conflictCount: 0
+  },
+  rows: [
+    {
+      key: "ops-console",
+      name: "ops-console",
+      scope: "Operations back office",
+      environments: ["staging"],
+      note: "Imported from project catalog batch",
+      action: "create",
+      warnings: []
+    }
+  ],
+  conflicts: []
+};
+
+const projectImportCommitResponse = {
+  status: "ACCEPTED",
+  kind: "catalog-project-import",
+  created: 1,
+  updated: 0,
+  totalProjects: 3,
+  path: "config/phase3/project-catalog.json"
+};
+
 describe("App", () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -637,6 +669,192 @@ describe("App", () => {
     });
     expect(await screen.findByText("Saved project catalog.")).toBeInTheDocument();
     expect(await screen.findByDisplayValue("Payment journey / audited")).toBeInTheDocument();
+  });
+
+  it("runs project import preview and commit through the new catalog import endpoints", async () => {
+    let importCommitted = false;
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) {
+        return jsonResponse(
+          importCommitted
+            ? {
+                ...snapshot,
+                projects: [
+                  ...snapshot.projects,
+                  {
+                    key: "ops-console",
+                    name: "ops-console",
+                    scope: "Operations back office",
+                    suites: 6,
+                    environments: 1,
+                    note: "Imported from project catalog batch"
+                  }
+                ]
+              }
+            : snapshot
+        );
+      }
+      if (url.endsWith("/api/phase3/catalog/project/import/preview")) {
+        return jsonResponse(projectImportPreviewResponse, 202);
+      }
+      if (url.endsWith("/api/phase3/catalog/project/import/commit")) {
+        importCommitted = true;
+        return jsonResponse(projectImportCommitResponse, 202);
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    await userEvent.click(await screen.findByRole("button", { name: /Projects/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Import" }));
+    await userEvent.click(screen.getByRole("button", { name: "Preview import" }));
+
+    expect(await screen.findByText("Preview ready for 1 project row(s).")).toBeInTheDocument();
+    expect(await screen.findByText("ops-console")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Commit import" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "http://127.0.0.1:8787/api/phase3/catalog/project/import/commit",
+        expect.objectContaining({ method: "POST" })
+      );
+    });
+    expect(await screen.findByText("Imported 1 project row(s): 1 created, 0 updated.")).toBeInTheDocument();
+    expect((await screen.findAllByText("ops-console")).length).toBeGreaterThan(0);
+  });
+
+  it("adds a new project row and persists it through the existing catalog save flow", async () => {
+    let snapshotAfterSave = snapshot;
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) {
+        return jsonResponse(snapshotAfterSave);
+      }
+      if (url.endsWith("/api/phase3/catalog/project")) {
+        const body = JSON.parse(String(init?.body ?? "{}")) as { key?: string; name?: string; scope?: string; note?: string };
+        if (body.key === "ops-console") {
+          snapshotAfterSave = {
+            ...snapshot,
+            projects: [
+              ...snapshot.projects,
+              {
+                key: "ops-console",
+                name: "ops-console",
+                scope: "Operations back office",
+                suites: 6,
+                environments: 1,
+                note: body.note ?? "Created from draft row."
+              }
+            ]
+          };
+        }
+        return jsonResponse({ status: "ACCEPTED" }, 202);
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    await userEvent.click(await screen.findByRole("button", { name: /Projects/ }));
+    await userEvent.click(screen.getByRole("button", { name: /New project/i }));
+
+    await waitFor(() => {
+      expect(document.querySelectorAll(".projectsEditorRow")).toHaveLength(3);
+    });
+
+    const editorRows = Array.from(document.querySelectorAll(".projectsEditorRow"));
+    const newRow = editorRows[editorRows.length - 1];
+    const [keyInput] = Array.from(newRow.querySelectorAll("input"));
+
+    expect(keyInput).toBeTruthy();
+    await userEvent.type(keyInput as HTMLInputElement, "ops-console");
+
+    const refreshedRows = Array.from(document.querySelectorAll(".projectsEditorRow"));
+    const refreshedNewRow = refreshedRows[refreshedRows.length - 1];
+    const refreshedInputs = Array.from(refreshedNewRow.querySelectorAll("input"));
+    const nameInput = refreshedInputs[1];
+    const scopeInput = refreshedInputs[2];
+    const noteInput = refreshedNewRow.querySelector("textarea");
+
+    expect(nameInput).toBeTruthy();
+    expect(scopeInput).toBeTruthy();
+    expect(noteInput).toBeTruthy();
+
+    await userEvent.type(nameInput as HTMLInputElement, "ops-console");
+    await userEvent.type(scopeInput as HTMLInputElement, "Operations back office");
+    await userEvent.type(noteInput as HTMLTextAreaElement, "Created from draft row.");
+    await userEvent.click(screen.getByRole("button", { name: "Save project catalog" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "http://127.0.0.1:8787/api/phase3/catalog/project",
+        expect.objectContaining({ method: "POST" })
+      );
+    });
+    expect(
+      fetchMock.mock.calls.some(
+        ([input, init]) =>
+          String(input).endsWith("/api/phase3/catalog/project") &&
+          String((init as RequestInit | undefined)?.body ?? "").includes("\"key\":\"ops-console\"")
+      )
+    ).toBe(true);
+    expect(await screen.findByText("Saved project catalog.")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.filter(([input]) => String(input).endsWith("/api/phase3/admin-console"))
+      ).toHaveLength(2);
+    });
+  });
+
+  it("hands off Enter project into Cases with the selected project context", async () => {
+    const fetchMock = vi.fn().mockImplementation(() => jsonResponse(snapshot));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    await userEvent.click(await screen.findByRole("button", { name: /Projects/ }));
+    const openButtons = await screen.findAllByRole("button", { name: "Open" });
+    await userEvent.click(openButtons[1]);
+    await userEvent.click(await screen.findByRole("button", { name: "Enter project" }));
+
+    expect(await screen.findByText("Case catalog")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "member-center" })).toBeInTheDocument();
+  });
+
+  it("hands off project Reports actions into the Reports screen", async () => {
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) {
+        return jsonResponse(snapshot);
+      }
+      if (url.endsWith("/api/phase3/runs/")) {
+        return jsonResponse({ items: [] });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    await userEvent.click(await screen.findByRole("button", { name: /Projects/ }));
+    const reportsButtons = await screen.findAllByRole("button", { name: "Reports" });
+    await userEvent.click(reportsButtons[reportsButtons.length - 1]);
+
+    expect(await screen.findByRole("heading", { name: "member-center" })).toBeInTheDocument();
+    expect(await screen.findByText("member-center-daily")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /Projects/ }));
+    const openButtons = await screen.findAllByRole("button", { name: "Open" });
+    await userEvent.click(openButtons[1]);
+    await userEvent.click(await screen.findByRole("button", { name: "View reports" }));
+
+    expect(await screen.findByRole("heading", { name: "member-center" })).toBeInTheDocument();
+    expect(await screen.findByText("member-center-daily")).toBeInTheDocument();
   });
 
   it("opens case detail inside the Cases screen", async () => {

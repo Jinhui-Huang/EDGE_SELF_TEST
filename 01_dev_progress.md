@@ -2809,3 +2809,89 @@ Reports / ReportDetail / DataDiff screens now consume backend report artifact AP
 
 ## Next Step
 - Await re-review of the synced P2-1 docs baseline before advancing to `P2-2`.
+
+## 2026-04-25 P2-2 projects import and navigation actions completed
+
+## Task
+- Complete the visible-but-unwired `projects` controls in the Phase 3 admin console:
+  - import preview / commit
+  - new-project draft persistence
+  - enter-project handoff to `cases`
+  - reports handoff to `reports`
+- Keep the implementation inside the existing App-level screen-state model and the current local-admin-api file-backed boundary.
+
+## Completed
+- Added minimal project import backend support in `local-admin-api`:
+  - `POST /api/phase3/catalog/project/import/preview`
+  - `POST /api/phase3/catalog/project/import/commit`
+- `CatalogPersistenceService` now supports:
+  - deterministic preview rows with `create` / `update`
+  - duplicate/conflict detection
+  - merge/replace mode normalization
+  - file-backed commit into `config/phase3/project-catalog.json`
+- `LocalAdminApiServerTest` now covers the project import preview/commit flow end-to-end.
+- `ProjectsScreen.tsx` now wires:
+  - `Import` -> preview / commit flow
+  - `New project` -> existing draft-row add flow
+  - project card / inline `Reports` -> App-level handoff to `reports`
+  - inline `Enter project` -> App-level handoff to `cases`
+- `App.tsx` now adds the minimum project handoff/import state:
+  - project import preview + status state
+  - `selectedCaseProjectKey`
+  - `selectedReportsProjectKey`
+  - App-level handlers for import preview, import commit, project->cases, project->reports
+- `CasesScreen.tsx` and `ReportsScreen.tsx` now accept `initialProjectKey` so the existing screen state can open on the intended project without adding a new router.
+- `ReportsScreen.tsx` was hardened so an empty `GET /api/phase3/runs/` result falls back to snapshot reports instead of rendering an empty project rail.
+- `ProjectsScreen.tsx` editor rows now use stable index-based React keys:
+  - prevents row remount/focus loss when the operator edits `project.key`
+  - keeps the new-project draft flow stable during typing
+
+## Modified Files
+- Modified: `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/CatalogPersistenceService.java`
+- Modified: `apps/local-admin-api/src/main/java/com/example/webtest/admin/http/LocalAdminApiServer.java`
+- Modified: `apps/local-admin-api/src/test/java/com/example/webtest/admin/http/LocalAdminApiServerTest.java`
+- Modified: `ui/admin-console/src/App.tsx`
+- Modified: `ui/admin-console/src/App.test.tsx`
+- Modified: `ui/admin-console/src/screens/ProjectsScreen.tsx`
+- Modified: `ui/admin-console/src/screens/CasesScreen.tsx`
+- Modified: `ui/admin-console/src/screens/ReportsScreen.tsx`
+- Modified: `ui/admin-console/src/types.ts`
+- Modified: `01_dev_progress.md`
+- Modified: `memory.txt`
+
+## Verification
+- Passed: `npm test -- --run` in `ui/admin-console` (`20/20`)
+- Passed: `npm run build` in `ui/admin-console`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test` (`11/11`)
+
+## Known Limits
+- Project handoff still uses App-level screen state only; no route system or Phase 4 typed route payload was introduced.
+- Project import remains deterministic and file-backed; it does not introduce typed catalog APIs beyond the minimal preview/commit endpoints required for P2-2.
+
+## Next Step
+- Sync the `docs/phase3/interface/projects/*` and overview docs if review finds stale `projects` wording after this implementation.
+- If docs are already aligned, the next recommended backlog item is `P2-3` / the next review-backlog priority after projects wiring.
+
+## 2026-04-25 P2-2 projects docs sync follow-up
+
+## Task
+- Align the `docs/phase3` projects baseline with the completed P2-2 implementation so review state and screen specs match current code.
+
+## Completed
+- Updated:
+  - `docs/phase3/interface/ui-control-interface-overview.md`
+  - `docs/phase3/interface/projects/functional-spec.md`
+  - `docs/phase3/interface/projects/interface-spec.md`
+- Synced the projects docs from stale future-state wording to current implemented state:
+  - `Import` now documented as implemented via `POST /api/phase3/catalog/project/import/preview` -> `POST /api/phase3/catalog/project/import/commit`
+  - `New project` now documented as implemented via the existing add-row draft flow plus `POST /api/phase3/catalog/project`
+  - `Reports` / `View reports` now documented as implemented App-level handoff into `reports`
+  - `Enter project` now documented as implemented App-level handoff into `cases`
+- Updated `projects/interface-spec.md` so the previous “recommended / future” implementation text for import and project-context handoff now reflects current P2-2 behavior.
+- Kept future wording only for truly unfinished areas, such as richer dedicated project APIs beyond the current Phase 3 boundary.
+
+## Verification
+- Doc consistency pass completed against current `App.tsx`, `ProjectsScreen.tsx`, `CasesScreen.tsx`, `ReportsScreen.tsx`, and `CatalogPersistenceService.java`
+
+## Next Step
+- Await re-review of the synced P2-2 docs baseline before advancing to the next backlog item.

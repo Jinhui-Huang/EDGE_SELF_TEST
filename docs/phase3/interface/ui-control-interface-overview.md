@@ -45,13 +45,13 @@ Conventions used here:
 | Control | Type | Current behavior / interface | Future interface / design |
 |---|---|---|---|
 | Search input | input | Local filter only | Keep local |
-| `Import` | button | Visual only | `POST /api/phase3/catalog/project/import/preview` -> `POST /api/phase3/catalog/project/import/commit` |
-| `New project` | button | Visual only | Reuse add-row draft flow, then persist through `POST /api/phase3/catalog/project` |
+| `Import` | button | Implemented: opens import review flow and uses `POST /api/phase3/catalog/project/import/preview` -> `POST /api/phase3/catalog/project/import/commit` | Keep current deterministic file-backed import flow |
+| `New project` | button | Implemented: reuses add-row draft flow, then persists through `POST /api/phase3/catalog/project` on save | Keep current lightweight create flow |
 | Project card body | clickable card | Local selection only | Keep local |
 | `Open` / `Close` | button | Local expand/collapse only | Keep local |
-| `Reports` | button | Visual only | App-level handoff into `reports` |
-| `Enter project` | button | Visual only | App-level handoff into `cases` |
-| `View reports` | button | Visual only | App-level handoff into `reports` |
+| `Reports` | button | Implemented as App-level handoff into `reports` with project context | Keep current lightweight handoff |
+| `Enter project` | button | Implemented as App-level handoff into `cases` with project context | Keep current lightweight handoff |
+| `View reports` | button | Implemented as App-level handoff into `reports` with project context | Keep current lightweight handoff |
 | Project field inputs | input group | Local draft only | Persist on save through `POST /api/phase3/catalog/project` |
 | `Remove row` | button | Local draft delete | Persist on save through `POST /api/phase3/catalog/project` |
 | `Add project row` | button | Local draft add | Persist on save through `POST /api/phase3/catalog/project` |

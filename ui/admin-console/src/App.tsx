@@ -29,6 +29,8 @@ import {
   ModelRoutingRule,
   MutationState,
   PreparedCaseItem,
+  ProjectImportCommitResponse,
+  ProjectImportPreviewResponse,
   ProjectItem,
   RunControlResponse,
   SchedulerMutationForm,
@@ -607,6 +609,60 @@ function isConnectionValidationResult(value: unknown): value is ConnectionValida
   );
 }
 
+function isProjectImportPreviewResponse(value: unknown): value is ProjectImportPreviewResponse {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const candidate = value as Partial<ProjectImportPreviewResponse>;
+  return (
+    typeof candidate.status === "string" &&
+    typeof candidate.kind === "string" &&
+    Boolean(candidate.summary) &&
+    typeof candidate.summary?.totalRows === "number" &&
+    typeof candidate.summary?.createCount === "number" &&
+    typeof candidate.summary?.updateCount === "number" &&
+    typeof candidate.summary?.conflictCount === "number" &&
+    Array.isArray(candidate.rows) &&
+    candidate.rows.every(
+      (row) =>
+        row &&
+        typeof row === "object" &&
+        typeof row.key === "string" &&
+        typeof row.name === "string" &&
+        typeof row.scope === "string" &&
+        Array.isArray(row.environments) &&
+        row.environments.every((item) => typeof item === "string") &&
+        typeof row.note === "string" &&
+        (row.action === "create" || row.action === "update") &&
+        Array.isArray(row.warnings) &&
+        row.warnings.every((item) => typeof item === "string")
+    ) &&
+    Array.isArray(candidate.conflicts) &&
+    candidate.conflicts.every(
+      (conflict) =>
+        conflict &&
+        typeof conflict === "object" &&
+        typeof conflict.key === "string" &&
+        typeof conflict.reason === "string"
+    )
+  );
+}
+
+function isProjectImportCommitResponse(value: unknown): value is ProjectImportCommitResponse {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const candidate = value as Partial<ProjectImportCommitResponse>;
+  return (
+    typeof candidate.status === "string" &&
+    typeof candidate.kind === "string" &&
+    typeof candidate.created === "number" &&
+    typeof candidate.updated === "number" &&
+    typeof candidate.totalProjects === "number" &&
+    typeof candidate.path === "string"
+  );
+}
+
 function buildLocalModelFallbackValidation(item: ModelProvider): ConnectionValidationResult {
   return {
     status: "API_UNAVAILABLE",
@@ -662,6 +718,38 @@ function buildLocalDatasourceFallbackValidation(item: DatabaseConfig): Connectio
     message: "Backend validation is unavailable. Only local draft completeness checks are shown.",
     warnings: ["No real backend validation result was returned."]
   };
+}
+
+function parseProjectImportRows(raw: string): ProjectItem[] {
+  const parsed: unknown = JSON.parse(raw);
+  const rows =
+    Array.isArray(parsed) ? parsed :
+    parsed && typeof parsed === "object" && Array.isArray((parsed as { rows?: unknown }).rows) ? (parsed as { rows: unknown[] }).rows :
+    null;
+  if (!rows) {
+    throw new Error("Import payload must be a JSON array or an object with a rows array.");
+  }
+
+  return rows.map((row, index) => {
+    if (!row || typeof row !== "object") {
+      throw new Error(`Import row ${index + 1} must be an object.`);
+    }
+    const candidate = row as Record<string, unknown>;
+    const environmentsValue = candidate.environments;
+    const environments = Array.isArray(environmentsValue)
+      ? environmentsValue.map((item) => String(item).trim()).filter(Boolean).join(", ")
+      : typeof environmentsValue === "string"
+        ? environmentsValue
+        : "";
+
+    return {
+      key: String(candidate.key ?? "").trim(),
+      name: String(candidate.name ?? "").trim(),
+      scope: String(candidate.scope ?? "").trim(),
+      environments: environments.trim(),
+      note: String(candidate.note ?? "").trim()
+    };
+  });
 }
 
 const screenCopy: Record<ScreenId, { title: CopyValue; description: CopyValue }> = {
@@ -1326,6 +1414,10 @@ export function App() {
   const [environmentConfigState, setEnvironmentConfigState] = useState<MutationState>({ kind: "idle", message: "" });
   const [databaseTestState, setDatabaseTestState] = useState<MutationState>({ kind: "idle", message: "" });
   const [projectState, setProjectState] = useState<MutationState>({ kind: "idle", message: "" });
+  const [projectImportState, setProjectImportState] = useState<MutationState>({ kind: "idle", message: "" });
+  const [projectImportPreview, setProjectImportPreview] = useState<ProjectImportPreviewResponse | null>(null);
+  const [selectedCaseProjectKey, setSelectedCaseProjectKey] = useState<string | null>(null);
+  const [selectedReportsProjectKey, setSelectedReportsProjectKey] = useState<string | null>(null);
   const [caseDraft, setCaseDraft] = useState<CaseItem[]>(
     fallbackSnapshot.cases.map((testCase) => ({
       id: testCase.id,
@@ -1393,6 +1485,24 @@ export function App() {
   function openMonitor(runId?: string | null) {
     setSelectedMonitorRunId(runId?.trim() || null);
     setActiveScreen("monitor");
+  }
+
+  function openProjectCases(projectKey: string) {
+    const normalizedProjectKey = projectKey.trim();
+    if (!normalizedProjectKey) {
+      return;
+    }
+    setSelectedCaseProjectKey(normalizedProjectKey);
+    setActiveScreen("cases");
+  }
+
+  function openProjectReports(projectKey: string) {
+    const normalizedProjectKey = projectKey.trim();
+    if (!normalizedProjectKey) {
+      return;
+    }
+    setSelectedReportsProjectKey(normalizedProjectKey);
+    setActiveScreen("reports");
   }
 
   async function refreshSnapshot() {
@@ -1578,6 +1688,82 @@ export function App() {
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(errorText || `HTTP ${response.status}`);
+    }
+  }
+
+  function resetProjectImportState() {
+    setProjectImportPreview(null);
+    setProjectImportState({ kind: "idle", message: "" });
+  }
+
+  async function handleProjectImportPreview(raw: string) {
+    setProjectImportState({ kind: "pending", message: "Preparing project import preview..." });
+    setProjectImportPreview(null);
+    try {
+      const rows = parseProjectImportRows(raw);
+      const response = await fetch(`${apiBaseUrl}/api/phase3/catalog/project/import/preview`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ mode: "merge", rows })
+      });
+      const payload: unknown = await response.json();
+      if (!response.ok) {
+        throw new Error(
+          payload && typeof payload === "object" && "message" in payload ? String((payload as { message: unknown }).message) : `HTTP ${response.status}`
+        );
+      }
+      if (!isProjectImportPreviewResponse(payload)) {
+        throw new Error("Invalid project import preview response.");
+      }
+      setProjectImportPreview(payload);
+      setProjectImportState({
+        kind: payload.summary.conflictCount > 0 ? "warning" : "success",
+        message:
+          payload.summary.conflictCount > 0
+            ? `Preview ready with ${payload.summary.conflictCount} conflict(s).`
+            : `Preview ready for ${payload.summary.totalRows} project row(s).`
+      });
+    } catch (error) {
+      setProjectImportState({
+        kind: "error",
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+
+  async function handleProjectImportCommit(raw: string) {
+    setProjectImportState({ kind: "pending", message: "Importing project catalog rows..." });
+    try {
+      const rows = parseProjectImportRows(raw);
+      const response = await fetch(`${apiBaseUrl}/api/phase3/catalog/project/import/commit`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ mode: "merge", rows })
+      });
+      const payload: unknown = await response.json();
+      if (!response.ok) {
+        throw new Error(
+          payload && typeof payload === "object" && "message" in payload ? String((payload as { message: unknown }).message) : `HTTP ${response.status}`
+        );
+      }
+      if (!isProjectImportCommitResponse(payload)) {
+        throw new Error("Invalid project import commit response.");
+      }
+      await loadSnapshot();
+      setProjectImportPreview(null);
+      setProjectImportState({
+        kind: "success",
+        message: `Imported ${payload.created + payload.updated} project row(s): ${payload.created} created, ${payload.updated} updated.`
+      });
+    } catch (error) {
+      setProjectImportState({
+        kind: "error",
+        message: error instanceof Error ? error.message : String(error)
+      });
     }
   }
 
@@ -1930,6 +2116,11 @@ export function App() {
     ]);
   }
 
+  function handleNewProject() {
+    addProjectDraftRow();
+    setProjectState({ kind: "idle", message: "" });
+  }
+
   function handleProjectSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const normalizedProjectRows = projectDraft.map((project) => ({
@@ -2043,6 +2234,8 @@ export function App() {
             snapshot={snapshot}
             projectDraft={projectDraft}
             projectState={projectState}
+            projectImportState={projectImportState}
+            projectImportPreview={projectImportPreview}
             title={t(localizedScreenCopy.projects.title)}
             saveHint={t(uiCopy.projectSaveHint)}
             fieldKeyLabel={t(uiCopy.fieldKey)}
@@ -2055,6 +2248,12 @@ export function App() {
             saveProjectCatalogLabel={t(uiCopy.saveProjectCatalog)}
             locale={locale}
             onProjectChange={updateProjectDraft}
+            onImportPreview={handleProjectImportPreview}
+            onImportCommit={handleProjectImportCommit}
+            onImportReset={resetProjectImportState}
+            onNewProject={handleNewProject}
+            onEnterProject={openProjectCases}
+            onOpenProjectReports={openProjectReports}
             onAddProjectRow={addProjectDraftRow}
             onRemoveProjectRow={removeProjectDraftRow}
             onSubmit={handleProjectSubmit}
@@ -2066,6 +2265,7 @@ export function App() {
             snapshot={snapshot}
             caseDraft={caseDraft}
             caseState={caseState}
+            initialProjectKey={selectedCaseProjectKey}
             title={t(localizedScreenCopy.cases.title)}
             saveHint={t(uiCopy.caseSaveHint)}
             caseTagsLabel={t(uiCopy.caseTags)}
@@ -2188,6 +2388,7 @@ export function App() {
             reviewBoardLabel={t(uiCopy.reviewBoard)}
             reportListLabel={t(uiCopy.reportList)}
             locale={locale}
+            initialProjectKey={selectedReportsProjectKey}
             selectedRunName={selectedReportRunName}
             onOpenDetail={openReportDetail}
             apiBaseUrl={apiBaseUrl}

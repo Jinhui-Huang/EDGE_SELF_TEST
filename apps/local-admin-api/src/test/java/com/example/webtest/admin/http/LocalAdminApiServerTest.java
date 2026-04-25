@@ -1150,6 +1150,113 @@ class LocalAdminApiServerTest {
     }
 
     @Test
+    void projectImportPreviewAndCommitEndpoints(@TempDir Path tempDir) throws Exception {
+        Path runsDir = tempDir.resolve("runs");
+        Files.createDirectories(runsDir);
+        Path schedulerRequestsFile = tempDir.resolve("scheduler-requests.json");
+        Path schedulerEventsFile = tempDir.resolve("scheduler-events.json");
+        Path schedulerStateFile = tempDir.resolve("scheduler-state.json");
+        Path queueFile = tempDir.resolve("execution-queue.json");
+        Path catalogFile = tempDir.resolve("project-catalog.json");
+        Path executionHistoryFile = tempDir.resolve("execution-history.json");
+        Path modelConfigFile = tempDir.resolve("model-config.json");
+        Path environmentConfigFile = tempDir.resolve("environment-config.json");
+        Files.writeString(queueFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(catalogFile, Jsons.writeValueAsString(Map.of(
+                "projects", List.of(Map.of(
+                        "key", "checkout-web",
+                        "name", "checkout-web",
+                        "scope", "Payment journey",
+                        "environments", List.of("prod-like"),
+                        "note", "baseline")),
+                "cases", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(executionHistoryFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(modelConfigFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(environmentConfigFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+
+        Clock clock = Clock.fixed(Instant.parse("2026-04-25T09:00:00Z"), ZoneOffset.UTC);
+        try (LocalAdminApiServer server = new LocalAdminApiServer(
+                new InetSocketAddress("127.0.0.1", 0),
+                new Phase3MockDataService(runsDir, schedulerRequestsFile, schedulerEventsFile, schedulerStateFile,
+                        queueFile, catalogFile, executionHistoryFile, modelConfigFile, environmentConfigFile, clock),
+                new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, clock),
+                new ConfigPersistenceService(modelConfigFile, environmentConfigFile),
+                new CatalogPersistenceService(catalogFile, clock),
+                new RunStatusService(schedulerRequestsFile, schedulerEventsFile,
+                        new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, clock), clock),
+                new AgentGenerateService(),
+                new ReportArtifactService(runsDir),
+                new DataTemplatePersistenceService(tempDir.resolve("data-templates.json"), clock))) {
+            server.start();
+            HttpClient client = HttpClient.newHttpClient();
+
+            HttpResponse<String> preview = client.send(
+                    request(
+                            server,
+                            "/api/phase3/catalog/project/import/preview",
+                            "POST",
+                            Jsons.writeValueAsString(Map.of(
+                                    "mode", "merge",
+                                    "rows", List.of(
+                                            Map.of(
+                                                    "key", "checkout-web",
+                                                    "name", "checkout-web",
+                                                    "scope", "Payment journey / imported",
+                                                    "environments", List.of("prod-like", "staging-edge"),
+                                                    "note", "updated"),
+                                            Map.of(
+                                                    "key", "ops-console",
+                                                    "name", "ops-console",
+                                                    "scope", "Operations",
+                                                    "environments", List.of("staging"),
+                                                    "note", "created"),
+                                            Map.of(
+                                                    "key", "ops-console",
+                                                    "name", "ops-console duplicate",
+                                                    "scope", "Duplicate",
+                                                    "environments", List.of("staging")))))),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(202, preview.statusCode());
+            assertTrue(preview.body().contains("\"PREVIEW_READY\""));
+            assertTrue(preview.body().contains("\"createCount\":1"));
+            assertTrue(preview.body().contains("\"updateCount\":1"));
+            assertTrue(preview.body().contains("\"conflictCount\":1"));
+            assertTrue(preview.body().contains("\"Duplicate key in import payload\""));
+
+            HttpResponse<String> commit = client.send(
+                    request(
+                            server,
+                            "/api/phase3/catalog/project/import/commit",
+                            "POST",
+                            Jsons.writeValueAsString(Map.of(
+                                    "mode", "merge",
+                                    "rows", List.of(
+                                            Map.of(
+                                                    "key", "checkout-web",
+                                                    "name", "checkout-web",
+                                                    "scope", "Payment journey / imported",
+                                                    "environments", List.of("prod-like", "staging-edge"),
+                                                    "note", "updated"),
+                                            Map.of(
+                                                    "key", "ops-console",
+                                                    "name", "ops-console",
+                                                    "scope", "Operations",
+                                                    "environments", List.of("staging"),
+                                                    "note", "created"))))),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(202, commit.statusCode());
+            assertTrue(commit.body().contains("\"ACCEPTED\""));
+            assertTrue(commit.body().contains("\"created\":1"));
+            assertTrue(commit.body().contains("\"updated\":1"));
+
+            String catalog = Files.readString(catalogFile, StandardCharsets.UTF_8);
+            assertTrue(catalog.contains("\"checkout-web\""));
+            assertTrue(catalog.contains("\"Payment journey / imported\""));
+            assertTrue(catalog.contains("\"ops-console\""));
+        }
+    }
+
+    @Test
     void dataTemplateCrudAndDryRunEndpoints(@TempDir Path tempDir) throws Exception {
         Path runsDir = tempDir.resolve("runs");
         Files.createDirectories(runsDir);

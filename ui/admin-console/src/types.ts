@@ -186,6 +186,43 @@ export type ProjectItem = {
   note: string;
 };
 
+export type ProjectImportPreviewRow = {
+  key: string;
+  name: string;
+  scope: string;
+  environments: string[];
+  note: string;
+  action: "create" | "update";
+  warnings: string[];
+};
+
+export type ProjectImportConflict = {
+  key: string;
+  reason: string;
+};
+
+export type ProjectImportPreviewResponse = {
+  status: string;
+  kind: string;
+  summary: {
+    totalRows: number;
+    createCount: number;
+    updateCount: number;
+    conflictCount: number;
+  };
+  rows: ProjectImportPreviewRow[];
+  conflicts: ProjectImportConflict[];
+};
+
+export type ProjectImportCommitResponse = {
+  status: string;
+  kind: string;
+  created: number;
+  updated: number;
+  totalProjects: number;
+  path: string;
+};
+
 export type CaseItem = {
   id: string;
   projectKey: string;

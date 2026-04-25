@@ -83,7 +83,16 @@ public final class LocalAdminApiServer implements AutoCloseable {
                 "/api/phase3/datasources/test-connection",
                 exchange -> handleValidation(exchange, connectionValidationService::testDatasourceConnection));
         server.createContext(
+                "/api/phase3/catalog/project/import/preview",
+                exchange -> handleMutation(exchange, catalogPersistenceService::importPreview));
+        server.createContext(
+                "/api/phase3/catalog/project/import/commit",
+                exchange -> handleMutation(exchange, catalogPersistenceService::importCommit));
+        server.createContext(
                 "/api/phase3/catalog/project",
+                exchange -> handleMutation(exchange, catalogPersistenceService::upsertProject));
+        server.createContext(
+                "/api/phase3/catalog/project/",
                 exchange -> handleMutation(exchange, catalogPersistenceService::upsertProject));
         server.createContext(
                 "/api/phase3/catalog/case",

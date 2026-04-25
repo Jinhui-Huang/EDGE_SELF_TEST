@@ -17,7 +17,7 @@ This document distinguishes:
 - direct write interfaces
 - local-only UI state transitions
 - indirect snapshot reflection path
-- current implementation vs future intended routes
+- current implementation vs remaining future routes
 
 ## 2. Interface Summary
 
@@ -27,8 +27,16 @@ Current `projects` screen conclusion:
   - `GET /api/phase3/admin-console`
 - current direct write source:
   - `POST /api/phase3/catalog/project`
+- current direct import write sources:
+  - `POST /api/phase3/catalog/project/import/preview`
+  - `POST /api/phase3/catalog/project/import/commit`
 - no dedicated project-list endpoint exists in the current implemented Phase 3 local-admin-api
 - project overview cards are composed in the front end from snapshot domains
+
+Current App-level handoffs already implemented:
+
+- project `Reports` / `View reports` -> `reports`
+- `Enter project` -> `cases`
 
 ## 3. Direct Read Interface: GET /api/phase3/admin-console
 
@@ -215,24 +223,26 @@ These controls change UI state but do not call the backend directly.
 - local state:
   - sets selection/opened detail
 - current request: none
-- current route: none
-- intended future route:
-  - `reports`
+- current route:
+  - implemented App-level handoff into `reports`
+- current project context handoff:
+  - `selectedReportsProjectKey`
 
 ### 5.5 Inline `Enter project`
 
 - current request: none
-- current route: none
-- intended future downstream:
-  - project-centered work context
-  - likely `cases` or future project detail flow
+- current route:
+  - implemented App-level handoff into `cases`
+- current project context handoff:
+  - `selectedCaseProjectKey`
 
 ### 5.6 Inline `View reports`
 
 - current request: none
-- current route: none
-- intended future downstream:
-  - `reports`
+- current route:
+  - implemented App-level handoff into `reports`
+- current project context handoff:
+  - `selectedReportsProjectKey`
 
 ### 5.7 `Remove row`
 
@@ -263,21 +273,24 @@ These controls change UI state but do not call the backend directly.
 
 #### `Import`
 
-- user action: click
-- request: none today
-- owner: not implemented
-- intended future interface: undefined in current Phase 3 implementation
-- current state: visible only
+- user action: click -> preview -> commit
+- request:
+  - `POST /api/phase3/catalog/project/import/preview`
+  - `POST /api/phase3/catalog/project/import/commit`
+- owner:
+  - preview/commit state in `App.tsx`
+  - UI review flow in `ProjectsScreen.tsx`
+  - persistence in `CatalogPersistenceService`
+- current state: implemented
 
 #### `New project`
 
 - user action: click
-- request: none today
-- owner: not implemented
-- intended future behavior:
-  - either append an editor row
-  - or open a dedicated create-project flow
-- current state: visible only
+- request: none on click
+- owner:
+  - draft-row append in `App.tsx`
+  - persistence continues through `POST /api/phase3/catalog/project`
+- current state: implemented
 
 ### 6.2 Card Controls
 
@@ -298,26 +311,26 @@ These controls change UI state but do not call the backend directly.
 #### `Reports`
 
 - user action: click
-- request: none today
-- owner: currently local screen state only
-- intended future route: `reports`
-- current state: partially implemented as local detail-opening behavior only
+- request: none
+- owner: App-level screen state in `App.tsx`
+- current route: `reports`
+- current state: implemented
 
 ### 6.3 Inline Detail Controls
 
 #### `Enter project`
 
 - user action: click
-- request: none today
-- intended route: downstream project work context
-- current state: visible only
+- request: none
+- current route: `cases`
+- current state: implemented
 
 #### `View reports`
 
 - user action: click
-- request: none today
-- intended route: `reports`
-- current state: visible only
+- request: none
+- current route: `reports`
+- current state: implemented
 
 ### 6.4 Editor Controls
 
@@ -381,13 +394,13 @@ Current error surfacing:
 
 - `projects` does not write case rows directly
 - but its snapshot view model depends on `cases[]`
-- future project-entry actions should likely open `cases`
+- current `Enter project` action opens `cases` through App-level handoff
 
 ### 8.2 Relationship to Reports
 
 - project cards derive latest report summary from `snapshot.reports`
 - the current screen does not directly call a report endpoint
-- future project report drill-down should route into `reports` or `reportDetail`
+- current project report drill-down routes into `reports` through App-level handoff
 
 ### 8.3 Relationship to Execution
 
@@ -415,18 +428,18 @@ Recommended rule for this phase:
 - document the current snapshot + upsert contract accurately
 - record future richer project APIs as evolution only
 
-## 10. Detailed Implementation Design for Currently Unwired Controls
+## 10. Current Implemented State for Previously Unwired Controls
 
-This section gives concrete implementation design for controls that are visible in the UI but not fully wired yet.
+This section records the current P2-2 implementation state for controls that were previously documented as placeholders.
 
 ### 10.1 `New project`
 
-Recommended implementation type:
+Current implementation type:
 
 - no new backend interface
 - reuse the existing local editor plus existing save endpoint
 
-Concrete implementation design:
+Current behavior:
 
 - button click should call the same app-level behavior as `Add project row`
 - after adding the row:
@@ -441,23 +454,21 @@ Route/API behavior:
   - `POST /api/phase3/catalog/project`
   - through existing save flow only
 
-Reasoning:
+Current reasoning boundary:
 
 - the screen already has a project-editor workflow
 - adding a new dedicated create endpoint would duplicate current Phase 3 semantics unnecessarily
 
 ### 10.2 `Import`
 
-Recommended implementation type:
+Current implementation type:
 
-- new backend-assisted import flow
-- because import is not equivalent to manually adding one editor row
-
-Recommended endpoints:
+- backend-assisted import flow
+- preview first, then explicit commit
 
 #### `POST /api/phase3/catalog/project/import/preview`
 
-Purpose:
+Current purpose:
 
 - validate imported project rows before commit
 - show create/update/conflict results without writing the catalog yet
@@ -480,7 +491,7 @@ Request body:
 }
 ```
 
-Request fields:
+Current request fields:
 
 - `format`
   - `json` or `csv`
@@ -517,7 +528,7 @@ Response body:
 }
 ```
 
-Functional rules:
+Current implemented rules:
 
 - reject rows missing `key`, `name`, or `scope`
 - normalize environment arrays
@@ -527,7 +538,7 @@ Functional rules:
 
 #### `POST /api/phase3/catalog/project/import/commit`
 
-Purpose:
+Current purpose:
 
 - persist approved import rows after preview
 
@@ -561,13 +572,13 @@ Response body:
 }
 ```
 
-Post-commit reflection:
+Current post-commit reflection:
 
 - call `loadSnapshot()`
 - refresh `GET /api/phase3/admin-console`
 - rehydrate `projectDraft`
 
-UI implementation notes:
+Current UI implementation:
 
 - `Import` opens import drawer/modal
 - operator pastes JSON/CSV or uploads a file
@@ -576,38 +587,38 @@ UI implementation notes:
 
 ### 10.3 Card `Reports`
 
-Recommended implementation type:
+Current implementation type:
 
 - route-state implementation
 - no new backend endpoint required in Phase 3
 
-Concrete implementation design:
+Current behavior:
 
 - add app-level handler:
   - `onOpenProjectReports(projectKey: string)`
 - handler behavior:
-  - store `reportProjectFilterKey`
+  - store `selectedReportsProjectKey`
   - set `activeScreen("reports")`
 
-Recommended app state:
+Current app state:
 
 ```ts
-const [reportProjectFilterKey, setReportProjectFilterKey] = useState<string | null>(null);
+const [selectedReportsProjectKey, setSelectedReportsProjectKey] = useState<string | null>(null);
 ```
 
-Recommended `ProjectsScreen` prop:
+Current `ProjectsScreen` prop:
 
 ```ts
 onOpenProjectReports: (projectKey: string) => void;
 ```
 
-Recommended `ReportsScreen` prop:
+Current `ReportsScreen` prop:
 
 ```ts
 initialProjectKey?: string | null;
 ```
 
-Recommended `ReportsScreen` behavior:
+Current `ReportsScreen` behavior:
 
 - initialize `selectedProjectKey` from `initialProjectKey` when valid
 - fallback to current default project if absent
@@ -618,56 +629,56 @@ Request behavior:
 - data source remains:
   - `GET /api/phase3/admin-console`
 
-Reasoning:
+Current reasoning boundary:
 
 - reports screen already derives project grouping from the shared snapshot
 - a route-state handoff is sufficient
 
 ### 10.4 Inline `View reports`
 
-Recommended implementation type:
+Current implementation type:
 
 - same route-state behavior as card `Reports`
 
-Concrete implementation design:
+Current behavior:
 
 - click should call `onOpenProjectReports(openedProject.key)`
 - no separate endpoint needed
 
 ### 10.5 Inline `Enter project`
 
-Recommended implementation type:
+Current implementation type:
 
 - route-state implementation into project-scoped case management
 - no new backend endpoint required for Phase 3
 
-Concrete implementation design:
+Current behavior:
 
 - add app-level handler:
   - `onEnterProject(projectKey: string)`
 - handler behavior:
-  - store `caseProjectFilterKey`
+  - store `selectedCaseProjectKey`
   - set `activeScreen("cases")`
 
-Recommended app state:
+Current app state:
 
 ```ts
-const [caseProjectFilterKey, setCaseProjectFilterKey] = useState<string | null>(null);
+const [selectedCaseProjectKey, setSelectedCaseProjectKey] = useState<string | null>(null);
 ```
 
-Recommended `ProjectsScreen` prop:
+Current `ProjectsScreen` prop:
 
 ```ts
 onEnterProject: (projectKey: string) => void;
 ```
 
-Recommended `CasesScreen` prop:
+Current `CasesScreen` prop:
 
 ```ts
 initialProjectKey?: string | null;
 ```
 
-Recommended `CasesScreen` behavior:
+Current `CasesScreen` behavior:
 
 - initialize its selected project from `initialProjectKey` if valid
 - preserve current fallback when no initial key exists
@@ -678,7 +689,7 @@ Request behavior:
 - downstream data source remains:
   - `GET /api/phase3/admin-console`
 
-Reasoning:
+Current reasoning boundary:
 
 - current Phase 3 already has case data in the shared snapshot
 - route-state handoff is enough for project-centered entry
@@ -688,7 +699,6 @@ Reasoning:
 Review-only findings:
 
 - the screen already has a real persistence path for project rows
-- but several visible navigation-oriented buttons are still placeholders
 - the card summary model is useful for operators but not a true backend-native project-summary contract
 - if future project detail navigation is implemented, routing ownership should be added without moving catalog save ownership away from this screen/app flow
 

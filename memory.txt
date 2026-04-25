@@ -888,3 +888,41 @@
    - Updated dashboard interface contract so `reports[]` explicitly documents canonical `runId`
    - Removed stale wording such as `visual only`, `not wired`, and similar future-state language from already implemented dashboard controls
    - This follow-up changed docs only; no code path changed
+52. 2026-04-25 P2-2 projects import and navigation actions completed
+   - `projects` visible-but-unwired controls are now connected inside the existing `App.tsx` screen-state model.
+   - Backend:
+     - added `POST /api/phase3/catalog/project/import/preview`
+     - added `POST /api/phase3/catalog/project/import/commit`
+     - `CatalogPersistenceService` now supports deterministic import preview, duplicate/conflict detection, and file-backed commit into the project catalog
+     - `LocalAdminApiServerTest` now covers the project import preview/commit flow
+   - Frontend:
+     - `ProjectsScreen.tsx` now wires `Import` to preview/commit
+     - `New project` now reuses the existing add-row draft flow and persists through `POST /api/phase3/catalog/project`
+     - project `Reports` / `View reports` now hand off to `reports`
+     - `Enter project` now hands off to `cases`
+     - `App.tsx` now keeps `selectedCaseProjectKey`, `selectedReportsProjectKey`, and project import preview/state
+     - `CasesScreen.tsx` and `ReportsScreen.tsx` accept `initialProjectKey` to reuse existing screen-state instead of adding a router
+   - Hardening:
+     - `ReportsScreen.tsx` now falls back to snapshot reports when `GET /api/phase3/runs/` returns an empty list
+     - `ProjectsScreen.tsx` draft editor rows now use stable index-based React keys so editing `project.key` no longer remounts the row
+   - Verification passed:
+     - `npm test -- --run` in `ui/admin-console` (`20/20`)
+     - `npm run build` in `ui/admin-console`
+     - `mvn "-Dmaven.repo.local=.m2/repository" -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test` (`11/11`)
+   - Current limit:
+     - project navigation remains App-level handoff only; no real route layer or typed route payload was introduced
+   - Review note:
+     - if review finds stale `projects` wording in `docs/phase3/interface`, sync docs before considering the step fully approved
+53. 2026-04-25 P2-2 projects docs baseline synchronized
+   - Follow-up review found that P2-2 was marked complete in progress logs, but `projects` docs still described import and navigation controls as unwired or future-only.
+   - Synced these docs to current implementation:
+     - `docs/phase3/interface/ui-control-interface-overview.md`
+     - `docs/phase3/interface/projects/functional-spec.md`
+     - `docs/phase3/interface/projects/interface-spec.md`
+   - Updated the docs so they now consistently state:
+     - `Import` is implemented via `POST /api/phase3/catalog/project/import/preview` -> `POST /api/phase3/catalog/project/import/commit`
+     - `New project` is implemented by reusing the add-row draft flow and persisting through `POST /api/phase3/catalog/project`
+     - `Reports` / `View reports` are implemented as App-level handoff to `reports`
+     - `Enter project` is implemented as App-level handoff to `cases`
+   - Rewrote the stale “recommended / future” wording in `projects/interface-spec.md` so it now reflects the current implemented P2-2 state, while still leaving future language only for truly unfinished areas.
+   - This follow-up changed docs only; no code path changed

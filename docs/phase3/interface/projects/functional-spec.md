@@ -62,12 +62,12 @@ Current implementation facts:
   - editable catalog form for metadata persistence
 - The overview region derives project cards from snapshot data using front-end composition.
 - The editor region uses real app-level state and a real save request flow.
-- Some top-level and card-level action buttons are visible but not wired to true navigation or backend behavior.
+- Top-level and card-level actions are now wired through the current App-level screen-state model and the local-admin-api file-backed interfaces.
 
 This distinction matters:
 
 - the screen already owns a real write flow for catalog persistence
-- but not every visible action is currently implemented
+- and now also owns the minimum required project import and downstream handoff behavior for Phase 3
 
 ## 6. Functional Areas
 
@@ -90,8 +90,8 @@ Functional role:
 Current behavior:
 
 - search box filters visible project cards locally
-- `Import` is visual only
-- `New project` is visual only
+- `Import` opens the import review flow and uses backend preview/commit interfaces
+- `New project` appends a new draft row in the editor and reuses the current save flow
 
 ### 6.2 Project Card Grid
 
@@ -123,7 +123,7 @@ Current behavior:
 
 - clicking the card selects the project locally
 - `Open` toggles inline detail panel locally
-- `Reports` only opens the same inline detail context locally; it does not navigate to `reports`
+- `Reports` performs App-level handoff into `reports` with the selected project context
 
 ### 6.3 Inline Project Detail Panel
 
@@ -149,8 +149,8 @@ Functional role:
 Current behavior:
 
 - detail panel is purely front-end/local
-- `Enter project` is visual only
-- `View reports` is visual only
+- `Enter project` performs App-level handoff into `cases`
+- `View reports` performs App-level handoff into `reports`
 
 ### 6.4 Empty State
 
@@ -230,8 +230,16 @@ The screen consumes:
 - shell snapshot
 - `projectDraft`
 - `projectState`
+- `projectImportState`
+- `projectImportPreview`
 - app-provided field labels and save hint
 - callbacks:
+  - `onImportPreview`
+  - `onImportCommit`
+  - `onImportReset`
+  - `onNewProject`
+  - `onEnterProject`
+  - `onOpenProjectReports`
   - `onProjectChange`
   - `onAddProjectRow`
   - `onRemoveProjectRow`
@@ -245,8 +253,12 @@ The screen produces two kinds of outputs:
   - search filter changes
   - selected/opened project changes
   - draft row changes
+- App-level navigation outputs
+  - project-context handoff into `cases`
+  - project-context handoff into `reports`
 - persistence output
   - project catalog save intent through the app-level submit handler
+  - project import preview / commit intent through app-level handlers
 
 ## 9. User Actions
 
@@ -271,15 +283,19 @@ Current implementation summary:
   - search
   - select card
   - open / close inline detail
+  - `Import`
+  - `New project`
+  - `Reports`
+  - `Enter project`
+  - `View reports`
   - edit draft
   - remove row
   - add row
   - save project catalog
-- not implemented beyond visible UI:
-  - `Import`
-  - `New project`
-  - `Enter project`
-  - `View reports`
+- still local/Phase 3 lightweight by design:
+  - card selection
+  - inline detail open/close
+  - draft editing before save
 
 ## 10. Functional Control Responsibility Matrix
 
@@ -290,13 +306,13 @@ Current implementation summary:
   - output type: local filter only
   - current implementation: implemented
 - `Import`
-  - function: reserved import entry
-  - output type: future project import flow
-  - current implementation: visual only
+  - function: open the project import review flow
+  - output type: preview / commit import through local-admin-api
+  - current implementation: implemented
 - `New project`
-  - function: reserved explicit create-project entry
-  - output type: future new-project flow or editor focus
-  - current implementation: visual only
+  - function: append a new draft row for project creation
+  - output type: local editor expansion, then existing save flow
+  - current implementation: implemented
 
 ### 10.2 Card Controls
 
@@ -309,23 +325,20 @@ Current implementation summary:
   - output type: local detail visibility
   - current implementation: implemented
 - `Reports`
-  - function: intended report-oriented drill-down
-  - output type: should lead operator toward project-related report context
-  - current implementation: only opens local detail state
+  - function: project-oriented report drill-down
+  - output type: App-level handoff into `reports`
+  - current implementation: implemented
 
 ### 10.3 Inline Detail Controls
 
 - `Enter project`
-  - function: intended downstream project-centered work entry
-  - likely downstreams:
-    - `cases`
-    - future project detail
-    - document-oriented project flow
-  - current implementation: visual only
+  - function: downstream project-centered work entry
+  - downstream: `cases`
+  - current implementation: implemented through App-level handoff
 - `View reports`
-  - function: intended report drill-down from project context
+  - function: report drill-down from project context
   - downstream relation: `reports`
-  - current implementation: visual only
+  - current implementation: implemented through App-level handoff
 
 ### 10.4 Catalog Editor Controls
 
@@ -437,10 +450,6 @@ The `projects` screen is not responsible for:
 
 Review items discovered while documenting:
 
-- `Import` is visible but not wired.
-- `New project` is visible but not wired beyond the existing draft editor.
-- `Reports` on project cards does not navigate to `reports`; it only opens local inline detail state.
-- `Enter project` and `View reports` in the inline detail panel are visible but not wired.
 - The project cards use a front-end-composed view model rather than a dedicated backend project-summary contract.
 
 These are documentation review items only. No implementation change is made in this stage.
@@ -451,4 +460,3 @@ This folder should keep:
 
 - `functional-spec.md`
 - `interface-spec.md`
-

@@ -8,6 +8,7 @@ type ReportsScreenProps = {
   reviewBoardLabel: string;
   reportListLabel: string;
   locale: Locale;
+  initialProjectKey?: string | null;
   selectedRunName: string | null;
   onOpenDetail: (runName: string) => void;
   apiBaseUrl: string;
@@ -107,6 +108,7 @@ export function ReportsScreen({
   reviewBoardLabel,
   reportListLabel,
   locale,
+  initialProjectKey,
   selectedRunName,
   onOpenDetail,
   apiBaseUrl
@@ -126,7 +128,7 @@ export function ReportsScreen({
   }, [apiBaseUrl]);
 
   const reportProjects = useMemo(() => {
-    const models = apiRuns
+    const models = apiRuns && apiRuns.length
       ? mapApiToViewModels(apiRuns, snapshot)
       : buildReportViewModels(snapshot);
     return groupReportProjects(models);
@@ -139,8 +141,9 @@ export function ReportsScreen({
         .find((report) => report.runName === selectedRunName) ?? null,
     [reportProjects, selectedRunName]
   );
+  const initialSelection = initialProjectKey?.trim() || selectedReport?.projectKey || reportProjects[0]?.projectKey || "";
   const [selectedProjectKey, setSelectedProjectKey] = useState(
-    selectedReport?.projectKey ?? reportProjects[0]?.projectKey ?? ""
+    initialSelection
   );
   const [overviewCollapsed, setOverviewCollapsed] = useState(false);
 
@@ -155,6 +158,16 @@ export function ReportsScreen({
       setSelectedProjectKey(selectedReport.projectKey);
     }
   }, [selectedRunName, selectedReport?.projectKey]);
+
+  useEffect(() => {
+    const normalizedProjectKey = initialProjectKey?.trim();
+    if (!normalizedProjectKey) {
+      return;
+    }
+    if (reportProjects.some((project) => project.projectKey === normalizedProjectKey) && normalizedProjectKey !== selectedProjectKey) {
+      setSelectedProjectKey(normalizedProjectKey);
+    }
+  }, [initialProjectKey, reportProjects, selectedProjectKey]);
 
   const selectedProject =
     reportProjects.find((project) => project.projectKey === selectedProjectKey) ?? reportProjects[0] ?? null;

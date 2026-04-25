@@ -8,9 +8,12 @@ import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 public final class CatalogPersistenceService {
     private final Path catalogPath;
@@ -134,6 +137,146 @@ public final class CatalogPersistenceService {
         return response;
     }
 
+    public Map<String, Object> importPreview(String requestBody) throws IOException {
+        Map<String, Object> payload = readObject(requestBody);
+        String mode = normalizeMode(optionalText(payload, "mode"));
+        List<Map<String, Object>> requestedRows = readObjectList(payload.get("rows"));
+
+        CatalogSnapshot snapshot = readSnapshot(catalogPath.toAbsolutePath().normalize());
+        Set<String> existingKeys = new HashSet<>();
+        for (Map<String, Object> project : snapshot.projects()) {
+            String key = text(project, "key");
+            if (key != null) {
+                existingKeys.add(normalizeKey(key));
+            }
+        }
+
+        List<Map<String, Object>> previewRows = new ArrayList<>();
+        List<Map<String, Object>> conflicts = new ArrayList<>();
+        Set<String> payloadKeys = new HashSet<>();
+        int createCount = 0;
+        int updateCount = 0;
+
+        for (Map<String, Object> row : requestedRows) {
+            String key = text(row, "key");
+            String name = text(row, "name");
+            String scope = text(row, "scope");
+            if (key == null || name == null || scope == null) {
+                conflicts.add(conflictRow(key, "Missing required field: key/name/scope"));
+                continue;
+            }
+
+            String normalizedKey = normalizeKey(key);
+            if (!payloadKeys.add(normalizedKey)) {
+                conflicts.add(conflictRow(key, "Duplicate key in import payload"));
+                continue;
+            }
+
+            String action = existingKeys.contains(normalizedKey) && !"replace".equals(mode) ? "update" : "create";
+            if ("update".equals(action)) {
+                updateCount++;
+            } else {
+                createCount++;
+            }
+
+            Map<String, Object> previewRow = normalizedProjectRow(row);
+            previewRow.put("action", action);
+            previewRow.put("warnings", List.of());
+            previewRows.add(previewRow);
+        }
+
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("totalRows", requestedRows.size());
+        summary.put("createCount", createCount);
+        summary.put("updateCount", updateCount);
+        summary.put("conflictCount", conflicts.size());
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("status", "PREVIEW_READY");
+        response.put("kind", "catalog-project-import-preview");
+        response.put("summary", summary);
+        response.put("rows", previewRows);
+        response.put("conflicts", conflicts);
+        return response;
+    }
+
+    public Map<String, Object> importCommit(String requestBody) throws IOException {
+        Map<String, Object> payload = readObject(requestBody);
+        String mode = normalizeMode(optionalText(payload, "mode"));
+        List<Map<String, Object>> requestedRows = readObjectList(payload.get("rows"));
+        if (requestedRows.isEmpty()) {
+            throw new IllegalArgumentException("Import rows are required.");
+        }
+
+        Path normalizedPath = catalogPath.toAbsolutePath().normalize();
+        Path parent = normalizedPath.getParent();
+        if (parent != null) {
+            Files.createDirectories(parent);
+        }
+
+        CatalogSnapshot snapshot = readSnapshot(normalizedPath);
+        List<Map<String, Object>> existingProjects = new ArrayList<>(snapshot.projects());
+        Set<String> existingKeys = new HashSet<>();
+        for (Map<String, Object> project : existingProjects) {
+            String key = text(project, "key");
+            if (key != null) {
+                existingKeys.add(normalizeKey(key));
+            }
+        }
+
+        List<Map<String, Object>> normalizedRows = new ArrayList<>();
+        Set<String> payloadKeys = new HashSet<>();
+        int created = 0;
+        int updated = 0;
+        for (Map<String, Object> row : requestedRows) {
+            Map<String, Object> normalizedRow = normalizedProjectRow(row);
+            String key = String.valueOf(normalizedRow.get("key"));
+            String normalizedKey = normalizeKey(key);
+            if (!payloadKeys.add(normalizedKey)) {
+                throw new IllegalArgumentException("Duplicate key in import payload: " + key);
+            }
+            if (existingKeys.contains(normalizedKey)) {
+                updated++;
+            } else {
+                created++;
+            }
+            normalizedRows.add(normalizedRow);
+        }
+
+        List<Map<String, Object>> persistedProjects;
+        if ("replace".equals(mode)) {
+            persistedProjects = normalizedRows;
+        } else {
+            persistedProjects = new ArrayList<>(existingProjects);
+            for (Map<String, Object> normalizedRow : normalizedRows) {
+                String key = String.valueOf(normalizedRow.get("key"));
+                boolean matched = false;
+                for (int index = 0; index < persistedProjects.size(); index++) {
+                    String existingKey = text(persistedProjects.get(index), "key");
+                    if (existingKey != null && existingKey.equalsIgnoreCase(key)) {
+                        persistedProjects.set(index, normalizedRow);
+                        matched = true;
+                        break;
+                    }
+                }
+                if (!matched) {
+                    persistedProjects.add(normalizedRow);
+                }
+            }
+        }
+
+        writeSnapshot(normalizedPath, persistedProjects, snapshot.cases());
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("status", "ACCEPTED");
+        response.put("kind", "catalog-project-import");
+        response.put("created", created);
+        response.put("updated", updated);
+        response.put("totalProjects", persistedProjects.size());
+        response.put("path", normalizedPath.toString());
+        return response;
+    }
+
     private CatalogSnapshot readSnapshot(Path path) throws IOException {
         if (!Files.isRegularFile(path)) {
             return new CatalogSnapshot(List.of(), List.of());
@@ -144,6 +287,13 @@ public final class CatalogPersistenceService {
         }
         Map<String, Object> document = readObject(json);
         return new CatalogSnapshot(readObjectList(document.get("projects")), readObjectList(document.get("cases")));
+    }
+
+    private void writeSnapshot(Path path, List<Map<String, Object>> projects, List<Map<String, Object>> cases) throws IOException {
+        Map<String, Object> document = new LinkedHashMap<>();
+        document.put("projects", projects);
+        document.put("cases", cases);
+        Files.writeString(path, Jsons.writeValueAsString(document), StandardCharsets.UTF_8);
     }
 
     private List<Map<String, Object>> readObjectList(Object value) {
@@ -231,6 +381,44 @@ public final class CatalogPersistenceService {
             return Boolean.parseBoolean(text.trim());
         }
         return false;
+    }
+
+    private Map<String, Object> normalizedProjectRow(Map<String, Object> row) {
+        String key = requiredText(row, "key");
+        String name = requiredText(row, "name");
+        String scope = requiredText(row, "scope");
+        List<String> environments = environments(row.get("environments"));
+        String note = optionalText(row, "note");
+
+        Map<String, Object> normalized = new LinkedHashMap<>();
+        normalized.put("key", key);
+        normalized.put("name", name);
+        normalized.put("scope", scope);
+        normalized.put("environments", environments);
+        normalized.put("note", note == null ? "" : note);
+        return normalized;
+    }
+
+    private Map<String, Object> conflictRow(String key, String reason) {
+        Map<String, Object> conflict = new LinkedHashMap<>();
+        conflict.put("key", key == null ? "" : key);
+        conflict.put("reason", reason);
+        return conflict;
+    }
+
+    private String normalizeMode(String mode) {
+        if (mode == null || mode.isBlank()) {
+            return "merge";
+        }
+        String normalized = mode.trim().toLowerCase(Locale.ROOT);
+        if (!"merge".equals(normalized) && !"replace".equals(normalized)) {
+            throw new IllegalArgumentException("Unsupported import mode: " + mode);
+        }
+        return normalized;
+    }
+
+    private String normalizeKey(String key) {
+        return key.trim().toLowerCase(Locale.ROOT);
     }
 
     private void copyOptional(Map<String, Object> source, Map<String, Object> target, String key) {
