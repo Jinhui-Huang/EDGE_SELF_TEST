@@ -43,6 +43,7 @@ export type AdminConsoleSnapshot = {
     detail: string;
   }>;
   reports: Array<{
+    runId?: string;
     runName: string;
     status: string;
     finishedAt: string;

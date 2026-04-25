@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { CasesScreen } from "./screens/CasesScreen";
 import { DatabaseConfigScreen } from "./screens/DatabaseConfigScreen";
-import { DashboardScreen } from "./screens/DashboardScreen";
+import { DashboardAttentionTarget, DashboardScreen } from "./screens/DashboardScreen";
 import { DataDiffScreen } from "./screens/DataDiffScreen";
 import { DataTemplatesScreen } from "./screens/DataTemplatesScreen";
 import { DocParseScreen } from "./screens/DocParseScreen";
@@ -186,9 +186,9 @@ const fallbackSnapshot: AdminConsoleSnapshot = {
     }
   ],
   reports: [
-    { runName: "dsl-smoke-run", status: "SUCCESS", finishedAt: "2026-04-18 18:22", entry: "HTML / artifacts / cleanup" },
-    { runName: "checkout-web-nightly", status: "FAILED", finishedAt: "2026-04-18 09:10", entry: "Failure analysis pending" },
-    { runName: "quota-cleanup-dry-run", status: "INFO", finishedAt: "2026-04-18 18:46", entry: "Maintenance diagnostics only" }
+    { runId: "dsl-smoke-run", runName: "dsl-smoke-run", status: "SUCCESS", finishedAt: "2026-04-18 18:22", entry: "HTML / artifacts / cleanup" },
+    { runId: "checkout-web-nightly", runName: "checkout-web-nightly", status: "FAILED", finishedAt: "2026-04-18 09:10", entry: "Failure analysis pending" },
+    { runId: "quota-cleanup-dry-run", runName: "quota-cleanup-dry-run", status: "INFO", finishedAt: "2026-04-18 18:46", entry: "Maintenance diagnostics only" }
   ],
   modelConfig: [
     { label: "Provider", value: "OpenAI-compatible placeholder" },
@@ -1278,7 +1278,9 @@ export function App() {
   const [snapshot, setSnapshot] = useState<AdminConsoleSnapshot>(fallbackSnapshot);
   const [sourceLabel, setSourceLabel] = useState(translate("en", sharedCopy.sourceFallback));
   const [activeScreen, setActiveScreen] = useState<ScreenId>("dashboard");
-  const [selectedReportRunName, setSelectedReportRunName] = useState<string | null>(fallbackSnapshot.reports[0]?.runName ?? null);
+  const [selectedReportRunName, setSelectedReportRunName] = useState<string | null>(
+    fallbackSnapshot.reports[0]?.runId ?? fallbackSnapshot.reports[0]?.runName ?? null
+  );
   const [selectedMonitorRunId, setSelectedMonitorRunId] = useState<string | null>(null);
   const [aiGenerateFocus, setAiGenerateFocus] = useState<AiGenerateFocus | null>(null);
   const [locale, setLocale] = useState<Locale>("en");
@@ -1393,6 +1395,35 @@ export function App() {
     setActiveScreen("monitor");
   }
 
+  async function refreshSnapshot() {
+    try {
+      await loadSnapshot();
+    } catch (error) {
+      setSourceLabel(
+        formatCopy(t(sharedCopy.sourceFallbackWithError), {
+          error: error instanceof Error ? error.message : String(error)
+        })
+      );
+    }
+  }
+
+  function handleDashboardAttention(target: DashboardAttentionTarget) {
+    switch (target.kind) {
+      case "reportDetail":
+        openReportDetail(target.runId);
+        break;
+      case "monitor":
+        openMonitor(target.runId);
+        break;
+      case "dataDiff":
+        openDataDiff(target.runId ?? selectedReportRunName);
+        break;
+      case "models":
+        handleScreenChange("models");
+        break;
+    }
+  }
+
   function handleScreenChange(screen: ScreenId) {
     if (screen === "monitor") {
       setSelectedMonitorRunId(null);
@@ -1437,7 +1468,9 @@ export function App() {
       return;
     }
     setSelectedReportRunName((current) =>
-      current && snapshot.reports.some((item) => item.runName === current) ? current : snapshot.reports[0].runName
+      current && snapshot.reports.some((item) => (item.runId ?? item.runName) === current)
+        ? current
+        : (snapshot.reports[0].runId ?? snapshot.reports[0].runName)
     );
   }, [snapshot.reports]);
 
@@ -1995,6 +2028,13 @@ export function App() {
             queueBoardLabel={t(uiCopy.queueBoard)}
             dashboardTitle={t(localizedScreenCopy.dashboard.title)}
             locale={locale}
+            onRefresh={() => {
+              void refreshSnapshot();
+            }}
+            onNewRun={() => handleScreenChange("execution")}
+            onOpenRunDetail={openReportDetail}
+            onOpenAttention={handleDashboardAttention}
+            onOpenModels={() => handleScreenChange("models")}
           />
         );
       case "projects":

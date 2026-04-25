@@ -845,3 +845,46 @@
      - datasource test connection is implemented via `POST /api/phase3/datasources/test-connection`
      - both remain deterministic validation only and do not perform real external connectivity in Phase 3
    - This sync unblocks review of the completed P1-4 implementation without changing the code path itself.
+50. 2026-04-25 P2-1 dashboard control wiring completed
+   - Dashboard controls that were visible but not wired are now connected through the existing `App.tsx` screen-state model.
+   - Dashboard actions completed:
+     - `Refresh` now reuses `GET /api/phase3/admin-console`
+     - `New run` now hands off to `execution`
+     - recent-run rows now hand off to `reportDetail`
+     - attention items now hand off to `reportDetail` / `monitor` / `dataDiff` / `models`
+     - AI provider chips now hand off to `models`
+   - To keep report-detail handoff canonical, dashboard snapshot rows now expose `runId`:
+     - `AdminConsoleSnapshot.ReportRow` updated with `runId`
+     - `Phase3MockDataService` now includes `runId` in mock snapshot report rows
+   - No new dashboard-specific route system was added.
+   - No Phase 4 typed route payload mechanism was introduced.
+   - `DashboardScreen.tsx` was rewritten from demo-only controls to snapshot-driven UI callbacks.
+   - Frontend tests were added for:
+     - refresh reloading admin snapshot
+     - new-run handoff to execution
+     - recent-run canonical report-detail handoff
+     - attention-item handoff for all target kinds
+     - AI provider chip handoff
+   - Verification passed:
+     - `npm test -- --run` in `ui/admin-console`
+     - `npm run build` in `ui/admin-console`
+     - `mvn "-Dmaven.repo.local=.m2/repository" -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+   - Known Phase 3 limit retained:
+     - handoff is screen-level only; provider chips do not yet deep-focus a specific provider editor
+   - Recommended next backlog item:
+     - `P2-2 Complete projects import and navigation actions`
+51. 2026-04-25 P2-1 dashboard docs baseline synchronized
+   - Follow-up review found that P2-1 was marked complete in progress logs, but dashboard docs still described the controls as unwired.
+   - Synced these docs to current implementation:
+     - `docs/phase3/interface/ui-control-interface-overview.md`
+     - `docs/phase3/interface/dashboard/functional-spec.md`
+     - `docs/phase3/interface/dashboard/interface-spec.md`
+   - Updated dashboard docs so they now consistently state:
+     - `Refresh` is implemented and reuses `GET /api/phase3/admin-console`
+     - `New run` is implemented as App-level handoff to `execution`
+     - recent-run rows are implemented as App-level handoff to `reportDetail`
+     - attention items are implemented as App-level handoff by target type
+     - AI provider chips are implemented as App-level handoff to `models`
+   - Updated dashboard interface contract so `reports[]` explicitly documents canonical `runId`
+   - Removed stale wording such as `visual only`, `not wired`, and similar future-state language from already implemented dashboard controls
+   - This follow-up changed docs only; no code path changed

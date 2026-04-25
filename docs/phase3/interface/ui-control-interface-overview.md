@@ -29,12 +29,12 @@ Conventions used here:
 
 | Control | Type | Current behavior / interface | Future interface / design |
 |---|---|---|---|
-| `Refresh` | button | Intended current read is `GET /api/phase3/admin-console`; currently not bound | Keep reuse of `GET /api/phase3/admin-console` |
-| `New run` | button | Visual only | App-level handoff into `execution`; actual submission remains `POST /api/phase3/scheduler/requests` and `POST /api/phase3/scheduler/events` in `execution` |
+| `Refresh` | button | Implemented; reuses `GET /api/phase3/admin-console` through the shell-level snapshot reload path | Keep current |
+| `New run` | button | Implemented as App-level handoff into `execution`; actual submission remains `POST /api/phase3/scheduler/requests` and `POST /api/phase3/scheduler/events` in `execution` | Keep current |
 | Metric cards | clickable cards | Mostly display-only | App-level handoff into related downstream page/filter |
-| Recent run row | clickable row | Visual only | App-level handoff into `reportDetail` via selected run |
-| Attention item | clickable row | Visual only | App-level handoff into `reportDetail` / `monitor` / `dataDiff` / `models` depending on target type |
-| AI summary / provider chips | clickable chips | Visual only | App-level handoff into `models` |
+| Recent run row | clickable row | Implemented as App-level handoff into `reportDetail` via canonical `runId` | Keep current lightweight handoff |
+| Attention item | clickable row | Implemented as App-level handoff into `reportDetail` / `monitor` / `dataDiff` / `models` depending on target type | Keep current lightweight handoff |
+| AI summary / provider chips | clickable chips | Implemented as App-level handoff into `models` | Keep current lightweight handoff |
 | Language switch | top-bar control | Local only | Keep local UI state |
 | Theme switch | top-bar control | Local only | Keep local UI state |
 

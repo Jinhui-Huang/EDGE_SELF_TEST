@@ -309,6 +309,7 @@ public final class Phase3MockDataService {
     private List<AdminConsoleSnapshot.ReportRow> buildReportRows(List<LocalExecutionSummary> executions) {
         if (executions.isEmpty()) {
             return List.of(new AdminConsoleSnapshot.ReportRow(
+                    "no-local-reports",
                     "No local reports",
                     "INFO",
                     "-",
@@ -317,6 +318,7 @@ public final class Phase3MockDataService {
         return executions.stream()
                 .limit(8)
                 .map(execution -> new AdminConsoleSnapshot.ReportRow(
+                        execution.runId(),
                         execution.runId(),
                         execution.status(),
                         formatReportTime(execution.sortInstant()),

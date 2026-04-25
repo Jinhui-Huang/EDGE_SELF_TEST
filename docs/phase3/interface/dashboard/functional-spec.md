@@ -61,15 +61,16 @@ The `dashboard` is the default overview screen in the shell-oriented navigation 
 Current implementation facts:
 
 - The page is rendered by `DashboardScreen.tsx`.
-- The page currently behaves as a read-only screen.
-- The current visible content is mostly screen-local demo/static presentation data.
-- The screen receives `snapshot` props from `App.tsx`, but the current implementation does not materially consume snapshot fields for the displayed cards and lists.
-- The visible buttons `Refresh` and `New run` are present in the UI, but they are not currently bound to a real action in `DashboardScreen.tsx`.
+- The page remains a read-mostly operational screen.
+- The current visible content is now materially derived from `snapshot` data passed from `App.tsx`.
+- `Refresh` is implemented through the shell snapshot reload path and reuses `GET /api/phase3/admin-console`.
+- `New run` is implemented as an App-level handoff into `execution`.
+- Recent-run rows, attention items, and AI provider chips are implemented as App-level handoff controls into downstream screens.
 
 This distinction matters for documentation:
 
 - The screen responsibility is broad and operational.
-- The current implementation depth is intentionally lighter than the long-term role.
+- The current implementation now matches the Phase 3 control-wiring scope without introducing a typed router.
 
 ## 6. Functional Areas
 
@@ -90,12 +91,13 @@ Functional intent:
 
 Current behavior:
 
-- Buttons are visual only in the current implementation.
+- `Refresh` reloads the current admin-console snapshot through `App.tsx`.
+- `New run` switches the active screen to `execution`.
 
 Expected relationship to other screens:
 
-- `Refresh` should conceptually reload the same admin-console state source used by the shell.
-- `New run` should conceptually lead the operator into `execution`.
+- `Refresh` reuses the same admin-console state source used by the shell.
+- `New run` leads the operator into `execution`.
 
 ### 6.2 Metric Cards Area
 
@@ -132,18 +134,17 @@ Operational interpretation:
 Visible structure:
 
 - Panel title: `Recent runs`
-- Time range hint: `last 24h`
+- Source hint: `from admin snapshot`
 - Tabular list of recent executions
 
 Displayed columns:
 
 - run marker
 - run name
-- environment
+- canonical run id
 - status
-- model
-- duration
-- relative time
+- finished time
+- summary entry
 
 Functional role:
 
@@ -154,12 +155,12 @@ What the operator can infer from this area:
 
 - which runs are failing now
 - whether a failure is isolated or widespread
-- which execution model handled the run
-- whether long duration suggests congestion or runtime instability
+- which canonical run should be opened for deeper investigation
+- whether the latest visible run summary is operationally actionable
 
 Downstream relation:
 
-- Failing or interesting runs should lead the operator toward `reports` and then `reportDetail`.
+- Failing or interesting runs currently lead the operator directly toward `reportDetail`.
 - Queue or running-state pressure should lead the operator toward `monitor`.
 
 ### 6.4 Needs Attention Panel
@@ -198,10 +199,8 @@ Expected downstream mapping:
 Visible structure:
 
 - panel title: `AI decisions`
-- time range hint
-- adopted count summary
-- fallback-trigger count summary
-- fallback reason hint
+- constraints summary
+- model-config count summary
 - model distribution chips
 
 Functional role:
@@ -211,13 +210,13 @@ Functional role:
 
 Operational interpretation:
 
-- adopted ratio indicates operator confidence and system stability
-- fallback count indicates reliability issues or schema/output drift
-- model chips indicate provider distribution and cost/risk concentration
+- constraint and config counts indicate current AI governance posture
+- provider chips indicate provider distribution and management entry points
+- the panel remains an overview surface, not a detailed routing editor
 
 Downstream relation:
 
-- unusual fallback behavior should drive the operator to `models`
+- unusual provider posture should drive the operator to `models`
 - AI-related failures observed here should later be correlated with `reports` and `reportDetail`
 
 ## 7. Data Semantics by Area
@@ -263,19 +262,19 @@ The `dashboard` screen is expected to consume these upstream inputs from the she
 Current implementation note:
 
 - the props contract already exposes this input model
-- the current rendered UI still uses mostly screen-local static values instead of deeply consuming the snapshot
+- the current rendered UI consumes `stats`, `reports`, `workQueue`, `constraints`, and `modelConfig` to build the visible dashboard sections
 
 ### 8.2 Screen Outputs
 
 The `dashboard` screen does not currently submit business data.
 
-Its output is operational guidance only:
+Its current outputs are operational guidance and lightweight App-level navigation:
 
 - tell the operator whether the platform is healthy
 - tell the operator what to open next
 - tell the operator whether queue, risk, restore, or AI posture needs attention
 
-Future interaction outputs should be limited to:
+Implemented interaction outputs are limited to:
 
 - refresh current overview state
 - navigate to downstream screens
@@ -289,7 +288,11 @@ Currently visible actions:
 
 Current implementation status:
 
-- No click handler is attached in the current screen implementation.
+- `Refresh` is wired.
+- `New run` is wired.
+- recent-run rows are wired.
+- attention items are wired.
+- provider chips are wired.
 
 Functional definition for documentation:
 
@@ -310,12 +313,12 @@ No inline editing, delete, approve, or submit action currently exists on this sc
   - function: refresh dashboard overview state
   - output type: reload current screen data
   - downstream relation: remains on `dashboard`
-  - current implementation: visual only
+  - current implementation: implemented via shell snapshot reload
 - `New run`
   - function: enter execution initiation flow
   - output type: route to `execution`
   - downstream relation: `execution`
-  - current implementation: visual only
+  - current implementation: implemented as App-level handoff
 
 ### 10.2 Summary Cards
 
@@ -344,8 +347,8 @@ No inline editing, delete, approve, or submit action currently exists on this sc
 
 - Recent run row
   - function: expose a single execution summary
-  - downstream relation: should lead to `reports` or `reportDetail`
-  - current implementation: display only
+  - downstream relation: leads to `reportDetail`
+  - current implementation: implemented as App-level handoff using canonical `runId`
 
 ### 10.4 Attention Controls
 
@@ -356,7 +359,7 @@ No inline editing, delete, approve, or submit action currently exists on this sc
     - queue pressure -> `monitor`
     - restore lock -> `dataDiff`
     - audit backlog -> `models` or later audit page
-  - current implementation: display only
+  - current implementation: implemented as App-level handoff based on target type
 
 ### 10.5 AI Decision Controls
 
@@ -367,7 +370,7 @@ No inline editing, delete, approve, or submit action currently exists on this sc
 - Model distribution chips
   - function: show provider distribution at overview level
   - downstream relation: `models`
-  - current implementation: display only
+  - current implementation: implemented as App-level handoff into `models`
 
 ## 11. State Model
 
@@ -455,13 +458,9 @@ The `dashboard` screen is not responsible for:
 
 Review items discovered while documenting:
 
-- `Refresh` is visible but not wired.
-- `New run` is visible but not wired to `execution`.
-- The screen receives `snapshot`, but most displayed content is still screen-local static content rather than mapped shell data.
-- The screen does not yet expose a direct row-level navigation from recent runs into `reports` or `reportDetail`.
+- Metric cards remain overview displays only and do not yet deep-link into filtered downstream screens.
+- The screen still derives attention items in the front end from snapshot data rather than receiving a dedicated backend attention model.
 - The screen currently lacks explicit loading, empty, and error rendering states in its own view layer.
-
-These are documentation review items only. No implementation change is made in this stage.
 
 ## 16. Suggested Output Files for This Screen Folder
 

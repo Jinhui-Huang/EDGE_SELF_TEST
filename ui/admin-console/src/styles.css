@@ -1681,7 +1681,7 @@ textarea {
 
 .dashboardRunHeader,
 .dashboardRunRow {
-  --dashboard-run-columns: 12px minmax(0, 1.6fr) 92px 88px 120px 72px 64px;
+  --dashboard-run-columns: 12px minmax(0, 1.8fr) 96px 120px minmax(0, 1.2fr);
   display: grid;
   grid-template-columns: var(--dashboard-run-columns);
   gap: 12px;
@@ -1713,6 +1713,19 @@ textarea {
   font-size: 13px;
 }
 
+.dashboardRunRowButton {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dashboardRunRowButton:hover {
+  background: color-mix(in srgb, var(--surface-2) 70%, transparent);
+}
+
 .dashboardRunRow:last-child {
   border-bottom: 0;
 }
@@ -1736,7 +1749,14 @@ textarea {
 }
 
 .dashboardRunName {
+  display: grid;
+  gap: 4px;
   font-weight: 500;
+  min-width: 0;
+}
+
+.dashboardRunName strong,
+.dashboardRunName span {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2341,6 +2361,19 @@ textarea {
   border-bottom: 1px solid var(--line);
 }
 
+.dashboardAttentionButton {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dashboardAttentionButton:hover {
+  background: color-mix(in srgb, var(--surface-2) 72%, transparent);
+}
+
 .dashboardAttentionItem:last-child {
   border-bottom: 0;
 }
@@ -2453,6 +2486,10 @@ textarea {
   color: var(--text-muted);
   font-size: 11px;
   font-weight: 600;
+}
+
+.dashboardChipButton {
+  cursor: pointer;
 }
 
 .dashboardChip.accent {

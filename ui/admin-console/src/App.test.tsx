@@ -72,12 +72,14 @@ const snapshot = {
   ],
   reports: [
     {
+      runId: "checkout-web-nightly",
       runName: "checkout-web-nightly",
       status: "FAILED",
       finishedAt: "2026-04-18 09:10",
       entry: "Failure analysis pending"
     },
     {
+      runId: "member-center-daily",
       runName: "member-center-daily",
       status: "SUCCESS",
       finishedAt: "2026-04-18 08:30",
@@ -121,6 +123,142 @@ const dataTemplatesResponse = {
   ]
 };
 
+const reportResponse = {
+  runId: "checkout-web-nightly",
+  status: "FAILED",
+  startedAt: "2026-04-18T09:00:00Z",
+  finishedAt: "2026-04-18T09:10:00Z",
+  durationMs: 600000,
+  stepsTotal: 8,
+  stepsPassed: 7,
+  assertionsTotal: 11,
+  assertionsPassed: 10,
+  artifactCount: 3,
+  outputDir: "runs/checkout-web-nightly",
+  summary: {
+    total: 8,
+    passed: 7,
+    failed: 1,
+    skipped: 0
+  },
+  steps: [
+    {
+      stepId: "step-1",
+      stepName: "Open checkout page",
+      action: "open",
+      status: "PASSED",
+      message: null,
+      durationMs: 1200,
+      artifactPath: "artifacts/step-1.png"
+    }
+  ],
+  assertions: [
+    {
+      name: "payment button visible",
+      action: "assertVisible",
+      status: "FAILED",
+      message: "button selector mismatch",
+      pass: false
+    }
+  ],
+  artifacts: [
+    {
+      kind: "screenshot",
+      label: "artifacts/step-1.png",
+      path: "runs/checkout-web-nightly/artifacts/step-1.png"
+    }
+  ]
+};
+
+const dataDiffResponse = {
+  runId: "checkout-web-nightly",
+  summary: {
+    expectedChanges: 6,
+    unexpectedChanges: 1,
+    restoredCount: 6,
+    totalRows: 7,
+    affectedTables: 4
+  },
+  rows: [
+    {
+      table: "orders",
+      pk: "ord_8821",
+      field: "status",
+      before: "\"pending\"",
+      after: "\"paid\"",
+      afterRestore: "\"pending\"",
+      expected: true,
+      restored: true
+    }
+  ]
+};
+
+const monitorStatusResponse = {
+  runId: "checkout-web-smoke",
+  projectKey: "checkout-web",
+  status: "RUNNING",
+  environment: "prod-like",
+  model: "gpt-4.1-mini",
+  owner: "qa-platform",
+  progress: {
+    currentStep: 2,
+    totalSteps: 5,
+    percent: 40,
+    elapsedMs: 120000,
+    estimatedTotalMs: 300000
+  },
+  currentPage: {
+    url: "https://example.test/checkout",
+    state: "ready"
+  },
+  counters: {
+    assertionsPassed: 8,
+    assertionsTotal: 10,
+    aiCalls: 2,
+    heals: 1
+  },
+  control: {
+    canPause: true,
+    canAbort: true
+  },
+  lastUpdatedAt: "2026-04-18T09:04:00Z"
+};
+
+const monitorStepsResponse = {
+  runId: "checkout-web-smoke",
+  items: [
+    { index: 1, label: "Open home", state: "DONE", durationMs: 2000 },
+    { index: 2, label: "Fill cart", state: "RUNNING", durationMs: 1500, note: "waiting for payment iframe" }
+  ]
+};
+
+const monitorRuntimeLogResponse = {
+  runId: "checkout-web-smoke",
+  items: [
+    {
+      at: "2026-04-18T09:03:30Z",
+      type: "RUNNING",
+      model: "gpt-4.1-mini",
+      summary: "Inspecting payment button locator."
+    }
+  ],
+  nextCursor: null
+};
+
+const monitorLivePageResponse = {
+  runId: "checkout-web-smoke",
+  capturedAt: "2026-04-18T09:03:31Z",
+  url: "https://example.test/checkout",
+  title: "Checkout",
+  pageState: "ready",
+  highlight: {
+    stepIndex: 2,
+    action: "Inspect payment button",
+    target: "#pay-now"
+  },
+  screenshotPath: null
+};
+
 describe("App", () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -136,6 +274,130 @@ describe("App", () => {
     expect((await screen.findAllByText("checkout-web")).length).toBeGreaterThan(0);
     expect(await screen.findByText("Project catalog")).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith("http://127.0.0.1:8787/api/phase3/admin-console");
+  });
+
+  it("refreshes the dashboard snapshot and hands off New run to Execution", async () => {
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) {
+        return jsonResponse(snapshot);
+      }
+      if (url.endsWith("/api/phase3/data-templates")) {
+        return jsonResponse(dataTemplatesResponse);
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    await screen.findByText("Recent runs");
+    await userEvent.click(screen.getByRole("button", { name: "Refresh" }));
+
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.filter(([input]) => String(input).endsWith("/api/phase3/admin-console"))
+      ).toHaveLength(2);
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: /New run/i }));
+
+    expect(await screen.findByText("Execution center")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith("http://127.0.0.1:8787/api/phase3/data-templates");
+  });
+
+  it("opens dashboard recent-run rows with the canonical runId", async () => {
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) {
+        return jsonResponse(snapshot);
+      }
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/report")) {
+        return jsonResponse(reportResponse);
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    await screen.findByText("Recent runs");
+    await userEvent.click(screen.getByRole("button", { name: "Open run checkout-web-nightly" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith("http://127.0.0.1:8787/api/phase3/runs/checkout-web-nightly/report");
+    });
+    expect(await screen.findByText("Download artifacts")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "checkout-web-nightly" })).toBeInTheDocument();
+  });
+
+  it("routes dashboard attention items and provider chips through existing App handoff state", async () => {
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) {
+        return jsonResponse(snapshot);
+      }
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/report")) {
+        return jsonResponse(reportResponse);
+      }
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/data-diff")) {
+        return jsonResponse(dataDiffResponse);
+      }
+      if (url.endsWith("/api/phase3/runs/checkout-web-smoke/status")) {
+        return jsonResponse(monitorStatusResponse);
+      }
+      if (url.endsWith("/api/phase3/runs/checkout-web-smoke/steps")) {
+        return jsonResponse(monitorStepsResponse);
+      }
+      if (url.endsWith("/api/phase3/runs/checkout-web-smoke/runtime-log")) {
+        return jsonResponse(monitorRuntimeLogResponse);
+      }
+      if (url.endsWith("/api/phase3/runs/checkout-web-smoke/live-page")) {
+        return jsonResponse(monitorLivePageResponse);
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    await screen.findByText("Needs attention");
+
+    await userEvent.click(screen.getByRole("button", { name: /Recent failed run requires triage/i }));
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith("http://127.0.0.1:8787/api/phase3/runs/checkout-web-nightly/report");
+    });
+    expect(await screen.findByText("Download artifacts")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /Dashboard/ }));
+    await screen.findByText("Needs attention");
+
+    await userEvent.click(screen.getByRole("button", { name: /Data diff review recommended/i }));
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith("http://127.0.0.1:8787/api/phase3/runs/checkout-web-nightly/data-diff");
+    });
+    expect(await screen.findByText("Data diff - orders & inventory")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /Dashboard/ }));
+    await screen.findByText("Needs attention");
+
+    await userEvent.click(screen.getByRole("button", { name: /Execution pressure needs monitoring/i }));
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith("http://127.0.0.1:8787/api/phase3/runs/checkout-web-smoke/status");
+    });
+    expect(await screen.findByText("checkout-web")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /Dashboard/ }));
+    await screen.findByText("Needs attention");
+
+    await userEvent.click(screen.getByRole("button", { name: /AI provider posture should be reviewed/i }));
+    expect(await screen.findByRole("button", { name: /Add provider/i })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /Dashboard/ }));
+    await screen.findByText("provider distribution");
+
+    await userEvent.click(screen.getByRole("button", { name: "OpenAI Responses API" }));
+    expect(await screen.findByRole("button", { name: /Add provider/i })).toBeInTheDocument();
   });
 
   it("posts scheduler mutations and refreshes the snapshot", async () => {

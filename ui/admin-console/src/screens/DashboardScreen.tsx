@@ -1,6 +1,16 @@
 import { translate } from "../i18n";
 import { AdminConsoleSnapshot, Locale } from "../types";
 
+type Copy = { en: string; zh: string; ja: string };
+
+const copy = (en: string, zh = en, ja = en): Copy => ({ en, zh, ja });
+
+export type DashboardAttentionTarget =
+  | { kind: "reportDetail"; runId: string }
+  | { kind: "monitor"; runId?: string | null }
+  | { kind: "dataDiff"; runId?: string | null }
+  | { kind: "models" };
+
 type DashboardScreenProps = {
   snapshot: AdminConsoleSnapshot;
   runtimePolicyLabel: string;
@@ -10,102 +20,174 @@ type DashboardScreenProps = {
   queueBoardLabel: string;
   dashboardTitle: string;
   locale: Locale;
+  onRefresh?: () => void;
+  onNewRun?: () => void;
+  onOpenRunDetail?: (runId: string) => void;
+  onOpenAttention?: (target: DashboardAttentionTarget) => void;
+  onOpenModels?: (providerId?: string | null) => void;
 };
 
-export function DashboardScreen({ locale }: DashboardScreenProps) {
-  const t = (value: { en: string; zh: string; ja: string }) => translate(locale, value);
+type DashboardProviderChip = {
+  id: string;
+  label: string;
+};
 
-  const recentRuns = [
-    { name: "Core smoke / login to dashboard", env: "staging", status: "pass", duration: "2m 46s", model: "audit-runtime", time: "3m ago" },
-    { name: "Member center / profile save", env: "pre-prod", status: "running", duration: "58s", model: "rule-first", time: "now" },
-    { name: "Checkout / card payment retry", env: "staging", status: "fail", duration: "4m 12s", model: "audit-runtime", time: "17m ago" },
-    { name: "Ops console / role permission edit", env: "dev", status: "pass", duration: "3m 37s", model: "local-review", time: "31m ago" },
-    { name: "Campaign page / lead form submit", env: "uat", status: "pass", duration: "5m 05s", model: "rule-first", time: "52m ago" },
-    { name: "Settlement center / export billing", env: "prod-mirror", status: "pass", duration: "6m 21s", model: "audit-runtime", time: "1h ago" }
-  ];
+function normalizeStatusTone(status: string) {
+  const normalized = status.toUpperCase();
+  if (normalized === "OK" || normalized === "SUCCESS" || normalized === "PASSED") return "pass";
+  if (normalized === "RUNNING" || normalized === "IN_PROGRESS" || normalized === "WAITING" || normalized === "QUEUED") return "running";
+  if (normalized === "FAILED" || normalized === "ERROR") return "fail";
+  return "neutral";
+}
 
-  const attentionItems = [
-    { title: "Payment confirmation locator drift", detail: "The checkout confirm button changed twice today and needs manual review.", tone: "danger" },
-    { title: "Staging browser pool nearing saturation", detail: "6 of 8 Edge workers are occupied by regression traffic.", tone: "warning" },
-    { title: "Rollback checkpoint pending release", detail: "Member profile baseline is still locked by the last restore session.", tone: "warning" },
-    { title: "Audit queue waiting for operator decision", detail: "Two AI-generated action plans remain in review-only state.", tone: "info" }
-  ];
+function extractRunIdFromQueueTitle(title: string) {
+  const [candidate] = title.split(" / ");
+  return candidate?.trim() || null;
+}
 
-  const metricCards = [
-    {
-      label: t({ en: "Active projects", zh: "活跃项目", ja: "稼働中プロジェクト" }),
-      value: "12",
-      delta: t({ en: "3 need follow-up", zh: "3 个待跟进", ja: "3 件要確認" }),
-      tone: "accent",
-      icon: "PRJ"
-    },
-    {
-      label: t({ en: "Runs today", zh: "今日运行", ja: "本日の実行" }),
-      value: "147",
-      delta: t({ en: "18 queued now", zh: "当前排队 18", ja: "現在 18 件待機" }),
-      tone: "mint",
-      icon: "RUN"
-    },
-    {
-      label: t({ en: "Pass rate", zh: "通过率", ja: "成功率" }),
-      value: "94.2%",
-      delta: t({ en: "stable vs yesterday", zh: "较昨日稳定", ja: "前日比で安定" }),
-      tone: "success",
-      icon: "OK"
-    },
-    {
-      label: t({ en: "Recovery ok", zh: "恢复成功", ja: "復旧成功" }),
-      value: "96%",
-      delta: t({ en: "2 locked items", zh: "2 个被锁定", ja: "2 件ロック中" }),
-      tone: "coral",
-      icon: "DB"
-    },
-    {
-      label: t({ en: "AI spend (mo)", zh: "AI 月度花费", ja: "AI 月間費用" }),
-      value: "$1,248",
-      delta: t({ en: "73% budget", zh: "预算 73%", ja: "予算の 73%" }),
-      tone: "violet",
-      icon: "AI"
-    }
-  ];
+function parseProviderChips(snapshot: AdminConsoleSnapshot): DashboardProviderChip[] {
+  const structuredProviders = snapshot.modelConfig
+    .filter((item) => item.label.startsWith("provider:"))
+    .map((item) => {
+      try {
+        const parsed = JSON.parse(item.value) as {
+          id?: string;
+          name?: string;
+          displayName?: string;
+          model?: string;
+        };
+        const providerId = parsed.id || item.label.slice("provider:".length);
+        const label = parsed.displayName || parsed.name || parsed.model || providerId;
+        return providerId && label ? { id: providerId, label } : null;
+      } catch {
+        return null;
+      }
+    })
+    .filter((item): item is DashboardProviderChip => Boolean(item));
 
-  const runColumns = [
-    "",
-    t({ en: "Run", zh: "执行项", ja: "実行" }),
-    t({ en: "Env", zh: "环境", ja: "環境" }),
-    t({ en: "Status", zh: "状态", ja: "状態" }),
-    t({ en: "Model", zh: "模型", ja: "モデル" }),
-    t({ en: "Dur", zh: "耗时", ja: "時間" }),
-    t({ en: "At", zh: "时间", ja: "時刻" })
-  ];
+  if (structuredProviders.length) {
+    return structuredProviders.slice(0, 6);
+  }
+
+  const providerSummary = snapshot.modelConfig.find((item) => item.label.toLowerCase() === "provider");
+  if (!providerSummary) {
+    return [];
+  }
+
+  return providerSummary.value
+    .split(",")
+    .map((item, index) => {
+      const label = item.trim();
+      return label ? { id: `provider-summary-${index}`, label } : null;
+    })
+    .filter((item): item is DashboardProviderChip => Boolean(item))
+    .slice(0, 6);
+}
+
+function buildAttentionItems(snapshot: AdminConsoleSnapshot, t: (value: Copy) => string) {
+  const items: Array<{ title: string; detail: string; tone: "danger" | "warning" | "info"; target: DashboardAttentionTarget }> = [];
+  const failedReport = snapshot.reports.find((item) => normalizeStatusTone(item.status) === "fail");
+  const queuePressure = snapshot.workQueue.find((item) => {
+    const normalized = item.state.toUpperCase();
+    return normalized.includes("WAIT") || normalized.includes("PROGRESS") || normalized.includes("RUN");
+  });
+  const providerChips = parseProviderChips(snapshot);
+
+  if (failedReport) {
+    const runId = failedReport.runId || failedReport.runName;
+    items.push({
+      title: t(copy("Recent failed run requires triage", "最近失败运行需要排查", "直近の失敗実行を確認")),
+      detail: `${failedReport.runName} - ${failedReport.entry}`,
+      tone: "danger",
+      target: { kind: "reportDetail", runId }
+    });
+    items.push({
+      title: t(copy("Data diff review recommended", "建议复核数据差异", "データ差分の確認を推奨")),
+      detail: `${failedReport.runName} - ${t(copy("Open diff and restore evidence for the failed run.", "打开失败运行的数据差异和恢复证据。", "失敗実行の差分と復元証跡を開きます。"))}`,
+      tone: "warning",
+      target: { kind: "dataDiff", runId }
+    });
+  }
+
+  if (queuePressure) {
+    items.push({
+      title: t(copy("Execution pressure needs monitoring", "执行压力需要关注", "実行負荷の監視が必要")),
+      detail: `${queuePressure.title} - ${queuePressure.detail}`,
+      tone: "warning",
+      target: { kind: "monitor", runId: extractRunIdFromQueueTitle(queuePressure.title) }
+    });
+  }
+
+  if (providerChips.length) {
+    items.push({
+      title: t(copy("AI provider posture should be reviewed", "建议检查 AI 提供方状态", "AI プロバイダー状態の確認を推奨")),
+      detail: t(copy("Open model configuration to review provider distribution and fallback posture.", "打开模型配置页复核提供方分布与回退策略。", "モデル設定を開いてプロバイダー分布とフォールバック方針を確認します。")),
+      tone: "info",
+      target: { kind: "models" }
+    });
+  }
+
+  return items.slice(0, 4);
+}
+
+export function DashboardScreen({
+  snapshot,
+  locale,
+  onRefresh,
+  onNewRun,
+  onOpenRunDetail,
+  onOpenAttention,
+  onOpenModels
+}: DashboardScreenProps) {
+  const t = (value: Copy) => translate(locale, value);
+
+  const metricCards = snapshot.stats.slice(0, 5).map((item, index) => ({
+    label: item.label,
+    value: item.value,
+    delta: item.note,
+    tone: ["accent", "mint", "success", "coral", "violet"][index % 5],
+    icon: ["PRJ", "RUN", "OK", "DB", "AI"][index % 5]
+  }));
+
+  const recentRuns = snapshot.reports.slice(0, 6).map((item) => ({
+    runId: item.runId || item.runName,
+    runName: item.runName,
+    status: item.status,
+    tone: normalizeStatusTone(item.status),
+    finishedAt: item.finishedAt,
+    entry: item.entry
+  }));
+
+  const attentionItems = buildAttentionItems(snapshot, t);
+  const providerChips = parseProviderChips(snapshot);
 
   return (
     <div className="dashboardDemo">
       <div className="dashboardHero">
         <div className="dashboardHeroCopy">
-          <h2>{t({ en: "Operations cockpit", zh: "运行总览", ja: "運用コックピット" })}</h2>
+          <h2>{t(copy("Operations cockpit", "运行总览", "運用コックピット"))}</h2>
           <p>
-            {t({
-              en: "Keep projects, execution, audit, and restore checkpoints on one control surface.",
-              zh: "把项目、执行、审计和恢复检查点放在同一控制面板中查看。",
-              ja: "プロジェクト、実行、監査、復旧チェックポイントを 1 つの面で管理します。"
-            })}
+            {t(copy(
+              "Keep projects, execution, audit, and restore checkpoints on one control surface.",
+              "把项目、执行、审计和恢复检查点放在同一个控制面板中查看。",
+              "プロジェクト、実行、監査、復元チェックポイントを 1 つの画面で確認します。"
+            ))}
           </p>
         </div>
 
         <div className="dashboardActions">
-          <button type="button" className="dashboardButton secondary">
-            {t({ en: "Refresh", zh: "刷新", ja: "更新" })}
+          <button type="button" className="dashboardButton secondary" onClick={onRefresh}>
+            {t(copy("Refresh", "刷新", "更新"))}
           </button>
-          <button type="button" className="dashboardButton primary">
-            + {t({ en: "New run", zh: "新建运行", ja: "新規実行" })}
+          <button type="button" className="dashboardButton primary" onClick={onNewRun}>
+            + {t(copy("New run", "新建运行", "新規実行"))}
           </button>
         </div>
       </div>
 
       <div className="dashboardMetricGrid">
         {metricCards.map((item) => (
-          <article key={item.label} className={`dashboardMetricCard ${item.tone}`}>
+          <article key={`${item.label}-${item.icon}`} className={`dashboardMetricCard ${item.tone}`}>
             <div className="dashboardMetricHead">
               <span>{item.label}</span>
               <div className="dashboardMetricIcon">{item.icon}</div>
@@ -119,33 +201,30 @@ export function DashboardScreen({ locale }: DashboardScreenProps) {
       <div className="dashboardMainGrid">
         <section className="dashboardPanel dashboardRunsPanel">
           <div className="dashboardPanelHeader">
-            <div className="dashboardPanelTitle">{t({ en: "Recent runs", zh: "最近运行", ja: "最近の実行" })}</div>
-            <div className="dashboardPanelMeta">{t({ en: "last 24h", zh: "过去 24 小时", ja: "過去 24 時間" })}</div>
+            <div className="dashboardPanelTitle">{t(copy("Recent runs", "最近运行", "最近の実行"))}</div>
+            <div className="dashboardPanelMeta">{t(copy("from admin snapshot", "来自当前快照", "現在のスナップショット"))}</div>
           </div>
 
           <div className="dashboardRunList">
-            <div className="dashboardRunHeader" aria-hidden="true">
-              {runColumns.map((label, index) => (
-                <div key={`${label}-${index}`} className="dashboardRunCellLabel">
-                  {label}
-                </div>
-              ))}
-            </div>
-
             {recentRuns.map((run) => (
-              <div key={`${run.name}-${run.time}`} className="dashboardRunRow">
-                <div className={`dashboardRunDot ${run.status}`} />
-                <div className="dashboardRunName">{run.name}</div>
-                <div>
-                  <span className="dashboardBadge neutral">{run.env}</span>
+              <button
+                key={run.runId}
+                type="button"
+                className="dashboardRunRow dashboardRunRowButton"
+                onClick={() => onOpenRunDetail?.(run.runId)}
+                aria-label={`Open run ${run.runId}`}
+              >
+                <div className={`dashboardRunDot ${run.tone}`} />
+                <div className="dashboardRunName">
+                  <strong>{run.runName}</strong>
+                  <span className="dashboardRunTime">{run.runId}</span>
                 </div>
                 <div>
-                  <span className={`dashboardBadge ${run.status}`}>{run.status}</span>
+                  <span className={`dashboardBadge ${run.tone}`}>{run.status}</span>
                 </div>
-                <div className="dashboardMono">{run.model}</div>
-                <div className="dashboardRunDuration">{run.duration}</div>
-                <div className="dashboardRunTime">{run.time}</div>
-              </div>
+                <div className="dashboardRunDuration">{run.finishedAt}</div>
+                <div className="dashboardMono">{run.entry}</div>
+              </button>
             ))}
           </div>
         </section>
@@ -153,47 +232,48 @@ export function DashboardScreen({ locale }: DashboardScreenProps) {
         <div className="dashboardSideStack">
           <section className="dashboardPanel">
             <div className="dashboardPanelHeader">
-              <div className="dashboardPanelTitle">{t({ en: "Needs attention", zh: "待处理", ja: "要確認" })}</div>
-              <span className="dashboardBadge warning">4</span>
+              <div className="dashboardPanelTitle">{t(copy("Needs attention", "待处理", "要確認"))}</div>
+              <span className="dashboardBadge warning">{attentionItems.length}</span>
             </div>
 
             <div className="dashboardAttentionList">
               {attentionItems.map((item) => (
-                <div key={item.title} className="dashboardAttentionItem">
+                <button
+                  key={`${item.title}-${item.detail}`}
+                  type="button"
+                  className="dashboardAttentionItem dashboardAttentionButton"
+                  onClick={() => onOpenAttention?.(item.target)}
+                >
                   <div className={`dashboardAttentionBar ${item.tone}`} />
                   <div className="dashboardAttentionBody">
                     <strong>{item.title}</strong>
                     <p>{item.detail}</p>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           </section>
 
           <section className="dashboardPanel dashboardDecisionPanel">
             <div className="dashboardPanelTitle dashboardPanelTitleSpaced">
-              {t({ en: "AI decisions", zh: "AI 决策", ja: "AI 判断" })}
+              {t(copy("AI decisions", "AI 决策", "AI 判断"))}
             </div>
             <div className="dashboardPanelMeta dashboardPanelMetaInline">
-              {t({ en: "last hour", zh: "近 1 小时", ja: "直近 1 時間" })}
+              {t(copy("provider distribution", "提供方分布", "プロバイダー分布"))}
             </div>
 
             <div className="dashboardAiGrid">
               <div>
-                <span className="dashboardAiLabel">{t({ en: "Adopted", zh: "已采纳", ja: "採用済み" })}</span>
-                <div className="dashboardAiValue">
-                  87<span>/ 92</span>
-                </div>
-                <div className="dashboardAiBarTrack">
-                  <div className="dashboardAiBarFill" style={{ width: "94.5%" }} />
-                </div>
+                <span className="dashboardAiLabel">{t(copy("Constraints", "约束", "制約"))}</span>
+                <div className="dashboardAiValue">{snapshot.constraints.length}</div>
+                <p className="dashboardAiHint">{snapshot.constraints[0] ?? t(copy("No active constraints.", "当前无约束。", "有効な制約はありません。"))}</p>
               </div>
 
               <div>
-                <span className="dashboardAiLabel">{t({ en: "Fallback triggered", zh: "触发回退", ja: "フォールバック" })}</span>
-                <div className="dashboardAiValue">5</div>
+                <span className="dashboardAiLabel">{t(copy("Model config items", "模型配置项", "モデル設定項目"))}</span>
+                <div className="dashboardAiValue">{snapshot.modelConfig.length}</div>
                 <p className="dashboardAiHint">
-                  {t({ en: "3x timeout, 2x schema mismatch", zh: "3 次超时，2 次结构不匹配", ja: "3 回タイムアウト、2 回スキーマ不一致" })}
+                  {t(copy("Open model configuration for provider and routing review.", "打开模型配置页查看提供方与路由。", "モデル設定を開いてプロバイダーとルーティングを確認します。"))}
                 </p>
               </div>
             </div>
@@ -201,9 +281,16 @@ export function DashboardScreen({ locale }: DashboardScreenProps) {
             <div className="dashboardDivider" />
 
             <div className="dashboardChipRow dashboardChipRowSpaced">
-              <span className="dashboardChip accent">claude-4.5 · 61</span>
-              <span className="dashboardChip mint">gpt-4o · 24</span>
-              <span className="dashboardChip coral">local-qwen · 7</span>
+              {providerChips.map((provider, index) => (
+                <button
+                  key={provider.id}
+                  type="button"
+                  className={`dashboardChip dashboardChipButton ${["accent", "mint", "coral", "violet"][index % 4]}`}
+                  onClick={() => onOpenModels?.(provider.id)}
+                >
+                  {provider.label}
+                </button>
+              ))}
             </div>
           </section>
         </div>

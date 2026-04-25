@@ -173,6 +173,7 @@ workQueue[]:
   state: string
   detail: string
 reports[]:
+  runId: string
   runName: string
   status: string
   finishedAt: string
@@ -253,7 +254,7 @@ Current derivation logic:
 Dashboard relation:
 
 - this is the proper metric source for dashboard card data
-- current `DashboardScreen.tsx` does not yet map these real values deeply
+- current `DashboardScreen.tsx` maps these values into the metric-card area
 
 #### `projects`
 
@@ -319,6 +320,7 @@ Current derivation logic:
 Dashboard relation:
 
 - should feed the "recent runs" operational area
+- current recent-run handoff uses canonical `runId`
 
 #### `modelConfig`
 
@@ -821,13 +823,13 @@ Current `App.tsx` behavior:
 
 - `dashboard` only benefits from the shell-level snapshot fetch
 - `DashboardScreen.tsx` does not perform direct `fetch`
-- `DashboardScreen.tsx` currently uses only `locale` at render time
-- visible dashboard data is still mostly local/static screen content
+- `DashboardScreen.tsx` consumes snapshot-backed metric, run, queue, attention, and provider-chip data
+- dashboard control clicks are routed through App-level callbacks, not a formal router
 
 Design implication:
 
 - the interface spec must document the real backend capability now available
-- but it must also state clearly that the screen does not yet fully consume that capability
+- and it should reflect the current Phase 3 App-level handoff design instead of a future typed route model
 
 ## 16. UI Control to Interface Mapping
 
@@ -854,9 +856,9 @@ This section maps each dashboard control to its expected interface behavior and 
 - Failure feedback:
   - shell-level error or fallback handling
 - Current implementation state:
-  - visible in UI
-  - not wired
-  - no request is sent today
+  - implemented
+  - click reuses shell-owned `loadSnapshot()`
+  - request sent today: `GET /api/phase3/admin-console`
 
 #### Control: `New run` button
 
@@ -877,9 +879,8 @@ This section maps each dashboard control to its expected interface behavior and 
 - Failure feedback:
   - if route fails in future implementation, show navigation error
 - Current implementation state:
-  - visible in UI
-  - not wired
-  - no navigation is triggered today
+  - implemented
+  - click triggers App-level handoff into `execution`
 
 ### 16.2 Metric Cards Area
 
@@ -895,10 +896,9 @@ This section maps each dashboard control to its expected interface behavior and 
   - shell-level snapshot loader
 - Request timing:
   - on console load
-  - on future manual refresh
+  - on manual refresh
 - Current implementation state:
-  - rendered as static screen-local values
-  - not yet mapped deeply to snapshot `stats[]`
+  - rendered from snapshot-derived card view models
   - no independent click or request behavior
 
 ### 16.3 Recent Runs Panel
@@ -906,27 +906,24 @@ This section maps each dashboard control to its expected interface behavior and 
 #### Control group: recent run rows
 
 - Area: `Recent runs`
-- User action: inspect row, future click on row
+- User action: inspect row, click on row
 - Intended behavior:
   - show recent execution summary
-  - allow drill-down into run history or report detail
+  - allow drill-down into report detail
 - Intended interface for display:
   - `GET /api/phase3/admin-console`
 - Intended interface for drill-down:
   - no direct dashboard write request
-  - route to:
-    - `reports`
-    - or `reportDetail`
-  - downstream detail screens may rely on:
-    - snapshot `reports[]`
-    - future report APIs such as `GET /api/runs/{id}/report`
+  - route to `reportDetail`
+  - downstream detail screen then reads:
+    - `GET /api/phase3/runs/{runId}/report`
 - Request owner:
   - display owned by shell snapshot
   - drill-down owned by navigation/report screens
 - Current implementation state:
-  - rows are visible
-  - rows are not clickable
-  - no route or request is triggered today
+  - rows are visible and clickable
+  - click triggers App-level handoff into `reportDetail`
+  - canonical row identity is `reports[].runId`
 
 #### Control: recent runs panel time-range label
 
@@ -944,24 +941,23 @@ This section maps each dashboard control to its expected interface behavior and 
 #### Control group: attention items
 
 - Area: `Needs attention`
-- User action: inspect item, future click on item
+- User action: inspect item, click on item
 - Intended behavior:
   - expose prioritized risk items
   - route operator to the correct downstream module
 - Intended interface for display:
   - `GET /api/phase3/admin-console`
 - Intended route mapping by item type:
-  - locator drift -> `reports` / `reportDetail`
+  - locator drift -> `reportDetail`
   - browser pool saturation -> `monitor`
-  - rollback lock -> `dataDiff` or execution-related review
-  - audit backlog -> `models` or future audit page
+  - rollback lock -> `dataDiff`
+  - audit backlog -> `models`
 - Request owner:
   - display via shell snapshot
   - deeper query or write behavior owned by downstream page
 - Current implementation state:
-  - items are visible
-  - not clickable
-  - no route or request is triggered today
+  - items are visible and clickable
+  - click triggers App-level handoff by target type
 
 #### Control: attention count badge
 
@@ -970,33 +966,32 @@ This section maps each dashboard control to its expected interface behavior and 
 - Intended behavior:
   - summarize attention item volume
 - Intended interface:
-  - should derive from snapshot-backed attention model in future
+  - derived from the current front-end attention view model built from snapshot data
 - Current implementation state:
-  - static visible badge
+  - dynamic visible badge
   - no direct request behavior
 
 ### 16.5 AI Decisions Panel
 
-#### Control group: adopted count / fallback count / distribution chips
+#### Control group: provider chips
 
 - Area: `AI decisions`
-- User action: inspect, future click on summary element
+- User action: inspect, click on provider chip
 - Intended behavior:
-  - show AI recommendation posture
+  - show AI posture at overview level
   - route to model/routing management when needed
 - Intended interface for display:
   - `GET /api/phase3/admin-console`
-  - specifically snapshot-derived `modelConfig[]` plus future richer AI telemetry
+  - specifically snapshot-derived `modelConfig[]`
 - Intended downstream relation:
   - navigation to `models`
-  - future audit/decision detail page if later introduced
 - Request owner:
   - display from shell snapshot
-  - deeper investigation owned by configuration or audit screens
+  - deeper investigation owned by configuration screens
 - Current implementation state:
-  - visible as static/local UI content
-  - chips are not clickable
-  - no request or route is triggered today
+  - visible as snapshot-derived overview content
+  - provider chips are clickable
+  - click triggers App-level handoff into `models`
 
 ### 16.6 Shell-Level Controls That Affect Dashboard
 
@@ -1049,228 +1044,105 @@ The current `dashboard` screen has no:
 
 Therefore, there is currently no dashboard-specific control that accepts operator input and submits structured request payloads directly.
 
-## 17. Detailed Implementation Design for Currently Unwired Controls
+## 17. Current App-Level Wiring Design
 
-This section turns dashboard placeholder controls into concrete implementation designs instead of leaving them at the “should” level.
+This section records the implemented Phase 3 wiring for dashboard controls.
 
 ### 17.1 `Refresh`
 
-Recommended implementation type:
+Implemented behavior:
 
-- no new backend endpoint
-- reuse existing shell snapshot reload path
-
-Concrete implementation design:
-
-- add prop to `DashboardScreen`:
-
-```ts
-onRefresh?: () => void;
-```
-
-- bind button click to `onRefresh`
-- in `App.tsx`, pass:
-
-```ts
-onRefresh={() => {
-  void loadSnapshot();
-}}
-```
+- `DashboardScreen` exposes `onRefresh?: () => void`
+- `App.tsx` passes a shell-owned refresh handler
+- clicking `Refresh` reuses the existing snapshot reload path
 
 Interface behavior:
 
 - request: `GET /api/phase3/admin-console`
-- owner: shell `App.tsx`
+- request owner: shell `App.tsx`
 - success:
-  - dashboard re-renders from refreshed snapshot
+  - refreshed snapshot is written back into shell state
+  - dashboard re-renders from the updated snapshot
 - failure:
-  - reuse existing shell fallback/error behavior
-
-Reasoning:
-
-- dashboard should not own a second fetch path
-- shell already owns snapshot loading and source labeling
+  - existing shell fallback/source-label handling is reused
 
 ### 17.2 `New run`
 
-Recommended implementation type:
+Implemented behavior:
 
-- route-state handoff into `execution`
-- no direct dashboard write request
-
-Concrete implementation design:
-
-- add prop to `DashboardScreen`:
-
-```ts
-onNewRun?: () => void;
-```
-
-- button click calls `onNewRun`
-- in `App.tsx`, pass:
-
-```ts
-onNewRun={() => handleScreenChange("execution")}
-```
-
-Optional route-state enhancement:
-
-- set execution defaults before route change:
-  - default `projectKey`
-  - default `executionModel`
-  - default `databaseId`
+- `DashboardScreen` exposes `onNewRun?: () => void`
+- `App.tsx` passes `handleScreenChange("execution")`
+- clicking `New run` performs App-level handoff only
 
 Interface behavior:
 
-- immediate click request: none
-- downstream write ownership remains:
+- immediate dashboard request: none
+- downstream write ownership remains in `execution`:
   - `POST /api/phase3/scheduler/requests`
   - `POST /api/phase3/scheduler/events`
 
-Reasoning:
-
-- execution submission is already owned by the `execution` screen flow
-- dashboard should only hand off intent
-
 ### 17.3 Recent Run Row Click
 
-Recommended implementation type:
+Implemented behavior:
 
-- route-state handoff into `reportDetail`
-- no new backend endpoint
-
-Concrete implementation design:
-
-- replace static/local `recentRuns` rows with snapshot-backed run view model
-- add prop to `DashboardScreen`:
-
-```ts
-onOpenRunDetail?: (runName: string) => void;
-```
-
-- clicking a row calls `onOpenRunDetail(runName)`
-- in `App.tsx`, pass the existing report-detail opener:
-
-```ts
-onOpenRunDetail={openReportDetail}
-```
+- `AdminConsoleSnapshot.reports[]` includes canonical `runId`
+- `DashboardScreen` renders recent runs from snapshot data
+- each row click calls `onOpenRunDetail(runId)`
+- `App.tsx` routes that handoff through the existing report-detail state
 
 Interface behavior:
 
-- immediate click request: none
-- downstream screen uses existing snapshot/report context
-- future richer backend may later add:
-  - `GET /api/runs/{id}/report`
-
-Reasoning:
-
-- `App.tsx` already has `selectedReportRunName`
-- `App.tsx` already has `openReportDetail(runName)`
-- the existing screen-state model is enough
+- immediate dashboard request: none
+- downstream detail read:
+  - `GET /api/phase3/runs/{runId}/report`
 
 ### 17.4 Attention Item Click
 
-Recommended implementation type:
+Implemented behavior:
 
-- route-state handoff based on attention item category
-- no new backend endpoint for Phase 3
-
-Required view-model refinement:
-
-- each attention item should carry machine-readable target metadata, not only free text
-
-Recommended attention model:
+- `DashboardScreen` derives target-aware attention items from snapshot data
+- target model:
 
 ```ts
 type DashboardAttentionTarget =
-  | { kind: "reportDetail"; runName: string }
-  | { kind: "monitor" }
-  | { kind: "dataDiff"; runName?: string | null }
+  | { kind: "reportDetail"; runId: string }
+  | { kind: "monitor"; runId?: string | null }
+  | { kind: "dataDiff"; runId?: string | null }
   | { kind: "models" };
 ```
 
-Recommended component prop:
-
-```ts
-onOpenAttention?: (target: DashboardAttentionTarget) => void;
-```
-
-Recommended `App.tsx` routing behavior:
-
-- `reportDetail`
-  - call `openReportDetail(runName)`
-- `monitor`
-  - call `handleScreenChange("monitor")`
-- `dataDiff`
-  - call `openDataDiff(runName ?? selectedReportRunName)`
-- `models`
-  - call `handleScreenChange("models")`
+- `App.tsx` routes the handoff as:
+  - `reportDetail` -> `openReportDetail(runId)`
+  - `monitor` -> `openMonitor(runId)`
+  - `dataDiff` -> `openDataDiff(runId ?? selectedReportRunName)`
+  - `models` -> `handleScreenChange("models")`
 
 Interface behavior:
 
-- immediate click request: none
-- deeper reads continue to come from shared snapshot/downstream pages
+- immediate dashboard request: none
+- deeper reads stay owned by downstream screens
 
-Reasoning:
+### 17.5 AI Provider Chips
 
-- attention items represent routing decisions, not direct mutations
-- route-state is sufficient in the current architecture
+Implemented behavior:
 
-### 17.5 AI Decision Summary and Provider Chips
-
-Recommended implementation type:
-
-- route-state handoff into `models`
-- no direct backend request from dashboard
-
-Concrete implementation design:
-
-- add prop to `DashboardScreen`:
-
-```ts
-onOpenModels?: (focus?: { providerId?: string | null }) => void;
-```
-
-- summary click:
-  - `onOpenModels()`
-- provider chip click:
-  - `onOpenModels({ providerId: "openai-gpt-4o" })`
-
-Recommended app-state enhancement:
-
-```ts
-const [modelScreenFocus, setModelScreenFocus] = useState<{ providerId?: string | null } | null>(null);
-```
-
-Recommended route behavior:
-
-- set model focus
-- `handleScreenChange("models")`
-
-Recommended `ModelConfigScreen` prop:
-
-```ts
-focus?: { providerId?: string | null };
-```
+- provider chips are derived from snapshot `modelConfig[]`
+- clicking a chip calls `onOpenModels(providerId)`
+- `App.tsx` currently uses that as a lightweight App-level handoff into `models`
 
 Interface behavior:
 
-- immediate click request: none
-- actual config reads/writes remain on model screen interfaces
-
-Reasoning:
-
-- dashboard AI panel is an overview surface
-- model management should stay owned by `models`
+- immediate dashboard request: none
+- current handoff granularity: screen-level only
+- no Phase 4 typed focus payload is introduced in this stage
 
 ## 18. Review Items
 
-Review-only findings from reading all main docs plus current code:
+Review findings after sync with current code:
 
-- `GET /api/phase3/admin-console` is already rich enough to support a more real dashboard than the current UI rendering uses.
+- `GET /api/phase3/admin-console` remains the correct single aggregated read interface for dashboard.
 - The dashboard screen should continue to treat all write endpoints as indirect source interfaces, not direct dashboard actions.
-- If dashboard `Refresh` becomes active later, it should trigger shell snapshot reload only.
-- If dashboard `New run` becomes active later, it should navigate to `execution`; the actual write ownership must remain with scheduler request/event flows.
+- `Refresh` correctly reuses shell snapshot reload instead of introducing a second dashboard fetch path.
+- `New run` correctly stays as an App-level handoff into `execution`; write ownership remains with scheduler request/event flows.
+- Dashboard run and attention handoff now depend on canonical `runId` in snapshot `reports[]`, which should remain explicit in the interface contract.
 - When future backend domain APIs mature, the dashboard may evolve from one aggregated snapshot to a composed query model, but that is not the current Phase 3 implementation.
-
-These are documentation findings only. No UI or backend implementation change is made in this stage.

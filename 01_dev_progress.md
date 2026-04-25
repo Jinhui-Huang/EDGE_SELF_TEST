@@ -2727,3 +2727,85 @@ Reports / ReportDetail / DataDiff screens now consume backend report artifact AP
 
 ## Next Step
 - After doc re-review, the next recommended backlog item is `P2-1 dashboard control wiring`.
+
+## 2026-04-25 P2-1 dashboard control wiring
+
+## Task
+- Complete the visible-but-unwired dashboard controls defined in `docs/phase3/interface/review-backlog.md` and the dashboard specs, while staying inside the existing `App.tsx` screen-switching model.
+
+## Completed
+- Dashboard refresh is now wired to the real shell snapshot reload path:
+  - `Refresh` reuses `GET /api/phase3/admin-console`
+  - no new routing system or dashboard-only fetch path was introduced
+- Dashboard handoff controls now use existing App-level screen state:
+  - `New run` switches to `execution`
+  - recent-run rows switch to `reportDetail`
+  - attention items switch to `reportDetail` / `monitor` / `dataDiff` / `models`
+  - AI provider chips switch to `models`
+- Added the minimum snapshot shape needed for canonical recent-run handoff:
+  - `AdminConsoleSnapshot.reports[]` now supports `runId`
+  - local admin snapshot mock data now returns `runId` together with `runName`
+- Kept Phase 3 boundaries intact:
+  - no real route layer
+  - no Phase 4 typed route payload system
+  - no expansion into external orchestration
+- `DashboardScreen.tsx` was converted from demo-only controls into snapshot-backed actions that call App-provided handlers.
+- Frontend tests were expanded to cover:
+  - dashboard refresh
+  - new-run handoff to execution
+  - recent-run handoff to report detail using canonical `runId`
+  - attention-item handoff to report detail / monitor / data diff / models
+  - AI provider chip handoff to models
+
+## Backend/Mock Data
+- `AdminConsoleSnapshot.ReportRow` now includes `runId`
+- `Phase3MockDataService` now fills `runId` for dashboard recent runs
+- No new dashboard-specific backend endpoint was added; wiring continues to rely on the existing admin snapshot API
+
+## Modified Files
+- Modified: `apps/local-admin-api/src/main/java/com/example/webtest/admin/model/AdminConsoleSnapshot.java`
+- Modified: `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/Phase3MockDataService.java`
+- Modified: `ui/admin-console/src/App.tsx`
+- Modified: `ui/admin-console/src/App.test.tsx`
+- Modified: `ui/admin-console/src/screens/DashboardScreen.tsx`
+- Modified: `ui/admin-console/src/styles.css`
+- Modified: `ui/admin-console/src/types.ts`
+- Modified: `01_dev_progress.md`
+- Modified: `memory.txt`
+
+## Verification
+- Passed: `npm test -- --run` in `ui/admin-console`
+- Passed: `npm run build` in `ui/admin-console`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+
+## Known Limits
+- Dashboard handoff continues to use the current screen-state model, so provider-chip clicks open `models` at the screen level only; they do not yet deep-focus a specific provider card or modal.
+- Attention-item targets remain lightweight screen transitions rather than typed route payloads, which is intentional for Phase 3.
+
+## Next Step
+- Recommended next backlog item: `P2-2 Complete projects import and navigation actions`.
+
+## 2026-04-25 P2-1 dashboard docs sync follow-up
+
+## Task
+- Align the `docs/phase3` dashboard baseline with the completed P2-1 implementation so review state, interface wording, and snapshot shape all match current code.
+
+## Completed
+- Updated:
+  - `docs/phase3/interface/ui-control-interface-overview.md`
+  - `docs/phase3/interface/dashboard/functional-spec.md`
+  - `docs/phase3/interface/dashboard/interface-spec.md`
+- Synced dashboard control wording from stale future-state language to current implemented state:
+  - `Refresh` -> implemented via shell reload of `GET /api/phase3/admin-console`
+  - `New run` -> implemented App-level handoff to `execution`
+  - recent-run row -> implemented App-level handoff to `reportDetail`
+  - attention item -> implemented App-level handoff to `reportDetail` / `monitor` / `dataDiff` / `models`
+  - AI provider chips -> implemented App-level handoff to `models`
+- Updated dashboard snapshot response documentation so `reports[]` explicitly includes canonical `runId`
+- Removed stale wording such as `visual only`, `not wired`, and similar future-state language from dashboard controls that are already implemented
+
+## Verification
+- Doc consistency pass completed against current code paths in `App.tsx`, `DashboardScreen.tsx`, and `AdminConsoleSnapshot.java`
+
+## Next Step
+- Await re-review of the synced P2-1 docs baseline before advancing to `P2-2`.

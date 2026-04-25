@@ -43,7 +43,7 @@ public record AdminConsoleSnapshot(
     public record WorkQueueItem(String title, String owner, String state, String detail) {
     }
 
-    public record ReportRow(String runName, String status, String finishedAt, String entry) {
+    public record ReportRow(String runId, String runName, String status, String finishedAt, String entry) {
     }
 
     public record ConfigItem(String label, String value) {
