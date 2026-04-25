@@ -2266,6 +2266,7 @@ export function App() {
             caseDraft={caseDraft}
             caseState={caseState}
             initialProjectKey={selectedCaseProjectKey}
+            apiBaseUrl={apiBaseUrl}
             title={t(localizedScreenCopy.cases.title)}
             saveHint={t(uiCopy.caseSaveHint)}
             caseTagsLabel={t(uiCopy.caseTags)}

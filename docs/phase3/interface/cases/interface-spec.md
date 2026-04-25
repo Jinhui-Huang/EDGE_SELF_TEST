@@ -11,6 +11,7 @@
   - `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/Phase3MockDataService.java`
   - `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/CatalogPersistenceService.java`
   - `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/SchedulerPersistenceService.java`
+  - `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/CaseDetailService.java`
 - Main design references reviewed for this document:
   - `docs/phase3/main/enterprise_web_test_platform_implementation_design.md`
   - `docs/phase3/main/enterprise_web_test_platform_tech_design.md`
@@ -26,26 +27,33 @@ This document distinguishes:
 - screen-adjacent write and handoff interfaces
 - local-only UI state transitions
 - currently implemented app-level case-catalog mutation path
-- new detailed interface design required by currently unwired controls
+- implemented case-detail read/write interfaces (DSL, state-machine, plans, history)
 
 ## 2. Interface Summary
 
 Current `cases` screen conclusion:
 
-- direct read source for visible data:
+- direct read source for overview/list data:
   - `GET /api/phase3/admin-console`
-- no direct write request is sent by the visible `cases` screen controls today
+- direct read/write interfaces for case detail artifacts:
+  - `GET /api/phase3/cases/{caseId}/dsl` (read DSL)
+  - `POST /api/phase3/cases/{caseId}/dsl/validate` (validate DSL)
+  - `PUT /api/phase3/cases/{caseId}/dsl` (save DSL)
+  - `GET /api/phase3/cases/{caseId}/state-machine` (read state-machine)
+  - `PUT /api/phase3/cases/{caseId}/state-machine` (save state-machine)
+  - `GET /api/phase3/cases/{caseId}/plans` (read plans)
+  - `GET /api/phase3/cases/{caseId}/history` (read history)
 - real implemented handoff:
   - `Pre-execution` updates app-level prepared-case state and later feeds `execution`
 - app-level case catalog write capability exists in the shell:
   - `POST /api/phase3/catalog/case`
-- deeper case-detail capabilities implied by the UI require additional dedicated interfaces because the current snapshot does not carry true DSL, state-machine, plan, or history documents
+- backend implementation: `CaseDetailService.java` provides file-backed persistence under `config/phase3/case-details/<caseId>/`
 
 ## 3. Direct Read Interface: GET /api/phase3/admin-console
 
 ### 3.1 Purpose for Cases Screen
 
-The `cases` screen uses the shared admin-console snapshot as its current read model. It does not fetch a case-specific detail endpoint today.
+The `cases` screen uses the shared admin-console snapshot for the overview/list read model. It also fetches case-specific detail endpoints for the DSL, state-machine, plans, and history tabs.
 
 Relevant snapshot fields for this screen:
 
@@ -72,12 +80,18 @@ Relevant snapshot fields for this screen:
 
 ### 3.3 Ownership Boundary
 
-- backend/local-admin-api owns the raw snapshot
-- `App.tsx` owns snapshot fetch and rehydration into `caseDraft`
-- `CasesScreen.tsx` owns only local presentational state:
+- backend/local-admin-api owns the raw snapshot and case-detail artifacts
+- `App.tsx` owns snapshot fetch and rehydration into `caseDraft`, and passes `apiBaseUrl` to `CasesScreen`
+- `CasesScreen.tsx` owns local presentational state and per-tab API data:
   - `selectedProjectKey`
   - `openedCaseId`
   - `overviewCollapsed`
+  - `activeTab` (`CaseDetailTab`)
+  - `dslData`, `dslDraft`, `dslValidation`, `dslSaving`
+  - `smData`
+  - `plansData`
+  - `historyData`
+  - `tabLoading`
 
 ## 4. Screen-Adjacent Handoff: Pre-execution to Execution
 
@@ -289,12 +303,11 @@ These controls change screen state but do not call the backend directly.
 
 ### 6.4 Detail Tabs
 
-- current state owner: none
-- current request: none
-- effect today:
-  - no functional change
-- intended future:
-  - local active-tab state plus tab-specific read interface
+- current state owner: `CasesScreen.tsx` via `activeTab` (`CaseDetailTab`)
+- current request: `GET /api/phase3/cases/{caseId}/{action}` on tab activation (for non-overview tabs)
+- effect:
+  - switches the detail main panel content to the selected tab's API-backed data
+  - tab state resets to `overview` when the opened case changes
 
 ## 7. UI Control to Interface Mapping
 
@@ -341,20 +354,23 @@ These controls change screen state but do not call the backend directly.
 #### `Edit DSL`
 
 - user action: click
-- request: none today
-- owner: not implemented
-- intended future interface:
-  - case DSL read/write interfaces
-- current state: visible only
+- request: switches `activeTab` to `"dsl"`, which triggers `GET /api/phase3/cases/{caseId}/dsl`
+- owner: `CasesScreen.tsx`
+- downstream interfaces:
+  - `GET /api/phase3/cases/{caseId}/dsl` (load DSL document)
+  - `POST /api/phase3/cases/{caseId}/dsl/validate` (validate edited DSL)
+  - `PUT /api/phase3/cases/{caseId}/dsl` (save DSL, returns 202)
+- current state: implemented
 
 #### `State machine`
 
 - user action: click
-- request: none today
-- owner: not implemented
-- intended future interface:
-  - case state-machine read interface
-- current state: visible only
+- request: switches `activeTab` to `"stateMachine"`, which triggers `GET /api/phase3/cases/{caseId}/state-machine`
+- owner: `CasesScreen.tsx`
+- downstream interfaces:
+  - `GET /api/phase3/cases/{caseId}/state-machine` (load state-machine)
+  - `PUT /api/phase3/cases/{caseId}/state-machine` (save state-machine, returns 202)
+- current state: implemented
 
 #### `Pre-execution`
 
@@ -375,42 +391,36 @@ These controls change screen state but do not call the backend directly.
 #### `Overview`
 
 - user action: click
-- request: none today
-- intended future behavior:
-  - activate overview sub-view only
-- current state: visual only
+- request: none (reuses front-end-generated step summary)
+- current state: implemented (default active tab)
 
 #### `DSL`
 
 - user action: click
-- request: none today
-- intended future behavior:
-  - load and show case DSL content
-- current state: visual only
+- request: `GET /api/phase3/cases/{caseId}/dsl` on tab activation
+- provides: JSON textarea editor, validate button (`POST .../dsl/validate`), save button (`PUT .../dsl`)
+- current state: implemented
 
 #### `State machine`
 
 - user action: click
-- request: none today
-- intended future behavior:
-  - load and show state-machine content
-- current state: visual only
+- request: `GET /api/phase3/cases/{caseId}/state-machine` on tab activation
+- provides: nodes/edges/guards display, save button (`PUT .../state-machine`)
+- current state: implemented
 
 #### `Plans`
 
 - user action: click
-- request: none today
-- intended future behavior:
-  - load and show data / compare / restore plans
-- current state: visual only
+- request: `GET /api/phase3/cases/{caseId}/plans` on tab activation
+- provides: plans list with name/summary/type, preconditions list
+- current state: implemented
 
 #### `History`
 
 - user action: click
-- request: none today
-- intended future behavior:
-  - load and show case run history and maintenance events
-- current state: visual only
+- request: `GET /api/phase3/cases/{caseId}/history` on tab activation
+- provides: run records with status/name/time/reportEntry, maintenance events
+- current state: implemented
 
 ### 7.6 Side Panels
 
@@ -452,14 +462,14 @@ These controls change screen state but do not call the backend directly.
 
 ### 8.4 Relationship to DSL and State-Machine Capabilities
 
-The main design docs make clear that case management is supposed to connect to:
+The main design docs make clear that case management connects to:
 
 - structured DSL review/edit
 - state-machine view
 - plan review
 - history/audit review
 
-The current aggregated snapshot is insufficient for those deeper views, so dedicated case-detail interfaces are required.
+These are now implemented as tab-based sub-views within `CasesScreen.tsx`, backed by dedicated `CaseDetailService` endpoints. File-backed persistence stores artifacts under `config/phase3/case-details/<caseId>/`.
 
 ## 9. Future Interface Evolution from Main Design Docs
 
@@ -472,48 +482,50 @@ The main design docs describe richer case-domain APIs such as:
 
 Current Phase 3 implementation choice:
 
-- keep read behavior on `GET /api/phase3/admin-console`
+- keep read behavior on `GET /api/phase3/admin-console` for overview/list
 - keep simple case persistence on `POST /api/phase3/catalog/case`
+- dedicated case-detail endpoints are implemented for DSL, state-machine, plans, and history artifacts
 
-Recommended rule for this phase:
+Implemented case-detail endpoints:
 
-- do not replace the current snapshot contract during documentation-only work
-- define dedicated deeper case-detail endpoints only where the current UI clearly implies a separate case artifact such as DSL, state machine, plans, or history
+- `GET /api/phase3/cases/{caseId}/dsl`
+- `POST /api/phase3/cases/{caseId}/dsl/validate`
+- `PUT /api/phase3/cases/{caseId}/dsl`
+- `GET /api/phase3/cases/{caseId}/state-machine`
+- `PUT /api/phase3/cases/{caseId}/state-machine`
+- `GET /api/phase3/cases/{caseId}/plans`
+- `GET /api/phase3/cases/{caseId}/history`
 
-## 10. Detailed Implementation Design for Currently Unwired Controls
+Future evolution:
 
-This section gives concrete implementation design for visible but currently unwired case controls.
+- richer typed case CRUD APIs (`GET /api/cases`, etc.) remain outside Phase 3 boundary
+- plans and history are currently read-only; write endpoints can be added when editing is required
+
+## 10. Implemented Case-Detail Interface Reference
+
+This section documents the implemented case-detail interfaces. All endpoints are served by `CaseDetailService.java` with file-backed persistence under `config/phase3/case-details/<caseId>/`.
 
 ### 10.1 `Edit DSL`
 
-Recommended implementation type:
+Implementation type:
 
-- route-state handoff into a dedicated DSL editor screen
-- plus new case DSL read/write interfaces
+- inline tab-based DSL editor within `CasesScreen.tsx`
+- backed by `CaseDetailService` read/validate/save endpoints
 
-Reasoning:
+UI behavior:
 
-- the current detail step list is only a presentational summary
-- the shared admin snapshot does not include true DSL document content
-- editing DSL introduces a new backend responsibility and cannot be satisfied by route-state alone
-
-Recommended route behavior:
-
-- add app-level handler:
-  - `onOpenCaseDsl(caseId: string)`
-- app state stores:
-  - `selectedCaseId`
-  - optional `dslEditorMode = "edit"`
-- route target:
-  - future `dslEditor` screen
-
-Recommended read endpoint:
+- clicking `Edit DSL` hero button or `DSL` tab sets `activeTab` to `"dsl"`
+- tab activation triggers `GET /api/phase3/cases/{caseId}/dsl`
+- DSL content displayed in JSON textarea editor
+- validate button calls `POST /api/phase3/cases/{caseId}/dsl/validate`
+- save button calls `PUT /api/phase3/cases/{caseId}/dsl`
 
 #### `GET /api/phase3/cases/{caseId}/dsl`
 
 Purpose:
 
 - load the current authoritative DSL document for one case
+- returns default mock data if no persisted file exists
 
 Response body:
 
@@ -524,10 +536,6 @@ Response body:
   "dslVersion": 3,
   "updatedAt": "2026-04-20T04:32:10Z",
   "updatedBy": "qa-platform",
-  "source": {
-    "type": "catalog-linked-json",
-    "path": "D:\\...\\cases\\checkout-smoke.dsl.json"
-  },
   "definition": {
     "id": "checkout-smoke",
     "name": "Checkout smoke",
@@ -539,13 +547,18 @@ Response body:
 }
 ```
 
-Recommended validate endpoint:
-
 #### `POST /api/phase3/cases/{caseId}/dsl/validate`
 
 Purpose:
 
-- validate edited DSL before save against DSL schema/parser rules
+- validate edited DSL before save
+
+Validation rules:
+
+- `definition` field is required
+- `definition.id` is required and must not be blank
+- each step must have a non-blank `action` field
+- empty steps list generates a warning
 
 Request body:
 
@@ -571,20 +584,19 @@ Response body:
 }
 ```
 
-Recommended save endpoint:
-
 #### `PUT /api/phase3/cases/{caseId}/dsl`
 
 Purpose:
 
 - persist the reviewed DSL definition for the case
+- auto-increments `dslVersion` on each save
 
 Request body:
 
 ```json
 {
-  "updatedBy": "qa-platform",
-  "changeReason": "Adjusted selector after checkout entry redesign",
+  "updatedBy": "operator",
+  "projectKey": "checkout-web",
   "definition": {
     "id": "checkout-smoke",
     "name": "Checkout smoke",
@@ -596,6 +608,8 @@ Request body:
 }
 ```
 
+Response status: `202 Accepted`
+
 Response body:
 
 ```json
@@ -604,43 +618,35 @@ Response body:
   "kind": "case-dsl",
   "caseId": "checkout-smoke",
   "dslVersion": 4,
-  "path": "D:\\...\\cases\\checkout-smoke.dsl.json",
   "updatedAt": "2026-04-20T05:10:22Z"
 }
 ```
 
 Post-save reflection:
 
-- future `dslEditor` reloads `GET /api/phase3/cases/{caseId}/dsl`
+- DSL tab reloads on next tab activation
 - optional summary fields may later flow back into `GET /api/phase3/admin-console`
 
 ### 10.2 `State machine`
 
-Recommended implementation type:
+Implementation type:
 
-- route-state handoff into a dedicated state-machine sub-view
-- plus new read interface for state-machine content
+- inline tab-based state-machine viewer within `CasesScreen.tsx`
+- backed by `CaseDetailService` read/save endpoints
 
-Reasoning:
+UI behavior:
 
-- the current screen has no true state-graph data
-- state-machine view is a distinct artifact implied by the main design docs and wireframes
-
-Recommended route behavior:
-
-- add app-level handler:
-  - `onOpenCaseStateMachine(caseId: string)`
-- route target:
-  - future `caseStateMachine` screen
-  - or future `cases` detail tab state once implemented
-
-Recommended read endpoint:
+- clicking `State machine` hero button or `State machine` tab sets `activeTab` to `"stateMachine"`
+- tab activation triggers `GET /api/phase3/cases/{caseId}/state-machine`
+- displays nodes, edges, and guards
+- save button calls `PUT /api/phase3/cases/{caseId}/state-machine`
 
 #### `GET /api/phase3/cases/{caseId}/state-machine`
 
 Purpose:
 
 - return graph-ready state-machine data for the case
+- returns default mock data if no persisted file exists
 
 Response body:
 
@@ -664,67 +670,83 @@ Response body:
 }
 ```
 
-Optional future write endpoint:
-
 #### `PUT /api/phase3/cases/{caseId}/state-machine`
 
 Purpose:
 
-- persist manually reviewed graph metadata when state-machine editing is later approved
+- persist manually reviewed graph metadata for the case
 
-Current recommendation:
+Request body:
 
-- do not require this endpoint for the first implementation if state machine remains read-only
+```json
+{
+  "projectKey": "checkout-web",
+  "nodes": [
+    { "id": "start", "label": "Start" }
+  ],
+  "edges": [],
+  "guards": []
+}
+```
+
+Response status: `202 Accepted`
+
+Response body:
+
+```json
+{
+  "status": "ACCEPTED",
+  "kind": "case-state-machine",
+  "caseId": "checkout-smoke",
+  "updatedAt": "2026-04-20T05:10:22Z"
+}
+```
 
 ### 10.3 Detail Tab Switching
 
-Recommended implementation type:
+Implementation type:
 
 - local active-tab state in `CasesScreen.tsx`
-- tab-specific data loading only when the selected tab requires true backend artifacts
+- tab-specific data loading when the selected tab requires backend artifacts
 
-Recommended local state:
+Local state:
 
 ```ts
 type CaseDetailTab = "overview" | "dsl" | "stateMachine" | "plans" | "history";
 ```
 
-Tab behavior design:
+Tab behavior:
 
 - `Overview`
   - request: none
-  - reuse current mixed summary panels
+  - reuses current mixed summary panels (front-end-generated steps)
 - `DSL`
-  - request:
-    - `GET /api/phase3/cases/{caseId}/dsl`
+  - request: `GET /api/phase3/cases/{caseId}/dsl`
+  - provides: JSON editor, validate, save
 - `State machine`
-  - request:
-    - `GET /api/phase3/cases/{caseId}/state-machine`
+  - request: `GET /api/phase3/cases/{caseId}/state-machine`
+  - provides: nodes/edges/guards display, save
 - `Plans`
-  - request:
-    - `GET /api/phase3/cases/{caseId}/plans`
+  - request: `GET /api/phase3/cases/{caseId}/plans`
+  - provides: read-only plans list with preconditions
 - `History`
-  - request:
-    - `GET /api/phase3/cases/{caseId}/history`
+  - request: `GET /api/phase3/cases/{caseId}/history`
+  - provides: read-only run history and maintenance events
+
+Tab state resets to `overview` when the opened case changes.
 
 ### 10.4 `Plans` Tab
 
-Recommended implementation type:
+Implementation type:
 
-- new read interface
-
-Reasoning:
-
-- current side-panel plan rows are placeholder summaries
-- real plan content is a first-class case artifact in the main design docs
-
-Recommended endpoint:
+- read-only interface backed by `CaseDetailService`
 
 #### `GET /api/phase3/cases/{caseId}/plans`
 
 Purpose:
 
 - load data plan, compare plan, restore plan, and execution-precondition summary for one case
+- returns default mock data if no persisted file exists
 
 Response body:
 
@@ -761,32 +783,17 @@ Response body:
 
 ### 10.5 `History` Tab
 
-Recommended implementation type:
+Implementation type:
 
-- new read interface
-- optional route-state handoff into `reports` / `reportDetail`
-
-Reasoning:
-
-- current `Recent runs` bars are only summary placeholders
-- true case history needs run records tied to a case id
-
-Recommended endpoint:
+- read-only interface backed by `CaseDetailService`
+- future: route-state handoff from run rows into `reportDetail`
 
 #### `GET /api/phase3/cases/{caseId}/history`
 
 Purpose:
 
 - return recent execution history and maintenance events for one case
-
-Query parameters:
-
-- `limit`
-- `includeMaintenance`
-
-Example:
-
-`GET /api/phase3/cases/checkout-smoke/history?limit=20&includeMaintenance=true`
+- returns default mock data if no persisted file exists
 
 Response body:
 
@@ -818,21 +825,19 @@ Response body:
 }
 ```
 
-Recommended row click behavior:
+Future row click behavior:
 
-- clicking a run row routes to `reportDetail`
+- clicking a run row should route to `reportDetail`
 - no new report-detail endpoint required for the first Phase 3 linkage if existing report screen state is reused
 
 ### 10.6 `Recent runs` Summary Panel
 
-Recommended implementation type:
+Current state: display-only sidebar placeholder
 
-- route-state handoff to `reportDetail`
-- no new backend endpoint required if history tab is not yet implemented
+Future implementation:
 
-Concrete implementation design:
-
-- once real history data exists, make summary bars or rows clickable
+- real history data now exists via `GET /api/phase3/cases/{caseId}/history`
+- sidebar summary bars could be connected to this data or made clickable
 - add app-level handler:
   - `onOpenCaseRunDetail(runName: string)`
 - reuse existing `openReportDetail(runName)`
@@ -880,25 +885,32 @@ Current surfacing:
 - case save errors map into `caseState`
 - `CasesScreen.tsx` displays `caseState` in `Catalog status`
 
-Recommended new-interface error surfaces:
+Implemented case-detail error surfaces:
 
-- DSL validation errors should return structured `errors[]`
-- DSL/state-machine/plans/history reads should return:
-  - `404` when case artifact does not exist
-  - `409` when artifact version is stale on write
-  - `400` when request body is invalid
+- DSL validation returns structured `errors[]` and `warnings[]` in the response body
+- DSL save with missing `definition` field returns `400` with error message
+- Invalid JSON in request body returns `400`
+- Path traversal in `caseId` returns `400` with "path traversal detected"
+- Method not allowed returns `405`
+- Unknown action path returns `404`
+
+Future error surfaces:
+
+- `409` when artifact version is stale on write (not yet implemented)
 
 ## 12. Review Items
 
-Review-only findings:
+Resolved findings (P2-3):
 
-- The visible `cases` screen currently behaves more like a case-overview/detail launcher than a full case-management workspace.
+- DSL, state-machine, plan, and history capabilities are now implemented as tab-based sub-views with backend persistence.
+- `Edit DSL` and `State machine` hero buttons are now wired to switch tabs and load data.
+- Tab switching is implemented with `CaseDetailTab` state and API-backed data loading.
+- `CaseDetailService.java` provides file-backed persistence for all case-detail artifacts.
+
+Remaining findings:
+
 - `Pre-execution` is correctly a state handoff, not a backend request.
-- The current UI strongly implies dedicated DSL, state-machine, plan, and history capabilities, but the current local API does not expose them yet.
-- App-level case-catalog save already exists, but the visible screen does not expose it.
-- Future implementation should prefer:
-  - route-state handoff when only navigation is missing
-  - reuse of `POST /api/phase3/catalog/case` if editor UI is restored
-  - new endpoints only for true new artifacts such as DSL, state machine, plans, and history
-
-These are documentation findings only. No implementation change is made in this stage.
+- App-level case-catalog save already exists, but the visible screen does not expose an editor form.
+- Sidebar info/plans/recent-run panels remain snapshot-derived display, not yet connected to per-tab API data.
+- History tab run row click does not yet hand off to `reportDetail`.
+- Plans and history are read-only; write endpoints can be added when editing is required.

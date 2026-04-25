@@ -66,10 +66,10 @@ Conventions used here:
 | Collapse / expand | button | Local only | Keep local |
 | Project card button | clickable card | Local project switch only | Keep local |
 | `Detail` | button/row action | Local detail open only | Keep local |
-| `Edit DSL` | button | Visual only | `GET /api/phase3/cases/{caseId}/dsl` + `POST /api/phase3/cases/{caseId}/dsl/validate` + `PUT /api/phase3/cases/{caseId}/dsl` |
-| `State machine` | button | Visual only | `GET /api/phase3/cases/{caseId}/state-machine` + `PUT /api/phase3/cases/{caseId}/state-machine` |
+| `Edit DSL` | button | Implemented: switches to DSL tab, loads `GET /api/phase3/cases/{caseId}/dsl`, provides validate via `POST .../dsl/validate` and save via `PUT .../dsl` | Keep current |
+| `State machine` | button | Implemented: switches to State machine tab, loads `GET /api/phase3/cases/{caseId}/state-machine`, provides save via `PUT .../state-machine` | Keep current |
 | `Pre-execution` | button | Implemented as App-level prepared-case handoff only; no backend request here | Actual run requests remain in `execution` via scheduler interfaces |
-| `Overview` / `DSL` / `State machine` / `Plans` / `History` tabs | tabs | Local/visual only today | Back tabs with `GET /api/phase3/cases/{caseId}/dsl`, `.../state-machine`, `.../plans`, `.../history` |
+| `Overview` / `DSL` / `State machine` / `Plans` / `History` tabs | tabs | Implemented: local `activeTab` state drives tab switching; each non-overview tab fetches from `GET /api/phase3/cases/{caseId}/{dsl,state-machine,plans,history}` on activation | Keep current API-backed tab flow |
 | `Recent runs` summary bars | display row | Display-only | App-level handoff into `reportDetail` |
 
 ---
@@ -179,11 +179,12 @@ Conventions used here:
 
 | Control | Type | Current behavior / interface | Future interface / design |
 |---|---|---|---|
-| Template row | clickable row | Local selection only | Optionally load detail through `GET /api/phase3/data-templates/{templateId}` if list becomes summary-only |
-| `Import` | button | Visual only | `POST /api/phase3/data-templates/import/preview` -> `POST /api/phase3/data-templates/import/commit` |
-| `New template` | button | Visual only | `POST /api/phase3/data-templates` |
-| `Edit` | button | Visual only | `GET /api/phase3/data-templates/{templateId}` -> `PUT /api/phase3/data-templates/{templateId}` |
-| `Dry-run` | button | Visual only | `POST /api/phase3/data-templates/{templateId}/dry-run` |
+| Template row | clickable row | Implemented: local selection plus detail load through `GET /api/phase3/data-templates/{templateId}` | Keep current |
+| `Import` | button | Implemented: `POST /api/phase3/data-templates/import/preview` -> `POST /api/phase3/data-templates/import/commit` | Keep current |
+| `New template` | button | Implemented: `POST /api/phase3/data-templates` | Keep current |
+| `Edit` | button | Implemented: `GET /api/phase3/data-templates/{templateId}` -> `PUT /api/phase3/data-templates/{templateId}` | Keep current |
+| `Dry-run` | button | Implemented: `POST /api/phase3/data-templates/{templateId}/dry-run` | Keep current |
+| `Delete` | button | Implemented: `DELETE /api/phase3/data-templates/{templateId}` | Keep current |
 
 ---
 
@@ -244,5 +245,9 @@ The highest-signal unresolved controls across the package are:
 - `plugin` still has no real popup/native wiring
 - `aiGenerate` still lacks real generate / dry-run / save actions
 - `monitor` still lacks all live runtime APIs
-- `dataTemplates` still lacks a real backend template registry
 - `models` and `environments` have switched to real backend validation interfaces, but the validation remains deterministic and non-connective by Phase 3 design
+
+Resolved since last review:
+
+- `dataTemplates` now has a full backend template registry (P1-3: CRUD, import, dry-run, delete)
+- `cases` tabs are now API-backed with DSL edit/validate/save, state-machine read/save, plans read, history read (P2-3)

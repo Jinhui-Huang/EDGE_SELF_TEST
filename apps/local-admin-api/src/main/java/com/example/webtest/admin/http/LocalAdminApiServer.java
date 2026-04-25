@@ -1,6 +1,7 @@
 package com.example.webtest.admin.http;
 
 import com.example.webtest.admin.service.AgentGenerateService;
+import com.example.webtest.admin.service.CaseDetailService;
 import com.example.webtest.admin.service.CatalogPersistenceService;
 import com.example.webtest.admin.service.ConnectionValidationService;
 import com.example.webtest.admin.service.ConfigPersistenceService;
@@ -45,7 +46,8 @@ public final class LocalAdminApiServer implements AutoCloseable {
                 agentGenerateService,
                 reportArtifactService,
                 dataTemplatePersistenceService,
-                new ConnectionValidationService());
+                new ConnectionValidationService(),
+                new CaseDetailService(java.nio.file.Path.of("config", "phase3", "case-details")));
     }
 
     public LocalAdminApiServer(
@@ -59,6 +61,33 @@ public final class LocalAdminApiServer implements AutoCloseable {
             ReportArtifactService reportArtifactService,
             DataTemplatePersistenceService dataTemplatePersistenceService,
             ConnectionValidationService connectionValidationService)
+            throws IOException {
+        this(
+                address,
+                mockDataService,
+                schedulerPersistenceService,
+                configPersistenceService,
+                catalogPersistenceService,
+                runStatusService,
+                agentGenerateService,
+                reportArtifactService,
+                dataTemplatePersistenceService,
+                connectionValidationService,
+                new CaseDetailService(java.nio.file.Path.of("config", "phase3", "case-details")));
+    }
+
+    public LocalAdminApiServer(
+            InetSocketAddress address,
+            Phase3MockDataService mockDataService,
+            SchedulerPersistenceService schedulerPersistenceService,
+            ConfigPersistenceService configPersistenceService,
+            CatalogPersistenceService catalogPersistenceService,
+            RunStatusService runStatusService,
+            AgentGenerateService agentGenerateService,
+            ReportArtifactService reportArtifactService,
+            DataTemplatePersistenceService dataTemplatePersistenceService,
+            ConnectionValidationService connectionValidationService,
+            CaseDetailService caseDetailService)
             throws IOException {
         server = HttpServer.create(address, 0);
         server.createContext("/health", jsonHandler(Map.of("status", "UP")));
@@ -106,6 +135,8 @@ public final class LocalAdminApiServer implements AutoCloseable {
         server.createContext(
                 "/api/phase3/cases/dsl/validate",
                 exchange -> handleMutation(exchange, agentGenerateService::validateDsl));
+        server.createContext("/api/phase3/cases/",
+                exchange -> handleCaseDetailEndpoint(exchange, caseDetailService));
         server.createContext(
                 "/api/phase3/data-templates/import/preview",
                 exchange -> handleMutation(exchange, dataTemplatePersistenceService::importPreview));
@@ -134,6 +165,82 @@ public final class LocalAdminApiServer implements AutoCloseable {
     @Override
     public void close() {
         server.stop(0);
+    }
+
+    private static void handleCaseDetailEndpoint(HttpExchange exchange,
+            CaseDetailService service) throws IOException {
+        if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
+            writeEmptyResponse(exchange);
+            return;
+        }
+        String path = exchange.getRequestURI().getPath();
+        // /api/phase3/cases/{caseId}/{action}
+        // /api/phase3/cases/{caseId}/{action}/{subAction}
+        String[] segments = path.split("/");
+        // segments: ["", "api", "phase3", "cases", "{caseId}", "{action?}", "{subAction?}"]
+
+        if (segments.length < 5 || segments[4].isEmpty()) {
+            writeJson(exchange, 400, Map.of("error", "BAD_REQUEST", "message", "caseId required"));
+            return;
+        }
+
+        String caseId = segments[4];
+        String action = segments.length > 5 ? segments[5] : "";
+        String subAction = segments.length > 6 ? segments[6] : "";
+        String method = exchange.getRequestMethod().toUpperCase();
+
+        try {
+            switch (action) {
+                case "dsl" -> {
+                    if ("validate".equals(subAction)) {
+                        if (!"POST".equals(method)) {
+                            writeJson(exchange, 405, Map.of("error", "METHOD_NOT_ALLOWED"));
+                            return;
+                        }
+                        String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+                        writeJson(exchange, 200, service.validateDsl(caseId, body));
+                    } else if (subAction.isEmpty()) {
+                        if ("GET".equals(method)) {
+                            writeJson(exchange, 200, service.getDsl(caseId));
+                        } else if ("PUT".equals(method)) {
+                            String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+                            writeJson(exchange, 202, service.saveDsl(caseId, body));
+                        } else {
+                            writeJson(exchange, 405, Map.of("error", "METHOD_NOT_ALLOWED"));
+                        }
+                    } else {
+                        writeJson(exchange, 404, Map.of("error", "NOT_FOUND", "subAction", subAction));
+                    }
+                }
+                case "state-machine" -> {
+                    if ("GET".equals(method)) {
+                        writeJson(exchange, 200, service.getStateMachine(caseId));
+                    } else if ("PUT".equals(method)) {
+                        String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+                        writeJson(exchange, 202, service.saveStateMachine(caseId, body));
+                    } else {
+                        writeJson(exchange, 405, Map.of("error", "METHOD_NOT_ALLOWED"));
+                    }
+                }
+                case "plans" -> {
+                    if (!"GET".equals(method)) {
+                        writeJson(exchange, 405, Map.of("error", "METHOD_NOT_ALLOWED"));
+                        return;
+                    }
+                    writeJson(exchange, 200, service.getPlans(caseId));
+                }
+                case "history" -> {
+                    if (!"GET".equals(method)) {
+                        writeJson(exchange, 405, Map.of("error", "METHOD_NOT_ALLOWED"));
+                        return;
+                    }
+                    writeJson(exchange, 200, service.getHistory(caseId));
+                }
+                default -> writeJson(exchange, 404, Map.of("error", "NOT_FOUND", "action", action));
+            }
+        } catch (IllegalArgumentException e) {
+            writeJson(exchange, 400, Map.of("error", "BAD_REQUEST", "message", e.getMessage()));
+        }
     }
 
     private static void handleDataTemplateEndpoint(HttpExchange exchange,

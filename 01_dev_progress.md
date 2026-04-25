@@ -2895,3 +2895,52 @@ Reports / ReportDetail / DataDiff screens now consume backend report artifact AP
 
 ## Next Step
 - Await re-review of the synced P2-2 docs baseline before advancing to the next backlog item.
+
+## 2026-04-25 P2-3 Complete cases editor-side read/write interfaces
+
+### Scope
+Wire the 7 case-detail API endpoints and make the CasesScreen tabs functional with real backend data.
+
+### Backend
+- **NEW** `CaseDetailService.java`: File-backed case detail service under `config/phase3/case-details/<caseId>/`
+  - GET/PUT DSL (`dsl.json`) with auto-versioning
+  - POST DSL validate (definition required, id required, step action checks)
+  - GET/PUT state-machine (`state-machine.json`) with nodes/edges/guards
+  - GET plans (`plans.json`) with plans array and preconditions
+  - GET history (`history.json`) with runs and maintenance events
+  - Path traversal protection via `.normalize()` + `.startsWith(root)`
+  - Default/mock data builders when no persisted file exists
+- **MODIFIED** `LocalAdminApiServer.java`:
+  - 11-param constructor with full delegation chain (9→10→11)
+  - Route `/api/phase3/cases/` registered after `/api/phase3/cases/dsl/validate` (prefix conflict avoidance)
+  - `handleCaseDetailEndpoint` dispatches by path segments: `{caseId}/{action}/{subAction}`
+- **MODIFIED** `LocalAdminApiApp.java`: Added CaseDetailService import (9-param constructor auto-creates default instance)
+
+### Frontend
+- **MODIFIED** `types.ts`: Added 7 P2-3 types (CaseDslResponse, CaseDslValidateResponse, CaseDslSaveResponse, CaseStateMachineResponse, CasePlansResponse, CaseHistoryResponse)
+- **MODIFIED** `CasesScreen.tsx`:
+  - Tab switching with `CaseDetailTab` type (`overview | dsl | stateMachine | plans | history`)
+  - API-backed data fetching per tab (GET on tab switch)
+  - DSL editor panel with JSON textarea, validate button, save button, validation status display
+  - State machine viewer with nodes/edges/guards display and save
+  - Plans tab with API data (plans list + preconditions)
+  - History tab with runs and maintenance events
+  - "Edit DSL" and "State machine" hero buttons now switch to respective tabs
+  - Tab state resets on case change
+  - Added `apiBaseUrl` prop
+- **MODIFIED** `App.tsx`: Pass `apiBaseUrl` to CasesScreen
+
+### Tests
+- **MODIFIED** `LocalAdminApiServerTest.java`:
+  - Added `caseDetailEndpoints` test with 10 steps covering all 7 endpoints
+  - Validates GET defaults, PUT DSL save + version increment, POST validate (valid/invalid), GET/PUT state-machine, GET plans, GET history
+  - Added CaseDetailService and ConnectionValidationService imports
+
+### Verification
+- `npm run build`: PASS (339 kB bundle)
+- `npm test -- --run`: PASS (20/20 tests, 2 files)
+- `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`: PASS (12/12 tests)
+
+### Next Step
+- Sync `docs/phase3/interface/cases/` functional-spec and interface-spec with completed P2-3 implementation
+- Continue with the next review-backlog priority after P2-3

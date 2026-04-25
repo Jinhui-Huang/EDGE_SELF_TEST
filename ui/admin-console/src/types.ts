@@ -542,6 +542,57 @@ export type DataTemplateDryRunResponse = {
   auditRef: string;
 };
 
+// ---- Case detail (P2-3) ----
+
+export type CaseDslResponse = {
+  caseId: string;
+  projectKey: string;
+  dslVersion: number;
+  updatedAt: string;
+  updatedBy: string;
+  definition: {
+    id: string;
+    name: string;
+    steps: { action: string; url?: string; target?: string; value?: string }[];
+  };
+};
+
+export type CaseDslValidateResponse = {
+  status: "VALID" | "INVALID";
+  errors: string[];
+  warnings: string[];
+};
+
+export type CaseDslSaveResponse = {
+  status: string;
+  kind: string;
+  caseId: string;
+  dslVersion: number;
+  updatedAt: string;
+};
+
+export type CaseStateMachineResponse = {
+  caseId: string;
+  projectKey: string;
+  updatedAt: string;
+  nodes: { id: string; label: string }[];
+  edges: { from: string; to: string; action: string }[];
+  guards: { id: string; description: string }[];
+};
+
+export type CasePlansResponse = {
+  caseId: string;
+  projectKey: string;
+  plans: { id: string; type: string; name: string; summary: string }[];
+  preconditions: string[];
+};
+
+export type CaseHistoryResponse = {
+  caseId: string;
+  runs: { runName: string; status: string; finishedAt: string; reportEntry: string }[];
+  maintenanceEvents: { at: string; type: string; operator: string; summary: string }[];
+};
+
 // ---- Extension popup snapshot (P0-3) ----
 
 export type ExtensionPopupSnapshot = {

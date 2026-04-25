@@ -1,13 +1,27 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatCopy, sharedCopy, translate } from "../i18n";
-import { AdminConsoleSnapshot, CaseItem, Locale, MutationState } from "../types";
+import {
+  AdminConsoleSnapshot,
+  CaseDslResponse,
+  CaseDslSaveResponse,
+  CaseDslValidateResponse,
+  CaseHistoryResponse,
+  CaseItem,
+  CasePlansResponse,
+  CaseStateMachineResponse,
+  Locale,
+  MutationState
+} from "../types";
 import { MutationStatus } from "../ui-kit/MutationStatus";
+
+type CaseDetailTab = "overview" | "dsl" | "stateMachine" | "plans" | "history";
 
 type CasesScreenProps = {
   snapshot: AdminConsoleSnapshot;
   caseDraft: CaseItem[];
   caseState: MutationState;
   initialProjectKey?: string | null;
+  apiBaseUrl: string;
   title: string;
   saveHint: string;
   caseTagsLabel: string;
@@ -79,6 +93,7 @@ export function CasesScreen({
   caseDraft,
   caseState,
   initialProjectKey,
+  apiBaseUrl,
   title,
   saveHint,
   caseTagsLabel,
@@ -91,6 +106,110 @@ export function CasesScreen({
   const [selectedProjectKey, setSelectedProjectKey] = useState(initialSelection);
   const [openedCaseId, setOpenedCaseId] = useState<string | null>(null);
   const [overviewCollapsed, setOverviewCollapsed] = useState(true);
+  const [activeTab, setActiveTab] = useState<CaseDetailTab>("overview");
+
+  // ---- API-backed tab data ----
+  const [dslData, setDslData] = useState<CaseDslResponse | null>(null);
+  const [dslDraft, setDslDraft] = useState<string>("");
+  const [dslValidation, setDslValidation] = useState<CaseDslValidateResponse | null>(null);
+  const [dslSaving, setDslSaving] = useState(false);
+  const [smData, setSmData] = useState<CaseStateMachineResponse | null>(null);
+  const [plansData, setPlansData] = useState<CasePlansResponse | null>(null);
+  const [historyData, setHistoryData] = useState<CaseHistoryResponse | null>(null);
+  const [tabLoading, setTabLoading] = useState(false);
+
+  const tabKeys: CaseDetailTab[] = ["overview", "dsl", "stateMachine", "plans", "history"];
+
+  const fetchTabData = useCallback(
+    async (tab: CaseDetailTab, caseId: string) => {
+      setTabLoading(true);
+      try {
+        if (tab === "dsl") {
+          const res = await fetch(`${apiBaseUrl}/api/phase3/cases/${caseId}/dsl`);
+          if (res.ok) {
+            const data: CaseDslResponse = await res.json();
+            setDslData(data);
+            setDslDraft(JSON.stringify(data.definition, null, 2));
+            setDslValidation(null);
+          }
+        } else if (tab === "stateMachine") {
+          const res = await fetch(`${apiBaseUrl}/api/phase3/cases/${caseId}/state-machine`);
+          if (res.ok) setSmData(await res.json());
+        } else if (tab === "plans") {
+          const res = await fetch(`${apiBaseUrl}/api/phase3/cases/${caseId}/plans`);
+          if (res.ok) setPlansData(await res.json());
+        } else if (tab === "history") {
+          const res = await fetch(`${apiBaseUrl}/api/phase3/cases/${caseId}/history`);
+          if (res.ok) setHistoryData(await res.json());
+        }
+      } catch {
+        /* network error – keep previous data */
+      } finally {
+        setTabLoading(false);
+      }
+    },
+    [apiBaseUrl]
+  );
+
+  const handleValidateDsl = useCallback(
+    async (caseId: string) => {
+      try {
+        const definition = JSON.parse(dslDraft);
+        const res = await fetch(`${apiBaseUrl}/api/phase3/cases/${caseId}/dsl/validate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ definition })
+        });
+        if (res.ok) setDslValidation(await res.json());
+      } catch {
+        setDslValidation({ status: "INVALID", errors: ["Invalid JSON"], warnings: [] });
+      }
+    },
+    [apiBaseUrl, dslDraft]
+  );
+
+  const handleSaveDsl = useCallback(
+    async (caseId: string, projectKey: string) => {
+      setDslSaving(true);
+      try {
+        const definition = JSON.parse(dslDraft);
+        const res = await fetch(`${apiBaseUrl}/api/phase3/cases/${caseId}/dsl`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ definition, projectKey, updatedBy: "operator" })
+        });
+        if (res.ok) {
+          const saved: CaseDslSaveResponse = await res.json();
+          setDslData((prev) => (prev ? { ...prev, dslVersion: saved.dslVersion, updatedAt: saved.updatedAt } : prev));
+        }
+      } catch {
+        /* save failed */
+      } finally {
+        setDslSaving(false);
+      }
+    },
+    [apiBaseUrl, dslDraft]
+  );
+
+  const handleSaveStateMachine = useCallback(
+    async (caseId: string) => {
+      if (!smData) return;
+      try {
+        const res = await fetch(`${apiBaseUrl}/api/phase3/cases/${caseId}/state-machine`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ projectKey: smData.projectKey, nodes: smData.nodes, edges: smData.edges, guards: smData.guards })
+        });
+        if (res.ok) {
+          const saved = await res.json();
+          setSmData((prev) => (prev ? { ...prev, updatedAt: saved.updatedAt } : prev));
+        }
+      } catch {
+        /* save failed */
+      }
+    },
+    [apiBaseUrl, smData]
+  );
 
   useEffect(() => {
     const normalizedProjectKey = initialProjectKey?.trim();
@@ -129,6 +248,24 @@ export function CasesScreen({
       setOpenedCaseId(null);
     }
   }, [openedCaseId, visibleCases]);
+
+  // Reset tab data when case changes
+  useEffect(() => {
+    setActiveTab("overview");
+    setDslData(null);
+    setDslDraft("");
+    setDslValidation(null);
+    setSmData(null);
+    setPlansData(null);
+    setHistoryData(null);
+  }, [openedCaseId]);
+
+  // Fetch data when tab changes
+  useEffect(() => {
+    if (openedCaseId && activeTab !== "overview") {
+      fetchTabData(activeTab, openedCaseId);
+    }
+  }, [activeTab, openedCaseId, fetchTabData]);
 
   const openedCase = visibleCases.find((item) => item.id === openedCaseId) ?? null;
   const selectedProject =
@@ -320,10 +457,20 @@ export function CasesScreen({
           </div>
 
           <div className="casesHeroActions">
-            <button type="button" className="casesActionButton ghost" disabled={!openedCase}>
+            <button
+              type="button"
+              className="casesActionButton ghost"
+              disabled={!openedCase}
+              onClick={() => setActiveTab("dsl")}
+            >
               {t(copy("Edit DSL", "编辑 DSL", "DSL 編集"))}
             </button>
-            <button type="button" className="casesActionButton secondary" disabled={!openedCase}>
+            <button
+              type="button"
+              className="casesActionButton secondary"
+              disabled={!openedCase}
+              onClick={() => setActiveTab("stateMachine")}
+            >
               {t(copy("State machine", "状态机", "状態機械"))}
             </button>
             <button
@@ -343,7 +490,13 @@ export function CasesScreen({
 
         <div className="casesTabs">
           {detailTabs.map((tab, index) => (
-            <button key={tab.en} type="button" className={`casesTab ${index === 0 ? "isActive" : ""}`} disabled={!openedCase}>
+            <button
+              key={tab.en}
+              type="button"
+              className={`casesTab ${activeTab === tabKeys[index] ? "isActive" : ""}`}
+              disabled={!openedCase}
+              onClick={() => setActiveTab(tabKeys[index])}
+            >
               {t(tab)}
             </button>
           ))}
@@ -352,23 +505,177 @@ export function CasesScreen({
         {openedCase ? (
           <div className="casesDetailGrid">
             <div className="casesDetailMain">
-              <section className="casesPanelCard casesStepsCard">
-                <div className="casesPanelHead">
-                  <div className="casesPanelTitle">{t(copy("Steps", "步骤", "ステップ"))}</div>
-                  <span className="casesPanelPill">{detailSteps.length} steps | 5 assertions</span>
-                </div>
-                <div className="casesStepsList">
-                  {detailSteps.map((step) => (
-                    <div key={step.index} className="casesStepRow">
-                      <div className="casesStepIndex">{String(step.index).padStart(2, "0")}</div>
-                      <span className={`casesStepBadge ${step.action === "assert" ? "info" : "neutral"}`}>{step.action}</span>
-                      <div className="casesStepSelector">{step.selector}</div>
-                      <div className="casesStepValue">{step.value ?? ""}</div>
-                      {step.healed ? <span className="casesStepFlag warning">healed</span> : <div className="casesStepNote">{step.note ?? ""}</div>}
+              {tabLoading ? (
+                <section className="casesPanelCard">
+                  <p className="casesPanelText">{t(copy("Loading…", "加载中…", "読み込み中…"))}</p>
+                </section>
+              ) : activeTab === "overview" ? (
+                <section className="casesPanelCard casesStepsCard">
+                  <div className="casesPanelHead">
+                    <div className="casesPanelTitle">{t(copy("Steps", "步骤", "ステップ"))}</div>
+                    <span className="casesPanelPill">{detailSteps.length} steps | 5 assertions</span>
+                  </div>
+                  <div className="casesStepsList">
+                    {detailSteps.map((step) => (
+                      <div key={step.index} className="casesStepRow">
+                        <div className="casesStepIndex">{String(step.index).padStart(2, "0")}</div>
+                        <span className={`casesStepBadge ${step.action === "assert" ? "info" : "neutral"}`}>{step.action}</span>
+                        <div className="casesStepSelector">{step.selector}</div>
+                        <div className="casesStepValue">{step.value ?? ""}</div>
+                        {step.healed ? <span className="casesStepFlag warning">healed</span> : <div className="casesStepNote">{step.note ?? ""}</div>}
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ) : activeTab === "dsl" ? (
+                <section className="casesPanelCard">
+                  <div className="casesPanelHead">
+                    <div className="casesPanelTitle">
+                      {t(copy("DSL Editor", "DSL 编辑器", "DSL エディタ"))}
+                      {dslData ? ` (v${dslData.dslVersion})` : ""}
                     </div>
-                  ))}
-                </div>
-              </section>
+                    <div className="casesPanelActions">
+                      <button type="button" className="casesActionButton ghost" onClick={() => handleValidateDsl(openedCase.id)}>
+                        {t(copy("Validate", "校验", "検証"))}
+                      </button>
+                      <button
+                        type="button"
+                        className="casesActionButton primary"
+                        disabled={dslSaving}
+                        onClick={() => handleSaveDsl(openedCase.id, openedCase.projectKey)}
+                      >
+                        {dslSaving ? t(copy("Saving…", "保存中…", "保存中…")) : t(copy("Save DSL", "保存 DSL", "DSL 保存"))}
+                      </button>
+                    </div>
+                  </div>
+                  {dslValidation ? (
+                    <div className={`casesDslValidation ${dslValidation.status === "VALID" ? "isValid" : "isInvalid"}`}>
+                      <strong>{dslValidation.status}</strong>
+                      {dslValidation.errors.map((e, i) => (
+                        <p key={i} className="errorText">{e}</p>
+                      ))}
+                      {dslValidation.warnings.map((w, i) => (
+                        <p key={i} className="warningText">{w}</p>
+                      ))}
+                    </div>
+                  ) : null}
+                  <textarea
+                    className="casesDslEditor"
+                    rows={16}
+                    value={dslDraft}
+                    onChange={(e) => setDslDraft(e.target.value)}
+                  />
+                  {dslData ? (
+                    <div className="casesDslMeta">
+                      <span>{t(copy("Updated by", "更新者", "更新者"))}: {dslData.updatedBy}</span>
+                      <span>{t(copy("Updated at", "更新于", "更新日時"))}: {dslData.updatedAt}</span>
+                    </div>
+                  ) : null}
+                </section>
+              ) : activeTab === "stateMachine" ? (
+                <section className="casesPanelCard">
+                  <div className="casesPanelHead">
+                    <div className="casesPanelTitle">{t(copy("State Machine", "状态机", "状態機械"))}</div>
+                    <button type="button" className="casesActionButton primary" onClick={() => handleSaveStateMachine(openedCase.id)}>
+                      {t(copy("Save", "保存", "保存"))}
+                    </button>
+                  </div>
+                  {smData ? (
+                    <>
+                      <div className="casesSmNodes">
+                        <strong>{t(copy("Nodes", "节点", "ノード"))}</strong>
+                        <div className="casesSmNodeList">
+                          {smData.nodes.map((node) => (
+                            <span key={node.id} className="casesSmNode">{node.label} ({node.id})</span>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="casesSmEdges">
+                        <strong>{t(copy("Edges", "边", "エッジ"))}</strong>
+                        {smData.edges.map((edge, i) => (
+                          <div key={i} className="casesSmEdge">
+                            {edge.from} → {edge.to} <span className="casesPanelPill">{edge.action}</span>
+                          </div>
+                        ))}
+                      </div>
+                      {smData.guards.length > 0 ? (
+                        <div className="casesSmGuards">
+                          <strong>{t(copy("Guards", "守卫条件", "ガード"))}</strong>
+                          {smData.guards.map((g) => (
+                            <div key={g.id} className="casesSmGuard">{g.id}: {g.description}</div>
+                          ))}
+                        </div>
+                      ) : null}
+                    </>
+                  ) : (
+                    <p className="casesPanelText">{t(copy("No data", "无数据", "データなし"))}</p>
+                  )}
+                </section>
+              ) : activeTab === "plans" ? (
+                <section className="casesPanelCard">
+                  <div className="casesPanelTitle">{t(copy("Plans", "计划", "計画"))}</div>
+                  {plansData ? (
+                    <>
+                      {plansData.plans.map((plan) => (
+                        <div key={plan.id} className="casesPlanRow">
+                          <span className="casesPlanDot accent2">•</span>
+                          <div>
+                            <strong>{plan.name}</strong>
+                            <p>{plan.summary}</p>
+                            <small>{plan.type}</small>
+                          </div>
+                        </div>
+                      ))}
+                      {plansData.preconditions.length > 0 ? (
+                        <div className="casesPlanPreconditions">
+                          <strong>{t(copy("Preconditions", "前置条件", "前提条件"))}</strong>
+                          <ul>
+                            {plansData.preconditions.map((pc, i) => (
+                              <li key={i}>{pc}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
+                    </>
+                  ) : (
+                    <p className="casesPanelText">{t(copy("No data", "无数据", "データなし"))}</p>
+                  )}
+                </section>
+              ) : activeTab === "history" ? (
+                <section className="casesPanelCard">
+                  <div className="casesPanelTitle">{t(copy("History", "历史", "履历"))}</div>
+                  {historyData ? (
+                    <>
+                      <div className="casesHistoryRuns">
+                        <strong>{t(copy("Runs", "运行记录", "実行履歴"))}</strong>
+                        {historyData.runs.map((run, i) => (
+                          <div key={i} className="casesHistoryRun">
+                            <span className={`casesStatusBadge ${run.status === "SUCCESS" ? "isActive" : ""}`}>{run.status}</span>
+                            <strong>{run.runName}</strong>
+                            <span>{run.finishedAt}</span>
+                            <span>{run.reportEntry}</span>
+                          </div>
+                        ))}
+                      </div>
+                      {historyData.maintenanceEvents.length > 0 ? (
+                        <div className="casesHistoryMaintenance">
+                          <strong>{t(copy("Maintenance events", "维护事件", "保守イベント"))}</strong>
+                          {historyData.maintenanceEvents.map((evt, i) => (
+                            <div key={i} className="casesHistoryEvent">
+                              <span>{evt.type}</span>
+                              <span>{evt.operator}</span>
+                              <span>{evt.summary}</span>
+                              <small>{evt.at}</small>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                    </>
+                  ) : (
+                    <p className="casesPanelText">{t(copy("No data", "无数据", "データなし"))}</p>
+                  )}
+                </section>
+              ) : null}
             </div>
 
             <aside className="casesDetailSide">

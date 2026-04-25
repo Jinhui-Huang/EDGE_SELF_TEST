@@ -4,8 +4,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.example.webtest.admin.service.AgentGenerateService;
+import com.example.webtest.admin.service.CaseDetailService;
 import com.example.webtest.admin.service.CatalogPersistenceService;
 import com.example.webtest.admin.service.ConfigPersistenceService;
+import com.example.webtest.admin.service.ConnectionValidationService;
 import com.example.webtest.admin.service.DataTemplatePersistenceService;
 import com.example.webtest.admin.service.Phase3MockDataService;
 import com.example.webtest.admin.service.ReportArtifactService;
@@ -1422,6 +1424,141 @@ class LocalAdminApiServerTest {
                     HttpResponse.BodyHandlers.ofString());
             assertEquals(200, notFound.statusCode());
             assertTrue(notFound.body().contains("\"NOT_FOUND\""));
+        }
+    }
+
+    @Test
+    void caseDetailEndpoints(@TempDir Path tempDir) throws Exception {
+        Clock clock = Clock.fixed(Instant.parse("2026-04-25T08:00:00Z"), ZoneOffset.UTC);
+        Path runsDir = tempDir.resolve("runs");
+        Files.createDirectories(runsDir);
+        Path schedulerRequestsFile = tempDir.resolve("scheduler-requests.json");
+        Path schedulerEventsFile = tempDir.resolve("scheduler-events.json");
+        Path schedulerStateFile = tempDir.resolve("scheduler-state.json");
+        Path queueFile = tempDir.resolve("execution-queue.json");
+        Path catalogFile = tempDir.resolve("project-catalog.json");
+        Path executionHistoryFile = tempDir.resolve("execution-history.json");
+        Path modelConfigFile = tempDir.resolve("model-config.json");
+        Path environmentConfigFile = tempDir.resolve("environment-config.json");
+        Path dataTemplateFile = tempDir.resolve("data-templates.json");
+        Path caseDetailRoot = tempDir.resolve("case-details");
+
+        Files.writeString(schedulerStateFile, "{}", StandardCharsets.UTF_8);
+        Files.writeString(queueFile, "{\"items\":[]}", StandardCharsets.UTF_8);
+        Files.writeString(catalogFile, "{\"projects\":[],\"cases\":[]}", StandardCharsets.UTF_8);
+
+        CaseDetailService caseDetailService = new CaseDetailService(caseDetailRoot, clock);
+
+        try (LocalAdminApiServer server = new LocalAdminApiServer(
+                new InetSocketAddress("127.0.0.1", 0),
+                new Phase3MockDataService(
+                        runsDir, schedulerRequestsFile, schedulerEventsFile,
+                        schedulerStateFile, queueFile, catalogFile,
+                        executionHistoryFile, modelConfigFile, environmentConfigFile, clock),
+                new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, clock),
+                new ConfigPersistenceService(modelConfigFile, environmentConfigFile),
+                new CatalogPersistenceService(catalogFile, clock),
+                new RunStatusService(schedulerRequestsFile, schedulerEventsFile,
+                        new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, clock), clock),
+                new AgentGenerateService(),
+                new ReportArtifactService(runsDir),
+                new DataTemplatePersistenceService(dataTemplateFile, clock),
+                new ConnectionValidationService(),
+                caseDetailService)) {
+            server.start();
+            HttpClient client = HttpClient.newHttpClient();
+
+            // 1. GET DSL — returns default
+            HttpResponse<String> dslGet = client.send(
+                    request(server, "/api/phase3/cases/checkout-smoke/dsl"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, dslGet.statusCode());
+            assertTrue(dslGet.body().contains("\"caseId\":\"checkout-smoke\""));
+            assertTrue(dslGet.body().contains("\"dslVersion\":1"));
+            assertTrue(dslGet.body().contains("\"definition\""));
+
+            // 2. Validate DSL — valid
+            HttpResponse<String> validateOk = client.send(
+                    request(server, "/api/phase3/cases/checkout-smoke/dsl/validate", "POST",
+                            Jsons.writeValueAsString(Map.of("definition",
+                                    Map.of("id", "checkout-smoke", "steps", List.of(Map.of("action", "goto")))))),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, validateOk.statusCode());
+            assertTrue(validateOk.body().contains("\"VALID\""));
+
+            // 3. Validate DSL — invalid (missing definition)
+            HttpResponse<String> validateBad = client.send(
+                    request(server, "/api/phase3/cases/checkout-smoke/dsl/validate", "POST",
+                            Jsons.writeValueAsString(Map.of("other", "value"))),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, validateBad.statusCode());
+            assertTrue(validateBad.body().contains("\"INVALID\""));
+            assertTrue(validateBad.body().contains("definition is required"));
+
+            // 4. PUT DSL — save
+            HttpResponse<String> dslSave = client.send(
+                    request(server, "/api/phase3/cases/checkout-smoke/dsl", "PUT",
+                            Jsons.writeValueAsString(Map.of(
+                                    "definition", Map.of("id", "checkout-smoke", "steps", List.of(Map.of("action", "click"))),
+                                    "projectKey", "checkout-web",
+                                    "updatedBy", "tester"))),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(202, dslSave.statusCode());
+            assertTrue(dslSave.body().contains("\"ACCEPTED\""));
+            assertTrue(dslSave.body().contains("\"dslVersion\":1"));
+
+            // 5. PUT DSL again — version increments
+            HttpResponse<String> dslSave2 = client.send(
+                    request(server, "/api/phase3/cases/checkout-smoke/dsl", "PUT",
+                            Jsons.writeValueAsString(Map.of(
+                                    "definition", Map.of("id", "checkout-smoke", "steps", List.of(Map.of("action", "fill"))),
+                                    "projectKey", "checkout-web"))),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(202, dslSave2.statusCode());
+            assertTrue(dslSave2.body().contains("\"dslVersion\":2"));
+
+            // 6. GET DSL — reflects saved version
+            HttpResponse<String> dslAfterSave = client.send(
+                    request(server, "/api/phase3/cases/checkout-smoke/dsl"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertTrue(dslAfterSave.body().contains("\"dslVersion\":2"));
+            assertTrue(dslAfterSave.body().contains("\"fill\""));
+
+            // 7. GET state-machine — returns default
+            HttpResponse<String> smGet = client.send(
+                    request(server, "/api/phase3/cases/checkout-smoke/state-machine"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, smGet.statusCode());
+            assertTrue(smGet.body().contains("\"nodes\""));
+            assertTrue(smGet.body().contains("\"edges\""));
+
+            // 8. PUT state-machine — save
+            HttpResponse<String> smSave = client.send(
+                    request(server, "/api/phase3/cases/checkout-smoke/state-machine", "PUT",
+                            Jsons.writeValueAsString(Map.of(
+                                    "projectKey", "checkout-web",
+                                    "nodes", List.of(Map.of("id", "start", "label", "Start")),
+                                    "edges", List.of(),
+                                    "guards", List.of()))),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(202, smSave.statusCode());
+            assertTrue(smSave.body().contains("\"ACCEPTED\""));
+
+            // 9. GET plans — returns default
+            HttpResponse<String> plans = client.send(
+                    request(server, "/api/phase3/cases/checkout-smoke/plans"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, plans.statusCode());
+            assertTrue(plans.body().contains("\"plans\""));
+            assertTrue(plans.body().contains("\"preconditions\""));
+
+            // 10. GET history — returns default
+            HttpResponse<String> history = client.send(
+                    request(server, "/api/phase3/cases/checkout-smoke/history"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, history.statusCode());
+            assertTrue(history.body().contains("\"runs\""));
+            assertTrue(history.body().contains("\"maintenanceEvents\""));
         }
     }
 

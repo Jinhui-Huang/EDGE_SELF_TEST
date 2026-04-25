@@ -64,18 +64,21 @@ The screen is placed after `projects` and before `execution` in the common opera
 Current implementation facts:
 
 - The page is rendered by `CasesScreen.tsx`.
-- The page currently behaves as a case overview plus lower detail canvas.
-- The page does not perform direct `fetch`.
-- The only implemented outward action on the screen is `Pre-execution`.
-- `Pre-execution` does not send a backend request from `cases`; it stores prepared case context in app state for later use by `execution`.
-- Visible controls such as `Edit DSL`, `State machine`, and detail tabs are present but not wired.
+- The page behaves as a case overview plus lower detail canvas with API-backed tab switching.
+- The page performs direct `fetch` calls to the backend for case-detail artifacts (DSL, state-machine, plans, history).
+- Implemented outward actions on the screen:
+  - `Pre-execution`: stores prepared case context in app state for later use by `execution`
+  - `Edit DSL`: switches to DSL tab, fetches `GET /api/phase3/cases/{caseId}/dsl`, provides validate (`POST .../dsl/validate`) and save (`PUT .../dsl`)
+  - `State machine`: switches to State machine tab, fetches `GET /api/phase3/cases/{caseId}/state-machine`, provides save (`PUT .../state-machine`)
+- Tab switching is implemented with local `activeTab` state; each non-overview tab fetches its data from the backend on activation.
+- Backend implementation: `CaseDetailService.java` provides file-backed persistence under `config/phase3/case-details/<caseId>/`.
 - App-level case save callbacks and labels exist in `App.tsx`, but the current `CasesScreen.tsx` does not render the editable catalog form that would use them.
 
 This matters for review:
 
-- the current visible screen is primarily a read-and-handoff surface
-- app-level write capability for case catalog exists in the shell
-- but that write capability is not currently exposed by this screen UI
+- the screen now includes both read-and-handoff and read/write capabilities for case detail artifacts
+- app-level write capability for case catalog exists in the shell but is not exposed by this screen UI
+- the DSL editor and state-machine viewer are functional with backend persistence
 
 ## 6. Functional Areas
 
@@ -179,9 +182,9 @@ Functional role:
 
 Current behavior:
 
-- `Pre-execution` is implemented
-- `Edit DSL` is visible but not wired
-- `State machine` is visible but not wired
+- `Pre-execution` is implemented as app-level state handoff
+- `Edit DSL` is implemented: switches to DSL tab, loads DSL from backend, provides validate and save actions
+- `State machine` is implemented: switches to State machine tab, loads state-machine data from backend, provides save action
 
 ### 6.6 Detail Tabs
 
@@ -195,33 +198,41 @@ Visible elements:
 
 Functional role:
 
-- represent the intended case-detail sub-views
-- communicate that case detail should eventually be a multi-view workspace rather than one fixed panel
+- provide switchable case-detail sub-views backed by dedicated API endpoints
+- each tab loads its data from `GET /api/phase3/cases/{caseId}/{action}` on activation
 
 Current behavior:
 
-- all tabs are visible
-- no tab switch state exists
-- `Overview` is statically styled as active
+- all tabs are visible and functional
+- local `activeTab` state (`CaseDetailTab`) tracks the selected tab
+- `Overview` shows the front-end-generated step summary (unchanged from original)
+- `DSL` tab fetches and displays DSL with validate/save controls
+- `State machine` tab fetches and displays nodes/edges/guards with save
+- `Plans` tab fetches and displays plans list with preconditions
+- `History` tab fetches and displays run history and maintenance events
+- tab state resets to `overview` when the opened case changes
 
 ### 6.7 Detail Main Panel
 
-Visible elements:
+Visible elements (varies by active tab):
 
-- step list
-- action badge
-- selector
-- value
-- note / healed flag
+- **Overview tab**: step list with action badge, selector, value, note / healed flag
+- **DSL tab**: JSON textarea editor, validate button, save button, validation status, DSL version and metadata
+- **State machine tab**: nodes list, edges list, guards list, save button
+- **Plans tab**: plans list with name/summary/type, preconditions list
+- **History tab**: run records with status/name/time, maintenance events
 
 Functional role:
 
-- show the operator a readable execution-style summary of the selected case
+- show the operator the selected case detail artifact for the active tab
 
 Current behavior:
 
-- steps are derived by front-end helper `buildDetailSteps`
-- the current content is a local presentational view model, not backend-loaded DSL
+- Overview tab: steps are derived by front-end helper `buildDetailSteps` (local presentational view model)
+- DSL tab: loaded from `GET /api/phase3/cases/{caseId}/dsl`, editable as JSON, validate via `POST .../dsl/validate`, save via `PUT .../dsl`
+- State machine tab: loaded from `GET /api/phase3/cases/{caseId}/state-machine`, save via `PUT .../state-machine`
+- Plans tab: loaded from `GET /api/phase3/cases/{caseId}/plans`
+- History tab: loaded from `GET /api/phase3/cases/{caseId}/history`
 
 ### 6.8 Detail Side Panels
 
@@ -254,8 +265,9 @@ Current behavior:
 ### 7.2 Detail Canvas Data
 
 - detail title/status/project identity come from the currently opened row plus `snapshot.cases`
-- step list is front-end generated summary data
-- info/plans/recent-run panels are presentational and not yet tied to dedicated case detail APIs
+- Overview tab step list is front-end generated summary data
+- DSL, state-machine, plans, and history tab content are loaded from dedicated backend APIs via `CaseDetailService`
+- sidebar info/plans/recent-run panels remain presentational snapshot-derived display
 
 ### 7.3 Prepared Case Handoff Data
 
@@ -321,10 +333,11 @@ Current implementation summary:
   - project switch
   - open case detail
   - `Pre-execution`
-- visible but not implemented:
-  - `Edit DSL`
-  - `State machine`
-  - tab switching
+  - `Edit DSL` (switches to DSL tab with backend-backed editor)
+  - `State machine` (switches to State machine tab with backend-backed viewer)
+  - tab switching (all 5 tabs: overview, DSL, state-machine, plans, history)
+- not yet implemented:
+  - none of the visible controls remain unwired
 
 ## 10. Functional Control Responsibility Matrix
 
@@ -352,16 +365,19 @@ Current implementation summary:
 ### 10.4 Detail Hero Controls
 
 - `Edit DSL`
-  - function: open a DSL-oriented maintenance view for the selected case
+  - function: switch to DSL tab and load the case DSL document from backend
   - downstream relation:
-    - future DSL editor / DSL detail page
-  - current implementation: visible only
+    - `GET /api/phase3/cases/{caseId}/dsl` (read)
+    - `POST /api/phase3/cases/{caseId}/dsl/validate` (validate)
+    - `PUT /api/phase3/cases/{caseId}/dsl` (save)
+  - current implementation: implemented
 
 - `State machine`
-  - function: open a state-machine-oriented review view for the selected case
+  - function: switch to State machine tab and load state-machine data from backend
   - downstream relation:
-    - future state-machine page or case detail sub-view
-  - current implementation: visible only
+    - `GET /api/phase3/cases/{caseId}/state-machine` (read)
+    - `PUT /api/phase3/cases/{caseId}/state-machine` (save)
+  - current implementation: implemented
 
 - `Pre-execution`
   - function: register current case as execution-ready context
@@ -372,20 +388,24 @@ Current implementation summary:
 ### 10.5 Detail Tabs
 
 - `Overview`
-  - function: show current mixed summary panel
-  - current implementation: visually active only
+  - function: show current mixed summary panel (front-end-generated steps)
+  - current implementation: implemented (default active tab)
 - `DSL`
-  - function: show case DSL content
-  - current implementation: visible only
+  - function: load and show case DSL with JSON editor, validate, and save
+  - request: `GET /api/phase3/cases/{caseId}/dsl` on tab activation
+  - current implementation: implemented
 - `State machine`
-  - function: show case state transitions
-  - current implementation: visible only
+  - function: load and show state-machine nodes/edges/guards with save
+  - request: `GET /api/phase3/cases/{caseId}/state-machine` on tab activation
+  - current implementation: implemented
 - `Plans`
-  - function: show data / comparison / restore plan content
-  - current implementation: visible only
+  - function: load and show data/compare/restore plans and preconditions
+  - request: `GET /api/phase3/cases/{caseId}/plans` on tab activation
+  - current implementation: implemented
 - `History`
-  - function: show run history and maintenance history
-  - current implementation: visible only
+  - function: load and show run history and maintenance events
+  - request: `GET /api/phase3/cases/{caseId}/history` on tab activation
+  - current implementation: implemented
 
 ## 11. State Model
 
@@ -407,7 +427,8 @@ Current implementation status:
 - overview collapsed state is implemented
 - opened case state is implemented
 - prepared case handoff is implemented
-- tab sub-view state is not implemented
+- tab sub-view state is implemented (`activeTab` with `CaseDetailTab` type)
+- per-tab API data state is implemented (dslData, smData, plansData, historyData)
 
 ## 12. Validation and Rules
 
@@ -445,9 +466,11 @@ The screen serves as an upstream context for:
 
 - `execution`
   - through `Pre-execution`
-- future DSL editor / DSL detail screen
-- future state-machine detail screen
-- future history/report drill-down
+- DSL editor (implemented inline as DSL tab with `CaseDetailService` backend)
+- State-machine viewer (implemented inline as State machine tab with `CaseDetailService` backend)
+- Plans viewer (implemented inline as Plans tab)
+- History viewer (implemented inline as History tab)
+- future history/report drill-down (clicking run rows → `reportDetail`)
 
 ### 13.3 Shared Data Context
 
@@ -472,22 +495,23 @@ The `cases` screen is not currently responsible for:
 
 - directly starting execution
 - directly sending scheduler requests/events
-- rendering a true DSL editor
-- rendering a true state-machine canvas
-- persisting case catalog rows from visible controls in the current UI build
+- persisting case catalog rows from visible controls in the current UI build (app-level capability exists but editor form is not exposed)
 
 ## 15. Known Gaps and Review Items
 
-Review items discovered while documenting:
+Resolved items (P2-3):
 
-- `Edit DSL` is visible but not wired.
-- `State machine` is visible but not wired.
-- Tabs are visible but do not switch the detail canvas.
-- The detail main/side panels are mostly front-end-composed placeholders rather than backend-backed case-detail data.
+- `Edit DSL` is now implemented with backend-backed DSL read/validate/save.
+- `State machine` is now implemented with backend-backed read/save.
+- Tabs now switch the detail canvas with API-backed data loading.
+- Detail main panel content is now driven by per-tab backend data for DSL, state-machine, plans, and history tabs.
+
+Remaining items:
+
+- Sidebar info/plans/recent-run panels remain presentational snapshot-derived display (not yet connected to per-tab API data).
 - App-level case save capability exists, but the current `cases` screen does not expose an actual editable catalog form.
-- The screen is visually positioned as the upstream entry for DSL/state-machine maintenance, but no route or dedicated interface is exposed yet.
-
-These are documentation review items only. No implementation change is made in this stage.
+- History tab run row click does not yet hand off to `reportDetail`.
+- `Recent runs` summary bars in sidebar are still display-only placeholders.
 
 ## 16. Suggested Output Files for This Screen Folder
 

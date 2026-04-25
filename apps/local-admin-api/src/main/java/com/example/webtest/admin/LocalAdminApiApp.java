@@ -1,6 +1,7 @@
 package com.example.webtest.admin;
 
 import com.example.webtest.admin.service.AgentGenerateService;
+import com.example.webtest.admin.service.CaseDetailService;
 import com.example.webtest.admin.service.CatalogPersistenceService;
 import com.example.webtest.admin.service.DataTemplatePersistenceService;
 import com.example.webtest.admin.http.LocalAdminApiServer;

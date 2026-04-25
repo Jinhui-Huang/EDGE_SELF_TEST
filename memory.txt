@@ -926,3 +926,18 @@
      - `Enter project` is implemented as App-level handoff to `cases`
    - Rewrote the stale “recommended / future” wording in `projects/interface-spec.md` so it now reflects the current implemented P2-2 state, while still leaving future language only for truly unfinished areas.
    - This follow-up changed docs only; no code path changed
+54. 2026-04-25 P2-3 cases editor-side read/write interfaces completed
+   - Scope: Wire the 7 case-detail API endpoints and make CasesScreen tabs functional with real backend data
+   - Backend:
+     - NEW `CaseDetailService.java`: File-backed case detail service under `config/phase3/case-details/<caseId>/`
+       - GET/PUT DSL (auto-versioning), POST validate, GET/PUT state-machine, GET plans, GET history
+       - Path traversal protection, default/mock data builders
+     - `LocalAdminApiServer.java`: 11-param constructor chain (9→10→11), route `/api/phase3/cases/` with handleCaseDetailEndpoint dispatcher
+     - PUT endpoints return 202 Accepted
+   - Frontend:
+     - `types.ts`: 7 new types (CaseDslResponse, CaseDslValidateResponse, CaseDslSaveResponse, CaseStateMachineResponse, CasePlansResponse, CaseHistoryResponse)
+     - `CasesScreen.tsx`: Tab switching (overview/dsl/stateMachine/plans/history), API-backed tab data, DSL editor with validate/save, state machine viewer with save, plans/history panels, hero buttons wired
+     - `App.tsx`: Pass apiBaseUrl to CasesScreen
+   - Tests:
+     - `LocalAdminApiServerTest.java`: 10-step `caseDetailEndpoints` test covering all 7 endpoints
+   - Verification: npm build PASS, npm test 20/20, mvn test 12/12
