@@ -2991,3 +2991,72 @@ Wire the 3 document-service API endpoints and make the DocParseScreen Upload/Re-
 
 ### Next Step
 - Continue with the next review-backlog priority after P2-4
+
+## 2026-04-26 P2-5 Complete reportDetail controls wiring
+
+### Scope
+Wire all visible-but-unwired controls on the reportDetail page: 5 tabs (Overview, Steps, Assertions, Recovery, AI decisions), Download artifacts, and Re-run.
+
+### Backend
+- **MODIFIED** `ReportArtifactService.java`:
+  - Added `getRecovery(runId)`: reads `recovery.json` from run dir, falls back to `buildMockRecovery()` (3 items: restore snapshot SUCCESS, verify row counts SUCCESS, restore audit_log SKIPPED)
+  - Added `getAiDecisions(runId)`: reads `ai-decisions.json` from run dir, falls back to `buildMockAiDecisions()` (3 items: LOCATOR_HEAL, WAIT_STRATEGY, ASSERTION_SUGGESTION)
+- **MODIFIED** `LocalAdminApiServer.java`:
+  - Added `recovery` and `ai-decisions` cases in `handleRunEndpoint` switch
+
+### Frontend
+- **MODIFIED** `types.ts`: Added 6 P2-5 types (RecoveryItem, RecoveryResponse, AiDecisionItem, AiDecisionsResponse, RunAssertionsResponse, RunArtifactsResponse)
+- **MODIFIED** `ReportDetailScreen.tsx`: Completely rewritten with:
+  - `ReportDetailTab` type (`overview | steps | assertions | dataDiff | recovery | aiDecisions`)
+  - `onRerun` prop for App-level execution handoff
+  - Tab-specific state variables with on-demand API fetches (cached per session)
+  - Artifact listing drawer with `GET .../artifacts`
+  - Re-run handoff extracting projectKey from runId
+  - Tab-specific panels: steps timeline, assertions detail, recovery detail with status badge, AI decisions log
+- **MODIFIED** `App.tsx`: Added `onRerun` prop wiring that sets `launchForm` and switches to `execution`
+
+### Tests
+- **MODIFIED** `App.test.tsx`: Added 3 reportDetail tests (tab switching with API fetches, artifact listing, re-run handoff)
+- **MODIFIED** `LocalAdminApiServerTest.java`: Added recovery and ai-decisions assertions to `reportArtifactEndpointsReadRealRunFiles`
+
+### Docs Synced
+- **MODIFIED** `docs/phase3/interface/ui-control-interface-overview.md`: Section 10 (ReportDetail) all controls → implemented
+- **MODIFIED** `docs/phase3/interface/reportDetail/functional-spec.md`: Sections 5, 6.2, 6.3, 9, 10, 11, 15 updated
+- **MODIFIED** `docs/phase3/interface/reportDetail/interface-spec.md`: Sections 2, 6, 9, 10, 11, 12 updated
+
+### Verification
+- `npm run build`: PASS
+- `npm test -- --run`: PASS (26/26 tests)
+- `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`: PASS (13/13 tests)
+
+### Next Step
+- Continue with the next review-backlog priority after P2-5
+
+## 2026-04-27 P2-5 reportDetail docs sync follow-up
+
+## Task
+- Align the `reportDetail` docs baseline with the completed P2-5 implementation so the functional and interface specs no longer describe artifact/re-run/tab behavior as future-only.
+
+## Completed
+- Updated:
+  - `docs/phase3/interface/reportDetail/functional-spec.md`
+  - `docs/phase3/interface/reportDetail/interface-spec.md`
+- Synced stale wording to current implemented state:
+  - artifact listing is implemented through `GET /api/phase3/runs/{runId}/artifacts`
+  - re-run is implemented as App-level handoff into `execution`
+  - tab behavior is documented as current API-backed behavior rather than future design
+- Removed stale wording such as:
+  - `future artifact download flow`
+  - `future re-run handoff`
+  - `no actual artifact opening or download exists`
+  - `future true report interfaces and artifact actions`
+- Kept remaining future/limit language only for actual unfinished scope:
+  - no inline artifact content open/download
+  - some detail fields still fall back to snapshot-derived view model data
+  - recovery / AI decisions may remain deterministic mock when no real run artifacts exist
+
+## Verification
+- Doc consistency pass completed against current `ReportDetailScreen.tsx`, `App.tsx`, `ReportArtifactService.java`, and the already-passing P2-5 test baseline
+
+## Next Step
+- Await re-review of the synced `reportDetail` docs baseline before submit/push.

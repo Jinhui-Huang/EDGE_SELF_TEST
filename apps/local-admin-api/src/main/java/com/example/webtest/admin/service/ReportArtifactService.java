@@ -131,6 +131,36 @@ public final class ReportArtifactService {
         return Map.of("runId", runId, "items", artifactItems);
     }
 
+    // ---- GET /api/phase3/runs/{runId}/recovery ----
+
+    @SuppressWarnings("unchecked")
+    public Object getRecovery(String runId) {
+        Path dir = resolveRunDir(runId);
+        Path recoveryJson = dir.resolve("recovery.json");
+        if (Files.isRegularFile(recoveryJson)) {
+            try {
+                return Jsons.readValue(Files.readString(recoveryJson), Map.class);
+            } catch (IOException ignored) {
+            }
+        }
+        return buildMockRecovery(runId);
+    }
+
+    // ---- GET /api/phase3/runs/{runId}/ai-decisions ----
+
+    @SuppressWarnings("unchecked")
+    public Object getAiDecisions(String runId) {
+        Path dir = resolveRunDir(runId);
+        Path aiJson = dir.resolve("ai-decisions.json");
+        if (Files.isRegularFile(aiJson)) {
+            try {
+                return Jsons.readValue(Files.readString(aiJson), Map.class);
+            } catch (IOException ignored) {
+            }
+        }
+        return buildMockAiDecisions(runId);
+    }
+
     // ---- internal ----
 
     private Path resolveRunDir(String runId) {
@@ -354,5 +384,35 @@ public final class ReportArtifactService {
             return (List<Map<String, Object>>) l;
         }
         return List.of();
+    }
+
+    private Map<String, Object> buildMockRecovery(String runId) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("runId", runId);
+        result.put("status", "PARTIAL");
+        result.put("items", List.of(
+                Map.of("step", "restore snapshot", "status", "SUCCESS",
+                        "detail", "Primary checkout schema restored from pre-run backup"),
+                Map.of("step", "verify row counts", "status", "SUCCESS",
+                        "detail", "Row counts match pre-run baseline"),
+                Map.of("step", "restore audit_log", "status", "SKIPPED",
+                        "detail", "Audit log rows are kept by policy")));
+        return result;
+    }
+
+    private Map<String, Object> buildMockAiDecisions(String runId) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("runId", runId);
+        result.put("items", List.of(
+                Map.of("at", "2026-04-20T05:37:12Z", "type", "LOCATOR_HEAL",
+                        "model", "claude-4.5-sonnet",
+                        "summary", "Candidate[1] selected after primary locator #pay-now failed"),
+                Map.of("at", "2026-04-20T05:38:01Z", "type", "WAIT_STRATEGY",
+                        "model", "claude-4.5-sonnet",
+                        "summary", "Extended wait to 8s for payment iframe to settle"),
+                Map.of("at", "2026-04-20T05:39:45Z", "type", "ASSERTION_SUGGESTION",
+                        "model", "claude-4.5-sonnet",
+                        "summary", "Suggested adding URL pattern assertion for /order/confirm/*")));
+        return result;
     }
 }

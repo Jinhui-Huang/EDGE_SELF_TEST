@@ -487,6 +487,20 @@ public final class LocalAdminApiServer implements AutoCloseable {
                     }
                     writeJson(exchange, 200, reportService.getArtifacts(runId));
                 }
+                case "recovery" -> {
+                    if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+                        writeJson(exchange, 405, Map.of("error", "METHOD_NOT_ALLOWED"));
+                        return;
+                    }
+                    writeJson(exchange, 200, reportService.getRecovery(runId));
+                }
+                case "ai-decisions" -> {
+                    if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+                        writeJson(exchange, 405, Map.of("error", "METHOD_NOT_ALLOWED"));
+                        return;
+                    }
+                    writeJson(exchange, 200, reportService.getAiDecisions(runId));
+                }
                 case "pause" -> {
                     if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
                         writeJson(exchange, 405, Map.of("error", "METHOD_NOT_ALLOWED"));

@@ -52,8 +52,8 @@ The screen is downstream of:
 The screen is upstream of:
 
 - `dataDiff`
-- future artifact download flow
-- future re-run handoff back to `execution`
+- artifact listing / path review for the current run
+- App-level re-run handoff back to `execution`
 
 ## 5. Current Implementation State
 
@@ -65,17 +65,26 @@ Current implementation facts:
   - `selectedRunName`
   - `onBackToReports`
   - `onOpenDataDiff`
-- run detail content is built through `selectReportViewModel(snapshot, selectedRunName)`.
+  - `onRerun`
+  - `apiBaseUrl`
+- run detail content is loaded from `GET /api/phase3/runs/{runId}/report` with fallback to `selectReportViewModel(snapshot, selectedRunName)`.
 - `Reports` backlink is implemented.
 - `Data diff` tab routes into `dataDiff`.
-- `Download artifacts` is visible but not wired.
-- `Re-run` is visible but not wired.
-- tabs are visible, but only `Data diff` has behavior; the rest are visual only.
+- `Download artifacts` is implemented: fetches `GET /api/phase3/runs/{runId}/artifacts` and opens an artifact listing drawer.
+- `Re-run` is implemented: hands off run context into `execution` with launch form pre-filled.
+- All tabs are implemented with active-tab state and tab-specific API fetches:
+  - `Overview` shows summary from the main report API
+  - `Steps` fetches `GET /api/phase3/runs/{runId}/steps`
+  - `Assertions` fetches `GET /api/phase3/runs/{runId}/assertions`
+  - `Recovery` fetches `GET /api/phase3/runs/{runId}/recovery`
+  - `AI decisions` fetches `GET /api/phase3/runs/{runId}/ai-decisions`
+- Backend implementation: `ReportArtifactService.java` provides recovery and ai-decisions endpoints with file-backed reads and mock fallbacks.
 
 This matters for review:
 
-- the screen is already a real downstream detail entry page
-- but most detailed content is still front-end-derived rather than backend-authored report artifact data
+- the screen is a real downstream detail entry page with API-backed tab data
+- tab-specific data is fetched on demand when the tab is activated
+- recovery and ai-decisions are served by the backend with deterministic mock data when no real run artifacts exist
 
 ## 6. Functional Areas
 
@@ -116,8 +125,9 @@ Functional role:
 
 Current behavior:
 
-- hero values are rendered from the selected report view model
-- both hero action buttons are visible only
+- hero values are rendered from the API report or fallback view model
+- `Download artifacts` fetches artifact list from backend and opens a listing drawer
+- `Re-run` hands off run context into `execution` with launch form pre-filled
 
 ### 6.3 Tab Bar
 
@@ -136,9 +146,13 @@ Functional role:
 
 Current behavior:
 
-- `Overview` is visually active
+- `Overview` is the default active tab showing summary panels
+- `Steps` fetches step timeline from `GET /api/phase3/runs/{runId}/steps`
+- `Assertions` fetches assertion details from `GET /api/phase3/runs/{runId}/assertions`
 - `Data diff` triggers route to `dataDiff`
-- all other tabs are visual only
+- `Recovery` fetches recovery details from `GET /api/phase3/runs/{runId}/recovery`
+- `AI decisions` fetches AI decision log from `GET /api/phase3/runs/{runId}/ai-decisions`
+- tab-specific data is fetched on demand when the tab is first activated
 
 ### 6.4 Summary Panel
 
@@ -176,8 +190,9 @@ Functional role:
 
 Current behavior:
 
-- screenshot cards are front-end synthetic placeholders
-- no actual artifact opening or download exists
+- screenshot cards are rendered from the current report view model
+- artifact access is implemented as backend-backed listing via `GET /api/phase3/runs/{runId}/artifacts`
+- the current screen does not support inline artifact open/download content; it shows a listing drawer with file paths only
 
 ### 6.6 Assertions Panel
 
@@ -231,7 +246,7 @@ The screen produces:
 - navigation outputs
   - back to `reports`
   - open `dataDiff`
-- future artifact action outputs
+- artifact/re-run action outputs
   - download artifacts
   - re-run handoff
 
@@ -249,13 +264,15 @@ Current implementation summary:
 - implemented:
   - back to `Reports`
   - `Data diff` tab handoff
-- visible but not implemented:
-  - `Download artifacts`
-  - `Re-run`
-  - `Steps` tab switching
-  - `Assertions` tab switching
-  - `Recovery` tab switching
-  - `AI decisions` tab switching
+  - `Download artifacts` (artifact listing from backend)
+  - `Re-run` (App-level handoff to `execution` with run context)
+  - `Overview` tab (default active, shows summary)
+  - `Steps` tab (fetches from backend on activation)
+  - `Assertions` tab (fetches from backend on activation)
+  - `Recovery` tab (fetches from backend on activation)
+  - `AI decisions` tab (fetches from backend on activation)
+- not yet implemented:
+  - none of the visible controls remain unwired
 
 ## 10. Functional Control Responsibility Matrix
 
@@ -270,33 +287,33 @@ Current implementation summary:
 
 - `Download artifacts`
   - function: retrieve or open run artifacts
-  - output type: future artifact access behavior
-  - current implementation: visual only
+  - output type: `GET /api/phase3/runs/{runId}/artifacts` then local artifact listing drawer
+  - current implementation: implemented
 - `Re-run`
   - function: reopen execution flow with current run context
-  - output type: future route-state handoff into `execution`
-  - current implementation: visual only
+  - output type: App-level handoff into `execution` with launch form pre-filled
+  - current implementation: implemented
 
 ### 10.3 Tab Controls
 
 - `Overview`
   - function: show current summary panels
-  - current implementation: visually active only
+  - current implementation: implemented (default active tab, uses main report API data)
 - `Steps`
   - function: show step-level detail
-  - current implementation: visual only
+  - current implementation: implemented (fetches `GET /api/phase3/runs/{runId}/steps` on activation)
 - `Assertions`
   - function: show assertion-focused detail
-  - current implementation: visual only
+  - current implementation: implemented (fetches `GET /api/phase3/runs/{runId}/assertions` on activation)
 - `Data diff`
   - function: open downstream diff page
   - current implementation: implemented as App-level selected-run handoff
 - `Recovery`
   - function: show restore/recovery detail
-  - current implementation: visual only
+  - current implementation: implemented (fetches `GET /api/phase3/runs/{runId}/recovery` on activation)
 - `AI decisions`
   - function: show AI decision log detail
-  - current implementation: visual only
+  - current implementation: implemented (fetches `GET /api/phase3/runs/{runId}/ai-decisions` on activation)
 
 ## 11. State Model
 
@@ -311,9 +328,9 @@ The screen should support:
 Current implementation status:
 
 - selected run loaded or no-report fallback is implemented
-- tab selection state is not implemented
-- artifact action state is not implemented
-- re-run handoff state is not implemented
+- tab selection state is implemented (`ReportDetailTab` type)
+- artifact listing drawer state is implemented
+- re-run handoff is implemented via `onRerun` callback
 
 ## 12. Validation and Rules
 
@@ -341,8 +358,8 @@ The screen depends on:
 The screen serves as an upstream context for:
 
 - `dataDiff`
-- future artifact viewer/downloader
-- future re-run entry into `execution`
+- current artifact listing/review
+- current re-run entry into `execution`
 
 ### 13.3 Shared Data Context
 
@@ -360,7 +377,8 @@ The `reportDetail` screen is responsible for:
 - one-run summary display
 - one-run screenshot/assertion overview
 - data-diff handoff
-- future artifact and re-run entry actions
+- artifact listing entry
+- re-run entry handoff
 
 The `reportDetail` screen is not currently responsible for:
 
@@ -370,15 +388,19 @@ The `reportDetail` screen is not currently responsible for:
 
 ## 15. Known Gaps and Review Items
 
-Review items discovered while documenting:
+Resolved items:
 
-- current run-detail content is still based on the synthetic `ReportViewModel` layer rather than backend-authored report artifacts.
-- `Download artifacts` is visible but not wired.
-- `Re-run` is visible but not wired.
-- only the `Data diff` tab is actionable; the rest do not switch the detail view.
-- screenshot and assertion details are still placeholder-style UI data rather than loaded report artifact content.
+- `Download artifacts` is now wired: fetches `GET /api/phase3/runs/{runId}/artifacts` and opens a listing drawer.
+- `Re-run` is now wired: hands off run context into `execution` via App-level handoff.
+- All tabs are now actionable with tab-specific API fetches.
+- `Recovery` and `AI decisions` backend endpoints are implemented in `ReportArtifactService` with mock fallback data.
+- Overview tab shows real report data from `GET /api/phase3/runs/{runId}/report` or falls back to synthetic view model.
 
-These are documentation review items only. No implementation change is made in this stage.
+Remaining items:
+
+- Recovery and AI decisions data are deterministic mock when no real run artifacts exist on disk.
+- Screenshot and artifact content cannot be viewed/downloaded inline — the listing drawer shows file paths only.
+- Re-run handoff carries `runId` but limited additional context (projectKey parsed from runId, no environment or model pre-fill from report).
 
 ## 16. Suggested Output Files for This Screen Folder
 

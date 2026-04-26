@@ -462,6 +462,40 @@ export type RunReport = RunSummaryItem & {
   artifacts: RunReportArtifact[];
 };
 
+export type RecoveryItem = {
+  step: string;
+  status: string;
+  detail: string;
+};
+
+export type RecoveryResponse = {
+  runId: string;
+  status: string;
+  items: RecoveryItem[];
+};
+
+export type AiDecisionItem = {
+  at: string;
+  type: string;
+  model: string;
+  summary: string;
+};
+
+export type AiDecisionsResponse = {
+  runId: string;
+  items: AiDecisionItem[];
+};
+
+export type RunAssertionsResponse = {
+  runId: string;
+  items: RunReportAssertion[];
+};
+
+export type RunArtifactsResponse = {
+  runId: string;
+  items: RunReportArtifact[];
+};
+
 export type DataDiffRow = {
   table: string;
   pk: string;

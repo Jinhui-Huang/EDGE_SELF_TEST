@@ -1065,6 +1065,146 @@ describe("App", () => {
     expect((await screen.findAllByText("Custom edited case")).length).toBeGreaterThan(0);
   });
 
+  it("switches reportDetail tabs and fetches tab-specific data from real endpoints", async () => {
+    const stepsResponse = {
+      runId: "checkout-web-nightly",
+      items: [
+        { index: 1, label: "Open cart page", state: "DONE", durationMs: 1200 },
+        { index: 2, label: "Fill payment form", state: "DONE", durationMs: 3400 }
+      ]
+    };
+    const assertionsResponse = {
+      runId: "checkout-web-nightly",
+      items: [
+        { name: "url matches /order/confirm", action: "ASSERT_URL", status: "FAILED", message: "got /checkout/payment", pass: false }
+      ]
+    };
+    const recoveryResponse = {
+      runId: "checkout-web-nightly",
+      status: "PARTIAL",
+      items: [
+        { step: "restore snapshot", status: "SUCCESS", detail: "Primary schema restored" }
+      ]
+    };
+    const aiDecisionsResponse = {
+      runId: "checkout-web-nightly",
+      items: [
+        { at: "2026-04-20T05:37:12Z", type: "LOCATOR_HEAL", model: "claude-4.5-sonnet", summary: "Candidate[1] selected" }
+      ]
+    };
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/report")) return jsonResponse(reportResponse);
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/steps")) return jsonResponse(stepsResponse);
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/assertions")) return jsonResponse(assertionsResponse);
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/recovery")) return jsonResponse(recoveryResponse);
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/ai-decisions")) return jsonResponse(aiDecisionsResponse);
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    // Navigate to reportDetail
+    await screen.findByText("Recent runs");
+    await userEvent.click(screen.getByRole("button", { name: "Open run checkout-web-nightly" }));
+    expect(await screen.findByText("Download artifacts")).toBeInTheDocument();
+
+    // Steps tab
+    await userEvent.click(screen.getByRole("button", { name: "Steps" }));
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith("http://127.0.0.1:8787/api/phase3/runs/checkout-web-nightly/steps");
+    });
+    expect(await screen.findByText("Open cart page")).toBeInTheDocument();
+    expect(await screen.findByText("Fill payment form")).toBeInTheDocument();
+
+    // Assertions tab
+    await userEvent.click(screen.getByRole("button", { name: "Assertions" }));
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith("http://127.0.0.1:8787/api/phase3/runs/checkout-web-nightly/assertions");
+    });
+    expect(await screen.findByText("url matches /order/confirm")).toBeInTheDocument();
+
+    // Recovery tab
+    await userEvent.click(screen.getByRole("button", { name: "Recovery" }));
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith("http://127.0.0.1:8787/api/phase3/runs/checkout-web-nightly/recovery");
+    });
+    expect(await screen.findByText("restore snapshot")).toBeInTheDocument();
+    expect(await screen.findByText("PARTIAL")).toBeInTheDocument();
+
+    // AI decisions tab
+    await userEvent.click(screen.getByRole("button", { name: "AI decisions" }));
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith("http://127.0.0.1:8787/api/phase3/runs/checkout-web-nightly/ai-decisions");
+    });
+    expect(await screen.findByText("LOCATOR_HEAL")).toBeInTheDocument();
+    expect(await screen.findByText("Candidate[1] selected")).toBeInTheDocument();
+
+    // Overview tab returns to summary
+    await userEvent.click(screen.getByRole("button", { name: "Overview" }));
+    expect(await screen.findByText("Summary")).toBeInTheDocument();
+  });
+
+  it("opens artifact listing on Download artifacts click", async () => {
+    const artifactsResponse = {
+      runId: "checkout-web-nightly",
+      items: [
+        { kind: "report-html", label: "report.html", path: "/runs/checkout-web-nightly/report.html" },
+        { kind: "report-json", label: "report.json", path: "/runs/checkout-web-nightly/report.json" }
+      ]
+    };
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/report")) return jsonResponse(reportResponse);
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/artifacts")) return jsonResponse(artifactsResponse);
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    await screen.findByText("Recent runs");
+    await userEvent.click(screen.getByRole("button", { name: "Open run checkout-web-nightly" }));
+    expect(await screen.findByText("Download artifacts")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Download artifacts" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith("http://127.0.0.1:8787/api/phase3/runs/checkout-web-nightly/artifacts");
+    });
+    expect(await screen.findByText("report.html")).toBeInTheDocument();
+    expect(await screen.findByText("report.json")).toBeInTheDocument();
+    expect(await screen.findByText(/Artifacts/)).toBeInTheDocument();
+  });
+
+  it("hands off Re-run from reportDetail into execution with run context", async () => {
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/report")) return jsonResponse(reportResponse);
+      if (url.endsWith("/api/phase3/data-templates")) return jsonResponse(dataTemplatesResponse);
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    await screen.findByText("Recent runs");
+    await userEvent.click(screen.getByRole("button", { name: "Open run checkout-web-nightly" }));
+    expect(await screen.findByText("Download artifacts")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Re-run" }));
+
+    // Should navigate to execution
+    expect(await screen.findByText("Execution center")).toBeInTheDocument();
+    // The run ID should be pre-filled
+    const runIdInput = document.querySelector("input[value='checkout-web-nightly']") as HTMLInputElement;
+    expect(runIdInput).toBeTruthy();
+  });
+
   it("switches the Reports overview when clicking another project", async () => {
     const fetchMock = vi.fn().mockImplementation(() => jsonResponse(snapshot));
     vi.stubGlobal("fetch", fetchMock);

@@ -941,7 +941,23 @@
    - Tests:
      - `LocalAdminApiServerTest.java`: 10-step `caseDetailEndpoints` test covering all 7 endpoints
    - Verification: npm build PASS, npm test 20/20, mvn test 12/12
-55. 2026-04-26 P2-4 docParse document-service actions completed
+55. 2026-04-26 P2-5 reportDetail controls wiring completed
+   - All visible-but-unwired controls on reportDetail page are now connected.
+   - Backend: ReportArtifactService extended with `getRecovery()` and `getAiDecisions()` (file-backed + mock fallback).
+   - Two new cases added to `handleRunEndpoint` in LocalAdminApiServer: `recovery` and `ai-decisions`.
+   - Frontend: ReportDetailScreen completely rewritten:
+     - 6 tabs with `ReportDetailTab` type, on-demand API fetches per tab, cached results
+     - Artifact listing drawer via `GET .../artifacts`
+     - Re-run handoff via `onRerun` callback → App.tsx sets launchForm and switches to execution
+   - Types added: RecoveryItem, RecoveryResponse, AiDecisionItem, AiDecisionsResponse, RunAssertionsResponse, RunArtifactsResponse
+   - Tests: 3 frontend tests (tab switching, artifact listing, re-run handoff), backend recovery/ai-decisions assertions
+   - Docs synced: ui-control-interface-overview.md, reportDetail/functional-spec.md, reportDetail/interface-spec.md
+   - Verification: npm build PASS, npm test 26/26, mvn test 13/13
+   - Remaining limits:
+     - Recovery and AI decisions data are deterministic mock when no real run artifacts exist
+     - Artifact listing drawer shows file paths only, no inline view/download
+     - Re-run pre-fill depends on report data availability for environment/model
+56. 2026-04-26 P2-4 docParse document-service actions completed
    - Scope: Wire the 3 document-service API endpoints and make DocParseScreen Upload/Re-parse/Manual edit buttons functional
    - Backend:
      - NEW `DocumentPersistenceService.java`: File-backed persistence under `config/phase3/documents/<documentId>/`
@@ -961,3 +977,18 @@
      - `LocalAdminApiServerTest.java`: 7-step `documentServiceEndpoints` test covering upload, get, reparse, manual edit, error cases
    - Docs synced: ui-control-interface-overview.md, docParse/functional-spec.md, docParse/interface-spec.md
    - Verification: npm build PASS, npm test 20/20, mvn test 13/13
+57. 2026-04-27 P2-5 reportDetail docs baseline synchronized
+   - Follow-up review found that P2-5 code and tests were already correct, but `reportDetail` docs still contained stale future-state wording for artifact download, re-run, and tab wiring.
+   - Synced these docs to current implementation:
+     - `docs/phase3/interface/reportDetail/functional-spec.md`
+     - `docs/phase3/interface/reportDetail/interface-spec.md`
+   - Updated the docs so they now consistently state:
+     - `Download artifacts` is implemented via `GET /api/phase3/runs/{runId}/artifacts` and opens an artifact listing drawer
+     - `Re-run` is implemented as App-level handoff into `execution`
+     - report-detail tabs are already API-backed current behavior, not future design
+   - Removed stale wording such as `future artifact download flow`, `future re-run handoff`, `no actual artifact opening or download exists`, and `future true report interfaces and artifact actions`
+   - Kept remaining future/limit wording only for real limits:
+     - no inline artifact content open/download
+     - some fields still fall back to snapshot-derived view model data
+     - recovery / AI decisions may use deterministic mock data when no real run artifacts exist
+   - This follow-up changed docs only; no code path changed

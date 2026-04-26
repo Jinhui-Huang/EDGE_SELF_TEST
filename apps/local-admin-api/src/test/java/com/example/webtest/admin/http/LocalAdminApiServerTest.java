@@ -1043,6 +1043,26 @@ class LocalAdminApiServerTest {
             assertTrue(artifacts.body().contains("\"report-html\""));
             assertTrue(artifacts.body().contains("\"screenshot\""));
 
+            // GET /api/phase3/runs/order-smoke-20260425/recovery — recovery (mock fallback)
+            HttpResponse<String> recovery = client.send(
+                    request(server, "/api/phase3/runs/order-smoke-20260425/recovery"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, recovery.statusCode());
+            assertTrue(recovery.body().contains("\"order-smoke-20260425\""));
+            assertTrue(recovery.body().contains("\"PARTIAL\""));
+            assertTrue(recovery.body().contains("\"restore snapshot\""));
+            assertTrue(recovery.body().contains("\"items\""));
+
+            // GET /api/phase3/runs/order-smoke-20260425/ai-decisions — ai decisions (mock fallback)
+            HttpResponse<String> aiDecisions = client.send(
+                    request(server, "/api/phase3/runs/order-smoke-20260425/ai-decisions"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, aiDecisions.statusCode());
+            assertTrue(aiDecisions.body().contains("\"order-smoke-20260425\""));
+            assertTrue(aiDecisions.body().contains("\"LOCATOR_HEAL\""));
+            assertTrue(aiDecisions.body().contains("\"items\""));
+            assertTrue(aiDecisions.body().contains("\"claude-4.5-sonnet\""));
+
             // GET /api/phase3/runs/nonexistent-run/report — fallback report
             HttpResponse<String> fallback = client.send(
                     request(server, "/api/phase3/runs/nonexistent-run/report"),

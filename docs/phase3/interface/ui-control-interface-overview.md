@@ -154,14 +154,14 @@ Conventions used here:
 | Control | Type | Current behavior / interface | Future interface / design |
 |---|---|---|---|
 | `Reports` | breadcrumb/button | Implemented App-level handoff back to `reports` | Keep current |
-| `Download artifacts` | button | Visual only | `GET /api/phase3/runs/{runId}/artifacts` |
-| `Re-run` | button | Visual only | App-level handoff into `execution` after `GET /api/phase3/runs/{runId}/report-summary` or `.../report` |
-| `Overview` tab | tab | Visual only | `GET /api/phase3/runs/{runId}/report` |
-| `Steps` tab | tab | Visual only | `GET /api/phase3/runs/{runId}/steps` |
-| `Assertions` tab | tab | Visual only | `GET /api/phase3/runs/{runId}/assertions` |
+| `Download artifacts` | button | Implemented: fetches `GET /api/phase3/runs/{runId}/artifacts`, opens artifact listing drawer | Keep current |
+| `Re-run` | button | Implemented as App-level handoff into `execution` with run context pre-filled into launch form | Keep current |
+| `Overview` tab | tab | Implemented: active by default, shows summary from `GET /api/phase3/runs/{runId}/report` | Keep current |
+| `Steps` tab | tab | Implemented: fetches `GET /api/phase3/runs/{runId}/steps` on activation | Keep current |
+| `Assertions` tab | tab | Implemented: fetches `GET /api/phase3/runs/{runId}/assertions` on activation | Keep current |
 | `Data diff` tab | tab | Implemented as App-level selected-run handoff into `dataDiff` | Keep current |
-| `Recovery` tab | tab | Visual only | `GET /api/phase3/runs/{runId}/recovery` |
-| `AI decisions` tab | tab | Visual only | `GET /api/phase3/runs/{runId}/ai-decisions` |
+| `Recovery` tab | tab | Implemented: fetches `GET /api/phase3/runs/{runId}/recovery` on activation | Keep current |
+| `AI decisions` tab | tab | Implemented: fetches `GET /api/phase3/runs/{runId}/ai-decisions` on activation | Keep current |
 
 ---
 

@@ -2405,6 +2405,16 @@ export function App() {
             selectedRunName={selectedReportRunName}
             onBackToReports={() => handleScreenChange("reports")}
             onOpenDataDiff={() => openDataDiff(selectedReportRunName)}
+            onRerun={(ctx) => {
+              setLaunchForm((prev) => ({
+                ...prev,
+                runId: ctx.runId,
+                projectKey: ctx.projectKey || prev.projectKey,
+                environment: ctx.environment || prev.environment,
+                executionModel: ctx.model || prev.executionModel
+              }));
+              handleScreenChange("execution");
+            }}
             apiBaseUrl={apiBaseUrl}
           />
         );

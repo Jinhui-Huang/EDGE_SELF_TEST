@@ -20,22 +20,29 @@ This document distinguishes:
 
 - current read context
 - App-level selected-run handoff into and out of the screen
-- current synthetic detail layer
-- future true report interfaces and artifact actions
+- current backend-backed report-detail interfaces
+- current artifact and re-run actions
 
 ## 2. Interface Summary
 
 Current `reportDetail` screen conclusion:
 
-- current direct read source:
-  - `GET /api/phase3/admin-console`
+- current direct read sources:
+  - `GET /api/phase3/runs/{runId}/report` (main report, loaded on mount)
+  - `GET /api/phase3/runs/{runId}/steps` (on Steps tab activation)
+  - `GET /api/phase3/runs/{runId}/assertions` (on Assertions tab activation)
+  - `GET /api/phase3/runs/{runId}/recovery` (on Recovery tab activation)
+  - `GET /api/phase3/runs/{runId}/ai-decisions` (on AI decisions tab activation)
+  - `GET /api/phase3/runs/{runId}/artifacts` (on Download artifacts click)
+  - `GET /api/phase3/admin-console` (fallback snapshot)
 - current direct write source:
   - none
 - current navigation outputs:
   - back to `reports`
   - open `dataDiff`
-- current detail data is front-end-derived from `selectReportViewModel(snapshot, selectedRunName)`
-- true report-detail behavior implied by the screen requires backend-authored run report interfaces
+  - re-run handoff into `execution` with run context pre-filled
+- fallback to `selectReportViewModel(snapshot, selectedRunName)` when API is unavailable
+- backend implementation: `ReportArtifactService.java` provides all report-detail read endpoints
 
 ## 3. Current Read Context: GET /api/phase3/admin-console
 
@@ -65,9 +72,9 @@ Relevant snapshot fields for this screen:
 - `reportViewModel.ts` owns detail derivation
 - `ReportDetailScreen.tsx` owns only local tab/button rendering
 
-## 4. Current Synthetic Detail Layer
+## 4. Current Detail Layer
 
-The current detail screen does not read a true report artifact.
+The current detail screen reads real report-detail interfaces first and falls back to the snapshot-derived view model only when API data is unavailable.
 
 ### 4.1 Current Derivation Entry Point
 
@@ -94,8 +101,8 @@ The following detail fields are currently synthetic or heuristically derived:
 
 This means the current page should be documented as:
 
-- a run-detail UI shell over a synthetic view model
-- not yet a stable backend-backed report artifact reader
+- a backend-backed run-detail screen with API-first tab data
+- a snapshot-fallback shell when report-detail APIs are unavailable
 
 ## 5. Current App-Level Handoff Interfaces
 
@@ -143,47 +150,46 @@ Current behavior:
 #### `Download artifacts`
 
 - user action: click
-- request: none today
-- owner: not implemented
-- intended future interface:
-  - artifact listing or artifact download endpoint
-- current state: visible only
+- request: `GET /api/phase3/runs/{runId}/artifacts`
+- owner: `ReportDetailScreen.tsx`
+- success behavior: open artifact listing drawer with kind/label/path for each artifact
+- failure behavior: surface fetch error in action status
+- current state: implemented
 
 #### `Re-run`
 
 - user action: click
-- request: none today
-- owner: not implemented
-- intended future behavior:
-  - route-state handoff into `execution`
-  - optional prefilled launch context
-- current state: visible only
+- request: none (App-level handoff only)
+- owner: `App.tsx` via `onRerun` callback
+- success behavior: navigate to `execution` with launch form pre-filled (runId, projectKey, environment, model)
+- failure behavior: none required (local state handoff)
+- current state: implemented
 
 ### 6.3 Tab Controls
 
 #### `Overview`
 
 - user action: click
-- request: none today
-- intended future behavior:
-  - activate summary sub-view
-- current state: visual only
+- request: uses main report data from `GET /api/phase3/runs/{runId}/report` (loaded on mount)
+- owner: `ReportDetailScreen.tsx` local tab state
+- success behavior: show summary panels (progress ring, stat cards)
+- current state: implemented (default active tab)
 
 #### `Steps`
 
 - user action: click
-- request: none today
-- intended future behavior:
-  - activate step-detail sub-view
-- current state: visual only
+- request: `GET /api/phase3/runs/{runId}/steps` (on first activation)
+- owner: `ReportDetailScreen.tsx` local tab state
+- success behavior: show step timeline with index, action, target, status, duration
+- current state: implemented
 
 #### `Assertions`
 
 - user action: click
-- request: none today
-- intended future behavior:
-  - activate assertion-detail sub-view
-- current state: visual only
+- request: `GET /api/phase3/runs/{runId}/assertions` (on first activation)
+- owner: `ReportDetailScreen.tsx` local tab state
+- success behavior: show assertion detail with name, actual, expected, pass/fail
+- current state: implemented
 
 #### `Data diff`
 
@@ -196,18 +202,18 @@ Current behavior:
 #### `Recovery`
 
 - user action: click
-- request: none today
-- intended future behavior:
-  - activate recovery-detail sub-view
-- current state: visual only
+- request: `GET /api/phase3/runs/{runId}/recovery` (on first activation)
+- owner: `ReportDetailScreen.tsx` local tab state
+- success behavior: show recovery items with step, status badge, detail
+- current state: implemented
 
 #### `AI decisions`
 
 - user action: click
-- request: none today
-- intended future behavior:
-  - activate AI-decision sub-view
-- current state: visual only
+- request: `GET /api/phase3/runs/{runId}/ai-decisions` (on first activation)
+- owner: `ReportDetailScreen.tsx` local tab state
+- success behavior: show AI decision log with timestamp, type, model, summary
+- current state: implemented
 
 ## 7. Relationship to Other Interfaces
 
@@ -238,24 +244,22 @@ These are the correct long-term direction for `reportDetail`.
 Recommended Phase 3 evolution:
 
 - keep current App-level selected-run handoff structure
-- replace synthetic detail panels with backend-authored report artifact reads
 - keep heavy artifact fetching on `reportDetail`, not on `reports`
 
-## 9. Recommended Future Report Detail Interfaces
+## 9. Implemented Report Detail Interfaces
 
 Identifier note:
 
-- current UI still carries selected run context by `runName`
-- future backend path parameters should use canonical `{runId}`
-- transition logic may temporarily map selected `runName` onto backend `runId`
+- the UI carries selected run context by `runName` which maps to `{runId}` in backend path parameters
 
-### 9.1 Full Report Interface
+### 9.1 Full Report Interface (implemented)
 
 #### `GET /api/phase3/runs/{runId}/report`
 
 Purpose:
 
 - return the full report artifact metadata and summary payload for one run
+- loaded on screen mount
 
 Response body:
 
@@ -286,13 +290,14 @@ Response body:
 }
 ```
 
-### 9.2 Steps Detail Interface
+### 9.2 Steps Detail Interface (implemented)
 
 #### `GET /api/phase3/runs/{runId}/steps`
 
 Purpose:
 
 - return step-by-step execution records for the run
+- fetched on Steps tab activation
 
 Response body:
 
@@ -311,13 +316,14 @@ Response body:
 }
 ```
 
-### 9.3 Assertions Detail Interface
+### 9.3 Assertions Detail Interface (implemented)
 
 #### `GET /api/phase3/runs/{runId}/assertions`
 
 Purpose:
 
 - return assertion records for the run
+- fetched on Assertions tab activation
 
 Response body:
 
@@ -335,13 +341,15 @@ Response body:
 }
 ```
 
-### 9.4 Recovery Detail Interface
+### 9.4 Recovery Detail Interface (implemented)
 
 #### `GET /api/phase3/runs/{runId}/recovery`
 
 Purpose:
 
 - return restore/recovery actions and results for the run
+- fetched on Recovery tab activation
+- backend: `ReportArtifactService.getRecovery()` reads `recovery.json` from run dir, falls back to deterministic mock
 
 Response body:
 
@@ -359,13 +367,15 @@ Response body:
 }
 ```
 
-### 9.5 AI Decisions Detail Interface
+### 9.5 AI Decisions Detail Interface (implemented)
 
 #### `GET /api/phase3/runs/{runId}/ai-decisions`
 
 Purpose:
 
 - return runtime AI decision and heal history for the run
+- fetched on AI decisions tab activation
+- backend: `ReportArtifactService.getAiDecisions()` reads `ai-decisions.json` from run dir, falls back to deterministic mock
 
 Response body:
 
@@ -383,13 +393,14 @@ Response body:
 }
 ```
 
-### 9.6 Artifact Listing Interface
+### 9.6 Artifact Listing Interface (implemented)
 
 #### `GET /api/phase3/runs/{runId}/artifacts`
 
 Purpose:
 
 - list downloadable artifacts for the run
+- fetched on Download artifacts button click
 
 Response body:
 
@@ -411,115 +422,70 @@ Response body:
 }
 ```
 
-## 10. Detailed Implementation Design for Currently Unwired Controls
+## 10. Implementation Reference for Wired Controls
 
-### 10.1 `Download artifacts`
+### 10.1 `Download artifacts` (implemented)
 
-Recommended implementation type:
+Implementation:
 
-- new artifact-listing/read interface
+- button calls `GET /api/phase3/runs/{runId}/artifacts`
+- UI opens local artifact listing drawer showing kind/label/path per item
+- drawer has dismiss button to close
 
-Concrete implementation design:
+### 10.2 `Re-run` (implemented)
 
-- button first calls:
-  - `GET /api/phase3/runs/{runId}/artifacts`
-- UI then opens:
-  - local artifact drawer
-  - or direct download/open behavior for chosen item
+Implementation:
 
-Reasoning:
-
-- the page should not guess artifact paths from front-end synthetic data
-- artifact availability belongs to backend-authored run output
-
-### 10.2 `Re-run`
-
-Recommended implementation type:
-
-- route-state handoff into `execution`
+- App-level `onRerun` callback receives `{ runId, projectKey, environment, model }`
+- `App.tsx` sets `launchForm` fields from run context and switches to `execution`
 - no direct execution-start mutation from `reportDetail`
+- `projectKey` is parsed from `runId` prefix; `environment` and `model` come from report data when available
 
-Concrete implementation design:
+### 10.3 Tabs (all implemented)
 
-- add app-level helper:
-  - `openExecutionFromRun(runName: string)`
-- helper behavior:
-  - load or reuse run summary context
-  - prefill `launchForm` with:
-    - project key
-    - environment
-    - execution model
-    - target URL when available
-  - preselect the relevant case if available
-  - set active screen to `execution`
-
-Recommended supporting read:
-
-- `GET /api/phase3/runs/{runId}/report-summary`
-  - or `GET /api/phase3/runs/{runId}/report`
-
-Reasoning:
-
-- actual scheduler mutations remain owned by `execution`
-
-### 10.3 Tabs Other Than `Data diff`
-
-Recommended implementation type:
-
-- local active-tab state
-- tab-specific reads from true report endpoints
-
-Recommended local state:
+Local state:
 
 ```ts
 type ReportDetailTab = "overview" | "steps" | "assertions" | "dataDiff" | "recovery" | "aiDecisions";
 ```
 
-Tab behavior design:
+Tab behavior:
 
-- `Overview`
-  - request:
-    - `GET /api/phase3/runs/{runId}/report`
-- `Steps`
-  - request:
-    - `GET /api/phase3/runs/{runId}/steps`
-- `Assertions`
-  - request:
-    - `GET /api/phase3/runs/{runId}/assertions`
-- `Data diff`
-  - route-state to `dataDiff`
-- `Recovery`
-  - request:
-    - `GET /api/phase3/runs/{runId}/recovery`
-- `AI decisions`
-  - request:
-    - `GET /api/phase3/runs/{runId}/ai-decisions`
+- `Overview`: default active tab, uses main report data loaded on mount
+- `Steps`: fetches `GET /api/phase3/runs/{runId}/steps` on first activation, cached
+- `Assertions`: fetches `GET /api/phase3/runs/{runId}/assertions` on first activation, cached
+- `Data diff`: App-level handoff to `dataDiff`
+- `Recovery`: fetches `GET /api/phase3/runs/{runId}/recovery` on first activation, cached
+- `AI decisions`: fetches `GET /api/phase3/runs/{runId}/ai-decisions` on first activation, cached
 
 ## 11. Error Handling Boundary
 
 Current implementation:
 
-- no direct backend requests from `reportDetail`
-- fallback no-report state if selected run cannot be resolved
+- `GET /api/phase3/runs/{runId}/report` loaded on mount; on failure, falls back to `selectReportViewModel(snapshot, selectedRunName)`
+- `selectedRunName == null` → displays explicit "No run selected" empty state
+- tab-specific fetches (steps, assertions, recovery, ai-decisions) show loading state then render data or leave panel empty on failure
+- `GET /api/phase3/runs/{runId}/artifacts` on failure surfaces error through action status
+- `Re-run` handoff is local state only, no failure path
 
-Recommended future read-interface errors:
+Backend error semantics:
 
-- `GET /api/phase3/runs/{runId}/report`
-  - `404` when report artifact does not exist
-- `GET /api/phase3/runs/{runId}/artifacts`
-  - `200` with empty items when no artifacts are available
-
-Recommended future action errors:
-
-- `Re-run` prep read failures should surface as route-preparation errors before entering `execution`
+- `GET /api/phase3/runs/{runId}/report` returns `404` when report artifact does not exist
+- `GET /api/phase3/runs/{runId}/artifacts` returns `200` with empty items when no artifacts are available
+- recovery and ai-decisions endpoints return deterministic mock data when no real run artifacts exist on disk
 
 ## 12. Review Items
 
-Review-only findings:
+Resolved items:
 
-- The current page is already the correct run-detail entry point, but the body content is still mostly synthetic.
-- `Data diff` handoff is the only real actionable tab today.
-- `Download artifacts` and `Re-run` need explicit behavior ownership and should not remain placeholder buttons.
-- This page should eventually become the first report page that reads true report artifacts from backend-owned run outputs such as `report.json` and `report.html`.
+- All tabs are now wired with tab-specific API fetches.
+- `Download artifacts` fetches artifact list from backend and opens listing drawer.
+- `Re-run` hands off run context into `execution` via App-level handoff.
+- Overview tab shows real report data from `GET /api/phase3/runs/{runId}/report` with fallback to synthetic view model.
+- Recovery and AI decisions backend endpoints are implemented in `ReportArtifactService` with file-backed reads and mock fallbacks.
 
-These are documentation findings only. No implementation change is made in this stage.
+Remaining items:
+
+- Recovery and AI decisions data are deterministic mock when no real run artifacts exist on disk.
+- Screenshot and artifact content cannot be viewed/downloaded inline — the listing drawer shows file paths only.
+- Re-run handoff carries `runId` and parses `projectKey` from it, but `environment` and `model` pre-fill depend on report data availability.
