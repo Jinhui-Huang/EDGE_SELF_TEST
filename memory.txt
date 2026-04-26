@@ -941,3 +941,23 @@
    - Tests:
      - `LocalAdminApiServerTest.java`: 10-step `caseDetailEndpoints` test covering all 7 endpoints
    - Verification: npm build PASS, npm test 20/20, mvn test 12/12
+55. 2026-04-26 P2-4 docParse document-service actions completed
+   - Scope: Wire the 3 document-service API endpoints and make DocParseScreen Upload/Re-parse/Manual edit buttons functional
+   - Backend:
+     - NEW `DocumentPersistenceService.java`: File-backed persistence under `config/phase3/documents/<documentId>/`
+       - upload (validates projectKey/fileName, persists raw.json + parse-result.json + meta.json)
+       - reparse (checks meta exists, regenerates parse-result.json)
+       - saveParseResult (overwrites parse-result.json with edited cases)
+       - getParseResult (reads persisted parse result)
+       - Path traversal protection via .normalize() + .startsWith(root)
+     - `LocalAdminApiServer.java`: 12-param constructor chain (9→12, 10→12, 11→12)
+       - `/api/phase3/documents/upload` route before `/api/phase3/documents/` (prefix conflict avoidance)
+       - `handleDocumentEndpoint` dispatches by path segments
+   - Frontend:
+     - `types.ts`: 4 new types (DocumentUploadResponse, DocumentReparseResponse, DocumentParseResultSaveResponse, DocumentParseResult)
+     - `DocParseScreen.tsx`: apiBaseUrl prop, FileReader upload, Re-parse with parse-result refresh, Manual edit with JSON editor, action status bar
+     - `App.tsx`: Pass apiBaseUrl to DocParseScreen
+   - Tests:
+     - `LocalAdminApiServerTest.java`: 7-step `documentServiceEndpoints` test covering upload, get, reparse, manual edit, error cases
+   - Docs synced: ui-control-interface-overview.md, docParse/functional-spec.md, docParse/interface-spec.md
+   - Verification: npm build PASS, npm test 20/20, mvn test 13/13

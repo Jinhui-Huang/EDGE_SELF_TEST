@@ -2291,6 +2291,7 @@ export function App() {
         return (
           <DocParseScreen
             snapshot={snapshot}
+            apiBaseUrl={apiBaseUrl}
             title={t(localizedScreenCopy.docParse.title)}
             locale={locale}
             onOpenAiGenerate={openAiGenerateFromDocParse}

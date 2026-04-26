@@ -593,6 +593,33 @@ export type CaseHistoryResponse = {
   maintenanceEvents: { at: string; type: string; operator: string; summary: string }[];
 };
 
+// ---- Document service (P2-4) ----
+
+export type DocumentUploadResponse = {
+  status: string;
+  uploaded: { id: string; name: string }[];
+};
+
+export type DocumentReparseResponse = {
+  status: string;
+  kind: string;
+  documentId: string;
+};
+
+export type DocumentParseResultSaveResponse = {
+  status: string;
+  kind: string;
+  documentId: string;
+};
+
+export type DocumentParseResult = {
+  documentId: string;
+  projectKey: string;
+  detectedCases: { id: string; name: string; category: string; confidence: string }[];
+  reasoning: { label: string; body: string }[];
+  missing: string[];
+};
+
 // ---- Extension popup snapshot (P0-3) ----
 
 export type ExtensionPopupSnapshot = {

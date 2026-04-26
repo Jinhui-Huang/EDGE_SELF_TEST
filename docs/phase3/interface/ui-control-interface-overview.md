@@ -81,11 +81,11 @@ Conventions used here:
 | Collapse / expand | button | Local only | Keep local |
 | Project button | button | Local project switch only | Keep local |
 | `Detail` | button | Local document open only | Keep local |
-| `Re-parse` | button | Visual only | `POST /api/phase3/documents/{documentId}/reparse` |
-| `Manual edit` | button | Visual only | `PUT /api/phase3/documents/{documentId}/parse-result` |
+| `Re-parse` | button | Implemented: `POST /api/phase3/documents/{documentId}/reparse`, refreshes parse result on success | Keep current |
+| `Manual edit` | button | Implemented: opens JSON editor for detected cases, saves via `PUT /api/phase3/documents/{documentId}/parse-result` | Keep current |
 | `Generate tests` | button | Implemented as App-level focus handoff into `aiGenerate` | Keep current handoff until typed routing is introduced |
 | `Parse result` / `Raw document` / `Version history` | tabs | Local only | Keep local tab state; content later from dedicated document reads |
-| `Upload file` | file input | Local filename capture only | `POST /api/phase3/documents/upload` |
+| `Upload file` | file input | Implemented: reads file content and uploads via `POST /api/phase3/documents/upload` with projectKey, fileName, and content | Keep current |
 | Case row | clickable row | Local case selection only | Keep local |
 | Case-name generate button | button | Implemented as App-level focus handoff into `aiGenerate` | Keep current handoff |
 

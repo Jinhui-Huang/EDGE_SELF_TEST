@@ -6,6 +6,7 @@ import com.example.webtest.admin.service.CatalogPersistenceService;
 import com.example.webtest.admin.service.ConnectionValidationService;
 import com.example.webtest.admin.service.ConfigPersistenceService;
 import com.example.webtest.admin.service.DataTemplatePersistenceService;
+import com.example.webtest.admin.service.DocumentPersistenceService;
 import com.example.webtest.admin.service.ReportArtifactService;
 import com.example.webtest.admin.service.RunStatusService;
 import com.example.webtest.admin.service.SchedulerPersistenceService;
@@ -47,7 +48,8 @@ public final class LocalAdminApiServer implements AutoCloseable {
                 reportArtifactService,
                 dataTemplatePersistenceService,
                 new ConnectionValidationService(),
-                new CaseDetailService(java.nio.file.Path.of("config", "phase3", "case-details")));
+                new CaseDetailService(java.nio.file.Path.of("config", "phase3", "case-details")),
+                new DocumentPersistenceService(java.nio.file.Path.of("config", "phase3", "documents")));
     }
 
     public LocalAdminApiServer(
@@ -73,7 +75,8 @@ public final class LocalAdminApiServer implements AutoCloseable {
                 reportArtifactService,
                 dataTemplatePersistenceService,
                 connectionValidationService,
-                new CaseDetailService(java.nio.file.Path.of("config", "phase3", "case-details")));
+                new CaseDetailService(java.nio.file.Path.of("config", "phase3", "case-details")),
+                new DocumentPersistenceService(java.nio.file.Path.of("config", "phase3", "documents")));
     }
 
     public LocalAdminApiServer(
@@ -88,6 +91,35 @@ public final class LocalAdminApiServer implements AutoCloseable {
             DataTemplatePersistenceService dataTemplatePersistenceService,
             ConnectionValidationService connectionValidationService,
             CaseDetailService caseDetailService)
+            throws IOException {
+        this(
+                address,
+                mockDataService,
+                schedulerPersistenceService,
+                configPersistenceService,
+                catalogPersistenceService,
+                runStatusService,
+                agentGenerateService,
+                reportArtifactService,
+                dataTemplatePersistenceService,
+                connectionValidationService,
+                caseDetailService,
+                new DocumentPersistenceService(java.nio.file.Path.of("config", "phase3", "documents")));
+    }
+
+    public LocalAdminApiServer(
+            InetSocketAddress address,
+            Phase3MockDataService mockDataService,
+            SchedulerPersistenceService schedulerPersistenceService,
+            ConfigPersistenceService configPersistenceService,
+            CatalogPersistenceService catalogPersistenceService,
+            RunStatusService runStatusService,
+            AgentGenerateService agentGenerateService,
+            ReportArtifactService reportArtifactService,
+            DataTemplatePersistenceService dataTemplatePersistenceService,
+            ConnectionValidationService connectionValidationService,
+            CaseDetailService caseDetailService,
+            DocumentPersistenceService documentPersistenceService)
             throws IOException {
         server = HttpServer.create(address, 0);
         server.createContext("/health", jsonHandler(Map.of("status", "UP")));
@@ -148,6 +180,10 @@ public final class LocalAdminApiServer implements AutoCloseable {
         server.createContext("/api/phase3/data-templates",
                 exchange -> handleDataTemplateEndpoint(exchange, dataTemplatePersistenceService));
         server.createContext("/api/phase3/runs/", exchange -> handleRunEndpoint(exchange, runStatusService, reportArtifactService));
+        server.createContext("/api/phase3/documents/upload",
+                exchange -> handleMutation(exchange, documentPersistenceService::upload));
+        server.createContext("/api/phase3/documents/",
+                exchange -> handleDocumentEndpoint(exchange, documentPersistenceService));
         server.createContext("/", exchange -> writeJson(exchange, 404, Map.of(
                 "error", "NOT_FOUND",
                 "path", exchange.getRequestURI().getPath())));
@@ -235,6 +271,54 @@ public final class LocalAdminApiServer implements AutoCloseable {
                         return;
                     }
                     writeJson(exchange, 200, service.getHistory(caseId));
+                }
+                default -> writeJson(exchange, 404, Map.of("error", "NOT_FOUND", "action", action));
+            }
+        } catch (IllegalArgumentException e) {
+            writeJson(exchange, 400, Map.of("error", "BAD_REQUEST", "message", e.getMessage()));
+        }
+    }
+
+    private static void handleDocumentEndpoint(HttpExchange exchange,
+            DocumentPersistenceService service) throws IOException {
+        if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
+            writeEmptyResponse(exchange);
+            return;
+        }
+        String path = exchange.getRequestURI().getPath();
+        // /api/phase3/documents/{documentId}/reparse       -> POST reparse
+        // /api/phase3/documents/{documentId}/parse-result   -> GET or PUT
+        String[] segments = path.split("/");
+        // segments: ["", "api", "phase3", "documents", "{documentId}", "{action}"]
+
+        if (segments.length < 5 || segments[4].isEmpty()) {
+            writeJson(exchange, 400, Map.of("error", "BAD_REQUEST", "message", "documentId required"));
+            return;
+        }
+
+        String documentId = segments[4];
+        String action = segments.length > 5 ? segments[5] : "";
+        String method = exchange.getRequestMethod().toUpperCase();
+
+        try {
+            switch (action) {
+                case "reparse" -> {
+                    if (!"POST".equals(method)) {
+                        writeJson(exchange, 405, Map.of("error", "METHOD_NOT_ALLOWED"));
+                        return;
+                    }
+                    String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+                    writeJson(exchange, 202, service.reparse(documentId, body));
+                }
+                case "parse-result" -> {
+                    if ("GET".equals(method)) {
+                        writeJson(exchange, 200, service.getParseResult(documentId));
+                    } else if ("PUT".equals(method)) {
+                        String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+                        writeJson(exchange, 202, service.saveParseResult(documentId, body));
+                    } else {
+                        writeJson(exchange, 405, Map.of("error", "METHOD_NOT_ALLOWED"));
+                    }
                 }
                 default -> writeJson(exchange, 404, Map.of("error", "NOT_FOUND", "action", action));
             }

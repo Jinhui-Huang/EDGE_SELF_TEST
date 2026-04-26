@@ -9,6 +9,7 @@
 - Current backend/local API implementation:
   - `apps/local-admin-api/src/main/java/com/example/webtest/admin/http/LocalAdminApiServer.java`
   - `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/Phase3MockDataService.java`
+  - `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/DocumentPersistenceService.java`
 - Main design references reviewed for this document:
   - `docs/phase3/main/platform_and_edge_low_fidelity_wireframes.md`
   - `docs/phase3/main/platform_ui_prototype_and_interaction_design_phase3_5.md`
@@ -19,7 +20,7 @@ This document distinguishes:
 - current read context
 - current synthetic document/parse model
 - current real App-level focus handoff into `aiGenerate`
-- future document upload/parse interfaces required by visible controls
+- implemented document upload/reparse/manual-edit interfaces
 
 ## 2. Interface Summary
 
@@ -27,11 +28,15 @@ Current `docParse` screen conclusion:
 
 - current direct read source:
   - `GET /api/phase3/admin-console`
-- current direct write source:
-  - none
+- current direct write/mutation interfaces:
+  - `POST /api/phase3/documents/upload` (upload document)
+  - `POST /api/phase3/documents/{documentId}/reparse` (re-parse document)
+  - `PUT /api/phase3/documents/{documentId}/parse-result` (save manual edit)
+  - `GET /api/phase3/documents/{documentId}/parse-result` (read parse result after mutation)
 - current real cross-screen output:
   - App-level focus handoff into `aiGenerate`
-- current document list, parse result, raw source, and history are front-end-generated from snapshot data rather than backend document-parser outputs
+- document list is still front-end-generated from snapshot; parse result can be persisted and refreshed from backend after upload/reparse/manual-edit
+- backend implementation: `DocumentPersistenceService.java` provides file-backed persistence under `config/phase3/documents/<documentId>/`
 
 ## 3. Current Read Context: GET /api/phase3/admin-console
 
@@ -164,9 +169,9 @@ These controls currently mutate UI state only.
 ### 6.5 Upload Filename List
 
 - owner: `uploadedFiles`
-- request: none today
+- request: `POST /api/phase3/documents/upload` (reads file content and uploads)
 - effect:
-  - stores local filenames only
+  - stores local filenames and uploads document to backend
 
 ## 7. UI Control to Interface Mapping
 
@@ -198,20 +203,18 @@ These controls currently mutate UI state only.
 #### `Re-parse`
 
 - user action: click
-- request: none today
-- owner: not implemented
-- intended future interface:
-  - document re-parse mutation
-- current state: visible only
+- request: `POST /api/phase3/documents/{documentId}/reparse`
+- owner: `DocParseScreen.tsx`
+- success behavior: refreshes parse result via `GET .../parse-result`, updates local document data
+- current state: implemented
 
 #### `Manual edit`
 
 - user action: click
-- request: none today
-- owner: not implemented
-- intended future interface:
-  - manual document/parse edit flow
-- current state: visible only
+- request: opens JSON editor; save calls `PUT /api/phase3/documents/{documentId}/parse-result`
+- owner: `DocParseScreen.tsx`
+- success behavior: updates local document data with edited cases
+- current state: implemented
 
 #### `Generate tests`
 
@@ -233,11 +236,10 @@ These controls currently mutate UI state only.
 #### `Upload file`
 
 - user action: click / file select
-- request: none today
-- owner: local filename list
-- intended future interface:
-  - document upload endpoint
-- current state: local filename capture only
+- request: reads file content via FileReader, then `POST /api/phase3/documents/upload` with projectKey, fileName, content
+- owner: `DocParseScreen.tsx`
+- success behavior: updates local filename list and persists document to backend
+- current state: implemented
 
 ### 7.4 Parse Result Controls
 
@@ -267,13 +269,15 @@ These controls currently mutate UI state only.
 - current document model is synthesized from project and case domains
 - future real document parsing should become its own domain rather than piggybacking on cases for mock content
 
-## 9. Recommended Future Document Interfaces
+## 9. Document Interfaces
 
-The visible controls clearly require document-specific interfaces.
+This section documents implemented and future document-specific interfaces.
 
-### 9.1 Document List Interface
+### 9.1 Document List Interface (future)
 
 #### `GET /api/phase3/documents`
+
+Status: not yet implemented
 
 Purpose:
 
@@ -307,46 +311,79 @@ Response body:
 
 #### `POST /api/phase3/documents/upload`
 
+Status: implemented (P2-4)
+
+Implementation:
+
+- `DocumentPersistenceService.upload()`
+- `LocalAdminApiServer` route `/api/phase3/documents/upload`
+
 Purpose:
 
-- upload one or more source documents for a project
+- upload one source document for a project
 
 Request type:
 
-- `multipart/form-data`
+- `application/json`
 
-Form parts:
+Request body:
 
-- `projectKey`
-- `files[]`
+```json
+{
+  "projectKey": "checkout-web",
+  "fileName": "checkout-regression-v3.md",
+  "content": "# checkout-web requirement packet ..."
+}
+```
 
-Response body:
+Response body (HTTP 202):
 
 ```json
 {
   "status": "ACCEPTED",
   "uploaded": [
     {
-      "id": "checkout-web-primary",
+      "id": "checkout-web-checkout-regression-v3-md",
       "name": "checkout-regression-v3.md"
     }
   ]
 }
 ```
 
+Error responses:
+
+- `400` when `projectKey` or `fileName` is missing
+
+Frontend caller:
+
+- `DocParseScreen.tsx` reads file content via `FileReader`, then calls `handleUploadToBackend` which posts JSON body
+
+Backend behavior:
+
+- generates document ID from `projectKey` + `fileName` (lowercase, alphanumeric + hyphens)
+- persists `raw.json`, `parse-result.json`, `meta.json` under `config/phase3/documents/<documentId>/`
+- auto-generates initial parse result with deterministic detected cases and reasoning
+
 ### 9.3 Parse Result Interface
 
 #### `GET /api/phase3/documents/{documentId}/parse-result`
+
+Status: implemented (P2-4)
+
+Implementation:
+
+- `DocumentPersistenceService.getParseResult()`
+- `LocalAdminApiServer` route `/api/phase3/documents/{documentId}/parse-result` (GET)
 
 Purpose:
 
 - return parser output for one document
 
-Response body:
+Response body (HTTP 200):
 
 ```json
 {
-  "documentId": "checkout-web-primary",
+  "documentId": "checkout-web-checkout-regression-v3-md",
   "projectKey": "checkout-web",
   "detectedCases": [
     {
@@ -368,51 +405,48 @@ Response body:
 }
 ```
 
-### 9.4 Raw Source Interface
+Error responses:
+
+- `404` when document does not exist (no `parse-result.json` found)
+
+Frontend caller:
+
+- `DocParseScreen.tsx` calls this after successful re-parse to refresh UI
+
+### 9.4 Raw Source Interface (future)
 
 #### `GET /api/phase3/documents/{documentId}/raw`
+
+Status: not yet implemented as a dedicated read endpoint
 
 Purpose:
 
 - return raw source content for the document
 
-Response body:
+Note: raw content is persisted by `DocumentPersistenceService` as `raw.json` during upload, but no dedicated GET endpoint is exposed yet; raw document tab content is still front-end synthetic data
 
-```json
-{
-  "documentId": "checkout-web-primary",
-  "name": "checkout-regression-v3.md",
-  "content": "# checkout-web requirement packet ..."
-}
-```
-
-### 9.5 Version History Interface
+### 9.5 Version History Interface (future)
 
 #### `GET /api/phase3/documents/{documentId}/versions`
+
+Status: not yet implemented
 
 Purpose:
 
 - return stored version history for one document
 
-Response body:
-
-```json
-{
-  "documentId": "checkout-web-primary",
-  "items": [
-    {
-      "id": "checkout-web-v3",
-      "label": "v3",
-      "time": "2026-04-20T06:10:00Z",
-      "summary": "Added payment assertions and restore notes."
-    }
-  ]
-}
-```
+Note: version history tab content is still front-end synthetic data
 
 ### 9.6 Re-Parse Interface
 
 #### `POST /api/phase3/documents/{documentId}/reparse`
+
+Status: implemented (P2-4)
+
+Implementation:
+
+- `DocumentPersistenceService.reparse()`
+- `LocalAdminApiServer` route `/api/phase3/documents/{documentId}/reparse` (POST)
 
 Purpose:
 
@@ -427,19 +461,39 @@ Request body:
 }
 ```
 
-Response body:
+Response body (HTTP 202):
 
 ```json
 {
   "status": "ACCEPTED",
   "kind": "document-reparse",
-  "documentId": "checkout-web-primary"
+  "documentId": "checkout-web-checkout-regression-v3-md"
 }
 ```
+
+Error responses:
+
+- response contains `"status": "NOT_FOUND"` when document meta does not exist
+
+Frontend caller:
+
+- `DocParseScreen.tsx` calls this on Re-parse button click, then fetches `GET .../parse-result` to refresh UI
+
+Backend behavior:
+
+- reads existing `meta.json` to confirm document exists
+- regenerates `parse-result.json` with updated timestamp and deterministic detected cases
 
 ### 9.7 Manual Edit Interface
 
 #### `PUT /api/phase3/documents/{documentId}/parse-result`
+
+Status: implemented (P2-4)
+
+Implementation:
+
+- `DocumentPersistenceService.saveParseResult()`
+- `LocalAdminApiServer` route `/api/phase3/documents/{documentId}/parse-result` (PUT)
 
 Purpose:
 
@@ -463,102 +517,99 @@ Request body:
 }
 ```
 
-Response body:
+Response body (HTTP 202):
 
 ```json
 {
   "status": "ACCEPTED",
   "kind": "document-parse-edit",
-  "documentId": "checkout-web-primary"
+  "documentId": "checkout-web-checkout-regression-v3-md"
 }
 ```
 
-## 10. Detailed Implementation Design for Currently Unwired Controls
+Frontend caller:
+
+- `DocParseScreen.tsx` opens a JSON editor for detected cases; saving calls this endpoint with the edited cases
+
+Backend behavior:
+
+- reads `changes.detectedCases` from request body
+- overwrites `parse-result.json` with the provided cases
+
+## 10. Implemented Control Wiring Reference
 
 ### 10.1 `Upload file`
 
-Recommended implementation type:
+Implementation:
 
-- new backend upload interface
-
-Concrete implementation design:
-
-- file chooser submits:
-  - `POST /api/phase3/documents/upload`
+- file chooser reads content via `FileReader`
+- `DocParseScreen.tsx` calls `handleUploadToBackend`:
+  - `POST /api/phase3/documents/upload` with JSON body `{ projectKey, fileName, content }`
 - after success:
-  - reload:
-    - `GET /api/phase3/documents?projectKey={selectedProjectKey}`
-
-Reasoning:
-
-- current local filename list is only a placeholder for the real upload action
+  - updates local filename list and local document data with API-returned parse result
 
 ### 10.2 `Re-parse`
 
-Recommended implementation type:
+Implementation:
 
-- new parse mutation
-
-Concrete implementation design:
-
-- button posts:
+- button calls `handleReparse(documentId)`:
   - `POST /api/phase3/documents/{documentId}/reparse`
 - after success:
-  - reload parse result and document list
+  - `GET /api/phase3/documents/{documentId}/parse-result` to refresh UI
+  - updates local document model with refreshed detected cases
 
 ### 10.3 `Manual edit`
 
-Recommended implementation type:
+Implementation:
 
-- local edit drawer or editor plus backend save
-
-Concrete implementation design:
-
-- button opens local edit drawer for parse-result fields
-- saving the drawer calls:
-  - `PUT /api/phase3/documents/{documentId}/parse-result`
+- button opens inline JSON editor pre-filled with `JSON.stringify(currentCases)`
+- Save button calls `handleSaveParseResult(documentId)`:
+  - `PUT /api/phase3/documents/{documentId}/parse-result` with `{ changes: { detectedCases: parsedDraft } }`
+- after success:
+  - updates local document model with edited cases
+  - closes editor
 
 ### 10.4 Parse/Raw/History Tabs
 
-Recommended implementation type:
+Current state:
 
-- keep local tab state
-- move each tab's content onto its own backend read when available
+- tab switching is local state only
+- `Parse result` content is refreshed from backend after re-parse or manual edit; initial load is still from front-end synthetic data
+- `Raw document` content is still front-end synthetic data
+- `Version history` content is still front-end synthetic data
 
-Tab behavior design:
+Future:
 
-- `Parse result`
-  - request:
-    - `GET /api/phase3/documents/{documentId}/parse-result`
-- `Raw document`
-  - request:
-    - `GET /api/phase3/documents/{documentId}/raw`
-- `Version history`
-  - request:
-    - `GET /api/phase3/documents/{documentId}/versions`
+- `Raw document` can be backed by `GET /api/phase3/documents/{documentId}/raw`
+- `Version history` can be backed by `GET /api/phase3/documents/{documentId}/versions`
 
 ## 11. Error Handling Boundary
 
 Current implementation:
 
-- no backend requests exist on this page
-- no opened document results in locked-state UI
+- upload, re-parse, and manual-edit mutations surface success/error status through an `actionStatus` bar in DocParseScreen
+- upload validates that `projectKey` is available before submission
+- re-parse returns `NOT_FOUND` status (not HTTP 404) when the document has not been uploaded yet
+- `GET .../parse-result` returns HTTP 404 when document does not exist
+- no opened document results in locked-state UI (hero actions disabled)
 
-Recommended future read-interface errors:
+Remaining gaps:
 
-- `GET /api/phase3/documents/{documentId}/parse-result`
-  - `404` when document does not exist
-
-Recommended future mutation errors:
-
-- upload/re-parse/manual-edit failures should surface in a doc-parse-local mutation status area
+- raw-document and version-history reads are still front-end synthetic and have no backend error surface
 
 ## 12. Review Items
 
-Review-only findings:
+Resolved items (P2-4):
 
-- The page already has a real and useful App-level focus handoff into `aiGenerate`.
-- Everything else on the page is still document-parser UI scaffolding over synthetic local data.
-- `Upload file`, `Re-parse`, and `Manual edit` should become true document-domain interfaces, not remain placeholder buttons.
+- `Upload file` is now a real document-upload action via `POST /api/phase3/documents/upload` with file content read by `FileReader`.
+- `Re-parse` is now a real backend mutation via `POST /api/phase3/documents/{documentId}/reparse` with parse-result refresh.
+- `Manual edit` is now a real backend mutation via `PUT /api/phase3/documents/{documentId}/parse-result` with inline JSON editor.
+- Backend persistence is implemented through `DocumentPersistenceService` with file-backed storage under `config/phase3/documents/<documentId>/`.
+- The page now has a real App-level focus handoff into `aiGenerate` and real document-service write capabilities.
 
-These are documentation findings only. No implementation change is made in this stage.
+Remaining items:
+
+- Document catalog is still synthetic front-end data from `buildDocuments(snapshot)`, not a backend document list via `GET /api/phase3/documents`.
+- Raw document tab content is still front-end synthetic data, not backed by `GET /api/phase3/documents/{documentId}/raw`.
+- Version history tab content is still front-end synthetic data, not backed by `GET /api/phase3/documents/{documentId}/versions`.
+- Parse result tab content is not API-backed on initial load (only refreshed after re-parse or manual edit).

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
@@ -883,6 +883,186 @@ describe("App", () => {
     expect(await screen.findByText("Case catalog")).toBeInTheDocument();
     expect(screen.getAllByText("Checkout smoke").length).toBeGreaterThan(0);
     expect(screen.queryByText("Document catalog")).not.toBeInTheDocument();
+  });
+
+  it("uploads a file from DocParse and shows action status", async () => {
+    const uploadResponse = {
+      status: "ACCEPTED",
+      uploaded: [{ id: "checkout-web-test-doc-md", name: "test-doc.md" }]
+    };
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) {
+        return jsonResponse(snapshot);
+      }
+      if (url.endsWith("/api/phase3/documents/upload")) {
+        return jsonResponse(uploadResponse, 202);
+      }
+      throw new Error(`Unexpected fetch: ${url} ${init?.method ?? "GET"}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    // Mock FileReader
+    const mockFileReader = {
+      result: "# Test document content",
+      readAsText: vi.fn(),
+      onload: null as (() => void) | null
+    };
+    mockFileReader.readAsText.mockImplementation(function (this: typeof mockFileReader) {
+      setTimeout(() => {
+        if (this.onload) this.onload();
+      }, 0);
+    }.bind(mockFileReader));
+    vi.stubGlobal("FileReader", vi.fn(() => mockFileReader));
+
+    render(<App />);
+
+    await userEvent.click(await screen.findByRole("button", { name: /Doc Parse/ }));
+    await screen.findByText("Document catalog");
+
+    // Upload a file
+    const fileInput = document.querySelector("input[type='file']") as HTMLInputElement;
+    expect(fileInput).toBeTruthy();
+
+    const file = new File(["# Test document content"], "test-doc.md", { type: "text/markdown" });
+    await userEvent.upload(fileInput, file);
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "http://127.0.0.1:8787/api/phase3/documents/upload",
+        expect.objectContaining({
+          method: "POST",
+          body: expect.stringContaining("\"fileName\":\"test-doc.md\"")
+        })
+      );
+    });
+    expect(await screen.findByText("Upload complete")).toBeInTheDocument();
+
+    // Open a document and switch to raw tab to see uploaded files list
+    const detailButtons = await screen.findAllByRole("button", { name: /Detail/ });
+    await userEvent.click(detailButtons[0]);
+    await userEvent.click(await screen.findByRole("button", { name: "Raw document" }));
+    expect(await screen.findByText("test-doc.md")).toBeInTheDocument();
+  });
+
+  it("re-parses a document and refreshes the parse result in UI", async () => {
+    const reparseResponse = {
+      status: "ACCEPTED",
+      kind: "document-reparse",
+      documentId: "checkout-web-primary"
+    };
+    const parseResultResponse = {
+      documentId: "checkout-web-primary",
+      projectKey: "checkout-web",
+      detectedCases: [
+        { id: "checkout-reparsed", name: "Checkout reparsed case", category: "happy", confidence: "high" }
+      ],
+      reasoning: [
+        { label: "Structure", body: "Re-parsed from updated source." }
+      ],
+      missing: []
+    };
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) {
+        return jsonResponse(snapshot);
+      }
+      if (url.endsWith("/api/phase3/documents/checkout-web-primary/reparse")) {
+        return jsonResponse(reparseResponse, 202);
+      }
+      if (url.endsWith("/api/phase3/documents/checkout-web-primary/parse-result")) {
+        return jsonResponse(parseResultResponse);
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    await userEvent.click(await screen.findByRole("button", { name: /Doc Parse/ }));
+    await screen.findByText("Document catalog");
+
+    // Open the first document
+    const detailButtons = await screen.findAllByRole("button", { name: /Detail/ });
+    await userEvent.click(detailButtons[0]);
+
+    // Click Re-parse
+    await userEvent.click(await screen.findByRole("button", { name: "Re-parse" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "http://127.0.0.1:8787/api/phase3/documents/checkout-web-primary/reparse",
+        expect.objectContaining({ method: "POST" })
+      );
+    });
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "http://127.0.0.1:8787/api/phase3/documents/checkout-web-primary/parse-result"
+      );
+    });
+    expect(await screen.findByText("Re-parse complete")).toBeInTheDocument();
+    expect((await screen.findAllByText("Checkout reparsed case")).length).toBeGreaterThan(0);
+  });
+
+  it("opens manual edit, saves edited cases, and updates UI", async () => {
+    const saveResponse = {
+      status: "ACCEPTED",
+      kind: "document-parse-edit",
+      documentId: "checkout-web-primary"
+    };
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) {
+        return jsonResponse(snapshot);
+      }
+      if (url.endsWith("/api/phase3/documents/checkout-web-primary/parse-result") && init?.method === "PUT") {
+        return jsonResponse(saveResponse, 202);
+      }
+      throw new Error(`Unexpected fetch: ${url} ${init?.method ?? "GET"}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    await userEvent.click(await screen.findByRole("button", { name: /Doc Parse/ }));
+    await screen.findByText("Document catalog");
+
+    // Open the first document
+    const detailButtons = await screen.findAllByRole("button", { name: /Detail/ });
+    await userEvent.click(detailButtons[0]);
+
+    // Click Manual edit hero button
+    const heroActions = document.querySelector(".docParseHeroActions") as HTMLElement;
+    const manualEditButton = heroActions.querySelector("button:nth-child(2)") as HTMLButtonElement;
+    await userEvent.click(manualEditButton);
+
+    // Verify editor panel opens with Save and Cancel buttons
+    expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+
+    // Modify the textarea with custom cases
+    const textarea = document.querySelector("textarea.casesDslEditor") as HTMLTextAreaElement;
+    expect(textarea).toBeTruthy();
+    const editedJson = JSON.stringify([{ id: "custom-1", name: "Custom edited case", category: "boundary", confidence: "low" }], null, 2);
+    fireEvent.change(textarea, { target: { value: editedJson } });
+
+    // Click Save
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "http://127.0.0.1:8787/api/phase3/documents/checkout-web-primary/parse-result",
+        expect.objectContaining({
+          method: "PUT",
+          body: expect.stringContaining("\"detectedCases\"")
+        })
+      );
+    });
+    expect(await screen.findByText("Saved")).toBeInTheDocument();
+    // Editor should be closed
+    expect(screen.queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
+    // Updated case should appear
+    expect((await screen.findAllByText("Custom edited case")).length).toBeGreaterThan(0);
   });
 
   it("switches the Reports overview when clicking another project", async () => {

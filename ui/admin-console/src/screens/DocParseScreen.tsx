@@ -1,9 +1,17 @@
-import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { translate } from "../i18n";
-import { AdminConsoleSnapshot, Locale } from "../types";
+import {
+  AdminConsoleSnapshot,
+  DocumentParseResult,
+  DocumentParseResultSaveResponse,
+  DocumentReparseResponse,
+  DocumentUploadResponse,
+  Locale
+} from "../types";
 
 type DocParseScreenProps = {
   snapshot: AdminConsoleSnapshot;
+  apiBaseUrl: string;
   title: string;
   locale: Locale;
   onOpenAiGenerate: (focus: {
@@ -173,7 +181,7 @@ ${baseCases.map((item) => `- ${item.name}`).join("\n")}`,
   });
 }
 
-export function DocParseScreen({ snapshot, title, locale, onOpenAiGenerate }: DocParseScreenProps) {
+export function DocParseScreen({ snapshot, apiBaseUrl, title, locale, onOpenAiGenerate }: DocParseScreenProps) {
   const t = (value: LocalizedCopy) => translate(locale, value);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [documents, setDocuments] = useState<ParsedDocument[]>(() => buildDocuments(snapshot));
@@ -183,6 +191,117 @@ export function DocParseScreen({ snapshot, title, locale, onOpenAiGenerate }: Do
   const [activeTab, setActiveTab] = useState<TabKey>("parse");
   const [overviewCollapsed, setOverviewCollapsed] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<string[]>([]);
+  const [actionStatus, setActionStatus] = useState<string | null>(null);
+  const [manualEditMode, setManualEditMode] = useState(false);
+  const [manualEditDraft, setManualEditDraft] = useState("");
+
+  const handleUploadToBackend = useCallback(
+    async (fileName: string, content: string, projectKey: string) => {
+      setActionStatus(t(copy("Uploading…", "上传中…", "アップロード中…")));
+      try {
+        const res = await fetch(`${apiBaseUrl}/api/phase3/documents/upload`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ projectKey, fileName, content })
+        });
+        if (res.ok) {
+          const data: DocumentUploadResponse = await res.json();
+          setActionStatus(t(copy("Upload complete", "上传完成", "アップロード完了")));
+          return data;
+        }
+      } catch {
+        /* network error */
+      }
+      setActionStatus(t(copy("Upload failed", "上传失败", "アップロード失敗")));
+      return null;
+    },
+    [apiBaseUrl, t]
+  );
+
+  const handleReparse = useCallback(
+    async (documentId: string) => {
+      setActionStatus(t(copy("Re-parsing…", "重新解析中…", "再解析中…")));
+      try {
+        const res = await fetch(`${apiBaseUrl}/api/phase3/documents/${documentId}/reparse`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ operator: "operator" })
+        });
+        if (res.ok) {
+          const data: DocumentReparseResponse = await res.json();
+          setActionStatus(data.status === "ACCEPTED"
+            ? t(copy("Re-parse complete", "重新解析完成", "再解析完了"))
+            : t(copy("Document not found", "文档未找到", "文書が見つかりません")));
+          // Refresh parse result
+          const prRes = await fetch(`${apiBaseUrl}/api/phase3/documents/${documentId}/parse-result`);
+          if (prRes.ok) {
+            const pr: DocumentParseResult = await prRes.json();
+            setDocuments((prev) =>
+              prev.map((doc) =>
+                doc.id === documentId
+                  ? {
+                      ...doc,
+                      cases: pr.detectedCases.map((c) => ({
+                        id: c.id,
+                        name: c.name,
+                        category: c.category as CaseCandidate["category"],
+                        confidence: c.confidence as CaseCandidate["confidence"]
+                      })),
+                      detectedCases: pr.detectedCases.length,
+                      status: "Parsed" as const
+                    }
+                  : doc
+              )
+            );
+          }
+        }
+      } catch {
+        setActionStatus(t(copy("Re-parse failed", "重新解析失败", "再解析失敗")));
+      }
+    },
+    [apiBaseUrl, t]
+  );
+
+  const handleSaveParseResult = useCallback(
+    async (documentId: string) => {
+      setActionStatus(t(copy("Saving…", "保存中…", "保存中…")));
+      try {
+        const detectedCases = JSON.parse(manualEditDraft);
+        const res = await fetch(`${apiBaseUrl}/api/phase3/documents/${documentId}/parse-result`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ updatedBy: "operator", changes: { detectedCases } })
+        });
+        if (res.ok) {
+          const data: DocumentParseResultSaveResponse = await res.json();
+          setActionStatus(data.status === "ACCEPTED"
+            ? t(copy("Saved", "已保存", "保存済み"))
+            : t(copy("Document not found", "文档未找到", "文書が見つかりません")));
+          setManualEditMode(false);
+          // Refresh local doc data
+          setDocuments((prev) =>
+            prev.map((doc) =>
+              doc.id === documentId
+                ? {
+                    ...doc,
+                    cases: (Array.isArray(detectedCases) ? detectedCases : []).map((c: CaseCandidate) => ({
+                      id: c.id,
+                      name: c.name,
+                      category: (c.category || "happy") as CaseCandidate["category"],
+                      confidence: (c.confidence || "medium") as CaseCandidate["confidence"]
+                    })),
+                    detectedCases: Array.isArray(detectedCases) ? detectedCases.length : 0
+                  }
+                : doc
+            )
+          );
+        }
+      } catch {
+        setActionStatus(t(copy("Invalid JSON or save failed", "JSON 无效或保存失败", "不正な JSON または保存失敗")));
+      }
+    },
+    [apiBaseUrl, manualEditDraft, t]
+  );
 
   useEffect(() => {
     setDocuments(buildDocuments(snapshot));
@@ -221,11 +340,23 @@ export function DocParseScreen({ snapshot, title, locale, onOpenAiGenerate }: Do
   }
 
   function handleUpload(event: ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(event.target.files ?? []).map((item) => item.name);
-    if (!files.length) {
+    const fileList = event.target.files;
+    if (!fileList?.length) {
       return;
     }
-    setUploadedFiles((current) => [...files, ...current].slice(0, 6));
+    const names = Array.from(fileList).map((item) => item.name);
+    setUploadedFiles((current) => [...names, ...current].slice(0, 6));
+
+    // Upload each file to backend
+    Array.from(fileList).forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const content = typeof reader.result === "string" ? reader.result : "";
+        handleUploadToBackend(file.name, content, selectedProjectKey);
+      };
+      reader.readAsText(file);
+    });
+
     event.target.value = "";
   }
 
@@ -376,10 +507,25 @@ export function DocParseScreen({ snapshot, title, locale, onOpenAiGenerate }: Do
           </div>
 
           <div className="docParseHeroActions">
-            <button type="button" className="casesActionButton ghost" disabled={!openedDocument}>
+            <button
+              type="button"
+              className="casesActionButton ghost"
+              disabled={!openedDocument}
+              onClick={() => openedDocument && handleReparse(openedDocument.id)}
+            >
               {t(copy("Re-parse", "重新解析", "再解析"))}
             </button>
-            <button type="button" className="casesActionButton secondary" disabled={!openedDocument}>
+            <button
+              type="button"
+              className="casesActionButton secondary"
+              disabled={!openedDocument}
+              onClick={() => {
+                if (openedDocument) {
+                  setManualEditMode(true);
+                  setManualEditDraft(JSON.stringify(openedDocument.cases, null, 2));
+                }
+              }}
+            >
               {t(copy("Manual edit", "手动修正", "手動修正"))}
             </button>
             <button
@@ -392,6 +538,35 @@ export function DocParseScreen({ snapshot, title, locale, onOpenAiGenerate }: Do
             </button>
           </div>
         </div>
+
+        {actionStatus ? (
+          <div className="docParseActionStatus">
+            <span>{actionStatus}</span>
+            <button type="button" className="docParseDismiss" onClick={() => setActionStatus(null)}>×</button>
+          </div>
+        ) : null}
+
+        {manualEditMode && openedDocument ? (
+          <div className="docParseManualEdit">
+            <div className="casesPanelHead">
+              <div className="casesPanelTitle">{t(copy("Manual edit — detected cases", "手动修正 — 检出用例", "手動修正 — 検出ケース"))}</div>
+              <div className="casesPanelActions">
+                <button type="button" className="casesActionButton ghost" onClick={() => setManualEditMode(false)}>
+                  {t(copy("Cancel", "取消", "キャンセル"))}
+                </button>
+                <button type="button" className="casesActionButton primary" onClick={() => handleSaveParseResult(openedDocument.id)}>
+                  {t(copy("Save", "保存", "保存"))}
+                </button>
+              </div>
+            </div>
+            <textarea
+              className="casesDslEditor"
+              rows={12}
+              value={manualEditDraft}
+              onChange={(e) => setManualEditDraft(e.target.value)}
+            />
+          </div>
+        ) : null}
 
         <div className="docParseTabs">
           <div className="docParseTabRail">

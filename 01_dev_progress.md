@@ -2944,3 +2944,50 @@ Wire the 7 case-detail API endpoints and make the CasesScreen tabs functional wi
 ### Next Step
 - Sync `docs/phase3/interface/cases/` functional-spec and interface-spec with completed P2-3 implementation
 - Continue with the next review-backlog priority after P2-3
+
+## 2026-04-26 P2-4 Complete docParse document-service actions
+
+### Scope
+Wire the 3 document-service API endpoints and make the DocParseScreen Upload/Re-parse/Manual edit buttons functional with real backend data.
+
+### Backend
+- **NEW** `DocumentPersistenceService.java`: File-backed document persistence under `config/phase3/documents/<documentId>/`
+  - `upload(body)`: validates projectKey/fileName, generates document ID, persists `raw.json` + `parse-result.json` + `meta.json`
+  - `reparse(documentId, body)`: checks meta exists, regenerates `parse-result.json`
+  - `saveParseResult(documentId, body)`: reads `changes.detectedCases`, overwrites `parse-result.json`
+  - `getParseResult(documentId)`: reads persisted parse result
+  - Path traversal protection via `.normalize()` + `.startsWith(root)`
+- **MODIFIED** `LocalAdminApiServer.java`:
+  - 12-param constructor with full delegation chain (9→12, 10→12, 11→12)
+  - Route `/api/phase3/documents/upload` registered before `/api/phase3/documents/` (prefix conflict avoidance)
+  - `handleDocumentEndpoint` dispatches by path segments: `{documentId}/{action}` (reparse POST, parse-result GET/PUT)
+
+### Frontend
+- **MODIFIED** `types.ts`: Added 4 P2-4 types (DocumentUploadResponse, DocumentReparseResponse, DocumentParseResultSaveResponse, DocumentParseResult)
+- **MODIFIED** `DocParseScreen.tsx`:
+  - Added `apiBaseUrl` prop
+  - `handleUploadToBackend`: reads file via FileReader, POSTs JSON to `/api/phase3/documents/upload`
+  - `handleReparse`: POSTs to `.../reparse`, then GETs `.../parse-result` to refresh UI
+  - `handleSaveParseResult`: PUTs to `.../parse-result` with edited JSON
+  - Re-parse button wired to `handleReparse`
+  - Manual edit button opens inline JSON editor with Save/Cancel
+  - Action status bar with dismiss button
+- **MODIFIED** `App.tsx`: Pass `apiBaseUrl` to DocParseScreen
+
+### Tests
+- **MODIFIED** `LocalAdminApiServerTest.java`:
+  - Added `documentServiceEndpoints` test with 7 steps: upload, get parse result, re-parse, manual edit save, get after edit, re-parse nonexistent, upload missing projectKey
+  - Uses 12-param constructor with explicit DocumentPersistenceService
+
+### Docs Synced
+- **MODIFIED** `docs/phase3/interface/ui-control-interface-overview.md`: DocParse section updated (Re-parse, Manual edit, Upload file → implemented)
+- **MODIFIED** `docs/phase3/interface/docParse/functional-spec.md`: Sections 5, 6.4, 6.5, 9, 10, 11, 15 updated to reflect implemented state
+- **MODIFIED** `docs/phase3/interface/docParse/interface-spec.md`: Sections 2, 6.5, 7.2, 7.3, 9 (9.1-9.7 with implementation status), 10, 11, 12 updated
+
+### Verification
+- `npm run build`: PASS
+- `npm test -- --run`: PASS (20/20 tests)
+- `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`: PASS (13/13 tests)
+
+### Next Step
+- Continue with the next review-backlog priority after P2-4

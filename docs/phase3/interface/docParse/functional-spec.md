@@ -64,20 +64,22 @@ It is intentionally separated from:
 Current implementation facts:
 
 - The page is rendered by `DocParseScreen.tsx`.
-- The page does not fetch directly.
-- The page builds its document catalog through local helper `buildDocuments(snapshot)`.
+- The page performs direct `fetch` calls to the backend for document upload, re-parse, and manual parse-result editing.
+- The page builds its document catalog through local helper `buildDocuments(snapshot)` and updates it with API-returned data after re-parse and manual edit.
 - project switching is implemented.
 - document detail opening is implemented.
 - `Generate tests` is implemented as App-level focus handoff into `aiGenerate`.
 - parse/raw/history tabs are implemented as local tab state.
-- `Upload file` is implemented only as local filename capture; no backend upload occurs.
-- `Re-parse` is visible but not wired.
-- `Manual edit` is visible but not wired.
+- `Upload file` reads file content and uploads via `POST /api/phase3/documents/upload`.
+- `Re-parse` is implemented: calls `POST /api/phase3/documents/{documentId}/reparse`, then refreshes parse result.
+- `Manual edit` is implemented: opens JSON editor for detected cases, saves via `PUT /api/phase3/documents/{documentId}/parse-result`.
+- Backend implementation: `DocumentPersistenceService.java` provides file-backed persistence under `config/phase3/documents/<documentId>/`.
 
 This matters for review:
 
-- the page already owns a real upstream handoff into `aiGenerate`
-- but document list, parse result, and version history are still synthetic front-end data, not backend-authored parse artifacts
+- the page owns real upstream handoff into `aiGenerate` and real document-service write capabilities
+- document list and version history are still synthetic front-end data from snapshot
+- parse result can now be persisted and refreshed from the backend after upload, re-parse, or manual edit
 
 ## 6. Functional Areas
 
@@ -155,9 +157,9 @@ Functional role:
 
 Current behavior:
 
-- `Generate tests` is implemented
-- `Re-parse` is visible only
-- `Manual edit` is visible only
+- `Generate tests` is implemented as App-level focus handoff into `aiGenerate`
+- `Re-parse` is implemented: calls `POST /api/phase3/documents/{documentId}/reparse`
+- `Manual edit` is implemented: opens JSON editor, saves via `PUT /api/phase3/documents/{documentId}/parse-result`
 
 ### 6.5 Tab Bar
 
@@ -176,7 +178,7 @@ Functional role:
 Current behavior:
 
 - tab switching is implemented locally
-- upload currently only stores local filenames in the UI
+- upload reads file content and sends to `POST /api/phase3/documents/upload`; also updates local filename list in UI
 
 ### 6.6 Parse Result View
 
@@ -314,11 +316,11 @@ Current implementation summary:
   - selected case change
   - `Generate tests`
   - tab switching
-  - local file-name upload capture
-- visible but not implemented:
-  - `Re-parse`
-  - `Manual edit`
-  - real backend upload
+  - `Upload file` (reads content and uploads to backend)
+  - `Re-parse` (calls backend, refreshes parse result in UI)
+  - `Manual edit` (JSON editor, saves to backend, updates UI)
+- not yet implemented:
+  - none of the visible controls remain unwired
 
 ## 10. Functional Control Responsibility Matrix
 
@@ -344,12 +346,12 @@ Current implementation summary:
 
 - `Re-parse`
   - function: request document parsing again
-  - output type: future parse mutation
-  - current implementation: visual only
+  - output type: `POST /api/phase3/documents/{documentId}/reparse`, then refreshes parse result via `GET .../parse-result`
+  - current implementation: implemented
 - `Manual edit`
-  - function: correct parse result or source metadata manually
-  - output type: future manual-edit flow
-  - current implementation: visual only
+  - function: correct parse result detected cases manually
+  - output type: opens JSON editor, saves via `PUT /api/phase3/documents/{documentId}/parse-result`
+  - current implementation: implemented
 - `Generate tests`
   - function: hand selected document/case parse context into `aiGenerate`
   - output type: cross-screen App-level focus handoff
@@ -363,8 +365,8 @@ Current implementation summary:
   - current implementation: implemented
 - `Upload file`
   - function: add source files for parse review or re-parse
-  - output type: current local filename list; future upload flow
-  - current implementation: local filename capture only
+  - output type: reads file content and uploads via `POST /api/phase3/documents/upload`; also updates local filename list
+  - current implementation: implemented
 
 ### 10.5 Parse Result Controls
 
@@ -394,7 +396,9 @@ Current implementation status:
 
 - local selection states are implemented
 - upload list UI state is implemented
-- parse/manual-edit action states are not implemented
+- upload backend action is implemented
+- re-parse action state is implemented (with status feedback)
+- manual-edit action state is implemented (with JSON editor and save)
 
 ## 12. Validation and Rules
 
@@ -449,15 +453,17 @@ The `docParse` screen is not currently responsible for:
 
 ## 15. Known Gaps and Review Items
 
-Review items discovered while documenting:
+Resolved items (P2-4):
 
-- document catalog and parse result are currently synthetic front-end data, not backend parser output.
-- `Upload file` does not upload anything yet; it only stores filenames locally.
-- `Re-parse` is visible but not wired.
-- `Manual edit` is visible but not wired.
-- raw document and version history are placeholder data rather than true persisted document artifacts.
+- `Upload file` now reads content and uploads to backend via `POST /api/phase3/documents/upload`.
+- `Re-parse` now calls `POST /api/phase3/documents/{documentId}/reparse` and refreshes parse result.
+- `Manual edit` now opens JSON editor and saves via `PUT /api/phase3/documents/{documentId}/parse-result`.
 
-These are documentation review items only. No implementation change is made in this stage.
+Remaining items:
+
+- Document catalog is still synthetic front-end data from `buildDocuments(snapshot)`, not a backend document list.
+- Raw document and version history are placeholder data rather than true persisted document artifacts.
+- Parse result tab content is not yet API-backed on initial load (only refreshed after re-parse or manual edit).
 
 ## 16. Suggested Output Files for This Screen Folder
 

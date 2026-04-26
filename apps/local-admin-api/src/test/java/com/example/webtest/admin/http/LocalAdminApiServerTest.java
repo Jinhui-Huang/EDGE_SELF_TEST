@@ -9,6 +9,7 @@ import com.example.webtest.admin.service.CatalogPersistenceService;
 import com.example.webtest.admin.service.ConfigPersistenceService;
 import com.example.webtest.admin.service.ConnectionValidationService;
 import com.example.webtest.admin.service.DataTemplatePersistenceService;
+import com.example.webtest.admin.service.DocumentPersistenceService;
 import com.example.webtest.admin.service.Phase3MockDataService;
 import com.example.webtest.admin.service.ReportArtifactService;
 import com.example.webtest.admin.service.RunStatusService;
@@ -1559,6 +1560,117 @@ class LocalAdminApiServerTest {
             assertEquals(200, history.statusCode());
             assertTrue(history.body().contains("\"runs\""));
             assertTrue(history.body().contains("\"maintenanceEvents\""));
+        }
+    }
+
+    @Test
+    void documentServiceEndpoints(@TempDir Path tempDir) throws Exception {
+        Clock clock = Clock.fixed(Instant.parse("2026-04-25T10:00:00Z"), ZoneOffset.UTC);
+        Path runsDir = tempDir.resolve("runs");
+        Files.createDirectories(runsDir);
+        Path schedulerRequestsFile = tempDir.resolve("scheduler-requests.json");
+        Path schedulerEventsFile = tempDir.resolve("scheduler-events.json");
+        Path schedulerStateFile = tempDir.resolve("scheduler-state.json");
+        Path queueFile = tempDir.resolve("execution-queue.json");
+        Path catalogFile = tempDir.resolve("project-catalog.json");
+        Path executionHistoryFile = tempDir.resolve("execution-history.json");
+        Path modelConfigFile = tempDir.resolve("model-config.json");
+        Path environmentConfigFile = tempDir.resolve("environment-config.json");
+        Path dataTemplateFile = tempDir.resolve("data-templates.json");
+        Path documentRoot = tempDir.resolve("documents");
+
+        Files.writeString(schedulerStateFile, "{}", StandardCharsets.UTF_8);
+        Files.writeString(queueFile, "{\"items\":[]}", StandardCharsets.UTF_8);
+        Files.writeString(catalogFile, "{\"projects\":[],\"cases\":[]}", StandardCharsets.UTF_8);
+
+        DocumentPersistenceService documentService = new DocumentPersistenceService(documentRoot, clock);
+
+        try (LocalAdminApiServer server = new LocalAdminApiServer(
+                new InetSocketAddress("127.0.0.1", 0),
+                new Phase3MockDataService(
+                        runsDir, schedulerRequestsFile, schedulerEventsFile,
+                        schedulerStateFile, queueFile, catalogFile,
+                        executionHistoryFile, modelConfigFile, environmentConfigFile, clock),
+                new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, clock),
+                new ConfigPersistenceService(modelConfigFile, environmentConfigFile),
+                new CatalogPersistenceService(catalogFile, clock),
+                new RunStatusService(schedulerRequestsFile, schedulerEventsFile,
+                        new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, clock), clock),
+                new AgentGenerateService(),
+                new ReportArtifactService(runsDir),
+                new DataTemplatePersistenceService(dataTemplateFile, clock),
+                new ConnectionValidationService(),
+                new CaseDetailService(tempDir.resolve("case-details"), clock),
+                documentService)) {
+            server.start();
+            HttpClient client = HttpClient.newHttpClient();
+
+            // 1. Upload a document
+            HttpResponse<String> upload = client.send(
+                    request(server, "/api/phase3/documents/upload", "POST",
+                            Jsons.writeValueAsString(Map.of(
+                                    "projectKey", "checkout-web",
+                                    "fileName", "checkout-regression-v3.md",
+                                    "content", "# Checkout regression\n\n## Scope\nPayment journey"))),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(202, upload.statusCode());
+            assertTrue(upload.body().contains("\"ACCEPTED\""));
+            assertTrue(upload.body().contains("checkout-regression-v3"));
+
+            // 2. Get parse result for uploaded document
+            String documentId = "checkout-web-checkout-regression-v3";
+            HttpResponse<String> parseResult = client.send(
+                    request(server, "/api/phase3/documents/" + documentId + "/parse-result"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, parseResult.statusCode());
+            assertTrue(parseResult.body().contains("\"detectedCases\""));
+            assertTrue(parseResult.body().contains("\"reasoning\""));
+
+            // 3. Re-parse document
+            HttpResponse<String> reparse = client.send(
+                    request(server, "/api/phase3/documents/" + documentId + "/reparse", "POST",
+                            Jsons.writeValueAsString(Map.of("operator", "tester", "reason", "requirements changed"))),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(202, reparse.statusCode());
+            assertTrue(reparse.body().contains("\"ACCEPTED\""));
+            assertTrue(reparse.body().contains("\"document-reparse\""));
+
+            // 4. Save parse result (manual edit)
+            HttpResponse<String> saveParseResult = client.send(
+                    request(server, "/api/phase3/documents/" + documentId + "/parse-result", "PUT",
+                            Jsons.writeValueAsString(Map.of(
+                                    "updatedBy", "tester",
+                                    "changes", Map.of("detectedCases", List.of(
+                                            Map.of("id", "checkout-custom", "name", "Custom case",
+                                                    "category", "happy", "confidence", "high")))))),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(202, saveParseResult.statusCode());
+            assertTrue(saveParseResult.body().contains("\"ACCEPTED\""));
+            assertTrue(saveParseResult.body().contains("\"document-parse-edit\""));
+
+            // 5. Get parse result after manual edit
+            HttpResponse<String> parseResultAfterEdit = client.send(
+                    request(server, "/api/phase3/documents/" + documentId + "/parse-result"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, parseResultAfterEdit.statusCode());
+            assertTrue(parseResultAfterEdit.body().contains("\"checkout-custom\""));
+            assertTrue(parseResultAfterEdit.body().contains("\"Custom case\""));
+
+            // 6. Re-parse nonexistent document
+            HttpResponse<String> reparseNotFound = client.send(
+                    request(server, "/api/phase3/documents/nonexistent/reparse", "POST",
+                            Jsons.writeValueAsString(Map.of("operator", "tester"))),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(202, reparseNotFound.statusCode());
+            assertTrue(reparseNotFound.body().contains("\"NOT_FOUND\""));
+
+            // 7. Upload missing projectKey
+            HttpResponse<String> uploadBad = client.send(
+                    request(server, "/api/phase3/documents/upload", "POST",
+                            Jsons.writeValueAsString(Map.of("fileName", "test.md"))),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(400, uploadBad.statusCode());
+            assertTrue(uploadBad.body().contains("projectKey"));
         }
     }
 
