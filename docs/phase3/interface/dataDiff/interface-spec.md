@@ -26,13 +26,16 @@ This document distinguishes:
 
 Current `dataDiff` screen conclusion:
 
-- current direct read source:
-  - `GET /api/phase3/admin-console`
+- current direct read sources:
+  - `GET /api/phase3/admin-console` (snapshot context)
+  - `GET /api/phase3/runs/{runId}/data-diff` (diff table data)
+  - `GET /api/phase3/runs/{runId}/data-diff/raw` (raw JSON drawer)
+  - `GET /api/phase3/runs/{runId}/restore-result` (restore status — available but not yet consumed by UI)
 - current direct write source:
-  - none
+  - `POST /api/phase3/runs/{runId}/restore/retry` (re-restore action)
 - current run context source:
   - `selectedRunName` App-level selected-run handoff from `App.tsx`
-- current diff table is locally generated from selected report summary, not from a backend diff endpoint
+- diff table is backed by the backend data-diff endpoint, with fallback to synthetic local data when API is unavailable
 
 ## 3. Current Read Context: GET /api/phase3/admin-console
 
@@ -112,20 +115,16 @@ No backend request is sent by this route change.
 #### `View raw JSON`
 
 - user action: click
-- request: none today
-- owner: not implemented
-- intended future interface:
-  - raw diff artifact read interface
-- current state: visible only
+- request: `GET /api/phase3/runs/{runId}/data-diff/raw`
+- owner: `DataDiffScreen.tsx`
+- current state: implemented — fetches raw diff data and opens in-page drawer with before/after/afterRestore tabs
 
 #### `Re-restore`
 
 - user action: click
-- request: none today
-- owner: not implemented
-- intended future interface:
-  - restore-control mutation
-- current state: visible only
+- request: `POST /api/phase3/runs/{runId}/restore/retry`
+- owner: `DataDiffScreen.tsx`
+- current state: implemented — posts restore-retry request, shows success/rejected/error status bar, refreshes diff data on success
 
 ### 6.2 Diff Table
 
@@ -153,7 +152,7 @@ The main design docs and wireframes clearly imply three data stages:
 
 The screen should therefore be backed by run-specific diff and restore-result interfaces rather than report-summary heuristics.
 
-## 8. Recommended Future Data Diff Interfaces
+## 8. Data Diff Interfaces
 
 Identifier note:
 
@@ -278,46 +277,26 @@ Response body:
 }
 ```
 
-## 9. Detailed Implementation Design for Currently Unwired Controls
+## 9. Implemented Control Wiring
 
 ### 9.1 `View raw JSON`
 
-Recommended implementation type:
+Implementation:
 
-- new raw-artifact read interface
-
-Concrete implementation design:
-
-- button calls:
-  - `GET /api/phase3/runs/{runId}/data-diff/raw`
-- UI then opens:
-  - a local raw-json drawer with tabs:
-    - `before`
-    - `after`
-    - `after_restore`
-
-Reasoning:
-
-- raw diff payloads are backend-owned artifacts and should not be reconstructed in the UI
+- button fetches `GET /api/phase3/runs/{runId}/data-diff/raw`
+- opens in-page drawer with three tabs: before / after / afterRestore
+- each tab renders the raw JSON in a `<pre>` block
+- drawer can be closed; loading and error states are handled inline
 
 ### 9.2 `Re-restore`
 
-Recommended implementation type:
+Implementation:
 
-- new restore-control mutation
-
-Concrete implementation design:
-
-- button posts:
-  - `POST /api/phase3/runs/{runId}/restore/retry`
-- after success:
-  - poll or reload:
-    - `GET /api/phase3/runs/{runId}/restore-result`
-    - `GET /api/phase3/runs/{runId}/data-diff`
-
-Reasoning:
-
-- restore retry is a backend responsibility and should not be modeled as local UI state
+- button posts `POST /api/phase3/runs/{runId}/restore/retry` with operator and reason
+- on ACCEPTED (202): shows success status bar and refreshes `GET /api/phase3/runs/{runId}/data-diff`
+- on REJECTED (409): shows rejection status bar with backend message
+- on network error: shows error status bar
+- button is disabled during pending state
 
 ## 10. Error Handling Boundary
 
@@ -340,10 +319,11 @@ Recommended future mutation errors:
 
 ## 11. Review Items
 
-Review-only findings:
+Remaining limits:
 
-- The current page has the correct comparison structure, but its data is still synthetic.
-- `selectedRunName` App-level handoff is enough for page entry, but not enough for real diff ownership unless backend run-diff endpoints are added.
-- `View raw JSON` and `Re-restore` should become true backend-owned artifact/control actions.
-
-These are documentation findings only. No implementation change is made in this stage.
+- `selectedRunName` App-level handoff is enough for page entry; backend run-diff endpoints now exist.
+- `View raw JSON` and `Re-restore` are implemented and wired to backend endpoints.
+- Raw diff data is deterministic mock when no real `data-diff-raw.json` exists in the run directory.
+- Restore result is deterministic mock when no real `restore-result.json` exists.
+- Re-restore does not trigger a real restore workflow — it records intent and returns ACCEPTED.
+- Raw JSON drawer does not support copy-to-clipboard or download.

@@ -1063,6 +1063,35 @@ class LocalAdminApiServerTest {
             assertTrue(aiDecisions.body().contains("\"items\""));
             assertTrue(aiDecisions.body().contains("\"claude-4.5-sonnet\""));
 
+            // GET /api/phase3/runs/order-smoke-20260425/data-diff/raw — raw diff
+            HttpResponse<String> rawDiff = client.send(
+                    request(server, "/api/phase3/runs/order-smoke-20260425/data-diff/raw"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, rawDiff.statusCode());
+            assertTrue(rawDiff.body().contains("\"order-smoke-20260425\""));
+            assertTrue(rawDiff.body().contains("\"before\""));
+            assertTrue(rawDiff.body().contains("\"after\""));
+            assertTrue(rawDiff.body().contains("\"afterRestore\""));
+
+            // GET /api/phase3/runs/order-smoke-20260425/restore-result — restore result
+            HttpResponse<String> restoreResult = client.send(
+                    request(server, "/api/phase3/runs/order-smoke-20260425/restore-result"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, restoreResult.statusCode());
+            assertTrue(restoreResult.body().contains("\"order-smoke-20260425\""));
+            assertTrue(restoreResult.body().contains("\"PARTIAL\""));
+            assertTrue(restoreResult.body().contains("\"restore snapshot\""));
+
+            // POST /api/phase3/runs/order-smoke-20260425/restore/retry — restore retry accepted
+            HttpResponse<String> restoreRetry = client.send(
+                    request(server, "/api/phase3/runs/order-smoke-20260425/restore/retry", "POST",
+                            "{\"operator\":\"qa-test\",\"reason\":\"unit test retry\"}"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(202, restoreRetry.statusCode());
+            assertTrue(restoreRetry.body().contains("\"ACCEPTED\""));
+            assertTrue(restoreRetry.body().contains("\"restore-retry\""));
+            assertTrue(restoreRetry.body().contains("qa-test"));
+
             // GET /api/phase3/runs/nonexistent-run/report — fallback report
             HttpResponse<String> fallback = client.send(
                     request(server, "/api/phase3/runs/nonexistent-run/report"),

@@ -83,6 +83,78 @@ public final class ReportArtifactService {
         return buildMockDataDiff(runId);
     }
 
+    // ---- GET /api/phase3/runs/{runId}/data-diff/raw ----
+
+    @SuppressWarnings("unchecked")
+    public Object getRawDataDiff(String runId) {
+        Path dir = resolveRunDir(runId);
+        Path rawDiffJson = dir.resolve("data-diff-raw.json");
+        if (Files.isRegularFile(rawDiffJson)) {
+            try {
+                return Jsons.readValue(Files.readString(rawDiffJson), Map.class);
+            } catch (IOException ignored) {
+            }
+        }
+        return buildMockRawDataDiff(runId, dir);
+    }
+
+    // ---- GET /api/phase3/runs/{runId}/restore-result ----
+
+    @SuppressWarnings("unchecked")
+    public Object getRestoreResult(String runId) {
+        Path dir = resolveRunDir(runId);
+        Path restoreJson = dir.resolve("restore-result.json");
+        if (Files.isRegularFile(restoreJson)) {
+            try {
+                return Jsons.readValue(Files.readString(restoreJson), Map.class);
+            } catch (IOException ignored) {
+            }
+        }
+        return buildMockRestoreResult(runId);
+    }
+
+    // ---- POST /api/phase3/runs/{runId}/restore/retry ----
+
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> restoreRetry(String runId, String body) {
+        resolveRunDir(runId); // validate runId (path traversal check)
+
+        Map<String, Object> input = Map.of();
+        if (body != null && !body.isBlank()) {
+            try {
+                input = Jsons.readValue(body, Map.class);
+            } catch (Exception ignored) {
+            }
+        }
+
+        String operator = stringValue(input.getOrDefault("operator", "unknown"));
+        String reason = stringValue(input.getOrDefault("reason", ""));
+
+        // Check current restore state — reject if already retrying
+        Object current = getRestoreResult(runId);
+        if (current instanceof Map<?, ?> m) {
+            String currentStatus = stringValue(m.get("status"));
+            if ("RETRY_IN_PROGRESS".equals(currentStatus)) {
+                Map<String, Object> rejected = new LinkedHashMap<>();
+                rejected.put("status", "REJECTED");
+                rejected.put("kind", "restore-retry");
+                rejected.put("runId", runId);
+                rejected.put("requestedState", "RESTORE_RETRY_QUEUED");
+                rejected.put("message", "Restore retry already in progress for run " + runId);
+                return rejected;
+            }
+        }
+
+        Map<String, Object> accepted = new LinkedHashMap<>();
+        accepted.put("status", "ACCEPTED");
+        accepted.put("kind", "restore-retry");
+        accepted.put("runId", runId);
+        accepted.put("requestedState", "RESTORE_RETRY_QUEUED");
+        accepted.put("message", "Restore retry queued by " + operator
+                + (reason.isEmpty() ? "" : " — " + reason));
+        return accepted;
+    }
+
     // ---- GET /api/phase3/runs/{runId}/assertions ----
 
     @SuppressWarnings("unchecked")
@@ -387,6 +459,49 @@ public final class ReportArtifactService {
     }
 
     private Map<String, Object> buildMockRecovery(String runId) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("runId", runId);
+        result.put("status", "PARTIAL");
+        result.put("items", List.of(
+                Map.of("step", "restore snapshot", "status", "SUCCESS",
+                        "detail", "Primary checkout schema restored from pre-run backup"),
+                Map.of("step", "verify row counts", "status", "SUCCESS",
+                        "detail", "Row counts match pre-run baseline"),
+                Map.of("step", "restore audit_log", "status", "SKIPPED",
+                        "detail", "Audit log rows are kept by policy")));
+        return result;
+    }
+
+    private Map<String, Object> buildMockRawDataDiff(String runId, Path dir) {
+        // Build inline raw snapshots shaped by the mock data-diff rows
+        Object diffResult = getDataDiff(runId);
+        List<Map<String, Object>> rows = List.of();
+        if (diffResult instanceof Map<?, ?> m && m.get("rows") instanceof List<?> l) {
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> typed = (List<Map<String, Object>>) l;
+            rows = typed;
+        }
+
+        List<Map<String, Object>> beforeEntries = new ArrayList<>();
+        List<Map<String, Object>> afterEntries = new ArrayList<>();
+        List<Map<String, Object>> afterRestoreEntries = new ArrayList<>();
+        for (Map<String, Object> row : rows) {
+            Map<String, Object> key = Map.of("table", row.getOrDefault("table", ""),
+                    "pk", row.getOrDefault("pk", ""), "field", row.getOrDefault("field", ""));
+            beforeEntries.add(Map.of("key", key, "value", row.getOrDefault("before", "")));
+            afterEntries.add(Map.of("key", key, "value", row.getOrDefault("after", "")));
+            afterRestoreEntries.add(Map.of("key", key, "value", row.getOrDefault("afterRestore", "")));
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("runId", runId);
+        result.put("before", beforeEntries);
+        result.put("after", afterEntries);
+        result.put("afterRestore", afterRestoreEntries);
+        return result;
+    }
+
+    private Map<String, Object> buildMockRestoreResult(String runId) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("runId", runId);
         result.put("status", "PARTIAL");

@@ -1,6 +1,14 @@
 import { useEffect, useState } from "react";
 import { translate } from "../i18n";
-import { AdminConsoleSnapshot, DataDiffResponse, DataDiffRow, Locale } from "../types";
+import {
+  AdminConsoleSnapshot,
+  DataDiffResponse,
+  DataDiffRow,
+  Locale,
+  RawDataDiffResponse,
+  RestoreRetryResponse,
+  RestoreResultResponse,
+} from "../types";
 import { selectReportViewModel, ReportViewModel } from "./reportViewModel";
 
 type DataDiffScreenProps = {
@@ -30,14 +38,33 @@ function makeFallbackDiffRows(report: ReportViewModel): DataDiffRow[] {
   ];
 }
 
+type RawJsonDrawerTab = "before" | "after" | "afterRestore";
+
 export function DataDiffScreen({ snapshot, title, locale, selectedRunName, apiBaseUrl }: DataDiffScreenProps) {
   const [apiDiff, setApiDiff] = useState<DataDiffResponse | null>(null);
   const [fetchFailed, setFetchFailed] = useState(false);
+
+  // Raw JSON drawer state
+  const [rawDrawerOpen, setRawDrawerOpen] = useState(false);
+  const [rawData, setRawData] = useState<RawDataDiffResponse | null>(null);
+  const [rawLoading, setRawLoading] = useState(false);
+  const [rawError, setRawError] = useState<string | null>(null);
+  const [rawTab, setRawTab] = useState<RawJsonDrawerTab>("before");
+
+  // Re-restore state
+  const [restoreState, setRestoreState] = useState<"idle" | "pending" | "success" | "rejected" | "error">("idle");
+  const [restoreMessage, setRestoreMessage] = useState("");
 
   useEffect(() => {
     if (!selectedRunName) return;
     setApiDiff(null);
     setFetchFailed(false);
+    // Reset action states when run changes
+    setRawDrawerOpen(false);
+    setRawData(null);
+    setRawError(null);
+    setRestoreState("idle");
+    setRestoreMessage("");
     fetch(`${apiBaseUrl}/api/phase3/runs/${encodeURIComponent(selectedRunName)}/data-diff`)
       .then((r) => r.ok ? r.json() as Promise<DataDiffResponse> : Promise.reject(r.status))
       .then((data) => {
@@ -49,6 +76,64 @@ export function DataDiffScreen({ snapshot, title, locale, selectedRunName, apiBa
       })
       .catch(() => setFetchFailed(true));
   }, [apiBaseUrl, selectedRunName]);
+
+  function handleViewRawJson() {
+    if (!selectedRunName) return;
+    setRawLoading(true);
+    setRawError(null);
+    setRawDrawerOpen(true);
+    setRawTab("before");
+    fetch(`${apiBaseUrl}/api/phase3/runs/${encodeURIComponent(selectedRunName)}/data-diff/raw`)
+      .then((r) => r.ok ? r.json() as Promise<RawDataDiffResponse> : Promise.reject(r.status))
+      .then((data) => {
+        if (data.runId && Array.isArray(data.before)) {
+          setRawData(data);
+        } else {
+          setRawError("Invalid response shape");
+        }
+      })
+      .catch((err) => setRawError(String(err)))
+      .finally(() => setRawLoading(false));
+  }
+
+  function handleReRestore() {
+    if (!selectedRunName) return;
+    setRestoreState("pending");
+    setRestoreMessage("");
+    fetch(`${apiBaseUrl}/api/phase3/runs/${encodeURIComponent(selectedRunName)}/restore/retry`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ operator: "qa-platform", reason: "Manual re-restore from dataDiff page" }),
+    })
+      .then(async (r) => {
+        const data = (await r.json()) as RestoreRetryResponse;
+        if (data.status === "ACCEPTED") {
+          setRestoreState("success");
+          setRestoreMessage(data.message || "Restore retry accepted");
+          // Refresh diff data and restore result
+          refreshDiffData();
+        } else {
+          setRestoreState("rejected");
+          setRestoreMessage(data.message || "Restore retry rejected");
+        }
+      })
+      .catch((err) => {
+        setRestoreState("error");
+        setRestoreMessage(String(err));
+      });
+  }
+
+  function refreshDiffData() {
+    if (!selectedRunName) return;
+    fetch(`${apiBaseUrl}/api/phase3/runs/${encodeURIComponent(selectedRunName)}/data-diff`)
+      .then((r) => r.ok ? r.json() as Promise<DataDiffResponse> : Promise.reject(r.status))
+      .then((data) => {
+        if (data.runId && Array.isArray(data.rows)) {
+          setApiDiff(data);
+        }
+      })
+      .catch(() => { /* keep existing data on refresh failure */ });
+  }
 
   const fallbackReport = fetchFailed && selectedRunName ? selectReportViewModel(snapshot, selectedRunName) : null;
 
@@ -114,6 +199,15 @@ export function DataDiffScreen({ snapshot, title, locale, selectedRunName, apiBa
     }
   })();
 
+  const rawTabs: RawJsonDrawerTab[] = ["before", "after", "afterRestore"];
+  const rawTabLabel = (tab: RawJsonDrawerTab) => {
+    switch (tab) {
+      case "before": return l(locale, "Before", "执行前", "実行前");
+      case "after": return l(locale, "After", "执行后", "実行後");
+      case "afterRestore": return l(locale, "After restore", "恢复后", "リストア後");
+    }
+  };
+
   return (
     <div className="dataDiffScreen">
       <div className="dataDiffBreadcrumb">
@@ -143,14 +237,43 @@ export function DataDiffScreen({ snapshot, title, locale, selectedRunName, apiBa
           </div>
         </div>
         <div className="dataDiffHeroActions">
-          <button type="button" className="reportsActionButton ghost">
-            {l(locale, "View raw JSON", "查看原始 JSON", "生 JSON を表示")}
+          <button
+            type="button"
+            className="reportsActionButton ghost"
+            onClick={handleViewRawJson}
+            disabled={rawLoading}
+          >
+            {rawLoading
+              ? l(locale, "Loading...", "加载中...", "読み込み中...")
+              : l(locale, "View raw JSON", "查看原始 JSON", "生 JSON を表示")}
           </button>
-          <button type="button" className="reportsActionButton">
-            {l(locale, "Re-restore", "重新恢复", "再リストア")}
+          <button
+            type="button"
+            className="reportsActionButton"
+            onClick={handleReRestore}
+            disabled={restoreState === "pending"}
+          >
+            {restoreState === "pending"
+              ? l(locale, "Restoring...", "恢复中...", "リストア中...")
+              : l(locale, "Re-restore", "重新恢复", "再リストア")}
           </button>
         </div>
       </section>
+
+      {/* Re-restore status bar */}
+      {restoreState !== "idle" && restoreState !== "pending" && (
+        <div
+          className={`dataDiffRestoreStatus ${restoreState === "success" ? "success" : "warning"}`}
+          data-testid="restore-status"
+        >
+          <span>
+            {restoreState === "success" && l(locale, "Restore retry accepted", "重新恢复已受理", "再リストアが受理されました")}
+            {restoreState === "rejected" && l(locale, "Restore retry rejected", "重新恢复被拒绝", "再リストアが拒否されました")}
+            {restoreState === "error" && l(locale, "Restore retry failed", "重新恢复失败", "再リストアに失敗しました")}
+          </span>
+          {restoreMessage && <span className="dataDiffRestoreMsg">{restoreMessage}</span>}
+        </div>
+      )}
 
       <div className="dataDiffStats">
         <article className="dataDiffStatCard success">
@@ -222,6 +345,52 @@ export function DataDiffScreen({ snapshot, title, locale, selectedRunName, apiBa
           ))}
         </div>
       </section>
+
+      {/* Raw JSON drawer */}
+      {rawDrawerOpen && (
+        <div className="dataDiffRawDrawer" data-testid="raw-json-drawer">
+          <div className="dataDiffRawDrawerHeader">
+            <h3>{l(locale, "Raw diff JSON", "原始差异 JSON", "生差分 JSON")}</h3>
+            <button type="button" onClick={() => setRawDrawerOpen(false)}>
+              {l(locale, "Close", "关闭", "閉じる")}
+            </button>
+          </div>
+
+          {rawLoading && (
+            <div className="dataDiffRawDrawerBody">
+              <p>{l(locale, "Loading raw data...", "加载原始数据...", "生データを読み込み中...")}</p>
+            </div>
+          )}
+
+          {rawError && (
+            <div className="dataDiffRawDrawerBody">
+              <p className="danger">{l(locale, "Failed to load raw diff", "加载原始差异失败", "生差分の読み込みに失敗")}: {rawError}</p>
+            </div>
+          )}
+
+          {rawData && !rawLoading && !rawError && (
+            <>
+              <div className="dataDiffRawTabs">
+                {rawTabs.map((tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    className={rawTab === tab ? "active" : ""}
+                    onClick={() => setRawTab(tab)}
+                  >
+                    {rawTabLabel(tab)}
+                  </button>
+                ))}
+              </div>
+              <div className="dataDiffRawDrawerBody">
+                <pre className="dataDiffRawPre">
+                  {JSON.stringify(rawData[rawTab], null, 2)}
+                </pre>
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

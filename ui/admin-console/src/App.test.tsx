@@ -1205,6 +1205,152 @@ describe("App", () => {
     expect(runIdInput).toBeTruthy();
   });
 
+  it("opens raw JSON drawer on View raw JSON click in dataDiff", async () => {
+    const rawDiffResponse = {
+      runId: "checkout-web-nightly",
+      before: [
+        { key: { table: "orders", pk: "ord_8821", field: "status" }, value: "null" }
+      ],
+      after: [
+        { key: { table: "orders", pk: "ord_8821", field: "status" }, value: "\"paid\"" }
+      ],
+      afterRestore: [
+        { key: { table: "orders", pk: "ord_8821", field: "status" }, value: "null" }
+      ]
+    };
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/report")) return jsonResponse(reportResponse);
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/data-diff")) return jsonResponse(dataDiffResponse);
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/data-diff/raw")) return jsonResponse(rawDiffResponse);
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    // Navigate: dashboard → reportDetail → dataDiff
+    await screen.findByText("Recent runs");
+    await userEvent.click(screen.getByRole("button", { name: "Open run checkout-web-nightly" }));
+    expect(await screen.findByText("Download artifacts")).toBeInTheDocument();
+
+    // Switch to dataDiff via the Data diff tab
+    await userEvent.click(screen.getByRole("button", { name: "Data diff" }));
+    expect(await screen.findByText("Data diff - orders & inventory")).toBeInTheDocument();
+
+    // Click View raw JSON
+    await userEvent.click(screen.getByRole("button", { name: "View raw JSON" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith("http://127.0.0.1:8787/api/phase3/runs/checkout-web-nightly/data-diff/raw");
+    });
+
+    // Drawer should be visible with raw data
+    expect(await screen.findByTestId("raw-json-drawer")).toBeInTheDocument();
+    expect(await screen.findByText("Raw diff JSON")).toBeInTheDocument();
+    expect(await screen.findByText("Before")).toBeInTheDocument();
+
+    // Switch to After tab
+    await userEvent.click(screen.getByRole("button", { name: "After" }));
+    expect(await screen.findByText(/"paid"/)).toBeInTheDocument();
+
+    // Close drawer
+    await userEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.queryByTestId("raw-json-drawer")).not.toBeInTheDocument();
+  });
+
+  it("calls re-restore endpoint and shows status feedback in dataDiff", async () => {
+    const restoreRetryResponse = {
+      status: "ACCEPTED",
+      kind: "restore-retry",
+      runId: "checkout-web-nightly",
+      requestedState: "RESTORE_RETRY_QUEUED",
+      message: "Restore retry queued by qa-platform"
+    };
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/report")) return jsonResponse(reportResponse);
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/data-diff") && (!init || init.method !== "POST")) return jsonResponse(dataDiffResponse);
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/restore/retry")) return jsonResponse(restoreRetryResponse, 202);
+      throw new Error(`Unexpected fetch: ${url} ${init?.method ?? "GET"}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    // Navigate: dashboard → reportDetail → dataDiff
+    await screen.findByText("Recent runs");
+    await userEvent.click(screen.getByRole("button", { name: "Open run checkout-web-nightly" }));
+    expect(await screen.findByText("Download artifacts")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Data diff" }));
+    expect(await screen.findByText("Data diff - orders & inventory")).toBeInTheDocument();
+
+    // Click Re-restore
+    await userEvent.click(screen.getByRole("button", { name: "Re-restore" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "http://127.0.0.1:8787/api/phase3/runs/checkout-web-nightly/restore/retry",
+        expect.objectContaining({ method: "POST" })
+      );
+    });
+
+    // Status feedback should be visible
+    expect(await screen.findByTestId("restore-status")).toBeInTheDocument();
+    expect(await screen.findByText("Restore retry accepted")).toBeInTheDocument();
+    expect(await screen.findByText(/Restore retry queued by qa-platform/)).toBeInTheDocument();
+
+    // Diff data should have been refreshed
+    const dataDiffCalls = fetchMock.mock.calls.filter(
+      (call: unknown[]) => String(call[0]).endsWith("/api/phase3/runs/checkout-web-nightly/data-diff")
+    );
+    expect(dataDiffCalls.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("shows rejected status when re-restore is rejected in dataDiff", async () => {
+    const restoreRejectedResponse = {
+      status: "REJECTED",
+      kind: "restore-retry",
+      runId: "checkout-web-nightly",
+      requestedState: "RESTORE_RETRY_QUEUED",
+      message: "Restore retry already in progress for run checkout-web-nightly"
+    };
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/report")) return jsonResponse(reportResponse);
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/data-diff") && (!init || init.method !== "POST")) return jsonResponse(dataDiffResponse);
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/restore/retry")) return jsonResponse(restoreRejectedResponse, 409);
+      throw new Error(`Unexpected fetch: ${url} ${init?.method ?? "GET"}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    await screen.findByText("Recent runs");
+    await userEvent.click(screen.getByRole("button", { name: "Open run checkout-web-nightly" }));
+    expect(await screen.findByText("Download artifacts")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Data diff" }));
+    expect(await screen.findByText("Data diff - orders & inventory")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Re-restore" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "http://127.0.0.1:8787/api/phase3/runs/checkout-web-nightly/restore/retry",
+        expect.objectContaining({ method: "POST" })
+      );
+    });
+
+    expect(await screen.findByTestId("restore-status")).toBeInTheDocument();
+    expect(await screen.findByText("Restore retry rejected")).toBeInTheDocument();
+    expect(await screen.findByText(/already in progress/)).toBeInTheDocument();
+  });
+
   it("switches the Reports overview when clicking another project", async () => {
     const fetchMock = vi.fn().mockImplementation(() => jsonResponse(snapshot));
     vi.stubGlobal("fetch", fetchMock);

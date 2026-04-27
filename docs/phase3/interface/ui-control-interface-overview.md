@@ -169,8 +169,8 @@ Conventions used here:
 
 | Control | Type | Current behavior / interface | Future interface / design |
 |---|---|---|---|
-| `View raw JSON` | button | Visual only | `GET /api/phase3/runs/{runId}/data-diff/raw` |
-| `Re-restore` | button | Visual only | `POST /api/phase3/runs/{runId}/restore/retry` then refresh `GET /api/phase3/runs/{runId}/restore-result` and `.../data-diff` |
+| `View raw JSON` | button | Implemented: fetches `GET /api/phase3/runs/{runId}/data-diff/raw`, opens in-page drawer with before/after/afterRestore tabs showing raw JSON | Keep current |
+| `Re-restore` | button | Implemented: posts `POST /api/phase3/runs/{runId}/restore/retry`, shows success/rejected/error status bar, refreshes diff data on success | Keep current |
 | Diff row | display row | Display-only | Backed by `GET /api/phase3/runs/{runId}/data-diff` |
 
 ---

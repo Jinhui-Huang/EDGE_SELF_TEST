@@ -519,6 +519,40 @@ export type DataDiffResponse = {
   rows: DataDiffRow[];
 };
 
+// ---- Data diff raw / restore types (P2-6) ----
+
+export type RawDataDiffEntry = {
+  key: { table: string; pk: string; field: string };
+  value: string;
+};
+
+export type RawDataDiffResponse = {
+  runId: string;
+  before: RawDataDiffEntry[];
+  after: RawDataDiffEntry[];
+  afterRestore: RawDataDiffEntry[];
+};
+
+export type RestoreResultItem = {
+  step: string;
+  status: string;
+  detail: string;
+};
+
+export type RestoreResultResponse = {
+  runId: string;
+  status: string;
+  items: RestoreResultItem[];
+};
+
+export type RestoreRetryResponse = {
+  status: string;
+  kind: string;
+  runId: string;
+  requestedState: string;
+  message: string;
+};
+
 // ---- Data template registry (P1-3) ----
 
 export type DataTemplateListResponse = {

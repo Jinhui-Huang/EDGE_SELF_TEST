@@ -992,3 +992,28 @@
      - some fields still fall back to snapshot-derived view model data
      - recovery / AI decisions may use deterministic mock data when no real run artifacts exist
    - This follow-up changed docs only; no code path changed
+58. 2026-04-27 P2-6 dataDiff control wiring completed
+   - Wired the two remaining visible-but-unwired controls on the dataDiff page: View raw JSON and Re-restore.
+   - Backend: ReportArtifactService extended with:
+     - `getRawDataDiff(runId)` — reads `data-diff-raw.json` or builds mock inline raw snapshots from existing diff rows
+     - `getRestoreResult(runId)` — reads `restore-result.json` or returns mock partial restore result
+     - `restoreRetry(runId, body)` — validates runId, rejects if RETRY_IN_PROGRESS, returns ACCEPTED with operator/reason
+   - LocalAdminApiServer.handleRunEndpoint extended:
+     - `data-diff` case now checks for `raw` sub-action
+     - new `restore-result` case (GET)
+     - new `restore` case with `retry` sub-action (POST, uses controlHttpStatus)
+   - Frontend DataDiffScreen.tsx:
+     - View raw JSON: fetches data-diff/raw, opens drawer with before/after/afterRestore tabs, shows raw JSON in `<pre>`
+     - Re-restore: posts restore/retry, shows success/rejected/error status bar, refreshes diff data on success
+     - Both buttons disabled during pending states; action states reset on run change
+   - Types added: RawDataDiffEntry, RawDataDiffResponse, RestoreResultItem, RestoreResultResponse, RestoreRetryResponse
+   - No App.tsx changes needed — existing apiBaseUrl and selectedRunName wiring was sufficient
+   - Tests:
+     - Backend: 3 new assertions inside reportArtifactEndpointsReadRealRunFiles (data-diff/raw, restore-result, restore/retry)
+     - Frontend: 3 new tests (raw drawer open/tab/close, re-restore accepted, re-restore rejected)
+   - Docs synced: ui-control-interface-overview.md, dataDiff/functional-spec.md, dataDiff/interface-spec.md
+   - Verification: npm test 29/29, npm build PASS, Maven test 13/13
+   - Known limits:
+     - raw diff and restore-result are deterministic mock when no real artifacts exist
+     - re-restore records intent only, does not trigger real restore workflow
+     - raw JSON drawer does not support copy-to-clipboard or download

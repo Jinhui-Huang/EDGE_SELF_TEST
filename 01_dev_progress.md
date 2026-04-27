@@ -3060,3 +3060,55 @@ Wire all visible-but-unwired controls on the reportDetail page: 5 tabs (Overview
 
 ## Next Step
 - Await re-review of the synced `reportDetail` docs baseline before submit/push.
+
+## 2026-04-27 P2-6 dataDiff control wiring completed
+
+## Summary
+- Wired the two remaining visible-but-unwired controls on the `dataDiff` page: **View raw JSON** and **Re-restore**.
+- Added three new backend endpoints and a minimal restore-retry control flow.
+- Added frontend raw-JSON drawer with three-tab (before/after/afterRestore) display and re-restore with status feedback.
+
+## Backend Changes
+- **MODIFIED** `ReportArtifactService.java`:
+  - `getRawDataDiff(runId)` — reads `data-diff-raw.json` or builds mock inline raw snapshots from existing diff rows
+  - `getRestoreResult(runId)` — reads `restore-result.json` or returns mock partial restore result
+  - `restoreRetry(runId, body)` — validates runId, rejects if RETRY_IN_PROGRESS, returns ACCEPTED with operator/reason context
+  - `buildMockRawDataDiff()` and `buildMockRestoreResult()` helpers
+- **MODIFIED** `LocalAdminApiServer.java`:
+  - `data-diff` case now checks `segments[6]` for `raw` sub-action → dispatches to `getRawDataDiff()`
+  - New `restore-result` case → dispatches GET to `getRestoreResult()`
+  - New `restore` case with `retry` sub-action → dispatches POST to `restoreRetry()`, uses `controlHttpStatus()` for 202/409
+
+## Frontend Changes
+- **MODIFIED** `types.ts`: Added 5 P2-6 types (RawDataDiffEntry, RawDataDiffResponse, RestoreResultItem, RestoreResultResponse, RestoreRetryResponse)
+- **MODIFIED** `DataDiffScreen.tsx`:
+  - View raw JSON: fetches `GET .../data-diff/raw`, opens drawer with before/after/afterRestore tabs, shows raw JSON in `<pre>`
+  - Re-restore: posts `POST .../restore/retry`, shows success/rejected/error status bar, refreshes diff data on success
+  - Both buttons disabled during pending states; action states reset when selectedRunName changes
+- No App.tsx changes needed — existing `apiBaseUrl` and `selectedRunName` wiring was sufficient
+
+## Tests
+- **MODIFIED** `LocalAdminApiServerTest.java`: Added 3 assertions inside `reportArtifactEndpointsReadRealRunFiles` for data-diff/raw, restore-result, restore/retry
+- **MODIFIED** `App.test.tsx`: Added 3 tests:
+  - raw JSON drawer open, tab switch, and close
+  - re-restore accepted with status feedback and diff refresh
+  - re-restore rejected with rejection message display
+
+## Docs Synced
+- `docs/phase3/interface/ui-control-interface-overview.md`
+- `docs/phase3/interface/dataDiff/functional-spec.md`
+- `docs/phase3/interface/dataDiff/interface-spec.md`
+
+## Verification
+- npm test: **29/29 passed** (up from 26)
+- npm build: **passed**
+- Maven test: **13/13 passed** (same count, expanded assertions inside existing test)
+
+## Known Limits
+- Raw diff data is currently deterministic mock built from existing diff rows when no real `data-diff-raw.json` exists
+- Restore result is currently deterministic mock when no real `restore-result.json` exists
+- Re-restore does not actually trigger a real restore workflow — it records intent and returns ACCEPTED
+- Raw JSON drawer does not support copy-to-clipboard or download
+
+## Next Step
+- Continue with the next review-backlog priority after P2-6

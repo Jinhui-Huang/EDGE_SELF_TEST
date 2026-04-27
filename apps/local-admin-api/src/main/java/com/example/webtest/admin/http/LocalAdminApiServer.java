@@ -467,11 +467,22 @@ public final class LocalAdminApiServer implements AutoCloseable {
                     writeJson(exchange, 200, reportService.getReport(runId));
                 }
                 case "data-diff" -> {
-                    if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
-                        writeJson(exchange, 405, Map.of("error", "METHOD_NOT_ALLOWED"));
-                        return;
+                    String dataDiffSub = segments.length > 6 ? segments[6] : "";
+                    if ("raw".equals(dataDiffSub)) {
+                        if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+                            writeJson(exchange, 405, Map.of("error", "METHOD_NOT_ALLOWED"));
+                            return;
+                        }
+                        writeJson(exchange, 200, reportService.getRawDataDiff(runId));
+                    } else if (dataDiffSub.isEmpty()) {
+                        if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+                            writeJson(exchange, 405, Map.of("error", "METHOD_NOT_ALLOWED"));
+                            return;
+                        }
+                        writeJson(exchange, 200, reportService.getDataDiff(runId));
+                    } else {
+                        writeJson(exchange, 404, Map.of("error", "NOT_FOUND", "subAction", dataDiffSub));
                     }
-                    writeJson(exchange, 200, reportService.getDataDiff(runId));
                 }
                 case "assertions" -> {
                     if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
@@ -518,6 +529,27 @@ public final class LocalAdminApiServer implements AutoCloseable {
                     String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
                     Map<String, Object> abortResult = service.abortRun(runId, body);
                     writeJson(exchange, controlHttpStatus(abortResult), abortResult);
+                }
+                case "restore-result" -> {
+                    if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+                        writeJson(exchange, 405, Map.of("error", "METHOD_NOT_ALLOWED"));
+                        return;
+                    }
+                    writeJson(exchange, 200, reportService.getRestoreResult(runId));
+                }
+                case "restore" -> {
+                    String restoreSub = segments.length > 6 ? segments[6] : "";
+                    if ("retry".equals(restoreSub)) {
+                        if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+                            writeJson(exchange, 405, Map.of("error", "METHOD_NOT_ALLOWED"));
+                            return;
+                        }
+                        String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+                        Map<String, Object> result = reportService.restoreRetry(runId, body);
+                        writeJson(exchange, controlHttpStatus(result), result);
+                    } else {
+                        writeJson(exchange, 404, Map.of("error", "NOT_FOUND", "subAction", restoreSub));
+                    }
                 }
                 default -> writeJson(exchange, 404, Map.of("error", "NOT_FOUND", "action", action));
             }
