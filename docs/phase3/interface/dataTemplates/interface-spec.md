@@ -30,28 +30,31 @@ This document distinguishes:
 Current `dataTemplates` screen conclusion:
 
 - current direct read source:
-  - none screen-specific
+  - `GET /api/phase3/data-templates` (authoritative template registry)
+  - `GET /api/phase3/data-templates/{templateId}` (implemented backend capability; not called by current UI edit flow)
 - current indirect read context:
-  - `GET /api/phase3/admin-console` only for project-name lookup through `snapshot.projects`
-- current direct write source:
-  - none
+  - `GET /api/phase3/admin-console` for project-name lookup through `snapshot.projects`
+- current direct write sources:
+  - `POST /api/phase3/data-templates` (create)
+  - `PUT /api/phase3/data-templates/{templateId}` (update)
+  - `DELETE /api/phase3/data-templates/{templateId}` (delete)
+  - `POST /api/phase3/data-templates/import/preview` (import preview)
+  - `POST /api/phase3/data-templates/import/commit` (import commit)
+  - `POST /api/phase3/data-templates/{templateId}/dry-run` (dry-run validation)
 - current template catalog source:
-  - `defaultDataTemplates` local constant in `App.tsx`
+  - backend file-backed registry at `config/phase3/data-templates.json`
+  - local `defaultDataTemplates` as fallback when API is unavailable
 - current shared consumer screens:
-  - `dataTemplates`
-  - `execution`
+  - `dataTemplates` (full CRUD)
+  - `execution` (read-only for compare-template selection)
 
-## 3. Current Local Template Registry
+## 3. Current Backend Template Registry
 
 ### 3.1 Current Source
 
-The page currently receives:
+The page fetches from `GET /api/phase3/data-templates` on mount. It receives `apiBaseUrl` and a fallback `dataTemplates` prop from `App.tsx`. The fallback list is used only when the backend API is unreachable.
 
-- `dataTemplates={defaultDataTemplates}`
-
-from `App.tsx`.
-
-This is not loaded from backend storage.
+The backend registry is persisted to `config/phase3/data-templates.json` by `DataTemplatePersistenceService`.
 
 ### 3.2 Current Template Shape
 
@@ -90,7 +93,7 @@ Current template objects follow `DataTemplateItem`:
 
 ### 3.3 Interface Meaning
 
-This local object currently stands in for a future backend-owned data-template registry.
+This shape is now persisted and served by the backend file-backed template registry. The local constant is only a fallback.
 
 ## 4. Current Indirect Snapshot Context
 
@@ -108,37 +111,28 @@ That snapshot originates from:
 
 ### 4.2 Current Limitation
 
-The shared snapshot does not currently provide:
+The shared snapshot does not provide template data. Template catalog, detail, and mutations are served by the dedicated `GET/POST/PUT/DELETE /api/phase3/data-templates` endpoints, not by the admin-console snapshot.
 
-- template catalog list
-- template detail
-- template versioning
-- template dry-run result
-- template mutation status
+Remaining limits:
+
+- template versioning is not yet implemented
+- snapshot only provides project-name lookup for the template display
 
 ## 5. Current Cross-Screen Interface Relationship with Execution
 
 ### 5.1 Shared Catalog Source
 
-`execution` currently uses the same local `defaultDataTemplates` list to populate:
+`execution` now reads from the same backend registry via `GET /api/phase3/data-templates` to populate:
 
 - available compare templates for selected project
 - selected compare-template chips
 
-### 5.2 Current Coupling Risk
+Both `dataTemplates` and `execution` share the same backend source of truth.
 
-This means:
+### 5.2 Interface Boundary
 
-- `dataTemplates` is not the source of truth
-- `execution` does not fetch a backend registry either
-- both pages are coupled to one local constant rather than a shared backend interface
-
-### 5.3 Intended Interface Boundary
-
-The correct future boundary is:
-
-- `dataTemplates` manages the template registry
-- `execution` reads the same registry through template-read interfaces
+- `dataTemplates` manages the template registry (full CRUD, import, dry-run)
+- `execution` reads the same registry through `GET /api/phase3/data-templates` (read-only)
 
 ## 6. UI Control to Interface Mapping
 
@@ -156,44 +150,43 @@ The correct future boundary is:
 #### `Import`
 
 - user action: click
-- request: none today
-- owner: not implemented
-- intended future interface:
-  - template import preview and commit
-- current state: visible only
+- request: `POST /api/phase3/data-templates/import/preview` then `POST /api/phase3/data-templates/import/commit`
+- owner: `DataTemplatesScreen.tsx`
+- current state: implemented — two-step preview/commit import flow
 
 #### `New template`
 
 - user action: click
-- request: none today
-- owner: not implemented
-- intended future interface:
-  - template-create mutation
-- current state: visible only
+- request: `POST /api/phase3/data-templates`
+- owner: `DataTemplatesScreen.tsx`
+- current state: implemented — opens create form, posts to backend
 
 ### 6.3 Detail Actions
 
 #### `Edit`
 
 - user action: click
-- request: none today
-- owner: not implemented
-- intended future interface:
-  - template-update mutation
-- current state: visible only
+- request: `PUT /api/phase3/data-templates/{templateId}`
+- owner: `DataTemplatesScreen.tsx`
+- current state: implemented — opens edit form, saves via PUT
+
+#### `Delete`
+
+- user action: click
+- request: `DELETE /api/phase3/data-templates/{templateId}`
+- owner: `DataTemplatesScreen.tsx`
+- current state: implemented — removes template from registry
 
 #### `Dry-run`
 
 - user action: click
-- request: none today
-- owner: not implemented
-- intended future interface:
-  - template dry-run mutation
-- current state: visible only
+- request: `POST /api/phase3/data-templates/{templateId}/dry-run`
+- owner: `DataTemplatesScreen.tsx`
+- current state: implemented — posts dry-run and shows result inline
 
-## 7. Recommended Future Template Registry Interfaces
+## 7. Implemented Template Registry Interfaces
 
-The visible controls require explicit template-registry interfaces.
+The following interfaces are implemented and backed by `DataTemplatePersistenceService`.
 
 ### 7.1 Template List Interface
 
@@ -236,6 +229,7 @@ Response body:
 Purpose:
 
 - return the full definition of one template for detail view or edit view
+- note: this endpoint is an implemented backend capability; the current UI edit flow uses the locally selected object copy rather than calling this endpoint
 
 Response body:
 
@@ -481,15 +475,15 @@ Response body:
 }
 ```
 
-## 8. Detailed Implementation Design for Currently Unwired Controls
+## 8. Implemented Control Wiring
 
 ### 8.1 `Import`
 
-Recommended implementation type:
+Implementation type:
 
 - two-step preview plus commit import flow
 
-Concrete implementation design:
+Implementation:
 
 1. button opens local import drawer
 2. uploaded definition posts to:
@@ -498,16 +492,15 @@ Concrete implementation design:
 4. commit posts to:
    - `POST /api/phase3/data-templates/import/commit`
 5. success behavior:
-   - reload catalog:
-     - `GET /api/phase3/data-templates`
+   - reload catalog via `GET /api/phase3/data-templates`
 
 ### 8.2 `New template`
 
-Recommended implementation type:
+Implementation type:
 
 - local create form plus backend create mutation
 
-Concrete implementation design:
+Implementation:
 
 1. button opens local create drawer/form
 2. submit posts to:
@@ -518,28 +511,42 @@ Concrete implementation design:
 
 ### 8.3 `Edit`
 
-Recommended implementation type:
+Implementation type:
 
 - local edit drawer plus backend update mutation
 
-Concrete implementation design:
+Implementation:
 
 1. button opens edit drawer for current template
-2. current detail loaded from:
-   - `GET /api/phase3/data-templates/{templateId}`
+2. current detail sourced from locally selected object copy (not a separate detail GET)
 3. save posts to:
    - `PUT /api/phase3/data-templates/{templateId}`
 4. success behavior:
    - reload detail
    - refresh execution-side available template list on next template read
 
-### 8.4 `Dry-run`
+### 8.4 `Delete`
 
-Recommended implementation type:
+Implementation type:
+
+- confirmation prompt plus backend delete mutation
+
+Implementation:
+
+1. button shows confirmation prompt
+2. confirmed delete posts to:
+   - `DELETE /api/phase3/data-templates/{templateId}`
+3. success behavior:
+   - reload catalog
+   - reset selection to first available template
+
+### 8.5 `Dry-run`
+
+Implementation type:
 
 - safe validation mutation, not real execution launch
 
-Concrete implementation design:
+Implementation:
 
 1. button opens parameter/environment confirmation drawer
 2. submit posts to:
@@ -550,32 +557,30 @@ Concrete implementation design:
 4. failure behavior:
    - show guard or parameter validation failure without leaving the page
 
-### 8.5 Template Row Selection
+### 8.6 Template Row Selection
 
-Recommended implementation type:
+Implementation type:
 
-- keep local selection behavior
-- bind detail panel to selected template record
+- local selection behavior
+- detail panel bound to selected template record
 
-Concrete implementation design:
+Implementation:
 
-- if list payload already contains full detail, no extra request is needed
-- if list payload is summary-only, row click should call:
-  - `GET /api/phase3/data-templates/{templateId}`
+- list payload contains full detail; no extra request is needed on row click
 
 ## 9. Relationship to Execution Interfaces
 
-### 9.1 Recommended Execution Read Contract
+### 9.1 Current Execution Read Contract
 
-`execution` should stop consuming local `defaultDataTemplates` and instead read from:
+`execution` reads from the same backend registry:
 
 - `GET /api/phase3/data-templates?projectKey={projectKey}`
 
-This preserves one template-registry source of truth.
+Both screens share one template-registry source of truth. The local `defaultDataTemplates` constant is used only as a fallback when the API is unavailable.
 
 ### 9.2 Compare-Selection Boundary
 
-`execution` should only consume:
+`execution` only consumes:
 
 - template id
 - name
@@ -590,25 +595,23 @@ It should not own template-definition editing logic.
 
 Current implementation:
 
-- page has no backend requests
-- no mutation status or failure state exists
+- mutation states (pending/success/error) are implemented for create, edit, delete, import, and dry-run
+- error feedback is shown inline after failed mutations
 
-Recommended future errors:
+Implemented error handling:
 
 - import validation failure
-  - return field-level and template-level errors
+  - preview step returns field-level and template-level errors
 - create/update failure
-  - preserve form draft for retry
+  - form draft is preserved for retry
 - dry-run failure
-  - distinguish guard failure, env-block failure, datasource failure, and rollback-policy failure
+  - guard, env-block, and parameter validation failures are shown inline
 
-## 11. Review Items
+## 11. Remaining Limits
 
-Review-only findings:
-
-- This screen currently shows the right template-governance concepts but has no backend registry behind it.
-- `execution` is directly coupled to the same local template constant, which should be replaced by shared read interfaces.
-- `Dry-run` should remain a template-safety validation interface, not be merged with scheduler execution.
-- Phase 3 main docs only point toward template design indirectly; the detailed registry/dry-run model had to be grounded with the Phase 4/5 template design documents.
-
-These are documentation findings only. No implementation change is made in this stage.
+- The backend template registry uses file-backed persistence (`config/phase3/data-templates.json`), not a real database.
+- Dry-run is deterministic validation only and does not execute real SQL or service calls.
+- Import preview/commit is deterministic and does not validate against real datasources.
+- Template versioning is not yet implemented; updates overwrite in place.
+- `Dry-run` remains a template-safety validation interface, not merged with scheduler execution.
+- Phase 3 main docs only point toward template design indirectly; the detailed registry/dry-run model was grounded with the Phase 4/5 template design documents.

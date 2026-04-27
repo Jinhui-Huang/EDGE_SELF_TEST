@@ -119,23 +119,20 @@ It does not authorize UI or backend changes in the current phase.
 - Acceptance target:
   - list, detail, and diff views all consume a consistent run/report contract anchored on canonical `runId`.
 
-### P1-3. Add real data-template registry for `execution` and `dataTemplates`
+### P1-3. Add real data-template registry for `execution` and `dataTemplates` — DONE
 
 - Screens:
   - `execution`
   - `dataTemplates`
-- Current gap:
-  - compare templates still come from front-end seeded constants.
-- Required interfaces:
-  - `GET /api/phase3/data-templates`
-  - `GET /api/phase3/data-templates/{templateId}`
-  - `POST /api/phase3/data-templates`
-  - `PUT /api/phase3/data-templates/{templateId}`
-  - `POST /api/phase3/data-templates/import/preview`
-  - `POST /api/phase3/data-templates/import/commit`
-  - `POST /api/phase3/data-templates/{templateId}/dry-run`
-- Acceptance target:
-  - execution form options and template-management UI read from the same persistent backend registry.
+- Resolved:
+  - backend file-backed template registry implemented (`DataTemplatePersistenceService`, `config/phase3/data-templates.json`)
+  - all 7 endpoints implemented: list, detail, create, update, delete, import preview/commit, dry-run
+  - both `execution` and `dataTemplates` read from `GET /api/phase3/data-templates`
+  - local seeded constants kept only as fallback when API is unavailable
+- Remaining limits:
+  - file-backed persistence, not a real database
+  - dry-run is deterministic validation only
+  - template versioning not yet implemented
 
 ### P1-4. Convert local-only connection tests into real validation interfaces
 

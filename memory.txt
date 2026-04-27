@@ -1017,3 +1017,14 @@
      - raw diff and restore-result are deterministic mock when no real artifacts exist
      - re-restore records intent only, does not trigger real restore workflow
      - raw JSON drawer does not support copy-to-clipboard or download
+
+59. P1-3 Documentation Sync (2026-04-27)
+   - All P1-3 code was already complete (2026-04-25). This session synced 5 stale interface docs.
+   - Files updated:
+     - ui-control-interface-overview.md (execution + dataTemplates rows)
+     - dataTemplates/functional-spec.md (all controls → implemented)
+     - dataTemplates/interface-spec.md (sections 2-11 fully synced)
+     - execution/interface-spec.md (compare-template source → backend registry)
+     - review-backlog.md (P1-3 → DONE)
+   - Pattern: "visual only" / "future" / "front-end seeded" language replaced with implemented endpoint references
+   - Verification: Maven 13/13 pass; npm test/build 未在本次 doc-only 变更中重跑

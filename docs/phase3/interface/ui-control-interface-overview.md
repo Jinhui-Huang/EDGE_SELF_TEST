@@ -114,7 +114,7 @@ Conventions used here:
 | `Environment` input | input | Local form state | Included in scheduler payloads |
 | `Target URL` input | input | Local form state | Included in scheduler payloads |
 | `Execution model` select | select | Local form state | Included in scheduler payloads |
-| `Compare data templates` multi-select | multi-select | Local only; source is front-end seeded `defaultDataTemplates` | Future source: `GET /api/phase3/data-templates` |
+| `Compare data templates` multi-select | multi-select | Implemented: reads from `GET /api/phase3/data-templates`; falls back to local seeded list when API is unavailable | Keep current |
 | `Database connection` select | select | Local form state | Included in scheduler payloads |
 | `Detail` textarea | textarea | Local form state | Included in scheduler payloads |
 | `Run` | button | Implemented: `POST /api/phase3/scheduler/requests` | Keep current |
@@ -179,10 +179,10 @@ Conventions used here:
 
 | Control | Type | Current behavior / interface | Future interface / design |
 |---|---|---|---|
-| Template row | clickable row | Implemented: local selection plus detail load through `GET /api/phase3/data-templates/{templateId}` | Keep current |
+| Template row | clickable row | Implemented: local selection; detail rendered from list payload (no separate detail GET) | Keep current |
 | `Import` | button | Implemented: `POST /api/phase3/data-templates/import/preview` -> `POST /api/phase3/data-templates/import/commit` | Keep current |
 | `New template` | button | Implemented: `POST /api/phase3/data-templates` | Keep current |
-| `Edit` | button | Implemented: `GET /api/phase3/data-templates/{templateId}` -> `PUT /api/phase3/data-templates/{templateId}` | Keep current |
+| `Edit` | button | Implemented: uses locally selected object copy, saves via `PUT /api/phase3/data-templates/{templateId}` | Keep current |
 | `Dry-run` | button | Implemented: `POST /api/phase3/data-templates/{templateId}/dry-run` | Keep current |
 | `Delete` | button | Implemented: `DELETE /api/phase3/data-templates/{templateId}` | Keep current |
 

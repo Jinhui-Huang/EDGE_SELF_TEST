@@ -25,7 +25,7 @@ This document distinguishes:
 - direct write interfaces
 - local-only screen controls
 - app-state-only handoff data
-- front-end-seeded execution helper data
+- backend-backed compare-template data with local fallback
 - detailed implementation design for currently unwired controls
 
 ## 2. Interface Summary
@@ -39,7 +39,7 @@ Current `execution` screen conclusion:
   - `POST /api/phase3/scheduler/events`
 - no dedicated execution-read endpoint is called by this screen today
 - prepared-case payload comes from app state, not from a direct backend read
-- compare-template options are currently front-end seeded, not backend-backed
+- compare-template options read from `GET /api/phase3/data-templates`; falls back to local seeded list when API is unavailable
 
 ## 3. Direct Read Interface: GET /api/phase3/admin-console
 
@@ -105,13 +105,14 @@ This means:
 - prepared cases only matter to the current selected project
 - a prepared case for another project does not satisfy the execution-ready condition
 
-## 5. Front-End Seed Data Boundary: Compare Templates
+## 5. Compare Template Data Source
 
-The execution screen presents compare-template selection, but the current source is not a backend interface.
+The execution screen presents compare-template selection backed by the shared backend template registry.
 
 ### 5.1 Current Source
 
-- `defaultDataTemplates` in `App.tsx`
+- `GET /api/phase3/data-templates` (same backend registry used by `dataTemplates` screen)
+- `defaultDataTemplates` in `App.tsx` as fallback when API is unavailable
 
 ### 5.2 Current Behavior
 
@@ -120,7 +121,7 @@ The execution screen presents compare-template selection, but the current source
 
 ### 5.3 Interface Implication
 
-This is not yet a true execution-template API. The current screen should document it as a front-end-seeded helper data source, not as a backend-owned contract.
+Both `execution` and `dataTemplates` share the same backend-owned template registry. The local constant is only a fallback, not the primary source.
 
 ## 6. Direct Write Interface: POST /api/phase3/scheduler/requests
 

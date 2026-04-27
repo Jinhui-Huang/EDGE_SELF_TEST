@@ -62,21 +62,21 @@ The screen is a configuration page that influences:
 Current implementation facts:
 
 - The page is rendered by `DataTemplatesScreen.tsx`.
-- The page does not fetch directly.
-- The page receives `dataTemplates` from `App.tsx`.
-- `App.tsx` currently passes `defaultDataTemplates`, a local constant list.
+- The page fetches from `GET /api/phase3/data-templates` on mount; falls back to local seeded data when API is unavailable.
+- The page receives `apiBaseUrl` from `App.tsx` and drives all CRUD/import/dry-run through backend endpoints.
 - template-row selection is implemented locally.
 - detail rendering for params, steps, guards, and project scope is implemented.
-- `Import` is visible but not wired.
-- `New template` is visible but not wired.
-- `Edit` is visible but not wired.
-- `Dry-run` is visible but not wired.
+- `Import` is implemented: `POST /api/phase3/data-templates/import/preview` -> `POST /api/phase3/data-templates/import/commit`.
+- `New template` is implemented: `POST /api/phase3/data-templates`.
+- `Edit` is implemented: uses locally selected object copy, saves via `PUT /api/phase3/data-templates/{templateId}`.
+- `Delete` is implemented: `DELETE /api/phase3/data-templates/{templateId}`.
+- `Dry-run` is implemented: `POST /api/phase3/data-templates/{templateId}/dry-run`.
 
 This matters for review:
 
-- the current page is a template-catalog review shell over local seeded data
-- the same local template source is also consumed by `execution`
-- this page currently defines no persistence or dry-run behavior of its own
+- the page is now backed by a real backend-owned template registry
+- `execution` reads from the same backend registry (`GET /api/phase3/data-templates`)
+- mutation status is shown inline after create/edit/delete/import/dry-run operations
 
 ## 6. Functional Areas
 
@@ -98,7 +98,8 @@ Functional role:
 
 Current behavior:
 
-- both actions are visual only
+- `Import` opens a preview/commit flow backed by `POST /api/phase3/data-templates/import/preview` and `POST /api/phase3/data-templates/import/commit`
+- `New template` opens a create form that posts to `POST /api/phase3/data-templates`
 
 ### 6.2 Template Catalog Table
 
@@ -139,8 +140,10 @@ Functional role:
 
 Current behavior:
 
-- detail content is driven by the currently selected local template object
-- footer actions are visual only
+- detail content is driven by the currently selected template from the backend registry
+- `Edit` opens an edit form that updates via `PUT /api/phase3/data-templates/{templateId}`
+- `Delete` removes the template via `DELETE /api/phase3/data-templates/{templateId}`
+- `Dry-run` posts to `POST /api/phase3/data-templates/{templateId}/dry-run` and shows result inline
 
 ## 7. Data Semantics by Area
 
@@ -181,7 +184,8 @@ The screen consumes:
 - current locale
 - shell snapshot
 - page title
-- `dataTemplates` list from `App.tsx`
+- `apiBaseUrl` from `App.tsx`
+- `dataTemplates` fallback list from `App.tsx` (used only when API is unavailable)
 
 ### 8.2 Screen Outputs
 
@@ -189,19 +193,12 @@ The screen currently produces:
 
 - local UI output
   - selected template id
-
-It does not currently produce:
-
 - backend mutations
-- route-state output
-- execution handoff output
-
-Its intended future outputs are:
-
-- template creation
-- template import
-- template edit persistence
-- template dry-run result
+  - template creation (`POST /api/phase3/data-templates`)
+  - template update (`PUT /api/phase3/data-templates/{templateId}`)
+  - template deletion (`DELETE /api/phase3/data-templates/{templateId}`)
+  - template import (`POST .../import/preview` -> `POST .../import/commit`)
+  - template dry-run (`POST /api/phase3/data-templates/{templateId}/dry-run`)
 
 ## 9. User Actions
 
@@ -217,11 +214,11 @@ Current implementation summary:
 
 - implemented:
   - template row selection
-- visible but not implemented:
-  - `Import`
-  - `New template`
-  - `Edit`
-  - `Dry-run`
+  - `Import` (preview/commit two-step flow)
+  - `New template` (create via POST)
+  - `Edit` (update via PUT)
+  - `Delete` (remove via DELETE)
+  - `Dry-run` (validation via POST)
 
 ## 10. Functional Control Responsibility Matrix
 
@@ -229,12 +226,12 @@ Current implementation summary:
 
 - `Import`
   - function: bring new template definitions into the catalog
-  - output type: future import flow
-  - current implementation: visual only
+  - output type: two-step preview/commit import flow
+  - current implementation: implemented via `POST /api/phase3/data-templates/import/preview` -> `POST /api/phase3/data-templates/import/commit`
 - `New template`
   - function: create a new reusable template definition
-  - output type: future create flow
-  - current implementation: visual only
+  - output type: create mutation
+  - current implementation: implemented via `POST /api/phase3/data-templates`
 
 ### 10.2 Catalog Controls
 
@@ -247,12 +244,16 @@ Current implementation summary:
 
 - `Edit`
   - function: update selected template metadata and recipe definition
-  - output type: future template-update mutation
-  - current implementation: visual only
+  - output type: template-update mutation
+  - current implementation: implemented via `PUT /api/phase3/data-templates/{templateId}`
+- `Delete`
+  - function: remove selected template from the registry
+  - output type: template-delete mutation
+  - current implementation: implemented via `DELETE /api/phase3/data-templates/{templateId}`
 - `Dry-run`
   - function: validate that selected template can execute safely with parameter and environment constraints
-  - output type: future template dry-run mutation
-  - current implementation: visual only
+  - output type: template dry-run mutation
+  - current implementation: implemented via `POST /api/phase3/data-templates/{templateId}/dry-run`
 
 ## 11. State Model
 
@@ -270,7 +271,8 @@ The screen should support:
 Current implementation status:
 
 - selected-template state is implemented
-- mutation and error states are not implemented
+- mutation states (pending/success/error) are implemented for create, edit, delete, import, and dry-run
+- error feedback is shown inline after failed mutations
 
 ## 12. Validation and Rules
 
@@ -292,7 +294,8 @@ Current intended data-governance rules implied by the UI:
 
 The screen depends on:
 
-- `App.tsx` for the current template catalog source
+- `App.tsx` for `apiBaseUrl` and fallback template catalog
+- `GET /api/phase3/data-templates` for the authoritative template registry
 - `snapshot.projects` for project-name resolution
 
 ### 13.2 Downstream Screens
@@ -329,14 +332,12 @@ The `dataTemplates` screen is not currently responsible for:
 
 ## 15. Known Gaps and Review Items
 
-Review items discovered while documenting:
+Current remaining limits:
 
-- `Import`, `New template`, `Edit`, and `Dry-run` are all visible but unwired.
-- The page is driven entirely by local seeded `defaultDataTemplates`.
-- `execution` consumes the same local template source directly, so the product currently has no backend-owned template registry.
-- There is no mutation-status or validation-status surface for template management actions.
-
-These are documentation review items only. No implementation change is made in this stage.
+- The backend template registry uses file-backed persistence (`config/phase3/data-templates.json`), not a real database.
+- Dry-run is deterministic validation only and does not execute real SQL or service calls.
+- Import preview/commit is deterministic and does not validate against real datasources.
+- Template versioning is not yet implemented; updates overwrite in place.
 
 ## 16. Suggested Output Files for This Screen Folder
 

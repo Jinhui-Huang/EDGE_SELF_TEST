@@ -3112,3 +3112,43 @@ Wire all visible-but-unwired controls on the reportDetail page: 5 tabs (Overview
 
 ## Next Step
 - Continue with the next review-backlog priority after P2-6
+
+---
+
+# P1-3 Documentation Sync (2026-04-27)
+
+## Goal
+Synchronize interface documentation to match the already-implemented P1-3 data-template registry.
+All code was completed on 2026-04-25; only the docs still described controls as "visual only" / "future" / "not wired".
+
+## Files Updated
+1. `docs/phase3/interface/ui-control-interface-overview.md`
+   - execution Compare data templates: changed from "Local only; front-end seeded" to "Implemented: reads from GET /api/phase3/data-templates"
+   - dataTemplates section: all controls (Import, New template, Edit, Delete, Dry-run) updated to show implemented endpoints
+2. `docs/phase3/interface/dataTemplates/functional-spec.md`
+   - Changed all "visual only" / "not wired" descriptions to implemented with specific endpoint references
+   - Updated screen inputs (apiBaseUrl), outputs (backend mutations), upstream dependencies
+   - Updated known gaps to "remaining limits" (file-backed, deterministic, no versioning)
+3. `docs/phase3/interface/dataTemplates/interface-spec.md`
+   - Updated interface summary with all direct read/write sources
+   - Changed "Current Local Template Registry" → "Current Backend Template Registry"
+   - Updated shared catalog source section to reflect both screens reading from same backend
+   - All control mappings marked as implemented
+   - Changed "Recommended Future" → "Implemented Template Registry Interfaces"
+   - Section 8: "Detailed Implementation Design for Currently Unwired Controls" → "Implemented Control Wiring"
+   - Section 9: "Recommended" → "Current" execution read contract
+   - Section 10: error handling updated to reflect implemented mutation state handling
+   - Section 11: review items → remaining limits
+4. `docs/phase3/interface/execution/interface-spec.md`
+   - Line 28: "front-end-seeded execution helper data" → "backend-backed compare-template data with local fallback"
+   - Line 42: "currently front-end seeded, not backend-backed" → "read from GET /api/phase3/data-templates"
+   - Section 5: "Front-End Seed Data Boundary" → "Compare Template Data Source", updated to reflect backend registry
+5. `docs/phase3/interface/review-backlog.md`
+   - P1-3 section marked DONE with resolved summary and remaining limits
+
+## Verification
+- Maven test: **13/13 passed**
+- npm test / npm build: doc-only 变更，未在本次重跑前端校验
+
+## Next Step
+- Continue with the next review-backlog priority
