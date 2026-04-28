@@ -394,10 +394,11 @@ These controls change UI or app state without directly calling the backend.
 
 ### 8.5 `Open Exec Monitor`
 
-- owner: app-level screen routing
+- owner: app-level screen routing with run context handoff
 - request: none
 - effect:
-  - sets active screen to `monitor`
+  - calls `openMonitor(launchForm.runId)` which sets `selectedMonitorRunId` and navigates to `monitor`
+  - the monitor screen receives `selectedRunId` as a prop and fetches runtime APIs for that run
 
 ## 9. UI Control to Interface Mapping
 
@@ -406,11 +407,11 @@ These controls change UI or app state without directly calling the backend.
 #### `Open Exec Monitor`
 
 - user action: click
-- request: none
-- owner: `App.tsx` route state
-- success behavior: navigate to `monitor`
+- request: none (navigation with run context handoff)
+- owner: `App.tsx` route state + `selectedMonitorRunId`
+- success behavior: navigate to `monitor` with `launchForm.runId` as the canonical run identifier
 - failure behavior: none required
-- current state: implemented
+- current state: implemented — `openMonitor(launchForm.runId)` sets `selectedMonitorRunId` and switches to monitor screen
 
 #### Execution contract hint button
 
@@ -611,8 +612,9 @@ Current surfacing:
 
 ### 11.4 Relationship to Monitor
 
-- `execution` provides the operator handoff into `monitor`
-- monitor should be the downstream owner of runtime progress and live event detail
+- `execution` provides the operator handoff into `monitor` via `openMonitor(launchForm.runId)`
+- the handoff passes canonical `runId` through `selectedMonitorRunId` app state
+- monitor is the downstream owner of runtime progress and live event detail
 
 ### 11.5 Relationship to Reports and Data Diff
 

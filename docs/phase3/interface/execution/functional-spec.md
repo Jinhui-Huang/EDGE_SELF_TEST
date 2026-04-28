@@ -78,7 +78,7 @@ Current implementation facts:
 - `Run` posts a scheduler request.
 - `Execution` posts a scheduler event.
 - the review form posts a scheduler event.
-- `Open Exec Monitor` is implemented as screen navigation.
+- `Open Exec Monitor` is implemented as screen navigation with canonical `runId` handoff via `openMonitor(launchForm.runId)`.
 - project/model/database/template selectors are implemented as local state changes only.
 - the page uses a mix of true shared data and front-end-only helper data.
 
@@ -109,7 +109,7 @@ Functional role:
 
 Current behavior:
 
-- `Open Exec Monitor` is implemented
+- `Open Exec Monitor` is implemented — passes `launchForm.runId` into `monitor` as canonical run context
 - the execution contract hint is visible but not wired
 
 ### 6.2 Execution Progress Card
@@ -349,9 +349,9 @@ Current implementation summary:
 ### 10.1 Header Controls
 
 - `Open Exec Monitor`
-  - function: route operator into runtime monitor
-  - output type: cross-screen navigation
-  - current implementation: implemented
+  - function: route operator into runtime monitor with canonical run identity
+  - output type: cross-screen navigation with `runId` handoff
+  - current implementation: implemented — `openMonitor(launchForm.runId)` sets `selectedMonitorRunId` and switches screen
 - execution contract hint button
   - function: should expose launch/event contract or operator guidance
   - output type: future local help panel or interface reference

@@ -1028,3 +1028,19 @@
      - review-backlog.md (P1-3 → DONE)
    - Pattern: "visual only" / "future" / "front-end seeded" language replaced with implemented endpoint references
    - Verification: Maven 13/13 pass; npm test/build 未在本次 doc-only 变更中重跑
+
+60. P0-1 / P0-2 Monitor RunId Handoff + Runtime APIs (2026-04-28)
+   - Both P0-1 and P0-2 code was already fully implemented. This session added tests and synced docs.
+   - Code already in place:
+     - App.tsx: selectedMonitorRunId state, openMonitor(runId) helper, execution onOpenMonitor wired
+     - MonitorScreen.tsx: idle/loading/error/loaded states, 4 runtime API fetches, Pause/Abort wiring
+     - types.ts: RunStatus, RunStep, RuntimeLogEntry, LivePage, RunControlResponse
+   - Tests added (App.test.tsx): 2 new tests (31 total)
+     - execution → monitor runId handoff
+     - monitor idle state when no runId
+   - Docs synced:
+     - execution/interface-spec.md, execution/functional-spec.md (runId handoff)
+     - monitor/functional-spec.md, monitor/interface-spec.md (full sync from placeholder to implemented)
+     - ui-control-interface-overview.md (execution + monitor sections)
+     - review-backlog.md (P0-1 + P0-2 → DONE)
+   - Verification: npm test 31/31, npm build PASS

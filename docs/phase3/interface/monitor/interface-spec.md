@@ -29,12 +29,17 @@ This document distinguishes:
 
 Current `monitor` screen conclusion:
 
-- current direct read source:
-  - `GET /api/phase3/admin-console`
-- current direct write source:
-  - none
-- current screen does not receive a run-specific runtime payload
-- true monitor behavior implied by the UI requires new run-status, runtime-log, and runtime-control interfaces
+- current direct read sources:
+  - `GET /api/phase3/admin-console` (snapshot context)
+  - `GET /api/phase3/runs/{runId}/status` (run status, progress, counters, control state)
+  - `GET /api/phase3/runs/{runId}/steps` (step timeline)
+  - `GET /api/phase3/runs/{runId}/runtime-log` (AI decision and runtime event log)
+  - `GET /api/phase3/runs/{runId}/live-page` (current page context)
+- current direct write sources:
+  - `POST /api/phase3/runs/{runId}/pause` (pause control)
+  - `POST /api/phase3/runs/{runId}/abort` (abort control)
+- run context source:
+  - `selectedRunId` from App-level `openMonitor(runId)` handoff
 
 ## 3. Current Read Context: GET /api/phase3/admin-console
 
@@ -71,21 +76,18 @@ This snapshot is not sufficient for true monitor behavior because it does not pr
 - runtime AI decision stream
 - pause/abort capability state
 
-## 4. Current Local-Only Runtime Placeholder Model
+## 4. API-Driven Runtime Data Model
 
-The following monitor data is hardcoded or screen-local today:
+The monitor screen fetches all runtime data from dedicated APIs when `selectedRunId` is provided:
 
-- `runId = "run_8f2a1c3e"`
-- current step summary
-- step timeline list
-- runtime log list
-- progress percentage
-- mocked live page viewport
+- `runStatus` from `GET /api/phase3/runs/{runId}/status`
+- `steps` from `GET /api/phase3/runs/{runId}/steps`
+- `runtimeLog` from `GET /api/phase3/runs/{runId}/runtime-log`
+- `livePage` from `GET /api/phase3/runs/{runId}/live-page`
 
-Interface implication:
+All 4 APIs are called in parallel via `Promise.all` on mount and after control actions.
 
-- these are not current backend contracts
-- they are placeholders representing the shape of future runtime-monitor APIs
+When `selectedRunId` is null (e.g., direct sidebar navigation), the screen shows an idle state with no API calls.
 
 ## 5. UI Control to Interface Mapping
 
@@ -94,20 +96,16 @@ Interface implication:
 #### `Pause`
 
 - user action: click
-- request: none today
-- owner: not implemented
-- intended future interface:
-  - runtime-control mutation for one run
-- current state: visible only
+- request: `POST /api/phase3/runs/{runId}/pause` via `onPauseRun` callback
+- owner: `App.tsx` (callback) + `MonitorScreen.tsx` (UI state)
+- current state: implemented — disabled when `control.canPause` is false, shows pending/success/error feedback, refreshes runtime data on success
 
 #### `Abort`
 
 - user action: click
-- request: none today
-- owner: not implemented
-- intended future interface:
-  - runtime-control mutation for one run
-- current state: visible only
+- request: `POST /api/phase3/runs/{runId}/abort` via `onAbortRun` callback
+- owner: `App.tsx` (callback) + `MonitorScreen.tsx` (UI state)
+- current state: implemented — disabled when `control.canAbort` is false, shows pending/success/error feedback, refreshes runtime data on success
 
 ### 5.2 Steps Timeline
 
@@ -146,13 +144,11 @@ Interface implication:
 ### 6.1 Relationship to Execution
 
 - `execution` is the current upstream entry into `monitor`
-- current routing is only:
-  - `handleScreenChange("monitor")`
-- no `runId` or monitor context is passed
-
-This is the key current gap:
-
-- `monitor` cannot yet identify which specific run it is monitoring from route-state alone
+- current routing uses `openMonitor(launchForm.runId)`:
+  - sets `selectedMonitorRunId` to the canonical run identifier
+  - switches active screen to `monitor`
+- `monitor` receives `selectedRunId` as a prop and fetches runtime APIs for that run
+- sidebar navigation to `monitor` uses `handleScreenChange("monitor")` which sets `selectedMonitorRunId` to null (idle state)
 
 ### 6.2 Relationship to Scheduler Request/Event Interfaces
 
@@ -180,9 +176,7 @@ Recommended relationship:
   - `reportDetail`
   - `dataDiff`
 
-## 7. Future Interface Evolution Required by This Screen
-
-The current UI shape clearly requires dedicated monitor interfaces.
+## 7. Implemented Monitor Interfaces
 
 ### 7.1 Run-Status Read Interface
 
@@ -385,142 +379,85 @@ Functional rules:
 - should be idempotent for already-finished runs
 - should be reflected later in run status and report status
 
-## 8. Recommended Route-State Design
+## 8. Implemented Route-State Design
 
-Because `monitor` currently receives no run identity, route-state must be expanded even before deeper live APIs are used.
-
-Recommended app state:
+App state:
 
 ```ts
 const [selectedMonitorRunId, setSelectedMonitorRunId] = useState<string | null>(null);
 ```
 
-Recommended app helper:
+App helper:
 
 ```ts
-function openMonitor(runId: string) {
-  setSelectedMonitorRunId(runId);
+function openMonitor(runId?: string | null) {
+  setSelectedMonitorRunId(runId?.trim() || null);
   setActiveScreen("monitor");
 }
 ```
 
-Recommended `MonitorScreen` prop:
+`MonitorScreen` prop:
 
 ```ts
 selectedRunId?: string | null;
 ```
 
-Recommended behavior:
+Implemented behavior:
 
 - if `selectedRunId` is absent:
-  - fall back to latest known running/queued run from snapshot
+  - show idle state with guidance to open a run from the execution page
 - if `selectedRunId` exists:
-  - use it for status/log/control interfaces
+  - fetch all 4 runtime APIs (`status`, `steps`, `runtime-log`, `live-page`) in parallel
+  - show loading state while fetching
+  - show error state if status API fails
+  - show loaded state with full runtime data on success
 
-## 9. Detailed Implementation Design for Currently Unwired Controls
-
-This section turns the visible but inactive monitor controls into concrete interface designs.
+## 9. Implemented Control Wiring
 
 ### 9.1 `Pause`
 
-Recommended implementation type:
+Implementation:
 
-- new runtime-control mutation
-
-Concrete implementation design:
-
-- add prop:
-  - `onPauseRun(runId: string): Promise<void> | void`
-- button uses current selected run id
-- submit endpoint:
-  - `POST /api/phase3/runs/{runId}/pause`
-- after success:
-  - refresh `GET /api/phase3/runs/{runId}/status`
-  - optionally refresh `GET /api/phase3/admin-console`
+- prop: `onPauseRun(runId: string): Promise<void>`
+- button uses current `selectedRunId`
+- endpoint: `POST /api/phase3/runs/{runId}/pause`
+- after success: refreshes all 4 runtime APIs + snapshot
+- disabled when `control.canPause` is false or mutation is pending
+- shows pending/success/error feedback inline
 
 ### 9.2 `Abort`
 
-Recommended implementation type:
+Implementation:
 
-- new runtime-control mutation
-
-Concrete implementation design:
-
-- add prop:
-  - `onAbortRun(runId: string): Promise<void> | void`
-- submit endpoint:
-  - `POST /api/phase3/runs/{runId}/abort`
-- after success:
-  - refresh run status
-  - if run is terminal, later allow route to `reportDetail`
+- prop: `onAbortRun(runId: string): Promise<void>`
+- endpoint: `POST /api/phase3/runs/{runId}/abort`
+- after success: refreshes all 4 runtime APIs + snapshot
+- disabled when `control.canAbort` is false or mutation is pending
+- shows pending/success/error feedback inline
 
 ### 9.3 Step Row Drill-Down
 
-Recommended implementation type:
-
-- local detail drawer first
-- no extra route required for initial implementation
-
-Required read interface:
-
-- `GET /api/phase3/runs/{runId}/steps`
-
-Concrete behavior:
-
-- clicking a step row opens a drawer showing:
-  - step input
-  - resolved locator
-  - duration
-  - screenshots/artifacts
-  - assertions
+- not yet implemented
+- step data is displayed but rows are not clickable
 
 ### 9.4 Runtime Log Row Drill-Down
 
-Recommended implementation type:
-
-- local detail drawer first
-- no extra route required for initial implementation
-
-Required read interface:
-
-- `GET /api/phase3/runs/{runId}/runtime-log`
-
-Concrete behavior:
-
-- clicking a log row opens:
-  - full decision text
-  - model/provider
-  - structured decision payload
-  - related step index if present
+- not yet implemented
+- log entries are displayed but rows are not clickable
 
 ## 10. Error Handling Boundary
 
 Current implementation:
 
-- no runtime-control request exists
-- therefore no control-level error state is shown
+- if `status` API fails, screen shows error state with the error message
+- `steps`, `runtime-log`, and `live-page` API failures are non-fatal — screen renders available data
+- Pause/Abort failures show error feedback inline
+- when no `selectedRunId` is provided, idle state is shown with guidance text
 
-Recommended future error handling:
+## 11. Remaining Limits
 
-- status/log/live-page reads:
-  - `404` when run does not exist
-  - `409` when runtime state is not yet available
-- pause/abort:
-  - `409` when run is already terminal or cannot transition
-  - `423` when a control operation is locked
-
-Recommended UI surfacing:
-
-- hero-level control mutation status
-- fallback empty-state if no active run can be monitored
-
-## 11. Review Items
-
-Review-only findings:
-
-- The current monitor page is structurally aligned with the intended runtime-monitor design, but almost all live detail is still local placeholder data.
-- `GET /api/phase3/admin-console` is only enough for shallow monitor context, not true runtime monitoring.
-- `Pause` and `Abort` must become explicit runtime-control interfaces rather than scheduler append events.
-- `execution` to `monitor` handoff must start carrying `runId`; otherwise the monitor screen cannot observe a specific run reliably.
-
-These are documentation findings only. No implementation change is made in this stage.
+- Runtime data is deterministic mock from the backend when no real run artifacts or live execution exist.
+- Pause/Abort record intent only; the backend does not trigger real execution-control workflows in Phase 3.
+- Step rows and runtime log rows are display only — no drill-down behavior.
+- Live page panel shows structured data only; no real screenshot or DOM summary is rendered.
+- `GET /api/phase3/admin-console` is still used for queue pressure in the footer; deeper runtime context comes from run-specific APIs.

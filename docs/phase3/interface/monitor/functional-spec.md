@@ -67,24 +67,25 @@ It is an upstream diagnostic page for:
 Current implementation facts:
 
 - The page is rendered by `MonitorScreen.tsx`.
-- The page does not perform direct `fetch`.
-- The page currently receives only:
-  - `snapshot`
-  - `title`
-  - `locale`
-- the monitored `runId` is hardcoded in the component
-- the current step, step timeline, runtime log, and live page are all screen-local placeholder data
-- only a small part of the screen uses real snapshot fields:
-  - `snapshot.projects[0]`
-  - `snapshot.reports[0]`
-  - `snapshot.workQueue[0]`
-  - `snapshot.timeline[0]`
-- `Pause` and `Abort` are visible but not wired
+- The page is rendered by `MonitorScreen.tsx`.
+- The page receives `selectedRunId` from `App.tsx` via `openMonitor(runId)` handoff.
+- The page receives `apiBaseUrl` and fetches from 4 runtime APIs on mount when `selectedRunId` is present:
+  - `GET /api/phase3/runs/{runId}/status`
+  - `GET /api/phase3/runs/{runId}/steps`
+  - `GET /api/phase3/runs/{runId}/runtime-log`
+  - `GET /api/phase3/runs/{runId}/live-page`
+- `Pause` and `Abort` are wired to App-level callbacks that call:
+  - `POST /api/phase3/runs/{runId}/pause`
+  - `POST /api/phase3/runs/{runId}/abort`
+- When no `selectedRunId` is provided (e.g., direct sidebar navigation), an idle state is shown.
+- Loading and error states are implemented for the initial data fetch.
+- The page uses `snapshot.workQueue` for queue pressure in the footer.
 
 This matters for review:
 
-- the current UI shape matches the intended monitoring concept
-- but the runtime detail itself is not yet backed by true run-status interfaces
+- the current UI is backed by real runtime APIs through the `selectedRunId` handoff
+- runtime data comes from backend responses, not from screen-local placeholder data
+- Pause/Abort control actions are implemented with status feedback
 
 ## 6. Functional Areas
 
@@ -106,9 +107,10 @@ Functional role:
 
 Current behavior:
 
-- display only
-- `Pause` is visible only
-- `Abort` is visible only
+- run identity and top-level state driven by `runStatus` from `GET /api/phase3/runs/{runId}/status`
+- `Pause` is implemented — calls `onPauseRun(runId)`, disabled when `control.canPause` is false
+- `Abort` is implemented — calls `onAbortRun(runId)`, disabled when `control.canAbort` is false
+- Pause/Abort show pending/success/error feedback inline
 
 ### 6.2 Progress Card
 
@@ -129,8 +131,8 @@ Functional role:
 
 Current behavior:
 
-- values are mostly screen-local placeholder data
-- no direct backend request is tied to this area
+- values driven by `runStatus.progress` and `runStatus.counters` from the status API
+- step bar driven by `steps` from `GET /api/phase3/runs/{runId}/steps`
 
 ### 6.3 Steps Timeline Panel
 
@@ -147,8 +149,8 @@ Functional role:
 
 Current behavior:
 
-- timeline is local placeholder data
-- rows are not clickable
+- timeline driven by `steps` from `GET /api/phase3/runs/{runId}/steps`
+- rows are display only (not clickable)
 
 ### 6.4 Live Page Panel
 
@@ -164,8 +166,9 @@ Functional role:
 
 Current behavior:
 
-- panel is purely presentational placeholder
-- no true screenshot, DOM summary, or live page state is loaded
+- panel driven by `livePage` from `GET /api/phase3/runs/{runId}/live-page`
+- shows URL, page state, and active step highlight from API response
+- no true screenshot is rendered (uses structured data instead)
 
 ### 6.5 AI Runtime Log Panel
 
@@ -183,8 +186,8 @@ Functional role:
 
 Current behavior:
 
-- log items are local placeholder data
-- rows are not clickable
+- log items driven by `runtimeLog` from `GET /api/phase3/runs/{runId}/runtime-log`
+- rows are display only (not clickable)
 
 ### 6.6 Footer Summary
 
@@ -200,7 +203,8 @@ Functional role:
 
 Current behavior:
 
-- partly derived from shared snapshot
+- queue pressure from `snapshot.workQueue`
+- last event and owner from `runStatus`
 - no footer action is implemented
 
 ## 7. Data Semantics by Area
@@ -214,18 +218,14 @@ The screen currently takes limited contextual display data from:
 - `snapshot.workQueue`
 - `snapshot.timeline`
 
-### 7.2 Local Placeholder Runtime Data
+### 7.2 API-Driven Runtime Data
 
-The screen currently fabricates these as UI placeholders:
+The screen loads runtime data from dedicated APIs when `selectedRunId` is provided:
 
-- `runId`
-- current step
-- step timeline
-- runtime log
-- live page/viewport content
-- progress percentage
-
-This means the screen currently communicates the intended runtime-monitor structure more than the true run state.
+- `runStatus` from `GET /api/phase3/runs/{runId}/status` — run identity, progress, counters, control state
+- `steps` from `GET /api/phase3/runs/{runId}/steps` — step timeline and state
+- `runtimeLog` from `GET /api/phase3/runs/{runId}/runtime-log` — AI decision and runtime event entries
+- `livePage` from `GET /api/phase3/runs/{runId}/live-page` — current page URL, state, and highlight
 
 ## 8. Screen Inputs and Outputs
 
@@ -236,26 +236,21 @@ The screen consumes:
 - current locale
 - shell snapshot
 - page title
-
-Important current gap:
-
-- no run-specific prop is passed in today
-- no direct runtime-status payload is passed in today
+- `selectedRunId` from App-level handoff (canonical run identifier)
+- `apiBaseUrl` for runtime API calls
+- `onPauseRun` callback for pause control
+- `onAbortRun` callback for abort control
 
 ### 8.2 Screen Outputs
 
-The screen should produce:
+The screen produces:
 
 - operator control intent
-  - pause
-  - abort
-- future run drill-down intent
+  - pause via `onPauseRun(runId)` → `POST /api/phase3/runs/{runId}/pause`
+  - abort via `onAbortRun(runId)` → `POST /api/phase3/runs/{runId}/abort`
+- future run drill-down intent (not yet implemented)
   - step detail
   - AI decision detail
-
-Current actual output:
-
-- none
 
 ## 9. User Actions
 
@@ -270,10 +265,11 @@ Visible actions on this screen:
 Current implementation summary:
 
 - implemented:
-  - none of the runtime control actions
+  - `Pause` (via `onPauseRun` callback)
+  - `Abort` (via `onAbortRun` callback)
+  - idle/loading/error/loaded state rendering
+  - runtime data fetch on `selectedRunId` change
 - visible but not implemented:
-  - `Pause`
-  - `Abort`
   - step-row drill-down
   - runtime-log drill-down
 
@@ -283,12 +279,12 @@ Current implementation summary:
 
 - `Pause`
   - function: pause current run safely
-  - output type: future runtime-control mutation
-  - current implementation: visual only
+  - output type: runtime-control mutation via `POST /api/phase3/runs/{runId}/pause`
+  - current implementation: implemented — disabled when `control.canPause` is false, shows pending/success/error feedback
 - `Abort`
   - function: stop current run and mark it aborted
-  - output type: future runtime-control mutation
-  - current implementation: visual only
+  - output type: runtime-control mutation via `POST /api/phase3/runs/{runId}/abort`
+  - current implementation: implemented — disabled when `control.canAbort` is false, shows pending/success/error feedback
 
 ### 10.2 Timeline Controls
 
@@ -320,8 +316,9 @@ The screen should support:
 
 Current implementation status:
 
-- none of these runtime states are truly backed by live data
-- the page currently renders one static running-state composition
+- idle (no runId), loading, loaded, and error states are implemented
+- runtime-control mutation pending/success/error states are implemented for Pause and Abort
+- monitored run paused/aborted/finished states are rendered based on API response status
 
 ## 12. Validation and Rules
 
@@ -333,7 +330,9 @@ Intended runtime-control rules:
 
 Current implementation rule:
 
-- no runtime-control validation exists because no control action is wired
+- `Pause` is disabled when `control.canPause` is false (from status API response)
+- `Abort` is disabled when `control.canAbort` is false (from status API response)
+- both buttons are disabled during pending state
 
 ## 13. Cross-Screen Relationships
 
@@ -376,17 +375,12 @@ The `monitor` screen is not currently responsible for:
 - persisting project/case catalogs
 - rendering full post-run report detail
 
-## 15. Known Gaps and Review Items
+## 15. Remaining Limits
 
-Review items discovered while documenting:
-
-- the screen has no true monitored-run input; `runId` is hardcoded.
-- current progress, timeline, live page, and runtime log are local placeholders rather than backend-backed runtime data.
-- `Pause` and `Abort` are visible but not wired.
-- step rows and runtime log rows do not expose a drill-down behavior.
-- current screen entry from `execution` is only a generic screen switch, not a run-specific route-state handoff.
-
-These are documentation review items only. No implementation change is made in this stage.
+- Runtime data is deterministic mock from the backend when no real run artifacts exist.
+- Step rows and runtime log rows do not expose a drill-down behavior.
+- Live page panel shows structured data only; no real screenshot is rendered.
+- Pause/Abort record intent only; the backend does not trigger real execution-control workflows in Phase 3.
 
 ## 16. Suggested Output Files for This Screen Folder
 

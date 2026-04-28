@@ -106,7 +106,7 @@ Conventions used here:
 
 | Control | Type | Current behavior / interface | Future interface / design |
 |---|---|---|---|
-| `Open Exec Monitor` | button | Implemented as screen switch only; no `runId` handoff | Should carry explicit `runId` into `monitor` |
+| `Open Exec Monitor` | button | Implemented: `openMonitor(launchForm.runId)` passes canonical `runId` into `monitor` | Keep current |
 | Execution contract hint button | button | Visual only | Local help/contract drawer |
 | `Run ID` input | input | Local form state | Included in `POST /api/phase3/scheduler/requests` and `POST /api/phase3/scheduler/events` payloads |
 | `Project` select | select | Local form state | Included in scheduler payloads |
@@ -130,11 +130,11 @@ Conventions used here:
 
 | Control | Type | Current behavior / interface | Future interface / design |
 |---|---|---|---|
-| `Pause` | button | Visual only | `POST /api/phase3/runs/{runId}/pause` |
-| `Abort` | button | Visual only | `POST /api/phase3/runs/{runId}/abort` |
-| Step row | clickable row | Display-only | Drill-down on top of `GET /api/phase3/runs/{runId}/steps` |
-| Runtime log row | clickable row | Display-only | Drill-down on top of `GET /api/phase3/runs/{runId}/runtime-log` |
-| Live page viewport | panel | Display-only | Back with `GET /api/phase3/runs/{runId}/live-page` |
+| `Pause` | button | Implemented: `POST /api/phase3/runs/{runId}/pause` via `onPauseRun` callback | Keep current |
+| `Abort` | button | Implemented: `POST /api/phase3/runs/{runId}/abort` via `onAbortRun` callback | Keep current |
+| Step row | clickable row | Display-only; data from `GET /api/phase3/runs/{runId}/steps` | Drill-down drawer |
+| Runtime log row | clickable row | Display-only; data from `GET /api/phase3/runs/{runId}/runtime-log` | Drill-down drawer |
+| Live page viewport | panel | Display-only; data from `GET /api/phase3/runs/{runId}/live-page` | Screenshot/DOM rendering |
 
 ---
 
@@ -241,13 +241,14 @@ Plugin-specific data/source note:
 
 The highest-signal unresolved controls across the package are:
 
-- `execution -> monitor` still lacks explicit `runId` handoff
 - `plugin` still has no real popup/native wiring
 - `aiGenerate` still lacks real generate / dry-run / save actions
-- `monitor` still lacks all live runtime APIs
+- `monitor` step-row and runtime-log drill-down not yet implemented
 - `models` and `environments` have switched to real backend validation interfaces, but the validation remains deterministic and non-connective by Phase 3 design
 
 Resolved since last review:
 
 - `dataTemplates` now has a full backend template registry (P1-3: CRUD, import, dry-run, delete)
 - `cases` tabs are now API-backed with DSL edit/validate/save, state-machine read/save, plans read, history read (P2-3)
+- `execution -> monitor` now passes canonical `runId` through `openMonitor(launchForm.runId)` (P0-1)
+- `monitor` now fetches from 4 runtime APIs (status, steps, runtime-log, live-page) and has Pause/Abort wired (P0-1/P0-2)

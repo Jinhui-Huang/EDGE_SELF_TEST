@@ -17,47 +17,34 @@ It does not authorize UI or backend changes in the current phase.
 
 ## 2. Priority P0
 
-### P0-1. Add canonical `runId` handoff from `execution` to `monitor`
+### P0-1. Add canonical `runId` handoff from `execution` to `monitor` — DONE
 
 - Screens:
   - `execution`
   - `monitor`
-- Current gap:
-  - `execution` can open `monitor`, but the current handoff does not reliably pass a canonical run identifier.
-  - `monitor` therefore cannot bind to a stable runtime instance.
-- Current state:
-  - `execution` uses screen switching only.
-  - `monitor` is still mostly a shell with placeholder runtime data.
-- Required contract:
-  - app-level selected-run handoff now
-  - future typed route payload later
-- Required payload:
-  - `runId`
-  - optional `runName`
-  - optional `requestId`
-- Future interface dependency:
-  - `GET /api/phase3/runs/{runId}/status`
-  - `GET /api/phase3/runs/{runId}/steps`
-  - `GET /api/phase3/runs/{runId}/runtime-log`
-  - `GET /api/phase3/runs/{runId}/live-page`
-- Acceptance target:
-  - `monitor` always opens against a concrete run instance and stops depending on synthetic placeholder binding.
+- Resolved:
+  - `execution` calls `openMonitor(launchForm.runId)` which sets `selectedMonitorRunId` and navigates to `monitor`
+  - `monitor` receives `selectedRunId` as a prop and fetches 4 runtime APIs for that run
+  - idle state shown when no `runId` is provided (e.g., direct sidebar navigation)
+  - dashboard attention items also pass `runId` through the same `openMonitor()` path
+- Test coverage:
+  - execution → monitor runId handoff test
+  - monitor idle state when no runId is provided
 
-### P0-2. Replace `monitor` placeholder runtime data with real runtime APIs
+### P0-2. Replace `monitor` placeholder runtime data with real runtime APIs — DONE
 
 - Screens:
   - `monitor`
-- Current gap:
-  - progress, timeline, runtime logs, and live-page data are synthetic.
-- Required interfaces:
-  - `GET /api/phase3/runs/{runId}/status`
-  - `GET /api/phase3/runs/{runId}/steps`
-  - `GET /api/phase3/runs/{runId}/runtime-log`
-  - `GET /api/phase3/runs/{runId}/live-page`
-  - `POST /api/phase3/runs/{runId}/pause`
-  - `POST /api/phase3/runs/{runId}/abort`
-- Blocking reason:
-  - this screen cannot be treated as a real execution monitor until runtime data leaves demo mode.
+- Resolved:
+  - 4 read APIs implemented: `GET .../status`, `GET .../steps`, `GET .../runtime-log`, `GET .../live-page`
+  - 2 control APIs implemented: `POST .../pause`, `POST .../abort`
+  - Pause/Abort show pending/success/error feedback, refresh runtime data on success
+  - idle/loading/error/loaded states fully implemented
+- Remaining limits:
+  - runtime data is deterministic mock from backend when no real run artifacts exist
+  - Pause/Abort record intent only, no real execution-control workflow in Phase 3
+  - step-row and runtime-log drill-down not yet implemented
+  - live page shows structured data only, no real screenshot
 
 ### P0-3. Replace `plugin` admin-console snapshot dependency with dedicated popup contract
 

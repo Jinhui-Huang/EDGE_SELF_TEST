@@ -3152,3 +3152,38 @@ All code was completed on 2026-04-25; only the docs still described controls as 
 
 ## Next Step
 - Continue with the next review-backlog priority
+
+---
+
+# P0-1 / P0-2 Monitor RunId Handoff + Runtime APIs Documentation Sync (2026-04-28)
+
+## Goal
+Complete P0-1 (canonical runId handoff from execution to monitor) and sync P0-2 (monitor runtime APIs).
+All code was already implemented; this session verified, added tests, and synchronized docs.
+
+## Discovery
+On code inspection, both P0-1 and P0-2 were already fully implemented:
+- `App.tsx` — `selectedMonitorRunId` state, `openMonitor(runId)` helper, execution `onOpenMonitor` bound to `openMonitor(launchForm.runId)`
+- `MonitorScreen.tsx` — full implementation with idle/loading/error/loaded states, 4 runtime API fetches, Pause/Abort wiring
+- `types.ts` — all runtime types (RunStatus, RunStep, RuntimeLogEntry, LivePage, RunControlResponse) exist
+- `App.tsx` — Pause/Abort callbacks wired to backend fetch calls
+
+## Tests Added
+- `App.test.tsx`: 2 new tests (31 total, up from 29):
+  1. "passes runId from execution to monitor via Open Exec Monitor"
+  2. "shows monitor idle state when no runId is provided"
+
+## Docs Synced
+1. `execution/interface-spec.md` — §8.5, §9.1, §11.4 updated for runId handoff
+2. `execution/functional-spec.md` — §5, §6.1, §10.1 updated for runId handoff
+3. `monitor/functional-spec.md` — §5-§15 all synced from placeholder/future to implemented
+4. `monitor/interface-spec.md` — §2, §4, §5.1, §6.1, §7-§11 all synced
+5. `ui-control-interface-overview.md` — execution and monitor sections updated
+6. `review-backlog.md` — P0-1 and P0-2 both marked DONE
+
+## Verification
+- npm test: **31/31 passed** (up from 29)
+- npm build: **passed**
+
+## Next Step
+- Continue with the next review-backlog priority

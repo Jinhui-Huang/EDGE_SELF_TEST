@@ -1351,6 +1351,70 @@ describe("App", () => {
     expect(await screen.findByText(/already in progress/)).toBeInTheDocument();
   });
 
+  it("passes runId from execution to monitor via Open Exec Monitor", async () => {
+    const fetchMock = vi.fn().mockImplementation((call: unknown) => {
+      const url = String(call);
+      if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
+      if (url.endsWith("/api/phase3/data-templates")) return jsonResponse(dataTemplatesResponse);
+      if (url.endsWith("/api/phase3/runs/checkout-web-smoke/status")) return jsonResponse(monitorStatusResponse);
+      if (url.endsWith("/api/phase3/runs/checkout-web-smoke/steps")) return jsonResponse(monitorStepsResponse);
+      if (url.endsWith("/api/phase3/runs/checkout-web-smoke/runtime-log")) return jsonResponse(monitorRuntimeLogResponse);
+      if (url.endsWith("/api/phase3/runs/checkout-web-smoke/live-page")) return jsonResponse(monitorLivePageResponse);
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    // Wait for initial render
+    await screen.findByText("Needs attention");
+
+    // Wait for app to render
+    await screen.findByText("Needs attention");
+
+    // Navigate to execution screen via sidebar
+    const executionNavButtons = await screen.findAllByRole("button", { name: /Execution/ });
+    await userEvent.click(executionNavButtons[0]);
+
+    // Wait for execution page to render, click the first Open Exec Monitor button
+    const monitorButtons = await screen.findAllByText("Open Exec Monitor");
+    await userEvent.click(monitorButtons[0]);
+
+    // Verify monitor fetches the correct runId
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith("http://127.0.0.1:8787/api/phase3/runs/checkout-web-smoke/status");
+    });
+
+    // Verify monitor renders run context from API data — use badge class to find the specific status text
+    expect(await screen.findByText("40%")).toBeInTheDocument();
+    expect(await screen.findByText("Open home")).toBeInTheDocument();
+  });
+
+  it("shows monitor idle state when no runId is provided", async () => {
+    const fetchMock = vi.fn().mockImplementation(() => jsonResponse(snapshot));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    // Wait for app to render
+    await screen.findByText("Needs attention");
+
+    // Navigate to monitor via sidebar (no runId handoff — handleScreenChange sets selectedMonitorRunId to null)
+    const allButtons = screen.getAllByRole("button");
+    const monitorNavButton = allButtons.find((btn) => btn.textContent?.includes("Execution monitor"));
+    expect(monitorNavButton).toBeTruthy();
+    await userEvent.click(monitorNavButton!);
+
+    // Verify idle state is shown
+    expect(await screen.findByText(/no run selected|未选择运行|実行未選択/i)).toBeInTheDocument();
+
+    // Verify no run API calls were made
+    const runApiCalls = fetchMock.mock.calls.filter((call: unknown[]) =>
+      String(call[0]).includes("/api/phase3/runs/")
+    );
+    expect(runApiCalls).toHaveLength(0);
+  });
+
   it("switches the Reports overview when clicking another project", async () => {
     const fetchMock = vi.fn().mockImplementation(() => jsonResponse(snapshot));
     vi.stubGlobal("fetch", fetchMock);
