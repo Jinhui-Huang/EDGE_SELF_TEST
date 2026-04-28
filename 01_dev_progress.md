@@ -3224,3 +3224,45 @@ On code inspection, P0-3 was already implemented:
 
 ## Next Step
 - Continue with the next review-backlog priority
+62. P1-1 aiGenerate real generation flow baseline re-verified and docs finalized (2026-04-28)
+   - Goal of this pass:
+     - re-read the current Phase 3 docs and code paths for `docParse -> aiGenerate -> cases`
+     - verify whether P1-1 still had implementation gaps or only stale documentation
+   - Discovery:
+     - the real chain was already implemented in code:
+       - `DocParseScreen.tsx` hands stable focus context to `App.tsx`
+       - `App.tsx` stores `aiGenerateFocus` and opens `aiGenerate`
+       - `AiGenerateScreen.tsx` already uses:
+         - `POST /api/phase3/agent/generate-case`
+         - `POST /api/phase3/cases/dsl/validate`
+         - `POST /api/phase3/agent/generate-case/dry-run`
+         - `POST /api/phase3/catalog/case`
+       - validate-first behavior for Dry-run and Save was already in place
+       - save already reuses canonical case-catalog persistence instead of a parallel contract
+      - this pass added and re-verified frontend coverage for generate, dry-run, save, and failure visibility
+     - the main remaining mismatch was documentation wording in `docs/phase3/interface/aiGenerate/*`
+   - Docs updated:
+     - `docs/phase3/interface/aiGenerate/interface-spec.md`
+       - removed stale wording about lack of backend generation/validation/persistence requests
+       - rewrote save-path description to current implemented `POST /api/phase3/catalog/case` behavior
+       - clarified fallback vs backend-returned generated artifacts
+     - `docs/phase3/interface/aiGenerate/functional-spec.md`
+       - clarified current placement of validate/dry-run/save in the review flow
+       - clarified that DSL is display-only on this page, while validation and persistence are implemented
+   - Docs updated in this pass:
+     - `docs/phase3/interface/review-backlog.md`
+     - `docs/phase3/interface/ui-control-interface-overview.md`
+       - both now explicitly reflect P1-1 as implemented instead of leaving `aiGenerate` actions in stale future/unwired wording
+   - Docs checked and found already aligned, so no content change was needed:
+     - `docs/phase3/interface/docParse/*`
+     - `docs/phase3/interface/cases/*`
+   - Verification rerun:
+     - `npm test -- --run` in `ui/admin-console`: PASS (37/37)
+     - `npm run build` in `ui/admin-console`: PASS
+     - `mvn "-Dmaven.repo.local=.m2/repository" -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`: PASS (13/13)
+   - Current limits retained:
+     - backend generation remains deterministic mock shaped by input context, not a real AI model call
+     - candidate tab switch remains local-only; backend returns one selected DSL payload per generation
+     - `aiGenerate` still has no automatic downstream navigation into `cases` or `execution`
+   - Next suggested backlog step:
+     - continue from the next unresolved item in `docs/phase3/interface/review-backlog.md`

@@ -68,21 +68,29 @@ It does not authorize UI or backend changes in the current phase.
 
 ## 3. Priority P1
 
-### P1-1. Complete real `aiGenerate` generation flow
+### P1-1. Complete real `aiGenerate` generation flow — DONE
 
 - Screens:
   - `docParse`
   - `aiGenerate`
   - `cases`
-- Current gap:
-  - `Generate tests`, `Regenerate`, `Dry-run`, and `Save as case` are not backed by real generation and validation services.
-- Required interfaces:
-  - `POST /api/phase3/agent/generate-case`
-  - `POST /api/phase3/cases/dsl/validate`
-  - `POST /api/phase3/agent/generate-case/dry-run`
-  - `POST /api/phase3/catalog/case`
-- Acceptance target:
-  - document parse output can become a validated case draft and then persist into the case catalog.
+- Resolved:
+  - 4 endpoints implemented: `POST /api/phase3/agent/generate-case`, `POST /api/phase3/cases/dsl/validate`, `POST /api/phase3/agent/generate-case/dry-run`, `POST /api/phase3/catalog/case`
+  - `docParse` passes stable focus payload to `aiGenerate` via `openAiGenerateFromDocParse(focus)` in `App.tsx`
+  - `aiGenerate` auto-generates on mount when focus exists; replaces all panels with API data when genResult populated
+  - Validate-first pattern: both Dry-run and Save validate DSL before their second request
+  - Save reuses existing `POST /api/phase3/catalog/case` persistence; triggers snapshot reload on success
+  - Four mutation states (`generateState`, `validateState`, `dryRunState`, `saveState`) each with idle/pending/success/error
+  - API data clearly separated from local fallback via `genResult?.xxx ?? fallback` pattern
+- Remaining limits:
+  - backend returns deterministic mock data, not real AI agent output
+  - candidate tab switch is local-only; backend returns single selectedDsl per generation
+  - no return path from aiGenerate into cases or execution after review
+- Test coverage:
+  - generate from docParse handoff via real generate endpoint
+  - dry-run with validate-first then dry-run endpoint
+  - save with validate-first then catalog persistence
+  - generation failure visibility
 
 ### P1-2. Make report pages read real report artifacts instead of front-end synthesized summaries
 

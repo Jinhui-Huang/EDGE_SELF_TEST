@@ -96,9 +96,9 @@ Conventions used here:
 | Control | Type | Current behavior / interface | Future interface / design |
 |---|---|---|---|
 | Generated case tab | tab/button | Local candidate selection only | Keep local after generation payload load |
-| `Regenerate` | button | Visual only | `POST /api/phase3/agent/generate-case` |
-| `Dry-run` | button | Visual only | `POST /api/phase3/cases/dsl/validate` -> `POST /api/phase3/agent/generate-case/dry-run` |
-| `Save as case` | button | Visual only | `POST /api/phase3/cases/dsl/validate` -> `POST /api/phase3/catalog/case` |
+| `Regenerate` | button | Implemented: `POST /api/phase3/agent/generate-case` with `REGENERATE` mode; replaces all panel content on success, shows error on failure | Keep current |
+| `Dry-run` | button | Implemented: validates first via `POST /api/phase3/cases/dsl/validate`, then `POST /api/phase3/agent/generate-case/dry-run`; shows pass/fail with check details | Keep current |
+| `Save as case` | button | Implemented: validates first via `POST /api/phase3/cases/dsl/validate`, then `POST /api/phase3/catalog/case`; triggers snapshot reload on success | Keep current |
 
 ---
 
@@ -243,7 +243,6 @@ Plugin-specific data/source note:
 The highest-signal unresolved controls across the package are:
 
 - `plugin` quick actions still have no real popup/native wiring (require extension/background/native infrastructure)
-- `aiGenerate` still lacks real generate / dry-run / save actions
 - `monitor` step-row and runtime-log drill-down not yet implemented
 - `models` and `environments` have switched to real backend validation interfaces, but the validation remains deterministic and non-connective by Phase 3 design
 

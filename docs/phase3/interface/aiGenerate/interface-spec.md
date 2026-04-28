@@ -20,22 +20,24 @@ This document distinguishes:
 
 - current App-level focus input from `docParse`
 - current snapshot fallback behavior
-- current lack of backend generation/validation/persistence requests
-- future interfaces required by visible controls on the page
+- current implemented generation/validation/persistence requests
+- remaining limits between backend-returned generated artifacts and front-end fallback display
 
 ## 2. Interface Summary
 
 Current `aiGenerate` screen conclusion:
 
 - current direct read source:
-  - none screen-specific
-- current indirect read context:
-  - `GET /api/phase3/admin-console`
-- current direct write source:
-  - none
+  - `GET /api/phase3/admin-console` (fallback context when no focus)
+- current direct write sources:
+  - `POST /api/phase3/agent/generate-case` (generate/regenerate)
+  - `POST /api/phase3/cases/dsl/validate` (DSL validation)
+  - `POST /api/phase3/agent/generate-case/dry-run` (dry-run validation)
+  - `POST /api/phase3/catalog/case` (save to case catalog)
 - current real upstream integration:
   - App-level focus handoff from `docParse`
-- current generated flow, state machine, and DSL are front-end demo artifacts rather than backend-generated assets
+- auto-generate on mount when focus exists
+- generated flow, state machine, DSL, and reasoning come from backend when genResult is populated; local fallback used otherwise
 
 ## 3. Current Upstream App-Level Focus Handoff: DocParse -> AiGenerate
 
@@ -117,48 +119,50 @@ Those values originate from:
 
 ### 4.3 Current Limitation
 
-This fallback does not represent true AI generation output. It only prevents the screen from rendering empty content.
+This fallback does not represent true AI generation output. It only prevents the screen from rendering empty content before a focused generation request succeeds, or when the page is opened without `docParse` context.
 
-## 5. Current Local-Only Review Model
+## 5. Review Model — API-Driven with Local Fallback
 
 ### 5.1 Candidate Selection
 
 - owner: `selectedCaseId`
-- request: none
+- request: none (local switch only)
 - effect:
   - switches selected candidate tab
-  - regenerates local DSL template with the selected candidate name
+  - when no genResult: regenerates local DSL template with the selected candidate name
+  - when genResult exists: displays the same API-returned content (single selectedDsl per generation)
 
 ### 5.2 Flow Tree Model
 
-- source: local constant `flowNodes`
-- request: none
+- source when genResult exists: `genResult.flowTree` (backend-returned)
+- source when no genResult: local constant `defaultFlowNodes`
 - meaning:
-  - demo-only representation of generated flow structure
+  - backend returns deterministic flow tree shaped by input context
+  - local fallback provides demo structure until generation runs
 
 ### 5.3 State Machine Model
 
-- source: static local SVG
-- request: none
+- source when genResult exists: `genResult.stateMachine` (rendered as state rows + edge rows)
+- source when no genResult: static local SVG
 - meaning:
-  - demo-only representation of generated states and transitions
+  - backend returns deterministic state/edge graph
+  - local fallback provides static demo SVG until generation runs
 
 ### 5.4 DSL Model
 
-- source: local helper `buildDslLines(projectName, documentName, caseName)`
-- request: none
+- source when genResult exists: `genResult.selectedDsl.content` (backend-returned)
+- source when no genResult: local helper `buildLocalDsl(projectName, documentName, caseName)`
 - meaning:
-  - placeholder for the future backend-generated case DSL artifact
+  - backend returns deterministic DSL content shaped by input context
+  - local fallback provides demo DSL until generation runs
 
 ## 6. Relationship to Existing Persisted Interfaces
 
-The page does not currently save through any real endpoint.
-
-However, the broader shell already has a case catalog mutation path:
+The page now saves through the broader shell's case catalog mutation path:
 
 - `POST /api/phase3/catalog/case`
 
-That existing interface is suitable for final persistence after the generated output is converted into canonical case-catalog shape.
+That existing interface is reused for final persistence after the generated output is converted into canonical case-catalog shape. `aiGenerate` does not introduce a parallel save contract.
 
 ## 7. UI Control to Interface Mapping
 
@@ -176,65 +180,56 @@ That existing interface is suitable for final persistence after the generated ou
 #### `Regenerate`
 
 - user action: click
-- request: none today
-- owner: not implemented
-- intended future interface:
-  - AI case-generation mutation
-- current state: visible only
+- request: `POST /api/phase3/agent/generate-case` with `promptMode: "REGENERATE"`
+- owner: `doGenerate("REGENERATE")` in `AiGenerateScreen.tsx`
+- current state: implemented — replaces all panel content on success, shows error on failure, disabled during pending
 
 #### `Dry-run`
 
 - user action: click
-- request: none today
-- owner: not implemented
-- intended future interface:
-  - generated-case validation or execution-preview mutation
-- current state: visible only
+- request: `POST /api/phase3/cases/dsl/validate` then `POST /api/phase3/agent/generate-case/dry-run`
+- owner: `doDryRun()` in `AiGenerateScreen.tsx`
+- current state: implemented — validates first, shows dry-run pass/fail with runtime checks, disabled during pending
 
 #### `Save as case`
 
 - user action: click
-- request: none today
-- owner: not implemented
-- intended future interface:
-  - save generated candidate into case catalog
-- current state: visible only
+- request: `POST /api/phase3/cases/dsl/validate` then `POST /api/phase3/catalog/case`
+- owner: `doSave()` in `AiGenerateScreen.tsx`
+- current state: implemented — validates first, persists to catalog, triggers snapshot reload, disabled during pending
 
 ### 7.3 Review Surfaces
 
 #### Flow / state tree panel
 
 - user action: view
-- request: none
-- owner: local demo data
-- current state: display only
+- request: none (data from genResult or fallback)
+- owner: `genResult.flowTree` or `defaultFlowNodes`
+- current state: display only, backend-sourced when genResult exists
 
 #### State machine panel
 
 - user action: view
-- request: none
-- owner: local demo SVG
-- current state: display only
+- request: none (data from genResult or fallback)
+- owner: `genResult.stateMachine` (list view) or static SVG
+- current state: display only, backend-sourced when genResult exists
 
 #### DSL panel
 
 - user action: view
-- request: none today
-- owner: local generated text
-- intended future interface:
-  - DSL validation read/mutation
-- current state: display only
+- request: none (data from genResult or fallback)
+- owner: `genResult.selectedDsl.content` or `buildLocalDsl(...)`
+- validation: DSL validated before dry-run and save via `POST /api/phase3/cases/dsl/validate`
+- current state: display only, backend-sourced when genResult exists
 
 #### Review notes panel
 
 - user action: view
 - request: none
-- owner: App-level focus reasoning blocks
-- current state: display only
+- owner: `genResult.reasoning` or App-level focus reasoning blocks
+- current state: display only, backend-sourced when genResult exists
 
-## 8. Recommended Future AI Generate Interfaces
-
-The visible controls require explicit generation-domain interfaces.
+## 8. Implemented AI Generate Interfaces
 
 ### 8.1 Generate / Regenerate Interface
 
@@ -243,6 +238,12 @@ The visible controls require explicit generation-domain interfaces.
 Purpose:
 
 - generate or regenerate executable candidate cases from document-parse context
+
+Current status:
+
+- implemented in `AgentGenerateService.generateCase()`
+- returns deterministic mock data shaped by input context
+- REGENERATE mode adds an extra boundary candidate
 
 Request body:
 
@@ -319,6 +320,12 @@ Purpose:
 
 - validate generated DSL before save or dry-run
 
+Current status:
+
+- implemented in `AgentGenerateService.validateDsl()`
+- checks for empty DSL and missing case block declaration
+- returns VALID/INVALID with errors and warnings
+
 Request body:
 
 ```json
@@ -353,6 +360,12 @@ Response body:
 Purpose:
 
 - persist the accepted generated case into the canonical case catalog
+
+Current status:
+
+- implemented via existing `CatalogPersistenceService.upsertCase()`
+- aiGenerate submission includes `dsl`, `sourceDocumentId`, and `generationMeta` fields
+- file-backed persistence under `config/phase3/catalog.json`
 
 Request body design for `aiGenerate` submission:
 
@@ -398,6 +411,13 @@ Purpose:
 
 - validate generated candidate through parser/schema/runtime-readiness checks before catalog persistence or execution launch
 
+Current status:
+
+- implemented in `AgentGenerateService.dryRun()`
+- checks parser status, runtime plan references, and environment access
+- returns PASSED/FAILED with structured check results
+- suggests launch form when passed
+
 Request body:
 
 ```json
@@ -435,126 +455,72 @@ Response body:
 }
 ```
 
-## 9. Detailed Implementation Design for Currently Unwired Controls
+## 9. Implemented Control Wiring
 
 ### 9.1 `Regenerate`
 
-Recommended implementation type:
+Implementation:
 
-- new AI-generation mutation
-
-Concrete implementation design:
-
-- button posts:
-  - `POST /api/phase3/agent/generate-case`
-- request is assembled from current focus and selected candidate:
-  - `projectKey`
-  - `documentId`
-  - `caseId`
-  - operator identity
-  - prompt mode `REGENERATE`
+- prop: `doGenerate("REGENERATE")` callback
+- endpoint: `POST /api/phase3/agent/generate-case`
+- request assembled from activeFocus: `projectKey`, `documentId`, `caseId`, operator, `REGENERATE` mode
 - success behavior:
-  - replace current `generatedCases`
-  - replace flow tree
-  - replace state machine
-  - replace DSL
-  - replace reasoning
-  - set selected candidate to returned primary candidate
-- failure behavior:
-  - show page-local generate mutation error
+  - replaces `genResult` → all panels update (flow tree, state machine, DSL, reasoning)
+  - resets validation/dry-run/save states
+  - sets selected candidate to first returned candidate
+- failure behavior: shows error in header area
 
 ### 9.2 `Dry-run`
 
-Recommended implementation type:
+Implementation:
 
-- validate first, optionally hand off later to `execution`
-
-Concrete implementation design:
-
-1. button posts:
-   - `POST /api/phase3/cases/dsl/validate`
-2. if validation succeeds, post:
-   - `POST /api/phase3/agent/generate-case/dry-run`
-3. success behavior:
-   - show dry-run result summary
-   - optionally expose `Open in execution` follow-up action using returned launch-form hints
-4. failure behavior:
-   - keep operator on `aiGenerate`
-   - mark DSL/review surface as failed
+- prop: `doDryRun()` callback
+- step 1: `POST /api/phase3/cases/dsl/validate`
+- step 2 (only on VALID): `POST /api/phase3/agent/generate-case/dry-run`
+- success behavior: shows "Dry-run passed" and structured check results
+- failure behavior: keeps operator on aiGenerate, shows error
 
 ### 9.3 `Save as case`
 
-Recommended implementation type:
+Implementation:
 
-- validate then reuse existing case-catalog persistence interface
+- prop: `doSave()` callback
+- step 1: `POST /api/phase3/cases/dsl/validate`
+- step 2 (only on VALID): `POST /api/phase3/catalog/case`
+- payload includes `dsl`, `sourceDocumentId`, `generationMeta`
+- success behavior: shows "Saved to catalog", calls `onSaveSuccess()` (triggers snapshot reload)
+- failure behavior: shows error, preserves generated content for retry
 
-Concrete implementation design:
-
-1. button posts:
-   - `POST /api/phase3/cases/dsl/validate`
-2. if validation succeeds, submit canonical payload to:
-   - `POST /api/phase3/catalog/case`
-3. success behavior:
-   - reload shared snapshot:
-     - `GET /api/phase3/admin-console`
-   - optionally route to `cases` with saved case selected
-4. failure behavior:
-   - show save-state failure on the page
-
-Reasoning:
-
-- this keeps final persistence aligned with the existing case-catalog domain instead of inventing a second save endpoint
+Reasoning: reuses existing case-catalog persistence instead of inventing a second save endpoint.
 
 ### 9.4 Candidate Tabs
 
-Recommended implementation type:
+Implementation:
 
-- keep local selection behavior
-- when real generation payload exists, tabs should switch the bound artifact set without extra requests
+- local selection via `selectedCaseId`
+- candidates from `genResult.generatedCases` or `activeFocus.generatedCases`
+- tab click updates local state only; no extra API calls
 
-Concrete implementation design:
+### 9.5 DSL Validation Surface
 
-- initial generate response returns all candidate artifacts:
-  - candidate summary
-  - DSL
-  - flow tree
-  - state machine
-  - reasoning
-- tab click updates current candidate in local state only
+Implementation:
 
-### 9.5 DSL Review Surface
-
-Recommended implementation type:
-
-- keep local view switching
-- add explicit validation action coupling
-
-Concrete implementation design:
-
-- before showing `schema ok`, page should call:
-  - `POST /api/phase3/cases/dsl/validate`
-- validation result updates:
-  - success pill
-  - warnings list
-  - field-level or line-level errors when present
+- validation pill driven by `validateState` and `generateState`:
+  - "schema ok" after successful validation or generation
+  - "schema error" after validation failure
+  - "pending" when no validation has run
+- DSL validated automatically before dry-run and save actions
 
 ## 10. Error Handling Boundary
 
 Current implementation:
 
-- the page has no backend requests
 - missing focus falls back to snapshot-derived demo content
-
-Recommended future errors:
-
-- generation failure
-  - show mutation error in hero action area
-- DSL validation failure
-  - show invalid schema state in DSL panel
-- save failure
-  - keep candidate selected and preserve generated output for retry
-- dry-run failure
-  - return structured check results rather than only a generic message
+- generation failure: error message rendered in header action area
+- DSL validation failure: validation pill shows "schema error"; dry-run and save abort before their second request
+- save failure: error shown in header area; generated content preserved for retry
+- dry-run failure: structured check results shown inline (parser status + runtime check details)
+- all buttons disabled while any mutation is pending, preventing concurrent requests
 
 ## 11. Relationship to Other Interfaces
 
@@ -573,13 +539,11 @@ Recommended future errors:
 - dry-run success should be able to produce execution-launch hints
 - the screen should not directly replace the `execution` page's scheduler submission flow
 
-## 12. Review Items
+## 12. Remaining Limits
 
-Review-only findings:
-
-- The current page is mostly a review-shell prototype over App-level focus handoff and local demo artifacts.
-- The correct persistence direction is to reuse `POST /api/phase3/catalog/case` after DSL validation.
-- `Regenerate` and `Dry-run` need explicit generation-domain endpoints rather than being forced through unrelated scheduler APIs.
-- The current static flow tree and state machine make the page look more complete than it actually is; the interface document should treat them as placeholder artifacts until backend-generated payloads exist.
-
-These are documentation findings only. No implementation change is made in this stage.
+- Backend generation is deterministic mock shaped by input context; no real AI agent integrated in Phase 3.
+- Flow tree, state machine, and DSL from the backend are realistic but deterministic — they do not vary by actual document content.
+- Local fallback data still exists for when no focus or genResult is available; clearly separated from API data via `genResult?.xxx ?? fallback` pattern.
+- No automatic return path from `aiGenerate` into `cases` or `execution` after review completion; save and dry-run remain in-place review actions on this screen.
+- DSL is not directly editable on this page; operator can only review the generated content.
+- Candidate tab switch is local-only; does not change DSL/flow/machine per candidate when backend returns a single selectedDsl.

@@ -1487,6 +1487,239 @@ describe("App", () => {
     expect(await screen.findByText(/host unreachable|主机不可达|ホスト接続不可/)).toBeInTheDocument();
   });
 
+  it("generates cases from docParse handoff via real generate endpoint", async () => {
+    const generateResponse = {
+      documentId: "checkout-web-primary",
+      selectedCaseId: "checkout-smoke",
+      generatedCases: [
+        { id: "gen-checkout-smoke-a", name: "Checkout smoke", category: "happy", confidence: "0.94", summary: "Main flow." }
+      ],
+      reasoning: [{ label: "Coverage", body: "Expanded main flow." }],
+      selectedDsl: { format: "text/x-phase3-dsl", content: 'case "Checkout smoke" {\n  step open "/api-generated-page"\n  assert url = /confirm/*\n}' },
+      stateMachine: {
+        states: [{ id: "page.loaded", label: "page.loaded" }, { id: "confirmed", label: "confirmed" }],
+        edges: [{ from: "page.loaded", to: "confirmed", trigger: "click submit" }]
+      },
+      flowTree: [
+        { label: "page.loaded", tone: "accent", indent: 0 },
+        { label: "click submit", tone: "muted", indent: 1 },
+        { label: "confirmed", tone: "success", indent: 0 }
+      ]
+    };
+
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
+      if (url.endsWith("/api/phase3/agent/generate-case") && !url.includes("dry-run")) return jsonResponse(generateResponse);
+      throw new Error(`Unexpected fetch: ${url} ${init?.method ?? "GET"}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+    await userEvent.click(await screen.findByRole("button", { name: /Doc Parse/ }));
+    await screen.findByText("Document catalog");
+
+    // Open a document detail and click Generate tests
+    const detailButtons = await screen.findAllByRole("button", { name: /Detail/ });
+    await userEvent.click(detailButtons[0]);
+    const generateButtons = await screen.findAllByText("Generate tests");
+    await userEvent.click(generateButtons[0]);
+
+    // Verify generate endpoint was called
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "http://127.0.0.1:8787/api/phase3/agent/generate-case",
+        expect.objectContaining({ method: "POST" })
+      );
+    });
+
+    // Verify backend-returned DSL content (unique to API response, not in local fallback)
+    expect(await screen.findByText(/api-generated-page/)).toBeInTheDocument();
+    // Verify DSL validation pill reflects generation success
+    expect(await screen.findByText(/schema ok|结构校验通过|スキーマ OK/)).toBeInTheDocument();
+  });
+
+  it("runs dry-run with validate-first then dry-run endpoint", async () => {
+    const generateResponse = {
+      documentId: "checkout-web-primary",
+      selectedCaseId: "checkout-smoke",
+      generatedCases: [
+        { id: "gen-checkout-smoke-a", name: "Checkout smoke", category: "happy", confidence: "0.94", summary: "Main flow." }
+      ],
+      reasoning: [{ label: "Coverage", body: "Expanded main flow." }],
+      selectedDsl: { format: "text/x-phase3-dsl", content: 'case "Checkout smoke" {\n  step open "/api-generated-page"\n}' },
+      stateMachine: { states: [{ id: "s1", label: "s1" }], edges: [] },
+      flowTree: [{ label: "s1", tone: "accent", indent: 0 }]
+    };
+    const validateResponse = { status: "VALID", errors: [], warnings: [], normalizedDsl: 'case "Checkout smoke" { step open "/api-generated-page" }' };
+    const dryRunResponse = {
+      status: "PASSED",
+      parser: { status: "OK", errors: [] },
+      runtimeChecks: [{ name: "restorePlanRef", status: "OK" }],
+      suggestedLaunchForm: { projectKey: "checkout-web", environment: "staging" }
+    };
+
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
+      if (url.endsWith("/api/phase3/agent/generate-case") && !url.includes("dry-run")) return jsonResponse(generateResponse);
+      if (url.endsWith("/api/phase3/cases/dsl/validate")) return jsonResponse(validateResponse);
+      if (url.endsWith("/api/phase3/agent/generate-case/dry-run")) return jsonResponse(dryRunResponse);
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+    await userEvent.click(await screen.findByRole("button", { name: /Doc Parse/ }));
+    await screen.findByText("Document catalog");
+    const detailButtons = await screen.findAllByRole("button", { name: /Detail/ });
+    await userEvent.click(detailButtons[0]);
+    const generateButtons = await screen.findAllByText("Generate tests");
+    await userEvent.click(generateButtons[0]);
+
+    // Wait for auto-generate to complete
+    await screen.findByText(/api-generated-page/);
+
+    // Click Dry-run
+    await userEvent.click(await screen.findByText("Dry-run"));
+
+    // Verify validate was called first
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "http://127.0.0.1:8787/api/phase3/cases/dsl/validate",
+        expect.objectContaining({ method: "POST" })
+      );
+    });
+
+    // Then dry-run endpoint
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "http://127.0.0.1:8787/api/phase3/agent/generate-case/dry-run",
+        expect.objectContaining({ method: "POST" })
+      );
+    });
+
+    await waitFor(() => {
+      const validateIndex = fetchMock.mock.calls.findIndex(
+        ([input]) => String(input) === "http://127.0.0.1:8787/api/phase3/cases/dsl/validate"
+      );
+      const dryRunIndex = fetchMock.mock.calls.findIndex(
+        ([input]) => String(input) === "http://127.0.0.1:8787/api/phase3/agent/generate-case/dry-run"
+      );
+      expect(validateIndex).toBeGreaterThanOrEqual(0);
+      expect(dryRunIndex).toBeGreaterThanOrEqual(0);
+      expect(validateIndex).toBeLessThan(dryRunIndex);
+    });
+
+    // Verify dry-run result visible
+    expect(await screen.findByText(/Dry-run passed|试运行通过|ドライラン合格/)).toBeInTheDocument();
+  });
+
+  it("saves generated case with validate-first then catalog persistence", async () => {
+    const generateResponse = {
+      documentId: "checkout-web-primary",
+      selectedCaseId: "checkout-smoke",
+      generatedCases: [
+        { id: "gen-checkout-smoke-a", name: "Checkout smoke", category: "happy", confidence: "0.94", summary: "Main flow." }
+      ],
+      reasoning: [{ label: "Coverage", body: "Expanded main flow." }],
+      selectedDsl: { format: "text/x-phase3-dsl", content: 'case "Checkout smoke" {\n  step open "/api-generated-page"\n}' },
+      stateMachine: { states: [{ id: "s1", label: "s1" }], edges: [] },
+      flowTree: [{ label: "s1", tone: "accent", indent: 0 }]
+    };
+    const validateResponse = { status: "VALID", errors: [], warnings: [] };
+    const saveResponse = { status: "ACCEPTED", saved: 1 };
+
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
+      if (url.endsWith("/api/phase3/agent/generate-case") && !url.includes("dry-run")) return jsonResponse(generateResponse);
+      if (url.endsWith("/api/phase3/cases/dsl/validate")) return jsonResponse(validateResponse);
+      if (url.endsWith("/api/phase3/catalog/case")) return jsonResponse(saveResponse, 202);
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+    await userEvent.click(await screen.findByRole("button", { name: /Doc Parse/ }));
+    await screen.findByText("Document catalog");
+    const detailButtons = await screen.findAllByRole("button", { name: /Detail/ });
+    await userEvent.click(detailButtons[0]);
+    const generateButtons = await screen.findAllByText("Generate tests");
+    await userEvent.click(generateButtons[0]);
+    await screen.findByText(/api-generated-page/);
+
+    // Click Save as case
+    const saveButtons = await screen.findAllByText(/Save as case|保存为用例|ケースとして保存/);
+    await userEvent.click(saveButtons[0]);
+
+    // Verify validate called first
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "http://127.0.0.1:8787/api/phase3/cases/dsl/validate",
+        expect.objectContaining({ method: "POST" })
+      );
+    });
+
+    // Then catalog/case called
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "http://127.0.0.1:8787/api/phase3/catalog/case",
+        expect.objectContaining({ method: "POST" })
+      );
+    });
+
+    await waitFor(() => {
+      const validateIndex = fetchMock.mock.calls.findIndex(
+        ([input]) => String(input) === "http://127.0.0.1:8787/api/phase3/cases/dsl/validate"
+      );
+      const saveIndex = fetchMock.mock.calls.findIndex(
+        ([input]) => String(input) === "http://127.0.0.1:8787/api/phase3/catalog/case"
+      );
+      expect(validateIndex).toBeGreaterThanOrEqual(0);
+      expect(saveIndex).toBeGreaterThanOrEqual(0);
+      expect(validateIndex).toBeLessThan(saveIndex);
+    });
+
+    await waitFor(() => {
+      const adminConsoleCallIndexes = fetchMock.mock.calls
+        .map(([input], index) =>
+          String(input) === "http://127.0.0.1:8787/api/phase3/admin-console" ? index : -1
+        )
+        .filter((index) => index >= 0);
+      const saveIndex = fetchMock.mock.calls.findIndex(
+        ([input]) => String(input) === "http://127.0.0.1:8787/api/phase3/catalog/case"
+      );
+      expect(adminConsoleCallIndexes).toHaveLength(2);
+      expect(saveIndex).toBeGreaterThanOrEqual(0);
+      expect(saveIndex).toBeLessThan(adminConsoleCallIndexes[1]);
+    });
+
+    // Verify save success feedback
+    expect(await screen.findByText(/Saved to catalog|已保存到目录|カタログに保存完了/)).toBeInTheDocument();
+  });
+
+  it("shows generation failure in aiGenerate screen", async () => {
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
+      if (url.endsWith("/api/phase3/agent/generate-case") && !url.includes("dry-run")) return jsonResponse({}, 500);
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+    await userEvent.click(await screen.findByRole("button", { name: /Doc Parse/ }));
+    await screen.findByText("Document catalog");
+    const detailButtons = await screen.findAllByRole("button", { name: /Detail/ });
+    await userEvent.click(detailButtons[0]);
+    const generateButtons = await screen.findAllByText("Generate tests");
+    await userEvent.click(generateButtons[0]);
+
+    // Verify error message appears
+    expect(await screen.findByText(/HTTP 500/)).toBeInTheDocument();
+  });
+
   it("switches the Reports overview when clicking another project", async () => {
     const fetchMock = vi.fn().mockImplementation(() => jsonResponse(snapshot));
     vi.stubGlobal("fetch", fetchMock);
