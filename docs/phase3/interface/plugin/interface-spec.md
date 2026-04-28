@@ -27,42 +27,35 @@ This document distinguishes:
 
 Current `plugin` screen conclusion:
 
-- current direct read source actually feeding the current screen shell:
-  - `GET /api/phase3/admin-console`
-- current actual screen prop:
-  - `AdminConsoleSnapshot`
-- current dedicated popup snapshot interface that exists but is not consumed:
-  - `GET /api/phase3/extension-popup`
+- current direct read source:
+  - `GET /api/phase3/extension-popup` (dedicated popup snapshot)
+- current screen props:
+  - `apiBaseUrl: string`
+  - `title: string`
+  - `locale: Locale`
 - current direct write source:
   - none
 - current extension/native-message actions:
   - none wired in this page
 
-## 3. Current Screen Input Mismatch
+## 3. Popup Snapshot Contract
 
-### 3.1 Current Actual Input
+### 3.1 Current Input
 
-`PluginPopupScreen.tsx` currently consumes:
+`PluginPopupScreen.tsx` consumes:
 
-- `snapshot: AdminConsoleSnapshot`
-- `title`
-- `locale`
+- `apiBaseUrl: string`
+- `title: string`
+- `locale: Locale`
 
-The page then uses:
+The screen fetches `GET ${apiBaseUrl}/api/phase3/extension-popup` on mount and renders from `ExtensionPopupSnapshot`:
 
-- `snapshot.workQueue[0]` as a loose active-run title source
+- `popupSnapshot.page` → current page section (title, URL path, domain)
+- `popupSnapshot.runtime` → active run section (mode, queue state, audit state, next action)
 
-All other plugin-side data is local demo content.
+### 3.2 Popup Snapshot Endpoint
 
-That `snapshot` is currently sourced from:
-
-- `GET /api/phase3/admin-console`
-
-### 3.2 Dedicated Popup Snapshot That Already Exists
-
-local-admin-api already exposes:
-
-- `GET /api/phase3/extension-popup`
+`GET /api/phase3/extension-popup`
 
 Response model:
 
@@ -89,11 +82,13 @@ Response model:
 }
 ```
 
-### 3.3 Interface Meaning
+### 3.3 Load States
 
-The page is currently documented as a template shell because the dedicated popup snapshot contract exists, but the screen does not yet consume it.
+- `loading` — fetch in flight, shows "connecting…"
+- `loaded` — popup snapshot available, shows "host connected" and renders page/runtime data
+- `error` — fetch failed, shows "host unreachable" with fallback demo values
 
-## 4. Current Native/Extension Interface Gap
+## 4. Native/Extension Interface Gap
 
 ### 4.1 What the Design Docs Define
 
@@ -115,14 +110,15 @@ The TypeScript skeleton also defines extension-side messages such as:
 
 ### 4.2 What the Screen Currently Does
 
-The screen does none of this today.
+The screen fetches popup snapshot data from the dedicated REST endpoint, but does not wire any extension/native-message actions.
 
 There are no:
 
 - `chrome.runtime.sendMessage(...)` calls
 - background/native bridge calls
-- popup snapshot fetches
 - run-status event subscriptions
+
+These require real extension/background/native infrastructure that does not exist in the admin-console template shell.
 
 ## 5. UI Control to Interface Mapping
 
@@ -193,9 +189,9 @@ There are no:
   - platform handoff or extension-side draft bridge
 - current state: visual only
 
-## 6. Recommended Future Plugin Interfaces
+## 6. Plugin Interfaces
 
-### 6.1 Popup Snapshot Interface
+### 6.1 Popup Snapshot Interface — Implemented
 
 #### `GET /api/phase3/extension-popup`
 
@@ -205,8 +201,10 @@ Purpose:
 
 Current status:
 
-- already implemented in local-admin-api
-- not yet consumed by `PluginPopupScreen.tsx`
+- implemented in local-admin-api (`Phase3MockDataService.buildExtensionPopupSnapshot()`)
+- consumed by `PluginPopupScreen.tsx` on mount
+- TypeScript type: `ExtensionPopupSnapshot` in `types.ts`
+- Java model: `ExtensionPopupSnapshot.java`
 
 ### 6.2 Page Summary Interface
 
@@ -428,9 +426,11 @@ Concrete implementation design:
 
 Current implementation:
 
-- there are no real plugin-side requests in the page
+- popup snapshot fetch failure shows "host unreachable" error state
+- loading state shows "connecting…" while fetch is in flight
+- successful fetch shows "host connected" with popup data
 
-Recommended future popup errors:
+Recommended future popup errors (when extension/native infrastructure exists):
 
 - host disconnected
 - extension context unavailable
@@ -457,13 +457,10 @@ These align with the extension/native-message design docs.
 - background/service worker should own native-port communication
 - popup should not own heavy protocol logic directly
 
-## 10. Review Items
+## 10. Remaining Limits
 
-Review-only findings:
-
-- The current page is correctly classified as an Edge extension front-end template shell.
-- The screen currently uses the wrong data contract for that role: `AdminConsoleSnapshot` instead of `ExtensionPopupSnapshot`.
-- The dedicated local-admin-api popup endpoint already exists and should become the first real data source when this template is wired.
-- Quick actions and pick-mode controls should primarily map to extension/background/native interfaces, not to normal admin-console REST mutations.
-
-These are documentation findings only. No implementation change is made in this stage.
+- The popup snapshot contract is implemented and consumed (AdminConsoleSnapshot dependency removed).
+- Popup snapshot data is deterministic mock from the backend when no real extension context exists.
+- Quick actions and pick-mode controls remain display-only because they require real extension/background/native infrastructure.
+- Quick actions should primarily map to extension/background/native interfaces, not to normal admin-console REST mutations.
+- The screen remains an Edge extension front-end template shell, not a normal platform management page.

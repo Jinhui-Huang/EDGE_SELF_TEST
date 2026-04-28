@@ -63,19 +63,20 @@ It sits beside, not inside, the main platform workflows:
 Current implementation facts:
 
 - The page is rendered by `PluginPopupScreen.tsx`.
-- The page currently receives `AdminConsoleSnapshot`, not `ExtensionPopupSnapshot`.
-- current page summary, quick actions, active run card, selected element, and locator candidates are hardcoded demo content.
-- the active-run card only loosely reuses `snapshot.workQueue[0]`.
-- quick actions are display-only.
-- pick mode is display-only.
-- locator candidate list is display-only.
+- The page consumes `ExtensionPopupSnapshot` from `GET /api/phase3/extension-popup`.
+- Props: `apiBaseUrl`, `title`, `locale` (no `snapshot` prop — the screen fetches its own data).
+- Loading/loaded/error states are implemented for the popup snapshot fetch.
+- Current page section and active-run card render data from `popupSnapshot.page` and `popupSnapshot.runtime`.
+- Quick actions are display-only.
+- Pick mode is display-only.
+- Locator candidate list is display-only.
 - `Copy` is visible but not wired.
 - `Use in DSL` is visible but not wired.
 
 This matters for review:
 
 - the current page is an extension-front-end template shell
-- it is not yet connected to the real extension-popup snapshot contract
+- it is connected to the dedicated extension-popup snapshot contract
 - it is not yet connected to extension/background/native-message actions
 
 ## 6. Functional Areas
@@ -110,16 +111,17 @@ Functional role:
 
 Current behavior:
 
-- static demo values
+- page title, URL path, and domain rendered from `popupSnapshot.page`
+- fallback values used when popup snapshot is not yet loaded
 
 ### 6.3 Active Run Section
 
 Visible elements:
 
 - running badge
-- run id
-- run title
-- current step text
+- run mode
+- next action text
+- audit state
 - progress bar
 
 Functional role:
@@ -128,8 +130,9 @@ Functional role:
 
 Current behavior:
 
-- partial title reuse from `snapshot.workQueue[0]`
-- remaining content is static demo data
+- runtime mode, queue state, audit state, and next action rendered from `popupSnapshot.runtime`
+- running/idle badge derived from `runtime.queueState`
+- progress bar shown when queue state indicates active or running
 
 ### 6.4 Quick Actions Section
 
@@ -196,28 +199,29 @@ The plugin should only surface lightweight assistive context. Heavy configuratio
 
 The current implementation consumes:
 
-- `snapshot`
+- `apiBaseUrl` (used to fetch `GET /api/phase3/extension-popup`)
 - `title`
 - `locale`
 
-The intended popup-shell input should instead be:
+The screen fetches its own data on mount via `fetch(apiBaseUrl + "/api/phase3/extension-popup")`.
 
-- extension popup snapshot
+Future popup-shell inputs may also include:
+
 - extension runtime events
-- current tab page summary
+- current tab page summary from content script
 - pick-mode and locator-selection state
 
 ### 8.2 Screen Outputs
 
 The current implementation produces:
 
-- no backend requests
+- `GET /api/phase3/extension-popup` read request on mount
 - no extension-message requests
 - no platform handoff output
 
 Its intended future outputs are:
 
-- page summary request
+- page summary request via extension/background chain
 - element-pick and locator-candidate actions
 - lightweight execution start
 - platform handoff/open action
@@ -237,9 +241,11 @@ Visible actions on this screen:
 Current implementation summary:
 
 - implemented:
-  - none beyond static rendering
+  - popup snapshot fetch from `GET /api/phase3/extension-popup`
+  - loading/loaded/error state rendering
+  - page and runtime data rendering from popup snapshot
 - visible but not implemented:
-  - all quick actions
+  - all quick actions (require extension/background/native infrastructure)
   - `Copy`
   - `Use in DSL`
 
@@ -295,8 +301,13 @@ The screen should support:
 
 Current implementation status:
 
-- none of these live states are implemented
-- the UI only demonstrates their intended visual shape
+- implemented:
+  - `loading` — shown while `GET /api/phase3/extension-popup` is in flight ("connecting…")
+  - `loaded` — shown when popup snapshot is available ("host connected")
+  - `error` — shown when popup snapshot fetch fails ("host unreachable")
+- not yet implemented:
+  - pick mode active/element selected/locator candidates ready (require extension content-script infrastructure)
+  - execution starting/run status updating (require extension/native host infrastructure)
 
 ## 12. Validation and Rules
 
@@ -340,16 +351,13 @@ The `plugin` screen is not currently responsible for:
 - deep report review
 - full execution-center ownership
 
-## 15. Known Gaps and Review Items
+## 15. Remaining Limits
 
-Review items discovered while documenting:
-
-- The current screen still consumes `AdminConsoleSnapshot` instead of the dedicated `ExtensionPopupSnapshot`.
-- All plugin-side controls are visual only.
-- Pick mode, locator candidates, and quick actions are currently static demo constructs.
+- The screen now consumes `ExtensionPopupSnapshot` from `GET /api/phase3/extension-popup` (AdminConsoleSnapshot dependency removed).
+- Quick actions are display-only because they require real extension/background/native infrastructure that does not exist in the admin-console template shell.
+- Pick mode, locator candidates, `Copy`, and `Use in DSL` remain static demo constructs.
 - The screen must continue to be treated as an Edge extension front-end template shell, not as a normal platform management page.
-
-These are documentation review items only. No implementation change is made in this stage.
+- Popup snapshot data is deterministic mock from the backend when no real extension context exists.
 
 ## 16. Suggested Output Files for This Screen Folder
 

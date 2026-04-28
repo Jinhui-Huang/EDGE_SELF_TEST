@@ -3186,4 +3186,41 @@ On code inspection, both P0-1 and P0-2 were already fully implemented:
 - npm build: **passed**
 
 ## Next Step
+- Continue with P0-3
+
+---
+
+# P0-3 Plugin Popup Dedicated Contract Documentation Sync (2026-04-28)
+
+## Goal
+Complete P0-3: replace plugin AdminConsoleSnapshot dependency with dedicated popup contract.
+
+## Discovery
+On code inspection, P0-3 was already implemented:
+- `PluginPopupScreen.tsx` — consumes `ExtensionPopupSnapshot` from `GET /api/phase3/extension-popup`, not `AdminConsoleSnapshot`
+- Props: `apiBaseUrl: string`, `title: string`, `locale: Locale` (no `snapshot` prop)
+- Loading/loaded/error states implemented for popup snapshot fetch
+- Page and runtime sections render from `popupSnapshot.page` and `popupSnapshot.runtime`
+- `App.tsx` line 2473 — passes `apiBaseUrl` to plugin screen
+- Backend: `Phase3MockDataService.buildExtensionPopupSnapshot()` returns `ExtensionPopupSnapshot`
+- TypeScript type: `ExtensionPopupSnapshot` in `types.ts`
+- Java model: `ExtensionPopupSnapshot.java`
+- Quick actions remain display-only (require real extension/background/native infrastructure)
+
+## Tests Added
+- `App.test.tsx`: 2 new tests (33 total, up from 31):
+  1. "loads plugin popup from dedicated extension-popup endpoint"
+  2. "shows plugin popup error state when extension-popup endpoint fails"
+
+## Docs Synced
+1. `plugin/functional-spec.md` — §5, §6.2, §6.3, §8.1, §8.2, §9, §11, §15 updated from AdminConsoleSnapshot to ExtensionPopupSnapshot
+2. `plugin/interface-spec.md` — §2, §3, §4, §6.1, §8, §10 updated from future/mismatch to implemented
+3. `review-backlog.md` — P0-3 marked DONE with resolved summary and remaining limits
+4. `ui-control-interface-overview.md` — §15 plugin note and §16 resolved list updated
+
+## Verification
+- npm test: **33/33 passed** (up from 31)
+- npm build: **passed**
+
+## Next Step
 - Continue with the next review-backlog priority

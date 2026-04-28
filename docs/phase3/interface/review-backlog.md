@@ -46,21 +46,23 @@ It does not authorize UI or backend changes in the current phase.
   - step-row and runtime-log drill-down not yet implemented
   - live page shows structured data only, no real screenshot
 
-### P0-3. Replace `plugin` admin-console snapshot dependency with dedicated popup contract
+### P0-3. Replace `plugin` admin-console snapshot dependency with dedicated popup contract — DONE
 
 - Screens:
   - `plugin`
-- Current gap:
-  - the popup template shell still consumes `AdminConsoleSnapshot`.
-- Required contract split:
-  - popup read model: `GET /api/phase3/extension-popup`
-  - extension/native actions:
-    - `EXT_PAGE_SUMMARY_GET` -> `PAGE_SUMMARY_GET`
-    - `PAGE_HIGHLIGHT`
-    - `EXT_EXECUTION_START` -> `EXECUTION_START`
-    - `EXECUTION_STATUS_GET`
-- Acceptance target:
-  - popup data and popup actions stop pretending to be platform-admin REST behavior.
+- Resolved:
+  - `PluginPopupScreen.tsx` consumes `ExtensionPopupSnapshot` from `GET /api/phase3/extension-popup`
+  - Props changed from `snapshot: AdminConsoleSnapshot` to `apiBaseUrl: string` (screen fetches its own data)
+  - loading/loaded/error states implemented for popup snapshot fetch
+  - page and runtime sections render from dedicated popup snapshot data
+  - `App.tsx` passes `apiBaseUrl` instead of `snapshot` to plugin screen
+- Remaining limits:
+  - popup snapshot data is deterministic mock from backend when no real extension context exists
+  - quick actions remain display-only because they require real extension/background/native infrastructure
+  - pick mode, locator candidates, `Copy`, and `Use in DSL` remain static demo constructs
+- Test coverage:
+  - popup loads from dedicated extension-popup endpoint, not admin-console
+  - popup error state when extension-popup endpoint fails
 
 ---
 

@@ -231,8 +231,9 @@ Conventions used here:
 
 Plugin-specific data/source note:
 
-- the current template shell still reads `AdminConsoleSnapshot`
-- the dedicated popup contract already exists at `GET /api/phase3/extension-popup`
+- the template shell now reads `ExtensionPopupSnapshot` from `GET /api/phase3/extension-popup` (AdminConsoleSnapshot dependency removed)
+- loading/loaded/error states are implemented for popup snapshot fetch
+- page and runtime sections render from dedicated popup snapshot data
 - future quick actions should mainly map to extension/background/native-message interfaces, not standard admin-console REST mutations
 
 ---
@@ -241,13 +242,14 @@ Plugin-specific data/source note:
 
 The highest-signal unresolved controls across the package are:
 
-- `plugin` still has no real popup/native wiring
+- `plugin` quick actions still have no real popup/native wiring (require extension/background/native infrastructure)
 - `aiGenerate` still lacks real generate / dry-run / save actions
 - `monitor` step-row and runtime-log drill-down not yet implemented
 - `models` and `environments` have switched to real backend validation interfaces, but the validation remains deterministic and non-connective by Phase 3 design
 
 Resolved since last review:
 
+- `plugin` now reads from dedicated `GET /api/phase3/extension-popup` instead of `AdminConsoleSnapshot` (P0-3)
 - `dataTemplates` now has a full backend template registry (P1-3: CRUD, import, dry-run, delete)
 - `cases` tabs are now API-backed with DSL edit/validate/save, state-machine read/save, plans read, history read (P2-3)
 - `execution -> monitor` now passes canonical `runId` through `openMonitor(launchForm.runId)` (P0-1)

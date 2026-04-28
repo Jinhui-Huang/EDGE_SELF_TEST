@@ -1044,3 +1044,23 @@
      - ui-control-interface-overview.md (execution + monitor sections)
      - review-backlog.md (P0-1 + P0-2 → DONE)
    - Verification: npm test 31/31, npm build PASS
+
+61. P0-3 Plugin Popup Dedicated Contract (2026-04-28)
+   - P0-3 code was already implemented. This session added tests and synced docs.
+   - Code already in place:
+     - PluginPopupScreen.tsx: consumes ExtensionPopupSnapshot from GET /api/phase3/extension-popup
+     - Props: apiBaseUrl, title, locale (no AdminConsoleSnapshot prop)
+     - Loading/loaded/error states for popup snapshot fetch
+     - Page/runtime sections render from popupSnapshot.page and popupSnapshot.runtime
+     - App.tsx passes apiBaseUrl to plugin screen (not snapshot)
+     - Backend: Phase3MockDataService.buildExtensionPopupSnapshot()
+     - Quick actions remain display-only (require extension/background/native infrastructure)
+   - Tests added (App.test.tsx): 2 new tests (33 total)
+     - popup loads from dedicated extension-popup endpoint
+     - popup error state when extension-popup fails
+   - Docs synced:
+     - plugin/functional-spec.md (§5, §6.2, §6.3, §8, §9, §11, §15)
+     - plugin/interface-spec.md (§2, §3, §4, §6.1, §8, §10)
+     - review-backlog.md (P0-3 → DONE)
+     - ui-control-interface-overview.md (§15 plugin note, §16 resolved list)
+   - Verification: npm test 33/33, npm build PASS

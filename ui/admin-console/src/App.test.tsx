@@ -1415,6 +1415,78 @@ describe("App", () => {
     expect(runApiCalls).toHaveLength(0);
   });
 
+  it("loads plugin popup from dedicated extension-popup endpoint", async () => {
+    const popupSnapshot = {
+      generatedAt: "2026-04-20T04:00:00Z",
+      status: "READY",
+      summary: "Phase 3 popup assistive snapshot",
+      page: {
+        title: "Checkout - Payment",
+        url: "https://staging.example.test/checkout/payment",
+        domain: "staging.example.test",
+        lastUpdatedAt: "2026-04-20T04:00:00Z"
+      },
+      runtime: {
+        mode: "Audit-first",
+        queueState: "RUNNING",
+        auditState: "ATTENTION",
+        nextAction: "Review latest run"
+      },
+      hints: ["Use the platform UI for configuration and report review."]
+    };
+
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
+      if (url.endsWith("/api/phase3/extension-popup")) return jsonResponse(popupSnapshot);
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+    await screen.findByText("Needs attention");
+
+    // Navigate to plugin screen via sidebar
+    const allButtons = screen.getAllByRole("button");
+    const pluginNavButton = allButtons.find((btn) => btn.textContent?.includes("Plugin popup"));
+    expect(pluginNavButton).toBeTruthy();
+    await userEvent.click(pluginNavButton!);
+
+    // Verify it fetched the dedicated extension-popup endpoint
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith("http://127.0.0.1:8787/api/phase3/extension-popup");
+    });
+
+    // Verify popup snapshot data renders — host connected status and page title
+    expect(await screen.findByText(/host connected|主机已连接|ホスト接続済み/)).toBeInTheDocument();
+    expect(await screen.findByText("Checkout - Payment")).toBeInTheDocument();
+
+    // Verify active run section shows runtime data from popup snapshot
+    expect(await screen.findByText("running")).toBeInTheDocument();
+    expect(await screen.findByText("Review latest run")).toBeInTheDocument();
+  });
+
+  it("shows plugin popup error state when extension-popup endpoint fails", async () => {
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
+      if (url.endsWith("/api/phase3/extension-popup")) return jsonResponse({}, 500);
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+    await screen.findByText("Needs attention");
+
+    const allButtons = screen.getAllByRole("button");
+    const pluginNavButton = allButtons.find((btn) => btn.textContent?.includes("Plugin popup"));
+    expect(pluginNavButton).toBeTruthy();
+    await userEvent.click(pluginNavButton!);
+
+    // Verify error state shows host unreachable
+    expect(await screen.findByText(/host unreachable|主机不可达|ホスト接続不可/)).toBeInTheDocument();
+  });
+
   it("switches the Reports overview when clicking another project", async () => {
     const fetchMock = vi.fn().mockImplementation(() => jsonResponse(snapshot));
     vi.stubGlobal("fetch", fetchMock);
