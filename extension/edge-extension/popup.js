@@ -21,7 +21,7 @@ const formDefaults = {
 };
 
 let latestTab = null;
-const recommendedLocator = "button:has-text('Pay')";
+let currentPickResult = null;
 
 export function createFallbackPopupSnapshot(error) {
   return {
@@ -172,7 +172,7 @@ export function seedFormValues(snapshot, tab) {
 }
 
 export function getSelectedLocator() {
-  return recommendedLocator;
+  return currentPickResult?.recommendedLocator || "";
 }
 
 export async function requestPageSummary(tab = latestTab) {
@@ -181,6 +181,46 @@ export async function requestPageSummary(tab = latestTab) {
     pageUrl: tab?.url || "",
     locator: getSelectedLocator()
   });
+}
+
+export async function requestContentScriptPick(type, payload = {}) {
+  if (typeof chrome === "undefined" || !chrome.runtime?.sendMessage) {
+    throw new Error("Extension background bridge is unavailable.");
+  }
+  const response = await chrome.runtime.sendMessage({
+    channel: "content-script",
+    type,
+    payload
+  });
+  if (!response?.ok) {
+    throw new Error(response?.error || "Content script request failed.");
+  }
+  return response.data;
+}
+
+export async function requestPickState() {
+  if (typeof chrome === "undefined" || !chrome.runtime?.sendMessage) {
+    throw new Error("Extension background bridge is unavailable.");
+  }
+  const response = await chrome.runtime.sendMessage({
+    channel: "pick-state",
+    type: "PICK_STATE_GET"
+  });
+  if (!response?.ok) {
+    throw new Error(response?.error || "Pick state request failed.");
+  }
+  return response.data;
+}
+
+export function isPickStateForTab(pickState, tab) {
+  if (!pickState || pickState.status !== "picked" || !pickState.result) {
+    return false;
+  }
+  const sourceTabId = pickState.sourceTabId ?? null;
+  const sourcePageUrl = pickState.sourcePageUrl || "";
+  const tabId = tab?.id ?? null;
+  const pageUrl = tab?.url || "";
+  return sourceTabId === tabId && sourcePageUrl === pageUrl;
 }
 
 export async function preparePlatformHandoff(target, payload = {}) {
@@ -199,6 +239,77 @@ export function trackTouchedFields() {
       });
     });
   });
+}
+
+export function renderLocatorCandidates(candidates) {
+  const listNode = document.getElementById("locatorCandidatesList");
+  if (!(listNode instanceof HTMLElement)) {
+    return;
+  }
+  listNode.textContent = "";
+  const safeCandidates = Array.isArray(candidates) ? candidates : [];
+  if (safeCandidates.length === 0) {
+    const emptyNode = document.createElement("li");
+    emptyNode.className = "locatorCandidate empty";
+    emptyNode.textContent = "No picked element yet.";
+    listNode.appendChild(emptyNode);
+    return;
+  }
+  safeCandidates.forEach((candidate) => {
+    const itemNode = document.createElement("li");
+    itemNode.className = `locatorCandidate${candidate.recommended ? " recommended" : ""}`;
+
+    const valueNode = document.createElement("strong");
+    valueNode.textContent = String(candidate.value || "");
+    itemNode.appendChild(valueNode);
+
+    const metaNode = document.createElement("div");
+    metaNode.className = "locatorCandidateMeta";
+    const typeNode = document.createElement("span");
+    typeNode.textContent = String(candidate.type || "");
+    const scoreNode = document.createElement("span");
+    scoreNode.textContent = `score ${candidate.score ?? ""}`;
+    metaNode.appendChild(typeNode);
+    metaNode.appendChild(scoreNode);
+    itemNode.appendChild(metaNode);
+
+    const reasonNode = document.createElement("div");
+    reasonNode.className = "locatorCandidateReason";
+    reasonNode.textContent = String(candidate.reason || "");
+    itemNode.appendChild(reasonNode);
+
+    listNode.appendChild(itemNode);
+  });
+}
+
+export function renderPickResult(result) {
+  currentPickResult = result || null;
+  const tagNode = document.getElementById("pickedTag");
+  const textNode = document.getElementById("pickedText");
+  const idNode = document.getElementById("pickedId");
+  const nameNode = document.getElementById("pickedName");
+  const locatorNode = document.getElementById("selectedLocator");
+  const reasonNode = document.getElementById("locatorReason");
+
+  if (tagNode) {
+    tagNode.textContent = result?.tag || "Not picked yet.";
+  }
+  if (textNode) {
+    textNode.textContent = result?.text || "Pick an element from the page to inspect it here.";
+  }
+  if (idNode) {
+    idNode.textContent = result?.id || "-";
+  }
+  if (nameNode) {
+    nameNode.textContent = result?.name || "-";
+  }
+  if (locatorNode) {
+    locatorNode.textContent = result?.recommendedLocator || "-";
+  }
+  if (reasonNode) {
+    reasonNode.textContent = result?.recommendedReason || "Pick mode returns a recommended locator after the page element is selected.";
+  }
+  renderLocatorCandidates(result?.locatorCandidates || []);
 }
 
 export async function postSchedulerMutation(type, payload) {
@@ -307,6 +418,21 @@ export async function runPageSummaryAction() {
   }
 }
 
+export async function runPickElementAction() {
+  setButtonPending("pickElementButton", true, "Picking...", "Pick element");
+  setMutationState("quickActionStatus", "pending", "Starting pick mode on the current page...");
+  try {
+    const result = await requestContentScriptPick("CS_PICK_ELEMENT_START");
+    setMutationState("quickActionStatus", "success", "Pick mode started. Click an element on the page, then reopen the popup to review the result.");
+    return result;
+  } catch (error) {
+    setMutationState("quickActionStatus", "error", error instanceof Error ? error.message : String(error));
+    throw error;
+  } finally {
+    setButtonPending("pickElementButton", false, "Picking...", "Pick element");
+  }
+}
+
 export async function runOpenInPlatformAction() {
   const form = readForm("launch");
   const tab = latestTab || await getCurrentTab();
@@ -334,6 +460,9 @@ export async function runOpenInPlatformAction() {
 
 export async function copySelectedLocator() {
   const locator = getSelectedLocator();
+  if (!locator) {
+    throw new Error("Pick an element first to copy a real locator.");
+  }
   if (!globalThis.navigator?.clipboard?.writeText) {
     throw new Error("Clipboard write is unavailable in this popup context.");
   }
@@ -345,6 +474,10 @@ export async function copySelectedLocator() {
 export async function runUseInDslAction() {
   const tab = latestTab || await getCurrentTab();
   const form = readForm("launch");
+  const locator = getSelectedLocator();
+  if (!locator) {
+    throw new Error("Pick an element first to send a real locator into DSL.");
+  }
   setButtonPending("useDslButton", true, "Opening...", "Use in DSL");
   setMutationState("quickActionStatus", "pending", "Preparing DSL handoff through native host...");
   try {
@@ -353,7 +486,7 @@ export async function runUseInDslAction() {
       projectName: form.projectKey || "checkout-web",
       pageTitle: tab?.title || "Current page",
       pageUrl: tab?.url || "",
-      locator: getSelectedLocator()
+      locator
     });
     await requestPlatformOpen(handoff.url);
     setMutationState("quickActionStatus", "success", "Opened platform DSL review workspace.");
@@ -397,6 +530,12 @@ export async function refreshCurrentPage() {
       summary: snapshot.summary,
       recommendedAction: snapshot.runtime.nextAction
     });
+    const pickState = await requestPickState();
+    if (isPickStateForTab(pickState, tab)) {
+      renderPickResult(pickState.result);
+    } else {
+      renderPickResult(null);
+    }
     seedFormValues(snapshot, tab);
     return snapshot;
   } catch (error) {
@@ -416,6 +555,9 @@ export async function refreshCurrentPage() {
 }
 
 export function initPopup() {
+  document.getElementById("pickElementButton")?.addEventListener("click", () => {
+    void runPickElementAction();
+  });
   document.getElementById("refreshButton")?.addEventListener("click", () => {
     void refreshCurrentPage();
   });

@@ -39,6 +39,7 @@ Current `plugin` screen conclusion:
 - current direct write source:
   - none
 - current extension/native-message actions:
+  - popup/background/content-script pick bridge
   - `PAGE_SUMMARY_GET`
   - `PLATFORM_HANDOFF_PREPARE`
   - background `platform-open` action
@@ -123,7 +124,6 @@ The admin-console mirror page still fetches popup snapshot data only, but the re
 
 Still missing:
 
-- content-script pick-mode flow
 - popup execution-start / runtime event subscriptions
 
 ## 5. UI Control to Interface Mapping
@@ -133,11 +133,9 @@ Still missing:
 #### `Pick element`
 
 - user action: click
-- request: none today
-- owner: not implemented
-- intended future interface:
-  - extension pick-mode and highlight flow
-- current state: visual only
+- request: popup -> background -> content script (`CS_PICK_ELEMENT_START`)
+- owner: `extension/edge-extension/popup.js` + `background.js` + `content-script.js`
+- current state: implemented in the real extension popup
 
 #### `Page summary`
 
@@ -169,12 +167,10 @@ Still missing:
 
 #### Locator candidate row
 
-- user action: click
-- request: none today
-- owner: not implemented
-- intended future interface:
-  - local selected-locator state
-- current state: display only
+- user action: review rendered row
+- request: none
+- owner: popup-local rendered pick result
+- current state: implemented as display of real content-script pick result
 
 #### `Copy`
 
@@ -231,35 +227,50 @@ Implemented flow:
   - URL/path/host summary
   - recommended next action
 
-### 6.3 Element Highlight / Pick Interface
+### 6.3 Element Highlight / Pick Interface - Implemented Inside Extension
 
-#### Native/content interface: `PAGE_HIGHLIGHT`
+#### Popup -> background request: `CS_PICK_ELEMENT_START`
 
 Purpose:
 
-- highlight one element during pick mode
+- enter real pick mode on the active page without involving native-host or local-admin-api
 
-Request body:
+Flow:
+
+- popup -> background:
+  - `chrome.runtime.sendMessage({ channel: "content-script", type: "CS_PICK_ELEMENT_START", payload: {} })`
+- background -> active tab content script:
+  - `chrome.tabs.sendMessage(tabId, { channel: "content-script", type: "CS_PICK_ELEMENT_START", payload: {} })`
+- content script:
+  - starts pick mode
+  - highlights hover target
+  - highlights selected target
+  - shapes selected element info and locator candidates
+  - clears highlight when pick mode exits
+
+Response body:
 
 ```json
 {
-  "locator": {
-    "by": "css",
-    "value": "#pay-submit"
-  }
-}
-```
-
-Related picker result shape:
-
-```json
-{
-  "candidates": [
-    { "by": "id", "value": "pay-submit", "score": 0.95 },
-    { "by": "text", "value": "Pay", "score": 0.80 }
+  "tag": "button",
+  "text": "Pay now",
+  "id": "pay-submit",
+  "name": "payment-submit",
+  "recommendedLocator": "#pay-submit",
+  "recommendedReason": "Stable explicit id.",
+  "locatorCandidates": [
+    { "type": "id", "value": "#pay-submit", "score": 0.98, "recommended": true },
+    { "type": "name", "value": "[name=\"payment-submit\"]", "score": 0.90, "recommended": false },
+    { "type": "css", "value": "form > button.primary", "score": 0.64, "recommended": false }
   ]
 }
 ```
+
+#### Popup -> background request: `CS_PICK_ELEMENT_STOP`
+
+Purpose:
+
+- explicit cleanup path when the popup wants to stop pick mode without selection
 
 ### 6.4 Quick Smoke Test Interface
 
@@ -339,20 +350,22 @@ Concrete implementation design:
 - `ui/admin-console/src/App.tsx` consumes query params and maps them into existing App state
 - no complex route system is introduced
 
-## 7. Detailed Implementation Design for Currently Unwired Controls
+## 7. Detailed Implementation Design for Remaining and Recently Wired Controls
 
 ### 7.1 `Pick element`
 
-Recommended implementation type:
+Current implementation type:
 
 - extension-local pick mode plus content-script highlight support
 
-Concrete implementation design:
+Current implementation design:
 
-1. popup action enters pick mode in extension UI
-2. background instructs content script to highlight hovered element
-3. selected element returns locator candidates
-4. popup updates selected-element card and locator list
+1. popup sends `CS_PICK_ELEMENT_START` to background
+2. background forwards the request to the active tab content script
+3. content script enters pick mode and adds hover highlight
+4. page click captures one DOM element, shapes basic info and candidate locators, briefly marks selected highlight, then exits pick mode
+5. popup renders selected element card and candidate list
+6. popup `Copy` and `Use in DSL` read the recommended locator from this real pick result
 
 ### 7.2 `Page summary`
 
@@ -468,6 +481,7 @@ These align with the extension/native-message design docs.
 - The popup snapshot contract is implemented and consumed (AdminConsoleSnapshot dependency removed).
 - Popup snapshot data is deterministic mock from the backend when no real extension context exists.
 - `Page summary`, `Open in platform`, `Copy`, and `Use in DSL` are now implemented in the real extension popup runtime.
-- `Pick element` and `Quick smoke test` still require additional extension/background/content/native work.
+- `Pick element` is now implemented through popup/background/content-script only; it does not involve native-host or local-admin-api DOM collection.
+- `Quick smoke test` still requires additional extension/background/content/native work.
 - Quick actions should primarily map to extension/background/native interfaces plus extension-specific local-admin-api endpoints, not to normal admin-console REST mutations.
 - The screen remains an Edge extension front-end template shell, not a normal platform management page.

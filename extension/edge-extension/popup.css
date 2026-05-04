@@ -159,6 +159,64 @@ dd {
   width: 100%;
 }
 
+.locatorActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.locatorActions > button {
+  flex: 1 1 0;
+}
+
+.locatorCandidates {
+  margin-top: 12px;
+}
+
+.locatorCandidates h3 {
+  font-size: 0.92rem;
+  margin: 0 0 8px;
+}
+
+.locatorCandidateList {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.locatorCandidate {
+  background: #fffdf8;
+  border: 1px solid rgba(31, 107, 84, 0.12);
+  border-radius: 12px;
+  display: grid;
+  gap: 4px;
+  padding: 0.7rem 0.8rem;
+}
+
+.locatorCandidate.recommended {
+  border-color: rgba(31, 107, 84, 0.34);
+  box-shadow: inset 0 0 0 1px rgba(31, 107, 84, 0.14);
+}
+
+.locatorCandidate.empty {
+  color: var(--popup-muted);
+}
+
+.locatorCandidateMeta {
+  color: var(--popup-muted);
+  display: flex;
+  font-size: 0.78rem;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.locatorCandidateReason {
+  color: var(--popup-muted);
+  font-size: 0.82rem;
+}
+
 .actionStatus {
   border-radius: 12px;
   font-size: 0.82rem;

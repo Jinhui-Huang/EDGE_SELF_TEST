@@ -81,7 +81,7 @@ It does not authorize UI or backend changes in the current phase.
   - `POST /api/phase3/extension/page-summary`
   - `POST /api/phase3/extension/platform-handoff`
 - Remaining limits:
-  - `Pick element` is still visual-only because content-script pick mode and locator capture are not implemented
+  - `Pick element` was still visual-only at the end of P0-4 and was completed later in P0-5
   - `Quick smoke test` is still visual-only because popup-side execution start is not yet wired
   - `Page summary` remains deterministic from popup tab context plus local rules; no real DOM/content-script extraction exists yet
   - `Use in DSL` currently hands off into `aiGenerate`, not directly into the `cases` DSL editor
@@ -90,6 +90,40 @@ It does not authorize UI or backend changes in the current phase.
   - native-host message dispatch tests for page-summary and platform-handoff message types
   - local-admin-api tests for extension quick-action endpoints
   - admin-console App tests for execution and AI-generate query handoff consumption
+
+### P0-5. Plugin Pick Element Real Chain — DONE
+
+- Surfaces:
+  - `extension/edge-extension/popup.html`
+  - `extension/edge-extension/popup.js`
+  - `extension/edge-extension/background.js`
+  - `extension/edge-extension/content-script.js`
+- Resolved:
+  - `Pick element` now uses popup -> background -> active-tab content script
+  - content script enters real pick mode, highlights hovered element, captures selected element on click, shapes basic element info plus locator candidates, and clears highlight on exit
+  - popup now renders:
+    - `tag`
+    - `text`
+    - `id`
+    - `name`
+    - candidate locator list
+    - recommended locator and recommendation reason
+  - `Copy` now uses the current real recommended locator from pick result
+  - `Use in DSL` now uses the current real recommended locator from pick result and keeps the existing `PLATFORM_HANDOFF_PREPARE` chain
+  - native-host and local-admin-api remain out of DOM collection for this flow
+- New extension-local messages:
+  - popup/background:
+    - `channel: "content-script"`
+    - `type: "CS_PICK_ELEMENT_START"`
+    - `type: "CS_PICK_ELEMENT_STOP"`
+- Remaining limits:
+  - `Quick smoke test` is still visual-only
+  - locator row selection is not yet an interactive local state; popup renders the content-script recommendation directly
+  - popup mirror screen in `ui/admin-console` remains a demo surface; the real implementation lives in `extension/edge-extension`
+- Test coverage:
+  - popup tests for pick trigger, result render, and Copy/Use-in-DSL using real locator
+  - background forwarding test for popup -> content script
+  - content-script tests for pick-result shaping and highlight cleanup
 
 ---
 

@@ -1142,3 +1142,36 @@
     - `Quick smoke test` still not implemented
     - page summary is deterministic and does not yet use real content-script DOM extraction
     - `Use in DSL` currently targets `aiGenerate`, not direct `cases` DSL insertion
+- 2026-05-05: Completed P0-5 Plugin Pick Element Real Chain.
+  - Added `extension/edge-extension/content-script.js` and registered it in `manifest.json`.
+  - Real pick flow now stays fully inside the extension:
+    - popup `Pick element` trigger
+    - background bridge
+    - content script hover/selected highlight
+    - content script selected-element shaping with locator candidates
+    - popup result render
+  - Popup now renders real selected element fields:
+    - `tag`
+    - `text`
+    - `id`
+    - `name`
+    - recommended locator
+    - locator candidate list
+  - `Copy` and `Use in DSL` now consume the current real recommended locator from pick result instead of the old static popup suggestion.
+  - Kept the Phase 3 boundary:
+    - popup = trigger/render only
+    - background = bridge only
+    - content script = DOM collection/highlight only
+    - native-host unchanged
+    - local-admin-api unchanged
+    - no scheduler/report/run protocol changes
+    - no complex router introduced
+  - Added verification:
+    - `npm test -- --run src/popup.test.js`
+    - `npm test -- --run src/background.test.js`
+    - `npm test -- --run src/content-script.test.js`
+    - `npm run build`
+  - Remaining plugin limits after this pass:
+    - `Quick smoke test` still not implemented
+    - locator row selection is not yet interactive local state
+    - `Use in DSL` still targets `aiGenerate`, not direct `cases` DSL insertion

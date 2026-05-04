@@ -11,19 +11,38 @@ function createFormDom() {
     <input id="reviewProjectKey" value="" />
     <input id="reviewEnvironment" value="" />
     <textarea id="reviewDetail"></textarea>
+    <button id="pickElementButton" type="button">Pick element</button>
     <button id="pageSummaryButton" type="button">Page summary</button>
     <button id="openPlatformButton" type="button">Open in platform</button>
     <button id="copyLocatorButton" type="button">Copy locator</button>
     <button id="useDslButton" type="button">Use in DSL</button>
     <p id="quickActionStatus" class="actionStatus hidden"></p>
+    <dd id="pickedTag">Not picked yet.</dd>
+    <dd id="pickedText">Pick an element from the page to inspect it here.</dd>
+    <dd id="pickedId">-</dd>
+    <dd id="pickedName">-</dd>
+    <dd id="selectedLocator">-</dd>
+    <dd id="locatorReason">Pick mode returns a recommended locator after the page element is selected.</dd>
+    <ul id="locatorCandidatesList"><li class="locatorCandidate empty">No picked element yet.</li></ul>
     <dd id="pageSummaryResult">Not requested yet.</dd>
     <dd id="pageSummaryRecommendation">Not requested yet.</dd>
+    <dd id="pageTitle">Not loaded</dd>
+    <dd id="pageUrl">Not loaded</dd>
+    <span id="connectionBadge">Mock</span>
+    <strong id="connectionState">Waiting</strong>
+    <p id="connectionSummary">Waiting</p>
+    <span id="runtimeMode">Mode</span>
+    <span id="runtimeQueue">Queue</span>
+    <span id="runtimeAudit">Audit</span>
+    <span id="runtimeState">State</span>
+    <span id="runtimeAction">Action</span>
   `;
 }
 
 describe("popup helpers", () => {
   beforeEach(() => {
     document.body.innerHTML = "";
+    vi.resetModules();
     vi.restoreAllMocks();
     globalThis.chrome = {
       runtime: {
@@ -31,7 +50,7 @@ describe("popup helpers", () => {
       },
       tabs: {
         query: vi.fn().mockResolvedValue([
-          { title: "Checkout", url: "https://checkout.example.test/pay" }
+          { id: 42, title: "Checkout", url: "https://checkout.example.test/pay" }
         ])
       }
     };
@@ -153,11 +172,147 @@ describe("popup helpers", () => {
       payload: {
         pageTitle: "Checkout",
         pageUrl: "https://checkout.example.test/pay",
-        locator: "button:has-text('Pay')"
+        locator: ""
       }
     });
     expect(document.getElementById("pageSummaryResult").textContent).toContain("Checkout page is active.");
     expect(document.getElementById("pageSummaryRecommendation").textContent).toContain("Open the platform.");
+  });
+
+  it("triggers pick mode through background and renders the real pick result", async () => {
+    createFormDom();
+    globalThis.chrome.runtime.sendMessage = vi.fn().mockResolvedValue({
+      ok: true,
+      data: {
+        started: true
+      }
+    });
+    const popup = await import("../../../extension/edge-extension/popup.js");
+
+    await expect(popup.runPickElementAction()).resolves.toMatchObject({
+      started: true
+    });
+    expect(globalThis.chrome.runtime.sendMessage).toHaveBeenCalledWith({
+      channel: "content-script",
+      type: "CS_PICK_ELEMENT_START",
+      payload: {}
+    });
+    expect(document.getElementById("quickActionStatus").textContent).toContain("Pick mode started");
+  });
+
+  it("loads stored pick results when the popup refreshes again", async () => {
+    createFormDom();
+    globalThis.chrome.runtime.sendMessage = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        data: {
+          status: "READY",
+          summary: "Bridge online",
+          runtime: {
+            mode: "Audit-first",
+            queueState: "Synced",
+            auditState: "Idle",
+            nextAction: "Proceed"
+          }
+        }
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        data: {
+          status: "picked",
+          sourceTabId: 42,
+          sourcePageUrl: "https://checkout.example.test/pay",
+          sourcePageTitle: "Checkout",
+          result: {
+            tag: "button",
+            text: "Pay now",
+            id: "pay-submit",
+            name: "payment-submit",
+            recommendedLocator: "#pay-submit",
+            recommendedReason: "Stable explicit id.",
+            locatorCandidates: [
+              { type: "id", value: "#pay-submit", score: 0.98, reason: "Stable explicit id.", recommended: true },
+              { type: "name", value: "[name=\"payment-submit\"]", score: 0.9, reason: "Stable field name.", recommended: false }
+            ]
+          }
+        }
+      });
+    const popup = await import("../../../extension/edge-extension/popup.js");
+
+    await popup.refreshCurrentPage();
+
+    expect(document.getElementById("pickedTag").textContent).toBe("button");
+    expect(document.getElementById("pickedText").textContent).toBe("Pay now");
+    expect(document.getElementById("pickedId").textContent).toBe("pay-submit");
+    expect(document.getElementById("pickedName").textContent).toBe("payment-submit");
+    expect(document.getElementById("selectedLocator").textContent).toBe("#pay-submit");
+    expect(document.getElementById("locatorCandidatesList").textContent).toContain("[name=\"payment-submit\"]");
+  });
+
+  it("does not rehydrate a pick result from a different tab or page", async () => {
+    createFormDom();
+    globalThis.chrome.runtime.sendMessage = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        data: {
+          status: "READY",
+          summary: "Bridge online",
+          runtime: {
+            mode: "Audit-first",
+            queueState: "Synced",
+            auditState: "Idle",
+            nextAction: "Proceed"
+          }
+        }
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        data: {
+          status: "picked",
+          sourceTabId: 99,
+          sourcePageUrl: "https://other.example.test/pay",
+          sourcePageTitle: "Other page",
+          result: {
+            tag: "button",
+            text: "Should not render",
+            id: "other-submit",
+            name: "other-submit",
+            recommendedLocator: "#other-submit",
+            recommendedReason: "Other tab result.",
+            locatorCandidates: [
+              { type: "id", value: "#other-submit", score: 0.98, reason: "Other tab result.", recommended: true }
+            ]
+          }
+        }
+      });
+    const popup = await import("../../../extension/edge-extension/popup.js");
+
+    await popup.refreshCurrentPage();
+
+    expect(document.getElementById("pickedTag").textContent).toBe("Not picked yet.");
+    expect(document.getElementById("selectedLocator").textContent).toBe("-");
+    expect(document.getElementById("locatorCandidatesList").textContent).toContain("No picked element yet.");
+  });
+
+  it("renders locator candidates without injecting HTML from page-controlled strings", async () => {
+    createFormDom();
+    const popup = await import("../../../extension/edge-extension/popup.js");
+
+    popup.renderLocatorCandidates([
+      {
+        type: "text",
+        value: "<img src=x onerror=alert(1)>",
+        score: 0.5,
+        reason: "<script>alert(1)</script>",
+        recommended: true
+      }
+    ]);
+
+    expect(document.getElementById("locatorCandidatesList").querySelector("img")).toBeNull();
+    expect(document.getElementById("locatorCandidatesList").textContent).toContain("<img src=x onerror=alert(1)>");
+    expect(document.getElementById("locatorCandidatesList").textContent).toContain("<script>alert(1)</script>");
   });
 
   it("opens platform execution handoff through background and native host", async () => {
@@ -211,7 +366,7 @@ describe("popup helpers", () => {
         data: {
           status: "READY",
           screen: "aiGenerate",
-          url: "http://127.0.0.1:5173/?source=plugin&screen=aiGenerate&locator=button%3Ahas-text%28%27Pay%27%29"
+          url: "http://127.0.0.1:5173/?source=plugin&screen=aiGenerate&locator=%23pay-submit"
         }
       })
       .mockResolvedValueOnce({
@@ -222,8 +377,20 @@ describe("popup helpers", () => {
       });
     const popup = await import("../../../extension/edge-extension/popup.js");
 
-    await expect(popup.copySelectedLocator()).resolves.toBe("button:has-text('Pay')");
-    expect(globalThis.navigator.clipboard.writeText).toHaveBeenCalledWith("button:has-text('Pay')");
+    popup.renderPickResult({
+      tag: "button",
+      text: "Pay now",
+      id: "pay-submit",
+      name: "",
+      recommendedLocator: "#pay-submit",
+      recommendedReason: "Stable explicit id.",
+      locatorCandidates: [
+        { type: "id", value: "#pay-submit", score: 0.98, reason: "Stable explicit id.", recommended: true }
+      ]
+    });
+
+    await expect(popup.copySelectedLocator()).resolves.toBe("#pay-submit");
+    expect(globalThis.navigator.clipboard.writeText).toHaveBeenCalledWith("#pay-submit");
 
     await expect(popup.runUseInDslAction()).resolves.toMatchObject({
       screen: "aiGenerate"
@@ -237,12 +404,12 @@ describe("popup helpers", () => {
         projectName: "checkout-web",
         pageTitle: "Checkout",
         pageUrl: "https://checkout.example.test/pay",
-        locator: "button:has-text('Pay')"
+        locator: "#pay-submit"
       }
     });
     expect(globalThis.chrome.runtime.sendMessage).toHaveBeenNthCalledWith(2, {
       channel: "platform-open",
-      url: "http://127.0.0.1:5173/?source=plugin&screen=aiGenerate&locator=button%3Ahas-text%28%27Pay%27%29"
+      url: "http://127.0.0.1:5173/?source=plugin&screen=aiGenerate&locator=%23pay-submit"
     });
   });
 });

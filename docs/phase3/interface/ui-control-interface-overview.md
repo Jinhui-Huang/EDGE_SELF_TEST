@@ -221,13 +221,13 @@ Conventions used here:
 
 | Control | Type | Current behavior / interface | Future interface / design |
 |---|---|---|---|
-| `Pick element` | quick action | Visual only | Extension pick-mode + `PAGE_HIGHLIGHT` / locator-candidate capture |
+| `Pick element` | quick action | Implemented in real extension popup: popup -> background -> active-tab content script -> pick result render | Keep current lightweight in-extension flow; do not move DOM collection into native-host or local-admin-api |
 | `Page summary` | quick action | Implemented in real extension popup: popup -> background -> native-host -> `POST /api/phase3/extension/page-summary` | Keep current deterministic page-summary flow until content-script collection is introduced |
 | `Quick smoke test` | quick action | Visual only | `EXT_EXECUTION_START` -> `EXECUTION_START` |
 | `Open in platform` | quick action | Implemented in real extension popup: popup -> background -> native-host -> `POST /api/phase3/extension/platform-handoff` -> background tab-open -> platform App query handoff into `execution` | Keep lightweight App-level handoff; do not add a complex router |
-| Locator candidate row | clickable row | Display-only | Local selected-locator state |
-| `Copy` | button | Implemented in real extension popup as local clipboard write of the recommended locator | Keep local-only |
-| `Use in DSL` | button | Implemented in real extension popup: popup -> background -> native-host -> `POST /api/phase3/extension/platform-handoff` -> background tab-open -> platform App query handoff into `aiGenerate` | Keep current App-level handoff until a typed cross-surface payload exists |
+| Locator candidate row | clickable row | Implemented as rendered real candidate output from content script pick result | Local selected-locator state can be added later if review requires row selection |
+| `Copy` | button | Implemented in real extension popup as local clipboard write of the current real recommended locator | Keep local-only |
+| `Use in DSL` | button | Implemented in real extension popup: popup -> background -> native-host -> `POST /api/phase3/extension/platform-handoff` -> background tab-open -> platform App query handoff into `aiGenerate`, using current real recommended locator | Keep current App-level handoff until a typed cross-surface payload exists |
 
 Plugin-specific data/source note:
 
@@ -245,12 +245,13 @@ The highest-signal unresolved controls across the package are:
 
 - `monitor` step-row and runtime-log drill-down not yet implemented
 - `models` and `environments` have switched to real backend validation interfaces, but the validation remains deterministic and non-connective by Phase 3 design
-- `plugin` still lacks `Pick element` and `Quick smoke test`; page-summary / platform handoff / copy / use-in-dsl are now implemented in the real extension popup chain
+- `plugin` still lacks `Quick smoke test`; `Pick element`, page-summary, platform handoff, copy, and use-in-dsl are now implemented in the real extension popup chain
 
 Resolved since last review:
 
 - `plugin` now reads from dedicated `GET /api/phase3/extension-popup` instead of `AdminConsoleSnapshot` (P0-3)
 - `plugin` real extension popup now wires `Page summary`, `Open in platform`, `Copy`, and `Use in DSL` through popup/background/native-host/local-admin-api plus platform App-level handoff
+- `plugin` real extension popup now wires `Pick element` through popup/background/content-script with real hover/selected highlight and locator-candidate shaping (P0-5)
 - `dataTemplates` now has a full backend template registry (P1-3: CRUD, import, dry-run, delete)
 - `cases` tabs are now API-backed with DSL edit/validate/save, state-machine read/save, plans read, history read (P2-3)
 - `execution -> monitor` now passes canonical `runId` through `openMonitor(launchForm.runId)` (P0-1)

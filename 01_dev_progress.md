@@ -3331,3 +3331,47 @@ Known limits:
 - `Page summary` is deterministic from popup tab context plus local rules; there is still no real DOM/content-script extraction in Phase 3.
 - `Use in DSL` currently hands off into `aiGenerate`, not directly into the `cases` DSL editor.
 - Full `src/App.test.tsx` remains expensive on this machine, so verification used focused targeted runs for the new handoff cases instead of the whole file.
+
+# 2026-05-05 P0-5 Plugin Pick Element Real Chain
+
+Context:
+- Continued the next Phase 3 plugin step after P0-4 to replace the popup `Pick element` visual-only placeholder with a real in-extension pick chain.
+
+Implemented:
+- Added `extension/edge-extension/content-script.js` and registered it in `manifest.json`.
+- Wired real pick mode inside the extension only:
+  - `Pick element` -> popup -> background -> active-tab content script
+  - content script hover highlight
+  - content script selected-element capture on click
+  - content script locator-candidate shaping and cleanup on exit
+- Updated the real popup UI in `extension/edge-extension/popup.html` + `popup.js`:
+  - renders selected element `tag`, `text`, `id`, `name`
+  - renders candidate locator list plus recommended locator and reason
+  - `Copy` now uses the current real recommended locator
+  - `Use in DSL` now uses the current real recommended locator while keeping the existing native-host/platform handoff chain
+- Extended `background.js` with a content-script bridge channel for popup-triggered pick requests.
+- Kept the architecture boundary unchanged:
+  - popup triggers and renders
+  - background bridges
+  - content script owns DOM pick/highlight/candidate collection
+  - native-host unchanged
+  - local-admin-api unchanged
+  - no scheduler/report/run protocol change
+  - no complex routing introduced
+
+Docs synced:
+- `docs/phase3/interface/plugin/functional-spec.md`
+- `docs/phase3/interface/plugin/interface-spec.md`
+- `docs/phase3/interface/ui-control-interface-overview.md`
+- `docs/phase3/interface/review-backlog.md`
+
+Verification:
+- `npm test -- --run src/popup.test.js` in `ui/admin-console`: PASS (8/8)
+- `npm test -- --run src/background.test.js` in `ui/admin-console`: PASS (1/1)
+- `npm test -- --run src/content-script.test.js` in `ui/admin-console`: PASS (2/2)
+- `npm run build` in `ui/admin-console`: PASS
+
+Remaining limits:
+- `Quick smoke test` is still visual-only
+- popup candidate rows are rendered from real pick output, but row-selection state is not yet interactive
+- popup mirror screen in `ui/admin-console` remains a demo surface; the real implementation lives in `extension/edge-extension`

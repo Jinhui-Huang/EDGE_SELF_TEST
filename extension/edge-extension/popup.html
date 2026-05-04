@@ -47,32 +47,57 @@
       <section class="panel">
         <div class="panelHeader">
           <h2>Quick Actions</h2>
-          <span class="status">popup -> background -> native-host</span>
+          <span class="status">popup bridge</span>
         </div>
         <div class="actionGrid">
+          <button id="pickElementButton" type="button">Pick element</button>
           <button id="pageSummaryButton" type="button">Page summary</button>
           <button id="openPlatformButton" type="button">Open in platform</button>
-          <button id="copyLocatorButton" type="button">Copy locator</button>
-          <button id="useDslButton" type="button">Use in DSL</button>
         </div>
         <p class="actionStatus hidden" id="quickActionStatus" role="status" aria-live="polite"></p>
       </section>
 
       <section class="panel">
         <div class="panelHeader">
-          <h2>Locator Candidate</h2>
-          <span class="status">local selection</span>
+          <h2>Picked Element</h2>
+          <span class="status">content script</span>
         </div>
         <dl class="summary">
           <div>
+            <dt>Tag</dt>
+            <dd id="pickedTag">Not picked yet.</dd>
+          </div>
+          <div>
+            <dt>Text</dt>
+            <dd id="pickedText">Pick an element from the page to inspect it here.</dd>
+          </div>
+          <div>
+            <dt>ID</dt>
+            <dd id="pickedId">-</dd>
+          </div>
+          <div>
+            <dt>Name</dt>
+            <dd id="pickedName">-</dd>
+          </div>
+          <div>
             <dt>Recommended locator</dt>
-            <dd id="selectedLocator">button:has-text('Pay')</dd>
+            <dd id="selectedLocator">-</dd>
           </div>
           <div>
             <dt>Reason</dt>
-            <dd id="locatorReason">Text-based locator remains readable and deterministic for popup handoff.</dd>
+            <dd id="locatorReason">Pick mode returns a recommended locator after the page element is selected.</dd>
           </div>
         </dl>
+        <div class="locatorActions">
+          <button id="copyLocatorButton" type="button">Copy locator</button>
+          <button id="useDslButton" type="button">Use in DSL</button>
+        </div>
+        <div class="locatorCandidates">
+          <h3>Locator candidates</h3>
+          <ul id="locatorCandidatesList" class="locatorCandidateList">
+            <li class="locatorCandidate empty">No picked element yet.</li>
+          </ul>
+        </div>
       </section>
 
       <section class="panel">
