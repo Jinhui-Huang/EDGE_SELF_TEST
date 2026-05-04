@@ -58,11 +58,38 @@ It does not authorize UI or backend changes in the current phase.
   - `App.tsx` passes `apiBaseUrl` instead of `snapshot` to plugin screen
 - Remaining limits:
   - popup snapshot data is deterministic mock from backend when no real extension context exists
-  - quick actions remain display-only because they require real extension/background/native infrastructure
-  - pick mode, locator candidates, `Copy`, and `Use in DSL` remain static demo constructs
+  - at the admin-console mirror layer, quick actions still remain visual-only
+  - pick mode and locator-candidate capture still remain static demo constructs until real extension content-script support is added
 - Test coverage:
   - popup loads from dedicated extension-popup endpoint, not admin-console
   - popup error state when extension-popup endpoint fails
+
+### P0-4. Wire plugin quick actions through popup/background/native-host/platform handoff — DONE
+
+- Surfaces:
+  - `extension/edge-extension/popup.html`
+  - `extension/edge-extension/popup.js`
+  - `extension/edge-extension/background.js`
+  - `ui/admin-console/src/App.tsx`
+- Resolved:
+  - `Page summary` now uses popup -> background -> native-host -> `POST /api/phase3/extension/page-summary`
+  - `Open in platform` now uses popup -> background -> native-host -> `POST /api/phase3/extension/platform-handoff` -> background tab-open -> platform App query handoff into `execution`
+  - `Copy` now writes the recommended locator through the popup-local clipboard path
+  - `Use in DSL` now uses popup -> background -> native-host -> `POST /api/phase3/extension/platform-handoff` -> background tab-open -> platform App query handoff into `aiGenerate`
+  - platform handoff stays App-level only; `App.tsx` consumes lightweight query params and maps them into existing `launchForm` or `aiGenerateFocus` state
+- New extension-specific interfaces:
+  - `POST /api/phase3/extension/page-summary`
+  - `POST /api/phase3/extension/platform-handoff`
+- Remaining limits:
+  - `Pick element` is still visual-only because content-script pick mode and locator capture are not implemented
+  - `Quick smoke test` is still visual-only because popup-side execution start is not yet wired
+  - `Page summary` remains deterministic from popup tab context plus local rules; no real DOM/content-script extraction exists yet
+  - `Use in DSL` currently hands off into `aiGenerate`, not directly into the `cases` DSL editor
+- Test coverage:
+  - popup quick-action tests for page summary, platform handoff, clipboard copy, and DSL handoff
+  - native-host message dispatch tests for page-summary and platform-handoff message types
+  - local-admin-api tests for extension quick-action endpoints
+  - admin-console App tests for execution and AI-generate query handoff consumption
 
 ---
 

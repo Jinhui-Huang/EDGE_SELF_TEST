@@ -148,6 +148,17 @@ dd {
   flex: 1 1 0;
 }
 
+.actionGrid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 10px;
+}
+
+.actionGrid button {
+  width: 100%;
+}
+
 .actionStatus {
   border-radius: 12px;
   font-size: 0.82rem;

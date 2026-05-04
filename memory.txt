@@ -1104,3 +1104,41 @@
   - `DataDiffScreen` now consumes `GET /api/phase3/runs/{runId}/restore-result` and refreshes restore-result together with diff data after `POST /api/phase3/runs/{runId}/restore/retry`.
   - Frontend tests were expanded/re-verified for report->detail->diff handoff, artifact failure tolerance, raw diff error state, and restore-result refresh.
   - Local verification exposed Vitest worker/resource instability on this machine; serialized targeted runs for the modified report flows passed, and backend `LocalAdminApiServerTest` passed.
+- 2026-05-04: Completed the current highest-priority remaining plugin quick-action gap instead of falling back to monitor drill-down, because the real extension popup chain was already present.
+  - Real chain confirmed before coding:
+    - `extension/edge-extension/popup.js`
+    - `extension/edge-extension/background.js`
+    - `apps/native-host`
+    - `apps/local-admin-api`
+  - Added extension-specific local-admin-api endpoints:
+    - `POST /api/phase3/extension/page-summary`
+    - `POST /api/phase3/extension/platform-handoff`
+  - Added native-host request routing for:
+    - `PAGE_SUMMARY_GET`
+    - `PLATFORM_HANDOFF_PREPARE`
+  - Real extension popup quick actions now wired:
+    - `Page summary` -> popup -> background -> native-host -> local-admin-api
+    - `Open in platform` -> popup -> background -> native-host -> local-admin-api -> background tab-open -> platform `execution` App handoff
+    - `Copy` -> popup-local clipboard write
+    - `Use in DSL` -> popup -> background -> native-host -> local-admin-api -> background tab-open -> platform `aiGenerate` App handoff
+  - `ui/admin-console/src/App.tsx` now consumes lightweight plugin query params and maps them into existing App state only:
+    - `launchForm`
+    - `aiGenerateFocus`
+    - no new router introduced
+  - Keep this architecture boundary:
+    - popup collects lightweight context and triggers actions
+    - background owns native-host bridge and tab open
+    - native-host only dispatches to local-admin-api
+    - local-admin-api owns deterministic page-summary and handoff URL shaping
+    - platform App owns final screen/state handoff
+  - Verification passed:
+    - `npm test -- --run src/popup.test.js`
+    - targeted `App.test.tsx` handoff tests
+    - `npm run build` in `ui/admin-console`
+    - `mvn "-Dmaven.repo.local=.m2/repository" -pl apps/native-host -Dtest=NativeHostMessageProcessorTest test`
+    - `mvn "-Dmaven.repo.local=.m2/repository" -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+  - Remaining plugin limits after this pass:
+    - `Pick element` still not implemented
+    - `Quick smoke test` still not implemented
+    - page summary is deterministic and does not yet use real content-script DOM extraction
+    - `Use in DSL` currently targets `aiGenerate`, not direct `cases` DSL insertion

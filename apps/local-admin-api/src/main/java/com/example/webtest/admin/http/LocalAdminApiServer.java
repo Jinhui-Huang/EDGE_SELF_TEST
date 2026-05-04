@@ -7,6 +7,7 @@ import com.example.webtest.admin.service.ConnectionValidationService;
 import com.example.webtest.admin.service.ConfigPersistenceService;
 import com.example.webtest.admin.service.DataTemplatePersistenceService;
 import com.example.webtest.admin.service.DocumentPersistenceService;
+import com.example.webtest.admin.service.ExtensionActionService;
 import com.example.webtest.admin.service.ReportArtifactService;
 import com.example.webtest.admin.service.RunStatusService;
 import com.example.webtest.admin.service.SchedulerPersistenceService;
@@ -121,10 +122,17 @@ public final class LocalAdminApiServer implements AutoCloseable {
             CaseDetailService caseDetailService,
             DocumentPersistenceService documentPersistenceService)
             throws IOException {
+        ExtensionActionService extensionActionService = new ExtensionActionService();
         server = HttpServer.create(address, 0);
         server.createContext("/health", jsonHandler(Map.of("status", "UP")));
         server.createContext("/api/phase3/admin-console", jsonHandler(mockDataService::buildAdminConsoleSnapshot));
         server.createContext("/api/phase3/extension-popup", jsonHandler(mockDataService::buildExtensionPopupSnapshot));
+        server.createContext(
+                "/api/phase3/extension/page-summary",
+                exchange -> handleValidation(exchange, extensionActionService::buildPageSummary));
+        server.createContext(
+                "/api/phase3/extension/platform-handoff",
+                exchange -> handleValidation(exchange, extensionActionService::preparePlatformHandoff));
         server.createContext(
                 "/api/phase3/scheduler/requests",
                 exchange -> handleMutation(exchange, schedulerPersistenceService::appendRequest));

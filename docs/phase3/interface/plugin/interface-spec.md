@@ -6,6 +6,9 @@
 - UI implementation:
   - `ui/admin-console/src/screens/PluginPopupScreen.tsx`
   - `ui/admin-console/src/App.tsx`
+  - `extension/edge-extension/popup.html`
+  - `extension/edge-extension/popup.js`
+  - `extension/edge-extension/background.js`
 - Current backend/local API implementation:
   - `apps/local-admin-api/src/main/java/com/example/webtest/admin/http/LocalAdminApiServer.java`
   - `apps/local-admin-api/src/main/java/com/example/webtest/admin/model/ExtensionPopupSnapshot.java`
@@ -20,8 +23,8 @@ This document distinguishes:
 
 - current front-end template-shell inputs
 - current dedicated extension-popup snapshot contract
-- current lack of real extension/native-message wiring in the page
-- future extension/background/native interfaces required by visible popup controls
+- current real extension/native-message wiring in the popup runtime
+- remaining extension/background/native interfaces still required by visible popup controls
 
 ## 2. Interface Summary
 
@@ -36,7 +39,9 @@ Current `plugin` screen conclusion:
 - current direct write source:
   - none
 - current extension/native-message actions:
-  - none wired in this page
+  - `PAGE_SUMMARY_GET`
+  - `PLATFORM_HANDOFF_PREPARE`
+  - background `platform-open` action
 
 ## 3. Popup Snapshot Contract
 
@@ -110,15 +115,16 @@ The TypeScript skeleton also defines extension-side messages such as:
 
 ### 4.2 What the Screen Currently Does
 
-The screen fetches popup snapshot data from the dedicated REST endpoint, but does not wire any extension/native-message actions.
+The admin-console mirror page still fetches popup snapshot data only, but the real extension popup now wires quick actions through:
 
-There are no:
+- `chrome.runtime.sendMessage(...)` from popup to background
+- background/native bridge calls through `sendNativeMessage`
+- local background tab-open action for platform handoff
 
-- `chrome.runtime.sendMessage(...)` calls
-- background/native bridge calls
-- run-status event subscriptions
+Still missing:
 
-These require real extension/background/native infrastructure that does not exist in the admin-console template shell.
+- content-script pick-mode flow
+- popup execution-start / runtime event subscriptions
 
 ## 5. UI Control to Interface Mapping
 
@@ -136,11 +142,9 @@ These require real extension/background/native infrastructure that does not exis
 #### `Page summary`
 
 - user action: click
-- request: none today
-- owner: not implemented
-- intended future interface:
-  - popup -> background -> content script/native request
-- current state: visual only
+- request: popup -> background -> native-host -> `POST /api/phase3/extension/page-summary`
+- owner: `extension/edge-extension/popup.js` + `background.js` + native-host + local-admin-api
+- current state: implemented in the real extension popup
 
 #### `Quick smoke test`
 
@@ -154,11 +158,12 @@ These require real extension/background/native infrastructure that does not exis
 #### `Open in platform`
 
 - user action: click
-- request: none today
-- owner: not implemented
-- intended future interface:
-  - local platform handoff/open action
-- current state: visual only
+- request:
+  - popup -> background -> native-host -> `POST /api/phase3/extension/platform-handoff`
+  - background -> browser tab open
+  - platform App query handoff -> `execution`
+- owner: popup/background/native-host/local-admin-api + `ui/admin-console/src/App.tsx`
+- current state: implemented in the real extension popup
 
 ### 5.2 Pick-Mode Controls
 
@@ -174,20 +179,19 @@ These require real extension/background/native infrastructure that does not exis
 #### `Copy`
 
 - user action: click
-- request: none today
-- owner: not implemented
-- intended future interface:
-  - clipboard write
-- current state: visual only
+- request: none
+- owner: popup-local clipboard path
+- current state: implemented in the real extension popup
 
 #### `Use in DSL`
 
 - user action: click
-- request: none today
-- owner: not implemented
-- intended future interface:
-  - platform handoff or extension-side draft bridge
-- current state: visual only
+- request:
+  - popup -> background -> native-host -> `POST /api/phase3/extension/platform-handoff`
+  - background -> browser tab open
+  - platform App query handoff -> `aiGenerate`
+- owner: popup/background/native-host/local-admin-api + `ui/admin-console/src/App.tsx`
+- current state: implemented in the real extension popup
 
 ## 6. Plugin Interfaces
 
@@ -208,22 +212,24 @@ Current status:
 
 ### 6.2 Page Summary Interface
 
-#### Extension message: `EXT_PAGE_SUMMARY_GET`
+#### Native-host request: `PAGE_SUMMARY_GET`
 
 Purpose:
 
-- ask the background layer to collect a current-tab page summary
+- ask the background/native-host chain to return a deterministic current-tab page summary
 
-Background flow:
+Implemented flow:
 
 - popup -> background:
-  - `EXT_PAGE_SUMMARY_GET`
-- background -> content script/native:
-  - `PAGE_SUMMARY_GET`
+  - `chrome.runtime.sendMessage({ channel: "native-host", type: "PAGE_SUMMARY_GET", payload })`
+- background -> native-host:
+  - `sendNativeMessage(...)`
+- native-host -> local-admin-api:
+  - `POST /api/phase3/extension/page-summary`
 - response:
   - page title
-  - visible text summary
-  - forms/buttons/structure data
+  - URL/path/host summary
+  - recommended next action
 
 ### 6.3 Element Highlight / Pick Interface
 
@@ -327,13 +333,11 @@ Recommended implementation type:
 
 Concrete implementation design:
 
-- popup action opens the full platform with query/route context such as:
-  - current URL
-  - selected run id
-  - selected locator
-  - current page summary reference
-
-No dedicated backend write is required for the open action itself.
+- popup -> background -> native-host -> `POST /api/phase3/extension/platform-handoff`
+- local-admin-api returns a deterministic platform URL with query-param context
+- background opens the tab
+- `ui/admin-console/src/App.tsx` consumes query params and maps them into existing App state
+- no complex route system is introduced
 
 ## 7. Detailed Implementation Design for Currently Unwired Controls
 
@@ -359,12 +363,12 @@ Recommended implementation type:
 Concrete implementation design:
 
 1. popup sends:
-   - `EXT_PAGE_SUMMARY_GET`
-2. background collects current-tab summary
+   - `PAGE_SUMMARY_GET`
+2. native-host forwards:
+   - `POST /api/phase3/extension/page-summary`
 3. popup renders:
-   - title
-   - path
-   - recognized forms/buttons
+   - summary
+   - recommended action
 
 ### 7.3 `Quick smoke test`
 
@@ -391,11 +395,10 @@ Recommended implementation type:
 
 Concrete implementation design:
 
-- popup opens platform UI with current popup context
-- platform handles heavy tasks:
-  - config
-  - full report review
-  - detailed logs
+- popup requests:
+  - `PLATFORM_HANDOFF_PREPARE` with target `execution`
+- background opens returned URL
+- platform App consumes query params and pre-fills `launchForm`
 
 ### 7.5 `Copy`
 
@@ -419,8 +422,11 @@ Concrete implementation design:
 - popup packages:
   - selected locator
   - page context
-  - optional case/run context
-- platform receives this as a draft insertion payload for later DSL editing or AI generation review
+  - selected project context
+- popup requests:
+  - `PLATFORM_HANDOFF_PREPARE` with target `aiGenerate`
+- background opens returned URL
+- platform App maps query params into `aiGenerateFocus`
 
 ## 8. Error Handling Boundary
 
@@ -461,6 +467,7 @@ These align with the extension/native-message design docs.
 
 - The popup snapshot contract is implemented and consumed (AdminConsoleSnapshot dependency removed).
 - Popup snapshot data is deterministic mock from the backend when no real extension context exists.
-- Quick actions and pick-mode controls remain display-only because they require real extension/background/native infrastructure.
-- Quick actions should primarily map to extension/background/native interfaces, not to normal admin-console REST mutations.
+- `Page summary`, `Open in platform`, `Copy`, and `Use in DSL` are now implemented in the real extension popup runtime.
+- `Pick element` and `Quick smoke test` still require additional extension/background/content/native work.
+- Quick actions should primarily map to extension/background/native interfaces plus extension-specific local-admin-api endpoints, not to normal admin-console REST mutations.
 - The screen remains an Edge extension front-end template shell, not a normal platform management page.

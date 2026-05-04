@@ -26,6 +26,12 @@ final class NativeHostMessageProcessor {
                 case "POPUP_SNAPSHOT_GET" -> NativeHostResponse.success(
                         request.requestId(),
                         localAdminApiBridge.fetchPopupSnapshot());
+                case "PAGE_SUMMARY_GET" -> NativeHostResponse.success(
+                        request.requestId(),
+                        localAdminApiBridge.fetchPageSummary(safePayload(request.payload())));
+                case "PLATFORM_HANDOFF_PREPARE" -> NativeHostResponse.success(
+                        request.requestId(),
+                        localAdminApiBridge.preparePlatformHandoff(safePayload(request.payload())));
                 case "SCHEDULER_REQUEST_CREATE" -> NativeHostResponse.success(
                         request.requestId(),
                         localAdminApiBridge.createSchedulerRequest(safePayload(request.payload())));

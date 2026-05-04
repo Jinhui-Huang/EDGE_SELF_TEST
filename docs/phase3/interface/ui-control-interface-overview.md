@@ -222,19 +222,20 @@ Conventions used here:
 | Control | Type | Current behavior / interface | Future interface / design |
 |---|---|---|---|
 | `Pick element` | quick action | Visual only | Extension pick-mode + `PAGE_HIGHLIGHT` / locator-candidate capture |
-| `Page summary` | quick action | Visual only | `EXT_PAGE_SUMMARY_GET` -> `PAGE_SUMMARY_GET` |
+| `Page summary` | quick action | Implemented in real extension popup: popup -> background -> native-host -> `POST /api/phase3/extension/page-summary` | Keep current deterministic page-summary flow until content-script collection is introduced |
 | `Quick smoke test` | quick action | Visual only | `EXT_EXECUTION_START` -> `EXECUTION_START` |
-| `Open in platform` | quick action | Visual only | Local platform handoff/open action |
+| `Open in platform` | quick action | Implemented in real extension popup: popup -> background -> native-host -> `POST /api/phase3/extension/platform-handoff` -> background tab-open -> platform App query handoff into `execution` | Keep lightweight App-level handoff; do not add a complex router |
 | Locator candidate row | clickable row | Display-only | Local selected-locator state |
-| `Copy` | button | Visual only | Local clipboard write |
-| `Use in DSL` | button | Visual only | Platform-side draft/DSL handoff |
+| `Copy` | button | Implemented in real extension popup as local clipboard write of the recommended locator | Keep local-only |
+| `Use in DSL` | button | Implemented in real extension popup: popup -> background -> native-host -> `POST /api/phase3/extension/platform-handoff` -> background tab-open -> platform App query handoff into `aiGenerate` | Keep current App-level handoff until a typed cross-surface payload exists |
 
 Plugin-specific data/source note:
 
 - the template shell now reads `ExtensionPopupSnapshot` from `GET /api/phase3/extension-popup` (AdminConsoleSnapshot dependency removed)
 - loading/loaded/error states are implemented for popup snapshot fetch
 - page and runtime sections render from dedicated popup snapshot data
-- future quick actions should mainly map to extension/background/native-message interfaces, not standard admin-console REST mutations
+- real quick actions now live in `extension/edge-extension/popup.html` + `popup.js`; `PluginPopupScreen.tsx` remains an admin-console mirror/demo surface
+- quick actions should mainly map to extension/background/native-message interfaces plus extension-specific local-admin-api endpoints, not standard admin-console REST mutations
 
 ---
 
@@ -242,13 +243,14 @@ Plugin-specific data/source note:
 
 The highest-signal unresolved controls across the package are:
 
-- `plugin` quick actions still have no real popup/native wiring (require extension/background/native infrastructure)
 - `monitor` step-row and runtime-log drill-down not yet implemented
 - `models` and `environments` have switched to real backend validation interfaces, but the validation remains deterministic and non-connective by Phase 3 design
+- `plugin` still lacks `Pick element` and `Quick smoke test`; page-summary / platform handoff / copy / use-in-dsl are now implemented in the real extension popup chain
 
 Resolved since last review:
 
 - `plugin` now reads from dedicated `GET /api/phase3/extension-popup` instead of `AdminConsoleSnapshot` (P0-3)
+- `plugin` real extension popup now wires `Page summary`, `Open in platform`, `Copy`, and `Use in DSL` through popup/background/native-host/local-admin-api plus platform App-level handoff
 - `dataTemplates` now has a full backend template registry (P1-3: CRUD, import, dry-run, delete)
 - `cases` tabs are now API-backed with DSL edit/validate/save, state-machine read/save, plans read, history read (P2-3)
 - `execution -> monitor` now passes canonical `runId` through `openMonitor(launchForm.runId)` (P0-1)

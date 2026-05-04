@@ -310,6 +310,7 @@ const projectImportCommitResponse = {
 describe("App", () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    window.history.replaceState({}, "", "/");
   });
 
   it("loads the admin snapshot from the local API", async () => {
@@ -1696,6 +1697,42 @@ describe("App", () => {
 
     // Verify error state shows host unreachable
     expect(await screen.findByText(/host unreachable|主机不可达|ホスト接続不可/)).toBeInTheDocument();
+  });
+
+  it("consumes plugin execution handoff from URL query params", async () => {
+    window.history.replaceState({}, "", "/?source=plugin&screen=execution&runId=popup-run&projectKey=checkout-web&owner=edge-popup&environment=staging-edge&targetUrl=https%3A%2F%2Fcheckout.example.test%2Fpay&detail=Queued%20from%20popup");
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
+      if (url.endsWith("/api/phase3/data-templates")) return jsonResponse(dataTemplatesResponse);
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    expect(await screen.findByText("Execution center")).toBeInTheDocument();
+    expect((await screen.findAllByLabelText("Run ID")).some((element) => (element as HTMLInputElement).value === "popup-run")).toBe(true);
+    expect((await screen.findAllByLabelText("Project")).some((element) => (element as HTMLInputElement).value === "checkout-web")).toBe(true);
+    expect((await screen.findAllByLabelText("Owner")).some((element) => (element as HTMLInputElement).value === "edge-popup")).toBe(true);
+    expect((await screen.findAllByLabelText("Environment")).some((element) => (element as HTMLInputElement).value === "staging-edge")).toBe(true);
+    expect(await screen.findByDisplayValue("https://checkout.example.test/pay")).toBeInTheDocument();
+  });
+
+  it("consumes plugin DSL handoff from URL query params", async () => {
+    window.history.replaceState({}, "", "/?source=plugin&screen=aiGenerate&projectKey=checkout-web&projectName=checkout-web&pageTitle=Checkout%20Payment&pageUrl=https%3A%2F%2Fcheckout.example.test%2Fpay&locator=%23pay-submit");
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    expect(await screen.findByText("AI Generate")).toBeInTheDocument();
+    expect((await screen.findAllByText("Checkout Payment locator review")).length).toBeGreaterThan(0);
+    expect(await screen.findByText(/#pay-submit/)).toBeInTheDocument();
   });
 
   it("generates cases from docParse handoff via real generate endpoint", async () => {

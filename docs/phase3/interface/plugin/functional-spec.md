@@ -4,6 +4,10 @@
 
 - Screen name: `plugin`
 - Front-end implementation: `ui/admin-console/src/screens/PluginPopupScreen.tsx`
+- Real extension popup runtime:
+  - `extension/edge-extension/popup.html`
+  - `extension/edge-extension/popup.js`
+  - `extension/edge-extension/background.js`
 - Parent orchestration: `ui/admin-console/src/App.tsx`
 - Documentation stage rule:
   - This document defines current and intended screen behavior for review.
@@ -67,11 +71,15 @@ Current implementation facts:
 - Props: `apiBaseUrl`, `title`, `locale` (no `snapshot` prop — the screen fetches its own data).
 - Loading/loaded/error states are implemented for the popup snapshot fetch.
 - Current page section and active-run card render data from `popupSnapshot.page` and `popupSnapshot.runtime`.
-- Quick actions are display-only.
-- Pick mode is display-only.
-- Locator candidate list is display-only.
-- `Copy` is visible but not wired.
-- `Use in DSL` is visible but not wired.
+- The admin-console `plugin` screen remains a mirror/demo shell.
+- The real extension popup now wires these actions in `extension/edge-extension/popup.js`:
+  - `Page summary`
+  - `Open in platform`
+  - `Copy`
+  - `Use in DSL`
+- Pick mode is still display-only.
+- Locator candidate selection is still display-only.
+- `Quick smoke test` is still not wired.
 
 This matters for review:
 
@@ -149,7 +157,12 @@ Functional role:
 
 Current behavior:
 
-- all actions are display-only
+- admin-console mirror: display-only
+- real extension popup:
+  - `Page summary` requests deterministic page summary through popup -> background -> native-host -> local-admin-api
+  - `Open in platform` requests a platform handoff URL through the same chain, then background opens the platform tab
+  - `Quick smoke test` remains display-only
+  - `Pick element` remains display-only
 
 ### 6.5 Pick Mode Panel
 
@@ -167,8 +180,9 @@ Functional role:
 
 Current behavior:
 
-- selected element and locator candidates are static demo data
-- footer actions are display-only
+- selected element and locator candidates remain deterministic/static
+- `Copy` writes the recommended locator to the popup-local clipboard
+- `Use in DSL` prepares a platform handoff into `aiGenerate`
 
 ## 7. Data Semantics by Area
 
@@ -216,8 +230,10 @@ Future popup-shell inputs may also include:
 The current implementation produces:
 
 - `GET /api/phase3/extension-popup` read request on mount
-- no extension-message requests
-- no platform handoff output
+- extension-message quick actions:
+  - `PAGE_SUMMARY_GET`
+  - `PLATFORM_HANDOFF_PREPARE`
+- platform handoff output through background tab-open
 
 Its intended future outputs are:
 
@@ -244,10 +260,13 @@ Current implementation summary:
   - popup snapshot fetch from `GET /api/phase3/extension-popup`
   - loading/loaded/error state rendering
   - page and runtime data rendering from popup snapshot
-- visible but not implemented:
-  - all quick actions (require extension/background/native infrastructure)
+  - `Page summary`
+  - `Open in platform`
   - `Copy`
   - `Use in DSL`
+- visible but not implemented:
+  - `Pick element`
+  - `Quick smoke test`
 
 ## 10. Functional Control Responsibility Matrix
 
@@ -259,16 +278,16 @@ Current implementation summary:
   - current implementation: visual only
 - `Page summary`
   - function: fetch structured summary of the current page
-  - output type: future extension/background/native request
-  - current implementation: visual only
+  - output type: extension/background/native request
+  - current implementation: implemented in real extension popup
 - `Quick smoke test`
   - function: launch a lightweight run from current page context
   - output type: future extension-to-host execution request
   - current implementation: visual only
 - `Open in platform`
   - function: hand off current popup context into the full platform
-  - output type: future platform-open action
-  - current implementation: visual only
+  - output type: platform-open action after native-host handoff preparation
+  - current implementation: implemented in real extension popup
 
 ### 10.2 Pick-Mode Controls
 
@@ -278,12 +297,12 @@ Current implementation summary:
   - current implementation: display only
 - `Copy`
   - function: copy selected locator into clipboard
-  - output type: future local clipboard action
-  - current implementation: visual only
+  - output type: local clipboard action
+  - current implementation: implemented in real extension popup
 - `Use in DSL`
   - function: insert or hand off locator into DSL-authoring/generation flow
-  - output type: future platform or extension-side handoff
-  - current implementation: visual only
+  - output type: platform handoff into `aiGenerate`
+  - current implementation: implemented in real extension popup
 
 ## 11. State Model
 
@@ -305,9 +324,10 @@ Current implementation status:
   - `loading` — shown while `GET /api/phase3/extension-popup` is in flight ("connecting…")
   - `loaded` — shown when popup snapshot is available ("host connected")
   - `error` — shown when popup snapshot fetch fails ("host unreachable")
+  - quick-action pending/success/error feedback for page summary and platform handoff
 - not yet implemented:
   - pick mode active/element selected/locator candidates ready (require extension content-script infrastructure)
-  - execution starting/run status updating (require extension/native host infrastructure)
+  - quick smoke execution starting/run status updating (require extension/native host execution flow)
 
 ## 12. Validation and Rules
 
@@ -354,8 +374,11 @@ The `plugin` screen is not currently responsible for:
 ## 15. Remaining Limits
 
 - The screen now consumes `ExtensionPopupSnapshot` from `GET /api/phase3/extension-popup` (AdminConsoleSnapshot dependency removed).
-- Quick actions are display-only because they require real extension/background/native infrastructure that does not exist in the admin-console template shell.
-- Pick mode, locator candidates, `Copy`, and `Use in DSL` remain static demo constructs.
+- The admin-console `plugin` screen remains a mirror/demo shell; the real quick actions now live in `extension/edge-extension/popup.html` + `popup.js`.
+- `Page summary`, `Open in platform`, `Copy`, and `Use in DSL` are now implemented in the real extension popup chain.
+- `Pick element` and `Quick smoke test` remain unimplemented.
+- Locator candidates remain deterministic static suggestions; there is no real content-script pick mode yet.
+- `Use in DSL` currently hands off into `aiGenerate`, not directly into the `cases` DSL editor.
 - The screen must continue to be treated as an Edge extension front-end template shell, not as a normal platform management page.
 - Popup snapshot data is deterministic mock from the backend when no real extension context exists.
 

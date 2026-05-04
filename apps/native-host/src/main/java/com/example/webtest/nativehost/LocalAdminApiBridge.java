@@ -28,6 +28,14 @@ final class LocalAdminApiBridge {
         return exchange("GET", "/api/phase3/extension-popup", null);
     }
 
+    Map<String, Object> fetchPageSummary(Map<String, Object> payload) {
+        return exchange("POST", "/api/phase3/extension/page-summary", payload);
+    }
+
+    Map<String, Object> preparePlatformHandoff(Map<String, Object> payload) {
+        return exchange("POST", "/api/phase3/extension/platform-handoff", payload);
+    }
+
     Map<String, Object> createSchedulerRequest(Map<String, Object> payload) {
         return exchange("POST", "/api/phase3/scheduler/requests", payload);
     }

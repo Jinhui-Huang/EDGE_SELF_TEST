@@ -1362,6 +1362,79 @@ function translate(locale: Locale, value: CopyValue): string {
   return typeof value === "string" ? value : value[locale] ?? value.en ?? value.zh ?? value.ja;
 }
 
+type PluginUrlHandoff =
+  | {
+      screen: "execution";
+      launchForm: Partial<SchedulerMutationForm>;
+    }
+  | {
+      screen: "aiGenerate";
+      focus: AiGenerateFocus;
+    }
+  | null;
+
+function parsePluginUrlHandoff(search: string): PluginUrlHandoff {
+  const params = new URLSearchParams(search);
+  if (params.get("source") !== "plugin") {
+    return null;
+  }
+  const screen = params.get("screen");
+  if (screen === "execution") {
+    return {
+      screen: "execution",
+      launchForm: {
+        runId: params.get("runId") || undefined,
+        projectKey: params.get("projectKey") || undefined,
+        owner: params.get("owner") || undefined,
+        environment: params.get("environment") || undefined,
+        targetUrl: params.get("targetUrl") || undefined,
+        detail: params.get("detail") || undefined
+      }
+    };
+  }
+  if (screen === "aiGenerate") {
+    const projectKey = params.get("projectKey") || "checkout-web";
+    const projectName = params.get("projectName") || projectKey;
+    const pageTitle = params.get("pageTitle") || "Plugin page context";
+    const pageUrl = params.get("pageUrl") || "";
+    const locator = params.get("locator") || "";
+    const caseId = `plugin-${projectKey}-locator-review`;
+    const caseName = pageTitle.includes("locator") ? pageTitle : `${pageTitle} locator review`;
+    return {
+      screen: "aiGenerate",
+      focus: {
+        projectKey,
+        projectName,
+        documentId: `plugin-${projectKey}-page-summary`,
+        documentName: pageUrl ? `${pageTitle} (${pageUrl})` : pageTitle,
+        caseId,
+        caseName,
+        generatedCases: [
+          {
+            id: caseId,
+            name: caseName,
+            category: "locator-handoff",
+            confidence: locator ? "0.88" : "0.72"
+          }
+        ],
+        reasoning: [
+          {
+            label: "Plugin handoff",
+            body: pageUrl
+              ? `Received from popup page context: ${pageUrl}`
+              : "Received from popup page context."
+          },
+          {
+            label: "Locator",
+            body: locator || "Popup did not provide a locator candidate."
+          }
+        ]
+      }
+    };
+  }
+  return null;
+}
+
 export function App() {
   const [snapshot, setSnapshot] = useState<AdminConsoleSnapshot>(fallbackSnapshot);
   const [sourceLabel, setSourceLabel] = useState(translate("en", sharedCopy.sourceFallback));
@@ -1571,6 +1644,24 @@ export function App() {
     setSourceLabel(t(sharedCopy.sourceLocalApi));
     return payload;
   }
+
+  useEffect(() => {
+    const handoff = parsePluginUrlHandoff(window.location.search);
+    if (!handoff) {
+      return;
+    }
+    if (handoff.screen === "execution") {
+      setLaunchForm((current) => ({
+        ...current,
+        ...Object.fromEntries(Object.entries(handoff.launchForm).filter(([, value]) => value != null && value !== ""))
+      }));
+      setActiveScreen("execution");
+    } else if (handoff.screen === "aiGenerate") {
+      setAiGenerateFocus(handoff.focus);
+      setActiveScreen("aiGenerate");
+    }
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }, []);
 
   useEffect(() => {
     if (!snapshot.reports.length) {

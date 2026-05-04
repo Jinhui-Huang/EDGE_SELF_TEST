@@ -3286,3 +3286,48 @@ Verification:
 
 Known limits:
 - Full `npm test -- --run` remains sensitive to local Vitest worker/resource behavior on this machine; serialized targeted runs for the modified report flows passed, but the full run was not stable enough to use as the only signal.
+
+# 2026-05-04 P0-4 Plugin Quick Actions Real Chain
+
+Context:
+- Re-opened the highest-priority unresolved Phase 3 plugin gap and verified that the real extension popup chain already existed in `extension/edge-extension` plus `apps/native-host`, so the work could proceed without falling back to monitor drill-down first.
+
+Implemented:
+- Added extension-specific local-admin-api endpoints:
+  - `POST /api/phase3/extension/page-summary`
+  - `POST /api/phase3/extension/platform-handoff`
+- Added native-host message dispatch for:
+  - `PAGE_SUMMARY_GET`
+  - `PLATFORM_HANDOFF_PREPARE`
+- Wired real extension popup quick actions in `extension/edge-extension/popup.html` + `popup.js`:
+  - `Page summary` -> popup -> background -> native-host -> local-admin-api
+  - `Open in platform` -> popup -> background -> native-host -> local-admin-api -> background tab-open
+  - `Copy` -> popup-local clipboard write
+  - `Use in DSL` -> popup -> background -> native-host -> local-admin-api -> background tab-open
+- Extended `background.js` with a local `platform-open` channel so popup UI does not own browser tab opening logic directly.
+- Added App-level platform handoff parsing in `ui/admin-console/src/App.tsx` using lightweight query params only:
+  - `execution` handoff pre-fills existing `launchForm`
+  - `aiGenerate` handoff maps query context into existing `aiGenerateFocus`
+- No complex router was introduced.
+- No existing scheduler/report/run protocol was modified.
+
+Docs synced:
+- `docs/phase3/interface/plugin/functional-spec.md`
+- `docs/phase3/interface/plugin/interface-spec.md`
+- `docs/phase3/interface/review-backlog.md`
+- `docs/phase3/interface/ui-control-interface-overview.md`
+
+Verification:
+- `npm test -- --run src/popup.test.js` in `ui/admin-console`: PASS (7/7)
+- `npm test -- --run src/App.test.tsx -t "consumes plugin execution handoff from URL query params"`: PASS
+- `npm test -- --run src/App.test.tsx -t "consumes plugin DSL handoff from URL query params"`: PASS
+- `npm run build` in `ui/admin-console`: PASS
+- `mvn "-Dmaven.repo.local=.m2/repository" -pl apps/native-host -Dtest=NativeHostMessageProcessorTest test`: PASS (7/7)
+- `mvn "-Dmaven.repo.local=.m2/repository" -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`: PASS (14/14)
+
+Known limits:
+- `Pick element` remains visual-only; no content-script pick/highlight/candidate capture chain exists yet.
+- `Quick smoke test` remains visual-only; popup-side execution start is not yet wired.
+- `Page summary` is deterministic from popup tab context plus local rules; there is still no real DOM/content-script extraction in Phase 3.
+- `Use in DSL` currently hands off into `aiGenerate`, not directly into the `cases` DSL editor.
+- Full `src/App.test.tsx` remains expensive on this machine, so verification used focused targeted runs for the new handoff cases instead of the whole file.

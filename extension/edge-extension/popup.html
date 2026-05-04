@@ -46,6 +46,54 @@
 
       <section class="panel">
         <div class="panelHeader">
+          <h2>Quick Actions</h2>
+          <span class="status">popup -> background -> native-host</span>
+        </div>
+        <div class="actionGrid">
+          <button id="pageSummaryButton" type="button">Page summary</button>
+          <button id="openPlatformButton" type="button">Open in platform</button>
+          <button id="copyLocatorButton" type="button">Copy locator</button>
+          <button id="useDslButton" type="button">Use in DSL</button>
+        </div>
+        <p class="actionStatus hidden" id="quickActionStatus" role="status" aria-live="polite"></p>
+      </section>
+
+      <section class="panel">
+        <div class="panelHeader">
+          <h2>Locator Candidate</h2>
+          <span class="status">local selection</span>
+        </div>
+        <dl class="summary">
+          <div>
+            <dt>Recommended locator</dt>
+            <dd id="selectedLocator">button:has-text('Pay')</dd>
+          </div>
+          <div>
+            <dt>Reason</dt>
+            <dd id="locatorReason">Text-based locator remains readable and deterministic for popup handoff.</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="panel">
+        <div class="panelHeader">
+          <h2>Page Summary Result</h2>
+          <span class="status">deterministic</span>
+        </div>
+        <dl class="summary">
+          <div>
+            <dt>Summary</dt>
+            <dd id="pageSummaryResult">Not requested yet.</dd>
+          </div>
+          <div>
+            <dt>Recommended next step</dt>
+            <dd id="pageSummaryRecommendation">Refresh current page context or open the platform.</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="panel">
+        <div class="panelHeader">
           <h2>Current Runtime Status</h2>
           <span class="status" id="runtimeState">Audit-only</span>
         </div>

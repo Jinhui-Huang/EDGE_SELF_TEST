@@ -21,6 +21,7 @@ const formDefaults = {
 };
 
 let latestTab = null;
+const recommendedLocator = "button:has-text('Pay')";
 
 export function createFallbackPopupSnapshot(error) {
   return {
@@ -46,6 +47,20 @@ export async function requestNativeBridge(type, payload = {}) {
   });
   if (!response?.ok) {
     throw new Error(response?.error || "Native host request failed.");
+  }
+  return response.data;
+}
+
+export async function requestPlatformOpen(url) {
+  if (typeof chrome === "undefined" || !chrome.runtime?.sendMessage) {
+    throw new Error("Extension background bridge is unavailable.");
+  }
+  const response = await chrome.runtime.sendMessage({
+    channel: "platform-open",
+    url
+  });
+  if (!response?.ok) {
+    throw new Error(response?.error || "Platform open request failed.");
   }
   return response.data;
 }
@@ -107,8 +122,19 @@ export function setButtonPending(buttonId, pending, pendingLabel, defaultLabel) 
   button.textContent = pending ? pendingLabel : defaultLabel;
 }
 
+export function renderPageSummaryResult(summary) {
+  const summaryNode = document.getElementById("pageSummaryResult");
+  const recommendationNode = document.getElementById("pageSummaryRecommendation");
+  if (summaryNode) {
+    summaryNode.textContent = summary?.summary || "No page summary available.";
+  }
+  if (recommendationNode) {
+    recommendationNode.textContent = summary?.recommendedAction || "Refresh current page context or open the platform.";
+  }
+}
+
 export function seedFormValues(snapshot, tab) {
-  const pageHost = snapshot?.page?.host || (tab?.url ? new URL(tab.url).host : "");
+  const pageHost = snapshot?.page?.domain || snapshot?.page?.host || (tab?.url ? new URL(tab.url).host : "");
   const runtimeHint = snapshot?.runtime?.nextAction || "";
   const launchRunId = document.getElementById("launchRunId");
   const reviewRunId = document.getElementById("reviewRunId");
@@ -143,6 +169,25 @@ export function seedFormValues(snapshot, tab) {
   if (reviewDetail instanceof HTMLTextAreaElement && !reviewDetail.dataset.touched && runtimeHint) {
     reviewDetail.value = `Review requested from popup. Suggested action: ${runtimeHint}`;
   }
+}
+
+export function getSelectedLocator() {
+  return recommendedLocator;
+}
+
+export async function requestPageSummary(tab = latestTab) {
+  return await requestNativeBridge("PAGE_SUMMARY_GET", {
+    pageTitle: tab?.title || "",
+    pageUrl: tab?.url || "",
+    locator: getSelectedLocator()
+  });
+}
+
+export async function preparePlatformHandoff(target, payload = {}) {
+  return await requestNativeBridge("PLATFORM_HANDOFF_PREPARE", {
+    target,
+    ...payload
+  });
 }
 
 export function trackTouchedFields() {
@@ -245,6 +290,82 @@ export async function submitReview(event) {
   }
 }
 
+export async function runPageSummaryAction() {
+  setButtonPending("pageSummaryButton", true, "Loading...", "Page summary");
+  setMutationState("quickActionStatus", "pending", "Requesting page summary through native host...");
+  try {
+    const tab = latestTab || await getCurrentTab();
+    const summary = await requestPageSummary(tab);
+    renderPageSummaryResult(summary);
+    setMutationState("quickActionStatus", "success", summary.recommendedAction || "Page summary loaded.");
+    return summary;
+  } catch (error) {
+    setMutationState("quickActionStatus", "error", error instanceof Error ? error.message : String(error));
+    throw error;
+  } finally {
+    setButtonPending("pageSummaryButton", false, "Loading...", "Page summary");
+  }
+}
+
+export async function runOpenInPlatformAction() {
+  const form = readForm("launch");
+  const tab = latestTab || await getCurrentTab();
+  setButtonPending("openPlatformButton", true, "Opening...", "Open in platform");
+  setMutationState("quickActionStatus", "pending", "Preparing platform execution handoff through native host...");
+  try {
+    const handoff = await preparePlatformHandoff("execution", {
+      runId: form.runId,
+      projectKey: form.projectKey,
+      owner: form.owner,
+      environment: form.environment,
+      targetUrl: tab?.url || "",
+      detail: buildContextDetail(form.detail, tab)
+    });
+    await requestPlatformOpen(handoff.url);
+    setMutationState("quickActionStatus", "success", "Opened platform execution workspace.");
+    return handoff;
+  } catch (error) {
+    setMutationState("quickActionStatus", "error", error instanceof Error ? error.message : String(error));
+    throw error;
+  } finally {
+    setButtonPending("openPlatformButton", false, "Opening...", "Open in platform");
+  }
+}
+
+export async function copySelectedLocator() {
+  const locator = getSelectedLocator();
+  if (!globalThis.navigator?.clipboard?.writeText) {
+    throw new Error("Clipboard write is unavailable in this popup context.");
+  }
+  await globalThis.navigator.clipboard.writeText(locator);
+  setMutationState("quickActionStatus", "success", `Copied locator: ${locator}`);
+  return locator;
+}
+
+export async function runUseInDslAction() {
+  const tab = latestTab || await getCurrentTab();
+  const form = readForm("launch");
+  setButtonPending("useDslButton", true, "Opening...", "Use in DSL");
+  setMutationState("quickActionStatus", "pending", "Preparing DSL handoff through native host...");
+  try {
+    const handoff = await preparePlatformHandoff("aiGenerate", {
+      projectKey: form.projectKey || "checkout-web",
+      projectName: form.projectKey || "checkout-web",
+      pageTitle: tab?.title || "Current page",
+      pageUrl: tab?.url || "",
+      locator: getSelectedLocator()
+    });
+    await requestPlatformOpen(handoff.url);
+    setMutationState("quickActionStatus", "success", "Opened platform DSL review workspace.");
+    return handoff;
+  } catch (error) {
+    setMutationState("quickActionStatus", "error", error instanceof Error ? error.message : String(error));
+    throw error;
+  } finally {
+    setButtonPending("useDslButton", false, "Opening...", "Use in DSL");
+  }
+}
+
 export async function refreshCurrentPage() {
   const titleNode = document.getElementById("pageTitle");
   const urlNode = document.getElementById("pageUrl");
@@ -272,6 +393,10 @@ export async function refreshCurrentPage() {
     runtimeAuditNode.textContent = snapshot.runtime.auditState;
     runtimeStateNode.textContent = `${snapshot.status} / ${snapshot.runtime.queueState}`;
     runtimeActionNode.textContent = snapshot.runtime.nextAction;
+    renderPageSummaryResult({
+      summary: snapshot.summary,
+      recommendedAction: snapshot.runtime.nextAction
+    });
     seedFormValues(snapshot, tab);
     return snapshot;
   } catch (error) {
@@ -293,6 +418,20 @@ export async function refreshCurrentPage() {
 export function initPopup() {
   document.getElementById("refreshButton")?.addEventListener("click", () => {
     void refreshCurrentPage();
+  });
+  document.getElementById("pageSummaryButton")?.addEventListener("click", () => {
+    void runPageSummaryAction();
+  });
+  document.getElementById("openPlatformButton")?.addEventListener("click", () => {
+    void runOpenInPlatformAction();
+  });
+  document.getElementById("copyLocatorButton")?.addEventListener("click", () => {
+    void copySelectedLocator().catch((error) => {
+      setMutationState("quickActionStatus", "error", error instanceof Error ? error.message : String(error));
+    });
+  });
+  document.getElementById("useDslButton")?.addEventListener("click", () => {
+    void runUseInDslAction();
   });
   document.getElementById("launchForm")?.addEventListener("submit", submitLaunch);
   document.getElementById("launchExecuteButton")?.addEventListener("click", () => {

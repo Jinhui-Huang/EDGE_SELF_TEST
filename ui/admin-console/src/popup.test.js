@@ -11,6 +11,13 @@ function createFormDom() {
     <input id="reviewProjectKey" value="" />
     <input id="reviewEnvironment" value="" />
     <textarea id="reviewDetail"></textarea>
+    <button id="pageSummaryButton" type="button">Page summary</button>
+    <button id="openPlatformButton" type="button">Open in platform</button>
+    <button id="copyLocatorButton" type="button">Copy locator</button>
+    <button id="useDslButton" type="button">Use in DSL</button>
+    <p id="quickActionStatus" class="actionStatus hidden"></p>
+    <dd id="pageSummaryResult">Not requested yet.</dd>
+    <dd id="pageSummaryRecommendation">Not requested yet.</dd>
   `;
 }
 
@@ -21,8 +28,21 @@ describe("popup helpers", () => {
     globalThis.chrome = {
       runtime: {
         sendMessage: vi.fn()
+      },
+      tabs: {
+        query: vi.fn().mockResolvedValue([
+          { title: "Checkout", url: "https://checkout.example.test/pay" }
+        ])
       }
     };
+    Object.defineProperty(globalThis, "navigator", {
+      value: {
+        clipboard: {
+          writeText: vi.fn().mockResolvedValue(undefined)
+        }
+      },
+      configurable: true
+    });
   });
 
   it("builds request titles and context details from the current tab", async () => {
@@ -109,6 +129,120 @@ describe("popup helpers", () => {
       runtime: {
         queueState: "Unavailable"
       }
+    });
+  });
+
+  it("requests page summary through native host and renders the result", async () => {
+    createFormDom();
+    globalThis.chrome.runtime.sendMessage = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      data: {
+        status: "READY",
+        summary: "Checkout page is active.",
+        recommendedAction: "Open the platform."
+      }
+    });
+    const popup = await import("../../../extension/edge-extension/popup.js");
+
+    await expect(popup.runPageSummaryAction()).resolves.toMatchObject({
+      status: "READY"
+    });
+    expect(globalThis.chrome.runtime.sendMessage).toHaveBeenCalledWith({
+      channel: "native-host",
+      type: "PAGE_SUMMARY_GET",
+      payload: {
+        pageTitle: "Checkout",
+        pageUrl: "https://checkout.example.test/pay",
+        locator: "button:has-text('Pay')"
+      }
+    });
+    expect(document.getElementById("pageSummaryResult").textContent).toContain("Checkout page is active.");
+    expect(document.getElementById("pageSummaryRecommendation").textContent).toContain("Open the platform.");
+  });
+
+  it("opens platform execution handoff through background and native host", async () => {
+    createFormDom();
+    globalThis.chrome.runtime.sendMessage = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        data: {
+          status: "READY",
+          screen: "execution",
+          url: "http://127.0.0.1:5173/?source=plugin&screen=execution&runId=popup-run"
+        }
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        data: {
+          opened: true
+        }
+      });
+    const popup = await import("../../../extension/edge-extension/popup.js");
+
+    await expect(popup.runOpenInPlatformAction()).resolves.toMatchObject({
+      screen: "execution"
+    });
+    expect(globalThis.chrome.runtime.sendMessage).toHaveBeenNthCalledWith(1, {
+      channel: "native-host",
+      type: "PLATFORM_HANDOFF_PREPARE",
+      payload: {
+        target: "execution",
+        runId: "popup-run",
+        projectKey: "checkout-web",
+        owner: "edge-popup",
+        environment: "staging-edge",
+        targetUrl: "https://checkout.example.test/pay",
+        detail: "review current page | Page: Checkout | URL: https://checkout.example.test/pay"
+      }
+    });
+    expect(globalThis.chrome.runtime.sendMessage).toHaveBeenNthCalledWith(2, {
+      channel: "platform-open",
+      url: "http://127.0.0.1:5173/?source=plugin&screen=execution&runId=popup-run"
+    });
+  });
+
+  it("copies locator locally and opens DSL handoff through native host", async () => {
+    createFormDom();
+    globalThis.chrome.runtime.sendMessage = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        data: {
+          status: "READY",
+          screen: "aiGenerate",
+          url: "http://127.0.0.1:5173/?source=plugin&screen=aiGenerate&locator=button%3Ahas-text%28%27Pay%27%29"
+        }
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        data: {
+          opened: true
+        }
+      });
+    const popup = await import("../../../extension/edge-extension/popup.js");
+
+    await expect(popup.copySelectedLocator()).resolves.toBe("button:has-text('Pay')");
+    expect(globalThis.navigator.clipboard.writeText).toHaveBeenCalledWith("button:has-text('Pay')");
+
+    await expect(popup.runUseInDslAction()).resolves.toMatchObject({
+      screen: "aiGenerate"
+    });
+    expect(globalThis.chrome.runtime.sendMessage).toHaveBeenNthCalledWith(1, {
+      channel: "native-host",
+      type: "PLATFORM_HANDOFF_PREPARE",
+      payload: {
+        target: "aiGenerate",
+        projectKey: "checkout-web",
+        projectName: "checkout-web",
+        pageTitle: "Checkout",
+        pageUrl: "https://checkout.example.test/pay",
+        locator: "button:has-text('Pay')"
+      }
+    });
+    expect(globalThis.chrome.runtime.sendMessage).toHaveBeenNthCalledWith(2, {
+      channel: "platform-open",
+      url: "http://127.0.0.1:5173/?source=plugin&screen=aiGenerate&locator=button%3Ahas-text%28%27Pay%27%29"
     });
   });
 });

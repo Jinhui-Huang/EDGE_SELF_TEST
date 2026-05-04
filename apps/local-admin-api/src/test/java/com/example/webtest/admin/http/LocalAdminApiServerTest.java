@@ -1743,6 +1743,94 @@ class LocalAdminApiServerTest {
         }
     }
 
+    @Test
+    void extensionQuickActionEndpoints(@TempDir Path tempDir) throws Exception {
+        Path runsDir = tempDir.resolve("runs");
+        Files.createDirectories(runsDir);
+        Path schedulerRequestsFile = tempDir.resolve("scheduler-requests.json");
+        Path schedulerEventsFile = tempDir.resolve("scheduler-events.json");
+        Path schedulerStateFile = tempDir.resolve("scheduler-state.json");
+        Path queueFile = tempDir.resolve("execution-queue.json");
+        Path catalogFile = tempDir.resolve("project-catalog.json");
+        Path executionHistoryFile = tempDir.resolve("execution-history.json");
+        Path modelConfigFile = tempDir.resolve("model-config.json");
+        Path environmentConfigFile = tempDir.resolve("environment-config.json");
+        Files.writeString(queueFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(catalogFile, Jsons.writeValueAsString(Map.of("projects", List.of(), "cases", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(executionHistoryFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(modelConfigFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(environmentConfigFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+
+        Clock clock = Clock.fixed(Instant.parse("2026-04-18T11:00:00Z"), ZoneOffset.UTC);
+        try (LocalAdminApiServer server = new LocalAdminApiServer(
+                new InetSocketAddress("127.0.0.1", 0),
+                new Phase3MockDataService(
+                        runsDir,
+                        schedulerRequestsFile,
+                        schedulerEventsFile,
+                        schedulerStateFile,
+                        queueFile,
+                        catalogFile,
+                        executionHistoryFile,
+                        modelConfigFile,
+                        environmentConfigFile,
+                        clock),
+                new SchedulerPersistenceService(
+                        schedulerRequestsFile,
+                        schedulerEventsFile,
+                        clock),
+                new ConfigPersistenceService(
+                        modelConfigFile,
+                        environmentConfigFile),
+                new CatalogPersistenceService(catalogFile, clock),
+                new RunStatusService(schedulerRequestsFile, schedulerEventsFile, new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, clock), clock),
+                new AgentGenerateService(),
+                new ReportArtifactService(runsDir),
+                new DataTemplatePersistenceService(tempDir.resolve("data-templates.json"), clock))) {
+            server.start();
+            HttpClient client = HttpClient.newHttpClient();
+
+            HttpResponse<String> pageSummary = client.send(
+                    request(server, "/api/phase3/extension/page-summary", "POST", Jsons.writeValueAsString(Map.of(
+                            "pageTitle", "Checkout - Payment",
+                            "pageUrl", "https://checkout.example.test/pay",
+                            "locator", "#pay-submit"))),
+                    HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> executionHandoff = client.send(
+                    request(server, "/api/phase3/extension/platform-handoff", "POST", Jsons.writeValueAsString(Map.of(
+                            "target", "execution",
+                            "runId", "popup-checkout-smoke",
+                            "projectKey", "checkout-web",
+                            "owner", "edge-popup",
+                            "environment", "staging-edge",
+                            "targetUrl", "https://checkout.example.test/pay"))),
+                    HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> dslHandoff = client.send(
+                    request(server, "/api/phase3/extension/platform-handoff", "POST", Jsons.writeValueAsString(Map.of(
+                            "target", "aiGenerate",
+                            "projectKey", "checkout-web",
+                            "projectName", "checkout-web",
+                            "pageTitle", "Checkout - Payment",
+                            "pageUrl", "https://checkout.example.test/pay",
+                            "locator", "#pay-submit"))),
+                    HttpResponse.BodyHandlers.ofString());
+
+            assertEquals(200, pageSummary.statusCode());
+            assertTrue(pageSummary.body().contains("\"recommendedAction\""));
+            assertTrue(pageSummary.body().contains("pay-submit"));
+
+            assertEquals(200, executionHandoff.statusCode());
+            assertTrue(executionHandoff.body().contains("\"screen\":\"execution\""));
+            assertTrue(executionHandoff.body().contains("screen=execution"));
+            assertTrue(executionHandoff.body().contains("runId=popup-checkout-smoke"));
+
+            assertEquals(200, dslHandoff.statusCode());
+            assertTrue(dslHandoff.body().contains("\"screen\":\"aiGenerate\""));
+            assertTrue(dslHandoff.body().contains("screen=aiGenerate"));
+            assertTrue(dslHandoff.body().contains("locator=%23pay-submit"));
+        }
+    }
+
     private static HttpRequest request(LocalAdminApiServer server, String path) {
         return request(server, path, "GET", null);
     }

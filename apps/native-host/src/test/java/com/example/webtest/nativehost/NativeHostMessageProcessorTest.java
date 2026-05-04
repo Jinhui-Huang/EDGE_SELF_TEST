@@ -75,6 +75,52 @@ class NativeHostMessageProcessorTest {
     }
 
     @Test
+    void proxiesExtensionQuickActionsToLocalAdminApi() throws Exception {
+        try (TestHttpServer server = new TestHttpServer()) {
+            AtomicReference<String> pageSummaryBody = new AtomicReference<>();
+            AtomicReference<String> handoffBody = new AtomicReference<>();
+            server.respondJson("/api/phase3/extension/page-summary", "POST", exchange -> {
+                pageSummaryBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+                return Map.of(
+                        "status", "READY",
+                        "title", "Checkout",
+                        "recommendedAction", "Open the platform");
+            });
+            server.respondJson("/api/phase3/extension/platform-handoff", "POST", exchange -> {
+                handoffBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+                return Map.of(
+                        "status", "READY",
+                        "screen", "execution",
+                        "url", "http://127.0.0.1:5173/?source=plugin&screen=execution");
+            });
+
+            NativeHostMessageProcessor processor = new NativeHostMessageProcessor(
+                    new LocalAdminApiBridge(server.baseUri()));
+
+            NativeHostResponse pageSummaryResponse = processor.process(new NativeHostRequest(
+                    "1.0",
+                    "PAGE_SUMMARY_GET",
+                    "req-page-summary",
+                    Map.of(
+                            "pageTitle", "Checkout",
+                            "pageUrl", "https://checkout.example.test/pay")));
+            NativeHostResponse handoffResponse = processor.process(new NativeHostRequest(
+                    "1.0",
+                    "PLATFORM_HANDOFF_PREPARE",
+                    "req-handoff",
+                    Map.of(
+                            "target", "execution",
+                            "runId", "popup-checkout-smoke")));
+
+            assertTrue(pageSummaryResponse.ok());
+            assertTrue(handoffResponse.ok());
+            assertTrue(pageSummaryBody.get().contains("\"pageTitle\":\"Checkout\""));
+            assertTrue(handoffBody.get().contains("\"target\":\"execution\""));
+            assertTrue(String.valueOf(handoffResponse.data()).contains("screen=execution"));
+        }
+    }
+
+    @Test
     void returnsStructuredErrorForUnsupportedRequestType() {
         NativeHostMessageProcessor processor = new NativeHostMessageProcessor(
                 new LocalAdminApiBridge(URI.create("http://127.0.0.1:8787")));
