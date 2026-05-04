@@ -466,6 +466,13 @@ public final class LocalAdminApiServer implements AutoCloseable {
                     }
                     writeJson(exchange, 200, reportService.getReport(runId));
                 }
+                case "report-summary" -> {
+                    if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+                        writeJson(exchange, 405, Map.of("error", "METHOD_NOT_ALLOWED"));
+                        return;
+                    }
+                    writeJson(exchange, 200, reportService.getReportSummary(runId));
+                }
                 case "data-diff" -> {
                     String dataDiffSub = segments.length > 6 ? segments[6] : "";
                     if ("raw".equals(dataDiffSub)) {

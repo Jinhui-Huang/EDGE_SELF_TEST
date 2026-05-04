@@ -1,5 +1,10 @@
 # Report Detail Interface Specification
 
+Update note:
+- Current App-level report selection uses canonical `runId`.
+- `ReportsScreen` opens detail through `onOpenDetail(runId)`.
+- `reportDetail` reads `GET /api/phase3/runs/{runId}/report` and tab-specific run endpoints, with snapshot fallback only when backend reads fail.
+
 ## 1. Scope and Design Basis
 
 - Screen: `reportDetail`

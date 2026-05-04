@@ -144,7 +144,7 @@ Conventions used here:
 |---|---|---|---|
 | Collapse / expand | button | Local only | Keep local |
 | Project button | button | Local project switch only | Keep local |
-| `Detail` | button | Implemented as App-level selected-run handoff into `reportDetail` | Keep list page lightweight; detail page can later read `GET /api/phase3/runs/{runId}/report` |
+| `Detail` | button | Implemented as App-level selected-run handoff into `reportDetail` with canonical `runId`; list data comes from `GET /api/phase3/runs/` | Keep list page lightweight |
 | Timeline item | clickable row | Display-only | App-level handoff into `reportDetail` or `monitor` once target metadata exists |
 
 ---
@@ -170,7 +170,7 @@ Conventions used here:
 | Control | Type | Current behavior / interface | Future interface / design |
 |---|---|---|---|
 | `View raw JSON` | button | Implemented: fetches `GET /api/phase3/runs/{runId}/data-diff/raw`, opens in-page drawer with before/after/afterRestore tabs showing raw JSON | Keep current |
-| `Re-restore` | button | Implemented: posts `POST /api/phase3/runs/{runId}/restore/retry`, shows success/rejected/error status bar, refreshes diff data on success | Keep current |
+| `Re-restore` | button | Implemented: posts `POST /api/phase3/runs/{runId}/restore/retry`, shows success/rejected/error status bar, refreshes diff data and restore result on success | Keep current |
 | Diff row | display row | Display-only | Backed by `GET /api/phase3/runs/{runId}/data-diff` |
 
 ---

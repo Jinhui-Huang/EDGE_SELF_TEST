@@ -1,6 +1,7 @@
 import { AdminConsoleSnapshot } from "../types";
 
 export type ReportViewModel = {
+  runId: string;
   runName: string;
   status: string;
   finishedAt: string;
@@ -102,6 +103,7 @@ export function buildReportViewModels(snapshot: AdminConsoleSnapshot): ReportVie
     const model = deriveModel(index);
 
     return {
+      runId: report.runId ?? report.runName,
       runName: report.runName,
       status,
       finishedAt: report.finishedAt,
@@ -161,7 +163,7 @@ export function buildReportViewModels(snapshot: AdminConsoleSnapshot): ReportVie
   });
 }
 
-export function selectReportViewModel(snapshot: AdminConsoleSnapshot, runName: string | null): ReportViewModel | null {
+export function selectReportViewModel(snapshot: AdminConsoleSnapshot, runId: string | null): ReportViewModel | null {
   const reports = buildReportViewModels(snapshot);
-  return reports.find((item) => item.runName === runName) ?? reports[0] ?? null;
+  return reports.find((item) => item.runId === runId || item.runName === runId) ?? reports[0] ?? null;
 }

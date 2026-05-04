@@ -1098,3 +1098,9 @@
      - backend generation remains deterministic mock shaped by input context
      - candidate tab switch remains local-only with one backend-selected DSL payload per generation
      - `aiGenerate` still has no automatic downstream navigation into `cases` or `execution`
+- 2026-04-29: Re-opened P1-2 and tightened the canonical report artifact path.
+  - `reports`, `reportDetail`, and `dataDiff` now use explicit `runId` handoff rather than `runName`-based selection.
+  - `ReportsScreen` is backend-first on `GET /api/phase3/runs/`; snapshot/view-model synthesis is fallback-only.
+  - `DataDiffScreen` now consumes `GET /api/phase3/runs/{runId}/restore-result` and refreshes restore-result together with diff data after `POST /api/phase3/runs/{runId}/restore/retry`.
+  - Frontend tests were expanded/re-verified for report->detail->diff handoff, artifact failure tolerance, raw diff error state, and restore-result refresh.
+  - Local verification exposed Vitest worker/resource instability on this machine; serialized targeted runs for the modified report flows passed, and backend `LocalAdminApiServerTest` passed.

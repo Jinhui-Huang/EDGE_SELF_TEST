@@ -1,5 +1,11 @@
 # Data Diff Interface Specification
 
+Update note:
+- Current App-level data-diff selection uses canonical `runId`.
+- `dataDiff` reads `GET /api/phase3/runs/{runId}/data-diff`, `.../data-diff/raw`, and `.../restore-result`.
+- `POST /api/phase3/runs/{runId}/restore/retry` refreshes both diff data and restore-result on success.
+- Synthetic diff rows are fallback-only when backend reads are unavailable.
+
 ## 1. Scope and Design Basis
 
 - Screen: `dataDiff`

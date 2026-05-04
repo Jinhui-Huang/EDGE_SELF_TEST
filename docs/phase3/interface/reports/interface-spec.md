@@ -1,5 +1,11 @@
 # Reports Interface Specification
 
+Update note:
+- P1-2 is implemented in the current workspace.
+- `reports` is now backend-first on `GET /api/phase3/runs/`.
+- App-level navigation uses canonical `runId` for `onOpenDetail(runId)`.
+- Snapshot/view-model synthesis remains fallback-only when the run-list API is unavailable.
+
 ## 1. Scope and Design Basis
 
 - Screen: `reports`

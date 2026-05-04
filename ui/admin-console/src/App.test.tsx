@@ -125,10 +125,19 @@ const dataTemplatesResponse = {
 
 const reportResponse = {
   runId: "checkout-web-nightly",
+  runName: "checkout-web-nightly",
   status: "FAILED",
   startedAt: "2026-04-18T09:00:00Z",
   finishedAt: "2026-04-18T09:10:00Z",
   durationMs: 600000,
+  projectKey: "checkout-web",
+  projectName: "checkout-web",
+  caseId: "checkout-smoke",
+  caseName: "Checkout smoke",
+  environment: "staging-edge",
+  model: "claude-4.5-sonnet",
+  operator: "qa-platform",
+  entry: "Failure analysis pending",
   stepsTotal: 8,
   stepsPassed: 7,
   assertionsTotal: 11,
@@ -172,6 +181,13 @@ const reportResponse = {
 
 const dataDiffResponse = {
   runId: "checkout-web-nightly",
+  projectKey: "checkout-web",
+  caseId: "checkout-smoke",
+  caseName: "Checkout smoke",
+  database: {
+    id: "oracle-checkout-main",
+    name: "checkout-oracle-main-prodlike"
+  },
   summary: {
     expectedChanges: 6,
     unexpectedChanges: 1,
@@ -360,7 +376,7 @@ describe("App", () => {
       expect(fetchMock).toHaveBeenCalledWith("http://127.0.0.1:8787/api/phase3/runs/checkout-web-nightly/report");
     });
     expect(await screen.findByText("Download artifacts")).toBeInTheDocument();
-    expect(await screen.findByRole("heading", { name: "checkout-web-nightly" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Checkout smoke" })).toBeInTheDocument();
   });
 
   it("routes dashboard attention items and provider chips through existing App handoff state", async () => {
@@ -374,6 +390,13 @@ describe("App", () => {
       }
       if (url.endsWith("/api/phase3/runs/checkout-web-nightly/data-diff")) {
         return jsonResponse(dataDiffResponse);
+      }
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/restore-result")) {
+        return jsonResponse({
+          runId: "checkout-web-nightly",
+          status: "PARTIAL",
+          items: [{ step: "restore snapshot", status: "SUCCESS", detail: "Primary schema restored" }]
+        });
       }
       if (url.endsWith("/api/phase3/runs/checkout-web-smoke/status")) {
         return jsonResponse(monitorStatusResponse);
@@ -833,7 +856,32 @@ describe("App", () => {
         return jsonResponse(snapshot);
       }
       if (url.endsWith("/api/phase3/runs/")) {
-        return jsonResponse({ items: [] });
+        return jsonResponse({
+          items: [
+            {
+              runId: "member-center-daily",
+              runName: "member-center-daily",
+              status: "SUCCESS",
+              startedAt: "2026-04-18T08:00:00Z",
+              finishedAt: "2026-04-18T08:30:00Z",
+              durationMs: 1800000,
+              projectKey: "member-center",
+              projectName: "member-center",
+              caseId: "member-profile-save",
+              caseName: "Profile save",
+              environment: "staging-edge",
+              model: "gpt-4.1-mini",
+              operator: "qa-platform",
+              entry: "5 artifacts exported",
+              stepsTotal: 8,
+              stepsPassed: 8,
+              assertionsTotal: 5,
+              assertionsPassed: 5,
+              artifactCount: 5,
+              outputDir: "runs/member-center-daily"
+            }
+          ]
+        });
       }
       throw new Error(`Unexpected fetch: ${url}`);
     });
@@ -855,6 +903,74 @@ describe("App", () => {
 
     expect(await screen.findByRole("heading", { name: "member-center" })).toBeInTheDocument();
     expect(await screen.findByText("member-center-daily")).toBeInTheDocument();
+  }, 20000);
+
+  it("hands off reports -> reportDetail -> dataDiff with canonical runId", async () => {
+    const restoreResultResponse = {
+      runId: "checkout-web-nightly",
+      status: "PARTIAL",
+      items: [
+        { step: "restore snapshot", status: "SUCCESS", detail: "Primary schema restored" }
+      ]
+    };
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
+      if (url.endsWith("/api/phase3/runs/")) {
+        return jsonResponse({
+          items: [
+            {
+              runId: "checkout-web-nightly",
+              runName: "checkout-web-nightly",
+              status: "FAILED",
+              startedAt: "2026-04-18T09:00:00Z",
+              finishedAt: "2026-04-18T09:10:00Z",
+              durationMs: 600000,
+              projectKey: "checkout-web",
+              projectName: "checkout-web",
+              caseId: "checkout-smoke",
+              caseName: "Checkout smoke",
+              environment: "staging-edge",
+              model: "claude-4.5-sonnet",
+              operator: "qa-platform",
+              entry: "Failure analysis pending",
+              stepsTotal: 8,
+              stepsPassed: 7,
+              assertionsTotal: 11,
+              assertionsPassed: 10,
+              artifactCount: 3,
+              outputDir: "runs/checkout-web-nightly"
+            }
+          ]
+        });
+      }
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/report")) return jsonResponse(reportResponse);
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/data-diff")) return jsonResponse(dataDiffResponse);
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/restore-result")) return jsonResponse(restoreResultResponse);
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    await userEvent.click(await screen.findByRole("button", { name: /Reports/ }));
+    await screen.findByText("checkout-web-nightly");
+    await userEvent.click((await screen.findAllByRole("button", { name: /Detail|Opened/ }))[0]);
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith("http://127.0.0.1:8787/api/phase3/runs/checkout-web-nightly/report");
+    });
+    expect(await screen.findByText("Download artifacts")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Data diff" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith("http://127.0.0.1:8787/api/phase3/runs/checkout-web-nightly/data-diff");
+      expect(fetchMock).toHaveBeenCalledWith("http://127.0.0.1:8787/api/phase3/runs/checkout-web-nightly/restore-result");
+    });
+    expect(await screen.findByText("Data diff - orders & inventory")).toBeInTheDocument();
+    expect(await screen.findByText("checkout-oracle-main-prodlike")).toBeInTheDocument();
+    expect(await screen.findByText("Restore result")).toBeInTheDocument();
   });
 
   it("opens case detail inside the Cases screen", async () => {
@@ -1180,6 +1296,31 @@ describe("App", () => {
     expect(await screen.findByText(/Artifacts/)).toBeInTheDocument();
   });
 
+  it("keeps reportDetail usable when artifact fetch fails", async () => {
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/report")) return jsonResponse(reportResponse);
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/artifacts")) return Promise.resolve(new Response("boom", { status: 500 }));
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    await screen.findByText("Recent runs");
+    await userEvent.click(screen.getByRole("button", { name: "Open run checkout-web-nightly" }));
+    expect(await screen.findByText("Download artifacts")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Download artifacts" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith("http://127.0.0.1:8787/api/phase3/runs/checkout-web-nightly/artifacts");
+    });
+    expect(screen.queryByText(/Artifacts/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Re-run" })).toBeInTheDocument();
+  });
+
   it("hands off Re-run from reportDetail into execution with run context", async () => {
     const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
       const url = String(input);
@@ -1206,6 +1347,13 @@ describe("App", () => {
   });
 
   it("opens raw JSON drawer on View raw JSON click in dataDiff", async () => {
+    const restoreResultResponse = {
+      runId: "checkout-web-nightly",
+      status: "PARTIAL",
+      items: [
+        { step: "restore snapshot", status: "SUCCESS", detail: "Primary schema restored" }
+      ]
+    };
     const rawDiffResponse = {
       runId: "checkout-web-nightly",
       before: [
@@ -1223,6 +1371,7 @@ describe("App", () => {
       if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
       if (url.endsWith("/api/phase3/runs/checkout-web-nightly/report")) return jsonResponse(reportResponse);
       if (url.endsWith("/api/phase3/runs/checkout-web-nightly/data-diff")) return jsonResponse(dataDiffResponse);
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/restore-result")) return jsonResponse(restoreResultResponse);
       if (url.endsWith("/api/phase3/runs/checkout-web-nightly/data-diff/raw")) return jsonResponse(rawDiffResponse);
       throw new Error(`Unexpected fetch: ${url}`);
     });
@@ -1260,7 +1409,51 @@ describe("App", () => {
     expect(screen.queryByTestId("raw-json-drawer")).not.toBeInTheDocument();
   });
 
+  it("shows raw JSON error state when raw diff fetch fails", async () => {
+    const restoreResultResponse = {
+      runId: "checkout-web-nightly",
+      status: "PARTIAL",
+      items: []
+    };
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/report")) return jsonResponse(reportResponse);
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/data-diff")) return jsonResponse(dataDiffResponse);
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/restore-result")) return jsonResponse(restoreResultResponse);
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/data-diff/raw")) return Promise.resolve(new Response("boom", { status: 500 }));
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    await screen.findByText("Recent runs");
+    await userEvent.click(screen.getByRole("button", { name: "Open run checkout-web-nightly" }));
+    await userEvent.click(screen.getByRole("button", { name: "Data diff" }));
+    await screen.findByText("Data diff - orders & inventory");
+    await userEvent.click(screen.getByRole("button", { name: "View raw JSON" }));
+
+    expect(await screen.findByTestId("raw-json-drawer")).toBeInTheDocument();
+    expect(await screen.findByText(/Failed to load raw diff/)).toBeInTheDocument();
+  });
+
   it("calls re-restore endpoint and shows status feedback in dataDiff", async () => {
+    const restoreResultResponse = {
+      runId: "checkout-web-nightly",
+      status: "PARTIAL",
+      items: [
+        { step: "restore snapshot", status: "SUCCESS", detail: "Primary schema restored" }
+      ]
+    };
+    const restoreResultAfterRetry = {
+      runId: "checkout-web-nightly",
+      status: "SUCCESS",
+      items: [
+        { step: "restore snapshot", status: "SUCCESS", detail: "Primary schema restored" },
+        { step: "verify coupon rollback", status: "SUCCESS", detail: "Rollback verified" }
+      ]
+    };
     const restoreRetryResponse = {
       status: "ACCEPTED",
       kind: "restore-retry",
@@ -1268,11 +1461,16 @@ describe("App", () => {
       requestedState: "RESTORE_RETRY_QUEUED",
       message: "Restore retry queued by qa-platform"
     };
+    let restoreResultCalls = 0;
     const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
       if (url.endsWith("/api/phase3/runs/checkout-web-nightly/report")) return jsonResponse(reportResponse);
       if (url.endsWith("/api/phase3/runs/checkout-web-nightly/data-diff") && (!init || init.method !== "POST")) return jsonResponse(dataDiffResponse);
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/restore-result")) {
+        restoreResultCalls += 1;
+        return jsonResponse(restoreResultCalls > 1 ? restoreResultAfterRetry : restoreResultResponse);
+      }
       if (url.endsWith("/api/phase3/runs/checkout-web-nightly/restore/retry")) return jsonResponse(restoreRetryResponse, 202);
       throw new Error(`Unexpected fetch: ${url} ${init?.method ?? "GET"}`);
     });
@@ -1302,15 +1500,27 @@ describe("App", () => {
     expect(await screen.findByTestId("restore-status")).toBeInTheDocument();
     expect(await screen.findByText("Restore retry accepted")).toBeInTheDocument();
     expect(await screen.findByText(/Restore retry queued by qa-platform/)).toBeInTheDocument();
+    expect(await screen.findByText("Rollback verified")).toBeInTheDocument();
 
     // Diff data should have been refreshed
     const dataDiffCalls = fetchMock.mock.calls.filter(
       (call: unknown[]) => String(call[0]).endsWith("/api/phase3/runs/checkout-web-nightly/data-diff")
     );
     expect(dataDiffCalls.length).toBeGreaterThanOrEqual(2);
+    const restoreResultCallsObserved = fetchMock.mock.calls.filter(
+      (call: unknown[]) => String(call[0]).endsWith("/api/phase3/runs/checkout-web-nightly/restore-result")
+    );
+    expect(restoreResultCallsObserved.length).toBeGreaterThanOrEqual(2);
   });
 
   it("shows rejected status when re-restore is rejected in dataDiff", async () => {
+    const restoreResultResponse = {
+      runId: "checkout-web-nightly",
+      status: "PARTIAL",
+      items: [
+        { step: "restore snapshot", status: "SUCCESS", detail: "Primary schema restored" }
+      ]
+    };
     const restoreRejectedResponse = {
       status: "REJECTED",
       kind: "restore-retry",
@@ -1323,6 +1533,7 @@ describe("App", () => {
       if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
       if (url.endsWith("/api/phase3/runs/checkout-web-nightly/report")) return jsonResponse(reportResponse);
       if (url.endsWith("/api/phase3/runs/checkout-web-nightly/data-diff") && (!init || init.method !== "POST")) return jsonResponse(dataDiffResponse);
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/restore-result")) return jsonResponse(restoreResultResponse);
       if (url.endsWith("/api/phase3/runs/checkout-web-nightly/restore/retry")) return jsonResponse(restoreRejectedResponse, 409);
       throw new Error(`Unexpected fetch: ${url} ${init?.method ?? "GET"}`);
     });
@@ -1721,7 +1932,61 @@ describe("App", () => {
   });
 
   it("switches the Reports overview when clicking another project", async () => {
-    const fetchMock = vi.fn().mockImplementation(() => jsonResponse(snapshot));
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
+      if (url.endsWith("/api/phase3/runs/")) {
+        return jsonResponse({
+          items: [
+            {
+              runId: "checkout-web-nightly",
+              runName: "checkout-web-nightly",
+              status: "FAILED",
+              startedAt: "2026-04-18T09:00:00Z",
+              finishedAt: "2026-04-18T09:10:00Z",
+              durationMs: 600000,
+              projectKey: "checkout-web",
+              projectName: "checkout-web",
+              caseId: "checkout-smoke",
+              caseName: "Checkout smoke",
+              environment: "staging-edge",
+              model: "claude-4.5-sonnet",
+              operator: "qa-platform",
+              entry: "Failure analysis pending",
+              stepsTotal: 8,
+              stepsPassed: 7,
+              assertionsTotal: 11,
+              assertionsPassed: 10,
+              artifactCount: 3,
+              outputDir: "runs/checkout-web-nightly"
+            },
+            {
+              runId: "member-center-daily",
+              runName: "member-center-daily",
+              status: "SUCCESS",
+              startedAt: "2026-04-18T08:00:00Z",
+              finishedAt: "2026-04-18T08:30:00Z",
+              durationMs: 1800000,
+              projectKey: "member-center",
+              projectName: "member-center",
+              caseId: "member-profile-save",
+              caseName: "Profile save",
+              environment: "staging-edge",
+              model: "gpt-4.1-mini",
+              operator: "qa-platform",
+              entry: "5 artifacts exported",
+              stepsTotal: 8,
+              stepsPassed: 8,
+              assertionsTotal: 5,
+              assertionsPassed: 5,
+              artifactCount: 5,
+              outputDir: "runs/member-center-daily"
+            }
+          ]
+        });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     render(<App />);
@@ -1734,5 +1999,184 @@ describe("App", () => {
     expect(await screen.findByText("member-center-daily")).toBeInTheDocument();
     expect(screen.queryByText("checkout-web-nightly")).not.toBeInTheDocument();
     expect(await screen.findByRole("heading", { name: "member-center" })).toBeInTheDocument();
+  });
+
+  it("renders Reports screen labels in Chinese when locale is zh", async () => {
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
+      if (url.endsWith("/api/phase3/runs/")) {
+        return jsonResponse({
+          items: [
+            {
+              runId: "checkout-web-nightly",
+              runName: "checkout-web-nightly",
+              status: "FAILED",
+              startedAt: "2026-04-18T09:00:00Z",
+              finishedAt: "2026-04-18T09:10:00Z",
+              durationMs: 600000,
+              projectKey: "checkout-web",
+              projectName: "checkout-web",
+              caseId: "checkout-smoke",
+              caseName: "Checkout smoke",
+              environment: "staging-edge",
+              model: "claude-4.5-sonnet",
+              operator: "qa-platform",
+              entry: "",
+              stepsTotal: 8,
+              stepsPassed: 7,
+              assertionsTotal: 11,
+              assertionsPassed: 10,
+              artifactCount: 3,
+              outputDir: "runs/checkout-web-nightly"
+            }
+          ]
+        });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    // Switch locale to Chinese
+    const localeSelect = await screen.findByRole("combobox");
+    await userEvent.selectOptions(localeSelect, "zh");
+
+    // Navigate to Reports
+    await userEvent.click(await screen.findByRole("button", { name: /报告|Reports/ }));
+
+    // Assert Chinese labels are visible (not English fallback)
+    expect(await screen.findByText("项目切换")).toBeInTheDocument();
+    expect(await screen.findByText("运行一览")).toBeInTheDocument();
+    expect(await screen.findByText(/步骤/)).toBeInTheDocument();
+    expect(await screen.findByText("操作时间线")).toBeInTheDocument();
+  });
+
+  it("renders reportDetail labels in Chinese when locale is zh", async () => {
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
+      if (url.endsWith("/api/phase3/runs/")) {
+        return jsonResponse({
+          items: [
+            {
+              runId: "checkout-web-nightly",
+              runName: "checkout-web-nightly",
+              status: "FAILED",
+              startedAt: "2026-04-18T09:00:00Z",
+              finishedAt: "2026-04-18T09:10:00Z",
+              durationMs: 600000,
+              projectKey: "checkout-web",
+              projectName: "checkout-web",
+              caseId: "checkout-smoke",
+              caseName: "Checkout smoke",
+              environment: "staging-edge",
+              model: "claude-4.5-sonnet",
+              operator: "qa-platform",
+              entry: "",
+              stepsTotal: 8,
+              stepsPassed: 7,
+              assertionsTotal: 11,
+              assertionsPassed: 10,
+              artifactCount: 3,
+              outputDir: "runs/checkout-web-nightly"
+            }
+          ]
+        });
+      }
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/report")) return jsonResponse(reportResponse);
+      return jsonResponse({}, 404);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    // Wait for app to load then switch locale to Chinese
+    await screen.findByText("Dashboard");
+    const localeSelects = screen.getAllByRole("combobox");
+    await userEvent.selectOptions(localeSelects[0], "zh");
+
+    // Navigate to Reports (sidebar button) then open detail
+    const reportsButtons = await screen.findAllByRole("button", { name: /Reports/ });
+    await userEvent.click(reportsButtons[0]);
+    await screen.findByText("checkout-web-nightly");
+    await userEvent.click((await screen.findAllByRole("button", { name: /Detail|详情|Opened|已打开/ }))[0]);
+
+    // Assert Chinese labels in reportDetail (not English fallback)
+    expect(await screen.findByText("下载产物")).toBeInTheDocument();
+    expect(await screen.findByText("重新执行")).toBeInTheDocument();
+    expect(await screen.findByText("概览")).toBeInTheDocument();
+    expect(await screen.findByText("摘要")).toBeInTheDocument();
+    expect(await screen.findByText("耗时")).toBeInTheDocument();
+  });
+
+  it("renders dataDiff labels in Chinese when locale is zh", async () => {
+    const restoreResultResponse = {
+      runId: "checkout-web-nightly",
+      status: "PARTIAL",
+      items: [
+        { step: "restore snapshot", status: "SUCCESS", detail: "Primary schema restored" }
+      ]
+    };
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
+      if (url.endsWith("/api/phase3/runs/")) {
+        return jsonResponse({
+          items: [
+            {
+              runId: "checkout-web-nightly",
+              runName: "checkout-web-nightly",
+              status: "FAILED",
+              startedAt: "2026-04-18T09:00:00Z",
+              finishedAt: "2026-04-18T09:10:00Z",
+              durationMs: 600000,
+              projectKey: "checkout-web",
+              projectName: "checkout-web",
+              caseId: "checkout-smoke",
+              caseName: "Checkout smoke",
+              environment: "staging-edge",
+              model: "claude-4.5-sonnet",
+              operator: "qa-platform",
+              entry: "",
+              stepsTotal: 8,
+              stepsPassed: 7,
+              assertionsTotal: 11,
+              assertionsPassed: 10,
+              artifactCount: 3,
+              outputDir: "runs/checkout-web-nightly"
+            }
+          ]
+        });
+      }
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/report")) return jsonResponse(reportResponse);
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/data-diff")) return jsonResponse(dataDiffResponse);
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/restore-result")) return jsonResponse(restoreResultResponse);
+      return jsonResponse({}, 404);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    // Wait for app to load then switch locale to Chinese
+    await screen.findByText("Dashboard");
+    const localeSelects = screen.getAllByRole("combobox");
+    await userEvent.selectOptions(localeSelects[0], "zh");
+
+    // Navigate to Reports (sidebar button) → reportDetail → dataDiff
+    const reportsButtons = await screen.findAllByRole("button", { name: /Reports/ });
+    await userEvent.click(reportsButtons[0]);
+    await screen.findByText("checkout-web-nightly");
+    await userEvent.click((await screen.findAllByRole("button", { name: /Detail|详情|Opened|已打开/ }))[0]);
+    await screen.findByText("下载产物");
+    const dataDiffButtons = await screen.findAllByRole("button", { name: /数据差异|Data diff/ });
+    await userEvent.click(dataDiffButtons[0]);
+
+    // Assert Chinese labels in dataDiff (not English fallback)
+    expect(await screen.findByText("查看原始 JSON")).toBeInTheDocument();
+    expect(await screen.findByText("重新恢复")).toBeInTheDocument();
+    expect(await screen.findByText("预期变更")).toBeInTheDocument();
+    expect(await screen.findByText("恢复结果")).toBeInTheDocument();
   });
 });

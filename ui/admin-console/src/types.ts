@@ -410,10 +410,19 @@ export type DryRunResponse = {
 
 export type RunSummaryItem = {
   runId: string;
+  runName: string;
   status: string;
   startedAt: string;
   finishedAt: string;
   durationMs: number;
+  projectKey: string;
+  projectName: string;
+  caseId: string;
+  caseName: string;
+  environment: string;
+  model: string;
+  operator: string;
+  entry: string;
   stepsTotal: number;
   stepsPassed: number;
   assertionsTotal: number;
@@ -425,6 +434,8 @@ export type RunSummaryItem = {
 export type RunListResponse = {
   items: RunSummaryItem[];
 };
+
+export type RunReportSummary = RunSummaryItem;
 
 export type RunReportStep = {
   stepId: string;
@@ -509,6 +520,13 @@ export type DataDiffRow = {
 
 export type DataDiffResponse = {
   runId: string;
+  projectKey: string;
+  caseId: string;
+  caseName: string;
+  database: {
+    id: string;
+    name: string;
+  };
   summary: {
     expectedChanges: number;
     unexpectedChanges: number;

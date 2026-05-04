@@ -1,5 +1,10 @@
 # Data Diff Functional Specification
 
+Update note:
+- `dataDiff` now opens with canonical `runId`.
+- The page reads `GET /api/phase3/runs/{runId}/data-diff`, `.../data-diff/raw`, and `.../restore-result`.
+- `Re-restore` refreshes both diff data and restore-result after `POST /api/phase3/runs/{runId}/restore/retry`.
+
 ## 1. Document Position
 
 - Screen name: `dataDiff`

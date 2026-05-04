@@ -1366,7 +1366,7 @@ export function App() {
   const [snapshot, setSnapshot] = useState<AdminConsoleSnapshot>(fallbackSnapshot);
   const [sourceLabel, setSourceLabel] = useState(translate("en", sharedCopy.sourceFallback));
   const [activeScreen, setActiveScreen] = useState<ScreenId>("dashboard");
-  const [selectedReportRunName, setSelectedReportRunName] = useState<string | null>(
+  const [selectedReportRunId, setSelectedReportRunId] = useState<string | null>(
     fallbackSnapshot.reports[0]?.runId ?? fallbackSnapshot.reports[0]?.runName ?? null
   );
   const [selectedMonitorRunId, setSelectedMonitorRunId] = useState<string | null>(null);
@@ -1470,14 +1470,14 @@ export function App() {
     setActiveScreen("aiGenerate");
   }
 
-  function openReportDetail(runName: string) {
-    setSelectedReportRunName(runName);
+  function openReportDetail(runId: string) {
+    setSelectedReportRunId(runId);
     setActiveScreen("reportDetail");
   }
 
-  function openDataDiff(runName?: string | null) {
-    if (runName) {
-      setSelectedReportRunName(runName);
+  function openDataDiff(runId?: string | null) {
+    if (runId) {
+      setSelectedReportRunId(runId);
     }
     setActiveScreen("dataDiff");
   }
@@ -1526,7 +1526,7 @@ export function App() {
         openMonitor(target.runId);
         break;
       case "dataDiff":
-        openDataDiff(target.runId ?? selectedReportRunName);
+        openDataDiff(target.runId ?? selectedReportRunId);
         break;
       case "models":
         handleScreenChange("models");
@@ -1574,10 +1574,10 @@ export function App() {
 
   useEffect(() => {
     if (!snapshot.reports.length) {
-      setSelectedReportRunName(null);
+      setSelectedReportRunId(null);
       return;
     }
-    setSelectedReportRunName((current) =>
+    setSelectedReportRunId((current) =>
       current && snapshot.reports.some((item) => (item.runId ?? item.runName) === current)
         ? current
         : (snapshot.reports[0].runId ?? snapshot.reports[0].runName)
@@ -2391,7 +2391,7 @@ export function App() {
             reportListLabel={t(uiCopy.reportList)}
             locale={locale}
             initialProjectKey={selectedReportsProjectKey}
-            selectedRunName={selectedReportRunName}
+            selectedRunId={selectedReportRunId}
             onOpenDetail={openReportDetail}
             apiBaseUrl={apiBaseUrl}
           />
@@ -2402,9 +2402,9 @@ export function App() {
             snapshot={snapshot}
             title={t(localizedScreenCopy.reportDetail.title)}
             locale={locale}
-            selectedRunName={selectedReportRunName}
+            selectedRunId={selectedReportRunId}
             onBackToReports={() => handleScreenChange("reports")}
-            onOpenDataDiff={() => openDataDiff(selectedReportRunName)}
+            onOpenDataDiff={(runId) => openDataDiff(runId)}
             onRerun={(ctx) => {
               setLaunchForm((prev) => ({
                 ...prev,
@@ -2455,7 +2455,7 @@ export function App() {
             snapshot={snapshot}
             title={t(localizedScreenCopy.dataDiff.title)}
             locale={locale}
-            selectedRunName={selectedReportRunName}
+            selectedRunId={selectedReportRunId}
             apiBaseUrl={apiBaseUrl}
           />
         );

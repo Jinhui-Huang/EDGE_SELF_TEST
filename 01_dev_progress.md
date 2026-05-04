@@ -3266,3 +3266,23 @@ On code inspection, P0-3 was already implemented:
      - `aiGenerate` still has no automatic downstream navigation into `cases` or `execution`
    - Next suggested backlog step:
      - continue from the next unresolved item in `docs/phase3/interface/review-backlog.md`
+# 2026-04-29 P1-2 Report Artifact Read Path Refresh
+
+Context:
+- Re-opened P1-2 against the current Phase 3 workspace to remove remaining `runName`-centric and synthetic read paths across `reports`, `reportDetail`, and `dataDiff`.
+
+Implemented:
+- Unified the three report screens to canonical `runId` handoff at the App level.
+- `ReportsScreen` now treats `GET /api/phase3/runs/` as the primary list source and uses snapshot-derived rows only as fallback when the API is unavailable.
+- `ReportDetailScreen` now reads hero context from `GET /api/phase3/runs/{runId}/report`, keeps tab fetches on run-specific endpoints, and hands `dataDiff` / `re-run` using explicit `runId`.
+- `DataDiffScreen` now reads `GET /api/phase3/runs/{runId}/data-diff`, `.../data-diff/raw`, and `.../restore-result`, and refreshes both diff data and restore-result after `POST .../restore/retry`.
+- Added/updated frontend tests for report -> detail -> diff `runId` handoff, artifact failure tolerance, raw diff success/error, and restore-result refresh.
+- Extended `LocalAdminApiServerTest` coverage for `GET /api/phase3/runs/{runId}/report-summary` and richer canonical report/data-diff fields.
+
+Verification:
+- `npm run build` in `ui/admin-console`: passed.
+- Targeted serialized Vitest checks for the changed report/dataDiff interactions passed.
+- `mvn "-Dmaven.repo.local=.m2/repository" -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`: passed.
+
+Known limits:
+- Full `npm test -- --run` remains sensitive to local Vitest worker/resource behavior on this machine; serialized targeted runs for the modified report flows passed, but the full run was not stable enough to use as the only signal.

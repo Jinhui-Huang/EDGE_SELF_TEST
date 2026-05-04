@@ -942,22 +942,30 @@ class LocalAdminApiServerTest {
         Path runsDir = tempDir.resolve("runs");
         Path runDir = runsDir.resolve("order-smoke-20260425");
         Files.createDirectories(runDir);
-        Map<String, Object> reportPayload = Map.of(
-                "runId", "order-smoke-20260425",
-                "startedAt", "2026-04-25T08:00:00Z",
-                "finishedAt", "2026-04-25T08:05:00Z",
-                "outputDir", "/output/order-smoke-20260425",
-                "summary", Map.of(
-                        "total", 5,
-                        "passed", 4,
-                        "failed", 1,
-                        "skipped", 0,
-                        "durationMs", 300_000),
-                "steps", List.of(
-                        Map.of("stepName", "Navigate to cart", "action", "GOTO", "status", "SUCCESS"),
-                        Map.of("stepName", "Assert title matches", "action", "ASSERT_TEXT", "status", "SUCCESS", "message", "OK"),
-                        Map.of("stepName", "Assert price visible", "action", "ASSERT_VISIBLE", "status", "FAILURE", "message", "Element not found"),
-                        Map.of("stepName", "Click checkout", "action", "CLICK", "status", "SUCCESS", "artifactPath", "checkout.png")));
+        Map<String, Object> reportPayload = new java.util.HashMap<>();
+        reportPayload.put("runId", "order-smoke-20260425");
+        reportPayload.put("runName", "order-smoke-20260425");
+        reportPayload.put("startedAt", "2026-04-25T08:00:00Z");
+        reportPayload.put("finishedAt", "2026-04-25T08:05:00Z");
+        reportPayload.put("projectKey", "checkout-web");
+        reportPayload.put("projectName", "Checkout Web");
+        reportPayload.put("caseId", "checkout-smoke");
+        reportPayload.put("caseName", "Checkout smoke");
+        reportPayload.put("environment", "staging-edge");
+        reportPayload.put("model", "claude-4.5-sonnet");
+        reportPayload.put("operator", "qa-platform");
+        reportPayload.put("outputDir", "/output/order-smoke-20260425");
+        reportPayload.put("summary", Map.of(
+                "total", 5,
+                "passed", 4,
+                "failed", 1,
+                "skipped", 0,
+                "durationMs", 300_000));
+        reportPayload.put("steps", List.of(
+                Map.of("stepName", "Navigate to cart", "action", "GOTO", "status", "SUCCESS"),
+                Map.of("stepName", "Assert title matches", "action", "ASSERT_TEXT", "status", "SUCCESS", "message", "OK"),
+                Map.of("stepName", "Assert price visible", "action", "ASSERT_VISIBLE", "status", "FAILURE", "message", "Element not found"),
+                Map.of("stepName", "Click checkout", "action", "CLICK", "status", "SUCCESS", "artifactPath", "checkout.png")));
         Files.writeString(runDir.resolve("report.json"), Jsons.writeValueAsString(reportPayload), StandardCharsets.UTF_8);
         Files.writeString(runDir.resolve("report.html"), "<html>report</html>", StandardCharsets.UTF_8);
         Files.writeString(runDir.resolve("screenshot.png"), "fake-png", StandardCharsets.UTF_8);
@@ -1001,6 +1009,16 @@ class LocalAdminApiServerTest {
             assertTrue(listRuns.body().contains("\"order-smoke-20260425\""));
             assertTrue(listRuns.body().contains("\"items\""));
             assertTrue(listRuns.body().contains("\"FAILED\""));
+            assertTrue(listRuns.body().contains("\"projectKey\":\"checkout-web\""));
+
+            // GET /api/phase3/runs/order-smoke-20260425/report-summary — canonical summary
+            HttpResponse<String> reportSummary = client.send(
+                    request(server, "/api/phase3/runs/order-smoke-20260425/report-summary"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, reportSummary.statusCode());
+            assertTrue(reportSummary.body().contains("\"runId\":\"order-smoke-20260425\""));
+            assertTrue(reportSummary.body().contains("\"caseId\":\"checkout-smoke\""));
+            assertTrue(reportSummary.body().contains("\"environment\":\"staging-edge\""));
 
             // GET /api/phase3/runs/order-smoke-20260425/report — full report
             HttpResponse<String> report = client.send(
@@ -1022,6 +1040,8 @@ class LocalAdminApiServerTest {
             assertTrue(dataDiff.body().contains("\"order-smoke-20260425\""));
             assertTrue(dataDiff.body().contains("\"rows\""));
             assertTrue(dataDiff.body().contains("\"summary\""));
+            assertTrue(dataDiff.body().contains("\"database\""));
+            assertTrue(dataDiff.body().contains("\"caseName\":\"Checkout smoke\""));
 
             // GET /api/phase3/runs/order-smoke-20260425/assertions — assertions
             HttpResponse<String> assertions = client.send(

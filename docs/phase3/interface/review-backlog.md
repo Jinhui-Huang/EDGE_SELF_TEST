@@ -92,7 +92,7 @@ It does not authorize UI or backend changes in the current phase.
   - save with validate-first then catalog persistence
   - generation failure visibility
 
-### P1-2. Make report pages read real report artifacts instead of front-end synthesized summaries
+### P1-2. Make report pages read real report artifacts instead of front-end synthesized summaries — DONE
 
 - Screens:
   - `reports`

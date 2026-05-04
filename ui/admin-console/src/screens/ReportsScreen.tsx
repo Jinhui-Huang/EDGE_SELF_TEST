@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { translate } from "../i18n";
 import { AdminConsoleSnapshot, Locale, RunListResponse, RunSummaryItem } from "../types";
-import { buildReportViewModels, ReportViewModel } from "./reportViewModel";
+import { buildReportViewModels } from "./reportViewModel";
 
 type ReportsScreenProps = {
   snapshot: AdminConsoleSnapshot;
@@ -9,8 +9,8 @@ type ReportsScreenProps = {
   reportListLabel: string;
   locale: Locale;
   initialProjectKey?: string | null;
-  selectedRunName: string | null;
-  onOpenDetail: (runName: string) => void;
+  selectedRunId: string | null;
+  onOpenDetail: (runId: string) => void;
   apiBaseUrl: string;
 };
 
@@ -20,10 +20,28 @@ type LocalizedCopy = {
   ja: string;
 };
 
+type ReportListRow = {
+  runId: string;
+  runName: string;
+  status: string;
+  finishedAt: string;
+  projectKey: string;
+  projectName: string;
+  caseId: string;
+  caseName: string;
+  caseTags: string[];
+  duration: string;
+  environment: string;
+  stepsPassed: number;
+  stepsTotal: number;
+  assertionsPassed: number;
+  assertionsTotal: number;
+};
+
 type ReportProjectNode = {
   projectKey: string;
   projectName: string;
-  reports: ReportViewModel[];
+  reports: ReportListRow[];
   totalCases: number;
 };
 
@@ -32,7 +50,7 @@ function copy(en: string, zh: string, ja: string): LocalizedCopy {
 }
 
 function formatDuration(ms: number): string {
-  if (ms <= 0) return "—";
+  if (ms <= 0) return "-";
   const seconds = Math.floor(ms / 1000);
   if (seconds < 60) return `${seconds}s`;
   const minutes = Math.floor(seconds / 60);
@@ -40,49 +58,50 @@ function formatDuration(ms: number): string {
   return `${minutes}m ${String(remainingSeconds).padStart(2, "0")}s`;
 }
 
-function mapApiToViewModels(items: RunSummaryItem[], snapshot: AdminConsoleSnapshot): ReportViewModel[] {
-  return items.map((item, index) => {
-    const normalizedRunId = item.runId.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-    const matchedCase = snapshot.cases.find((c) => {
-      const nId = c.id.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-      const nName = c.name.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-      return normalizedRunId.includes(nId) || normalizedRunId.includes(nName);
-    }) ?? snapshot.cases[index % snapshot.cases.length] ?? null;
-
-    const matchedProject = matchedCase
-      ? snapshot.projects.find((p) => p.key === matchedCase.projectKey)
-      : snapshot.projects[0];
-
+function mapApiToRows(items: RunSummaryItem[], snapshot: AdminConsoleSnapshot): ReportListRow[] {
+  return items.map((item) => {
+    const matchedCase = snapshot.cases.find((testCase) => testCase.id === item.caseId) ?? null;
     return {
-      runName: item.runId,
+      runId: item.runId,
+      runName: item.runName || item.runId,
       status: item.status,
       finishedAt: item.finishedAt,
-      entry: "",
-      projectKey: matchedProject?.key ?? matchedCase?.projectKey ?? "unknown",
-      projectName: matchedProject?.name ?? item.runId,
-      caseId: matchedCase?.id ?? "",
-      caseName: matchedCase?.name ?? item.runId,
+      projectKey: item.projectKey || matchedCase?.projectKey || "unknown-project",
+      projectName: item.projectName || item.projectKey || "Unknown project",
+      caseId: item.caseId || matchedCase?.id || "",
+      caseName: item.caseName || matchedCase?.name || item.runName || item.runId,
       caseTags: matchedCase?.tags ?? [],
       duration: formatDuration(item.durationMs),
-      environment: "",
-      operator: "",
-      model: "",
+      environment: item.environment || "-",
       stepsPassed: item.stepsPassed,
       stepsTotal: item.stepsTotal,
       assertionsPassed: item.assertionsPassed,
-      assertionsTotal: item.assertionsTotal,
-      aiCalls: 0,
-      aiCost: "",
-      heals: 0,
-      recovery: "",
-      artifacts: item.artifactCount,
-      screenshots: [],
-      assertions: []
+      assertionsTotal: item.assertionsTotal
     };
   });
 }
 
-function groupReportProjects(reports: ReportViewModel[]): ReportProjectNode[] {
+function mapFallbackToRows(snapshot: AdminConsoleSnapshot): ReportListRow[] {
+  return buildReportViewModels(snapshot).map((report) => ({
+    runId: report.runId,
+    runName: report.runName,
+    status: report.status,
+    finishedAt: report.finishedAt,
+    projectKey: report.projectKey,
+    projectName: report.projectName,
+    caseId: report.caseId,
+    caseName: report.caseName,
+    caseTags: report.caseTags,
+    duration: report.duration,
+    environment: report.environment || "-",
+    stepsPassed: report.stepsPassed,
+    stepsTotal: report.stepsTotal,
+    assertionsPassed: report.assertionsPassed,
+    assertionsTotal: report.assertionsTotal
+  }));
+}
+
+function groupReportProjects(reports: ReportListRow[]): ReportProjectNode[] {
   const grouped = new Map<string, ReportProjectNode>();
   reports.forEach((report) => {
     const existing = grouped.get(report.projectKey);
@@ -99,7 +118,7 @@ function groupReportProjects(reports: ReportViewModel[]): ReportProjectNode[] {
   });
   return Array.from(grouped.values()).map((project) => ({
     ...project,
-    totalCases: new Set(project.reports.map((report) => report.caseId)).size
+    totalCases: new Set(project.reports.map((report) => report.caseId).filter(Boolean)).size
   }));
 }
 
@@ -109,42 +128,43 @@ export function ReportsScreen({
   reportListLabel,
   locale,
   initialProjectKey,
-  selectedRunName,
+  selectedRunId,
   onOpenDetail,
   apiBaseUrl
 }: ReportsScreenProps) {
   const t = (value: LocalizedCopy) => translate(locale, value);
   const [apiRuns, setApiRuns] = useState<RunSummaryItem[] | null>(null);
+  const [apiLoaded, setApiLoaded] = useState(false);
+  const [apiFailed, setApiFailed] = useState(false);
 
   useEffect(() => {
+    setApiLoaded(false);
+    setApiFailed(false);
     fetch(`${apiBaseUrl}/api/phase3/runs/`)
-      .then((r) => r.ok ? r.json() as Promise<RunListResponse> : Promise.reject(r.status))
+      .then((r) => (r.ok ? (r.json() as Promise<RunListResponse>) : Promise.reject(r.status)))
       .then((data) => {
-        if (Array.isArray(data.items)) {
-          setApiRuns(data.items);
-        }
+        setApiRuns(Array.isArray(data.items) ? data.items : []);
+        setApiLoaded(true);
       })
-      .catch(() => {});
+      .catch(() => {
+        setApiRuns(null);
+        setApiLoaded(true);
+        setApiFailed(true);
+      });
   }, [apiBaseUrl]);
 
   const reportProjects = useMemo(() => {
-    const models = apiRuns && apiRuns.length
-      ? mapApiToViewModels(apiRuns, snapshot)
-      : buildReportViewModels(snapshot);
-    return groupReportProjects(models);
-  }, [apiRuns, snapshot]);
+    const rows = apiLoaded && !apiFailed ? mapApiToRows(apiRuns ?? [], snapshot) : mapFallbackToRows(snapshot);
+    return groupReportProjects(rows);
+  }, [apiFailed, apiLoaded, apiRuns, snapshot]);
 
   const selectedReport = useMemo(
-    () =>
-      reportProjects
-        .flatMap((project) => project.reports)
-        .find((report) => report.runName === selectedRunName) ?? null,
-    [reportProjects, selectedRunName]
+    () => reportProjects.flatMap((project) => project.reports).find((report) => report.runId === selectedRunId) ?? null,
+    [reportProjects, selectedRunId]
   );
+
   const initialSelection = initialProjectKey?.trim() || selectedReport?.projectKey || reportProjects[0]?.projectKey || "";
-  const [selectedProjectKey, setSelectedProjectKey] = useState(
-    initialSelection
-  );
+  const [selectedProjectKey, setSelectedProjectKey] = useState(initialSelection);
   const [overviewCollapsed, setOverviewCollapsed] = useState(false);
 
   useEffect(() => {
@@ -154,23 +174,20 @@ export function ReportsScreen({
   }, [reportProjects, selectedProjectKey, selectedReport]);
 
   useEffect(() => {
-    if (selectedRunName && selectedReport?.projectKey && selectedReport.projectKey !== selectedProjectKey) {
+    if (selectedRunId && selectedReport?.projectKey && selectedReport.projectKey !== selectedProjectKey) {
       setSelectedProjectKey(selectedReport.projectKey);
     }
-  }, [selectedRunName, selectedReport?.projectKey]);
+  }, [selectedRunId, selectedReport?.projectKey, selectedProjectKey]);
 
   useEffect(() => {
     const normalizedProjectKey = initialProjectKey?.trim();
-    if (!normalizedProjectKey) {
-      return;
-    }
+    if (!normalizedProjectKey) return;
     if (reportProjects.some((project) => project.projectKey === normalizedProjectKey) && normalizedProjectKey !== selectedProjectKey) {
       setSelectedProjectKey(normalizedProjectKey);
     }
   }, [initialProjectKey, reportProjects, selectedProjectKey]);
 
-  const selectedProject =
-    reportProjects.find((project) => project.projectKey === selectedProjectKey) ?? reportProjects[0] ?? null;
+  const selectedProject = reportProjects.find((project) => project.projectKey === selectedProjectKey) ?? reportProjects[0] ?? null;
   const visibleReports = selectedProject?.reports ?? [];
 
   return (
@@ -181,13 +198,11 @@ export function ReportsScreen({
             <p className="eyebrow">{snapshot.navigation.find((item) => item.id === "reports")?.label}</p>
             <h3>{reportListLabel}</h3>
             <p className="docParseOverviewLead">
-              {t(
-                copy(
-                  "Reports overview follows the same project-first catalog pattern as Doc Parse, then opens one concrete run.",
-                  "Reports 一览与 Doc Parse 保持同样的先项目后列表结构，再进入具体 run。",
-                  "Reports overview uses the same project-first catalog pattern as Doc Parse before opening a specific run."
-                )
-              )}
+              {t(copy(
+                "Reports read the canonical backend run list first, then open a concrete run by runId.",
+                "Reports 优先读取后端规范运行列表，再通过 runId 打开具体运行。",
+                "Reports はバックエンドの正規ランリストを先に読み、runId で具体的なランを開きます。"
+              ))}
             </p>
           </div>
           <div className="docParseOverviewActions">
@@ -210,9 +225,7 @@ export function ReportsScreen({
                 <button
                   key={project.projectKey}
                   type="button"
-                  className={`casesProjectCard accent${index === 0 ? "" : index + 1} ${
-                    selectedProjectKey === project.projectKey ? "isSelected" : ""
-                  }`.trim()}
+                  className={`casesProjectCard accent${index === 0 ? "" : index + 1} ${selectedProjectKey === project.projectKey ? "isSelected" : ""}`.trim()}
                   onClick={() => setSelectedProjectKey(project.projectKey)}
                 >
                   <div className="casesProjectCardTop">
@@ -224,9 +237,7 @@ export function ReportsScreen({
                   </div>
                   <div className="casesProjectCardMeta">
                     <span>{t(copy("Runs", "运行", "Runs"))}</span>
-                    <span>
-                      {t(copy("Cases", "用例", "Cases"))}: {project.totalCases}
-                    </span>
+                    <span>{`${t(copy("Cases", "用例", "Cases"))}: ${project.totalCases}`}</span>
                   </div>
                 </button>
               ))}
@@ -245,17 +256,15 @@ export function ReportsScreen({
               {visibleReports.length ? (
                 visibleReports.map((report) => (
                   <article
-                    key={report.runName}
-                    className={`docParseDocumentRow reportOverviewRow ${selectedRunName === report.runName ? "isOpened" : ""}`}
+                    key={report.runId}
+                    className={`docParseDocumentRow reportOverviewRow ${selectedRunId === report.runId ? "isOpened" : ""}`}
                   >
                     <div className="docParseDocumentIdentity reportOverviewIdentity">
                       <strong>{report.runName}</strong>
-                      <p>{`${report.caseName} / ${report.environment || "—"} / ${report.finishedAt}`}</p>
+                      <p>{`${report.caseName} / ${report.environment} / ${report.finishedAt}`}</p>
                     </div>
                     <div className="docParseDocumentMeta reportOverviewMeta">
-                      <span className={`docParseDocumentBadge ${/fail/i.test(report.status) ? "warning" : "info"}`}>
-                        {report.status}
-                      </span>
+                      <span className={`docParseDocumentBadge ${/fail/i.test(report.status) ? "warning" : "info"}`}>{report.status}</span>
                       <span>{report.duration}</span>
                     </div>
                     <div className="docParseDocumentStats reportOverviewStats">
@@ -263,25 +272,29 @@ export function ReportsScreen({
                       <span>{`${report.assertionsPassed}/${report.assertionsTotal} ${t(copy("assertions", "断言", "assertions"))}`}</span>
                     </div>
                     <div className="reportOverviewCaseLine">
-                      <span className="reportOverviewCaseId">{report.caseId}</span>
+                      <span className="reportOverviewCaseId">{report.caseId || "-"}</span>
                       <div className="reportCatalogTags">
                         {report.caseTags.length ? (
-                          report.caseTags.map((tag) => <span key={`${report.runName}-${tag}`}>{tag}</span>)
+                          report.caseTags.map((tag) => <span key={`${report.runId}-${tag}`}>{tag}</span>)
                         ) : (
                           <span>{t(copy("untagged", "未打标签", "untagged"))}</span>
                         )}
                       </div>
                     </div>
-                    <button type="button" className="casesInlineAction" onClick={() => onOpenDetail(report.runName)}>
-                      {selectedRunName === report.runName ? t(copy("Opened", "已打开", "Opened")) : t(copy("Detail", "详情", "Detail"))}
+                    <button type="button" className="casesInlineAction" onClick={() => onOpenDetail(report.runId)}>
+                      {selectedRunId === report.runId ? t(copy("Opened", "已打开", "Opened")) : t(copy("Detail", "详情", "Detail"))}
                     </button>
                   </article>
                 ))
               ) : (
                 <article className="docParseDocumentRow">
                   <div className="docParseDocumentIdentity">
-                    <strong>{t(copy("No runs yet", "暂无运行记录", "No runs yet"))}</strong>
-                    <p>{t(copy("This project does not have report entries in the current snapshot.", "当前快照里这个项目还没有报告记录。", "This project has no report entries in the current snapshot."))}</p>
+                    <strong>{t(copy("No runs yet", "暂无运行记录", "まだランがありません"))}</strong>
+                    <p>{t(copy(
+                      "This project has no report entries in the current backend run list.",
+                      "当前后端运行列表中该项目还没有报告记录。",
+                      "現在のバックエンドランリストにこのプロジェクトのレポートはありません。"
+                    ))}</p>
                   </div>
                 </article>
               )}
@@ -294,7 +307,7 @@ export function ReportsScreen({
         <div className="sectionHeader">
           <div>
             <p className="eyebrow">{reviewBoardLabel}</p>
-            <h3>{t(copy("Operator timeline", "操作时间线", "Operator timeline"))}</h3>
+            <h3>{t(copy("Operator timeline", "操作时间线", "オペレータータイムライン"))}</h3>
           </div>
         </div>
         <div className="timeline">

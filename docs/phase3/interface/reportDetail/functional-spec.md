@@ -1,5 +1,10 @@
 # Report Detail Functional Specification
 
+Update note:
+- `reportDetail` now opens with canonical `runId`.
+- The page reads `GET /api/phase3/runs/{runId}/report` and tab-specific run endpoints, with snapshot fallback only when backend reads fail.
+- `Download artifacts`, `Data diff`, and `Re-run` all operate on explicit `runId`.
+
 ## 1. Document Position
 
 - Screen name: `reportDetail`

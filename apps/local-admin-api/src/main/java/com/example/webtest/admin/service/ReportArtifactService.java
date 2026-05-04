@@ -68,6 +68,23 @@ public final class ReportArtifactService {
         }
     }
 
+    // ---- GET /api/phase3/runs/{runId}/report-summary ----
+
+    @SuppressWarnings("unchecked")
+    public Object getReportSummary(String runId) {
+        Path dir = resolveRunDir(runId);
+        Path reportJson = dir.resolve("report.json");
+        if (!Files.isRegularFile(reportJson)) {
+            return buildFallbackSummary(runId);
+        }
+        try {
+            Map<String, Object> raw = Jsons.readValue(Files.readString(reportJson), Map.class);
+            return buildSummary(raw, dir);
+        } catch (IOException e) {
+            return buildFallbackSummary(runId);
+        }
+    }
+
     // ---- GET /api/phase3/runs/{runId}/data-diff ----
 
     @SuppressWarnings("unchecked")
@@ -247,6 +264,7 @@ public final class ReportArtifactService {
     @SuppressWarnings("unchecked")
     private Map<String, Object> buildSummary(Map<String, Object> raw, Path dir) {
         String runId = stringValue(raw.getOrDefault("runId", dir.getFileName().toString()));
+        String runName = stringValue(raw.getOrDefault("runName", runId));
         Map<String, Object> summary = mapValue(raw.get("summary"));
         List<Map<String, Object>> steps = listValue(raw.get("steps"));
         int total = intValue(summary.get("total"));
@@ -274,10 +292,19 @@ public final class ReportArtifactService {
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("runId", runId);
+        result.put("runName", runName);
         result.put("status", status);
         result.put("startedAt", stringValue(raw.get("startedAt")));
         result.put("finishedAt", stringValue(raw.get("finishedAt")));
         result.put("durationMs", durationMs);
+        result.put("projectKey", stringValue(raw.get("projectKey")));
+        result.put("projectName", stringValue(raw.get("projectName")));
+        result.put("caseId", stringValue(raw.get("caseId")));
+        result.put("caseName", stringValue(raw.get("caseName")));
+        result.put("environment", stringValue(raw.get("environment")));
+        result.put("model", stringValue(raw.get("model")));
+        result.put("operator", stringValue(raw.get("operator")));
+        result.put("entry", stringValue(raw.get("entry")));
         result.put("stepsTotal", total);
         result.put("stepsPassed", passed);
         result.put("assertionsTotal", assertionsTotal);
@@ -326,19 +353,33 @@ public final class ReportArtifactService {
         return result;
     }
 
-    private Map<String, Object> buildFallbackReport(String runId) {
+    private Map<String, Object> buildFallbackSummary(String runId) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("runId", runId);
+        result.put("runName", runId);
         result.put("status", "UNKNOWN");
         result.put("startedAt", "");
         result.put("finishedAt", "");
         result.put("durationMs", 0);
+        result.put("projectKey", "");
+        result.put("projectName", "");
+        result.put("caseId", "");
+        result.put("caseName", "");
+        result.put("environment", "");
+        result.put("model", "");
+        result.put("operator", "");
+        result.put("entry", "");
         result.put("stepsTotal", 0);
         result.put("stepsPassed", 0);
         result.put("assertionsTotal", 0);
         result.put("assertionsPassed", 0);
         result.put("artifactCount", 0);
         result.put("outputDir", "");
+        return result;
+    }
+
+    private Map<String, Object> buildFallbackReport(String runId) {
+        Map<String, Object> result = new LinkedHashMap<>(buildFallbackSummary(runId));
         result.put("summary", Map.of("total", 0, "passed", 0, "failed", 0, "skipped", 0));
         result.put("steps", List.of());
         result.put("assertions", List.of());
@@ -349,6 +390,10 @@ public final class ReportArtifactService {
     @SuppressWarnings("unchecked")
     private Map<String, Object> buildMockDataDiff(String runId) {
         String status = "UNKNOWN";
+        String projectKey = "";
+        String caseId = "";
+        String caseName = "";
+        Map<String, Object> database = Map.of("id", "", "name", "");
         Path reportJson = resolveRunDir(runId).resolve("report.json");
         if (Files.isRegularFile(reportJson)) {
             try {
@@ -356,6 +401,12 @@ public final class ReportArtifactService {
                 Map<String, Object> summary = mapValue(raw.get("summary"));
                 int failed = intValue(summary.get("failed"));
                 status = failed > 0 ? "FAILED" : "OK";
+                projectKey = stringValue(raw.get("projectKey"));
+                caseId = stringValue(raw.get("caseId"));
+                caseName = stringValue(raw.get("caseName"));
+                database = Map.of(
+                        "id", stringValue(raw.get("databaseId")),
+                        "name", stringValue(raw.get("databaseName")));
             } catch (IOException ignored) {
             }
         }
@@ -384,6 +435,10 @@ public final class ReportArtifactService {
 
         return Map.of(
                 "runId", runId,
+                "projectKey", projectKey,
+                "caseId", caseId,
+                "caseName", caseName,
+                "database", database,
                 "summary", Map.of(
                         "expectedChanges", expected,
                         "unexpectedChanges", unexpected,

@@ -1,5 +1,10 @@
 # Reports Functional Specification
 
+Update note:
+- P1-2 is implemented in the current workspace.
+- `reports` now reads the canonical run list from `GET /api/phase3/runs/`.
+- Backend list rows carry canonical `runId`; snapshot-derived rows are fallback-only when the API is unavailable.
+
 ## 1. Document Position
 
 - Screen name: `reports`
