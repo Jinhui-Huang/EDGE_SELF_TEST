@@ -340,11 +340,40 @@ It does not authorize UI or backend changes in the current phase.
   - current queue metadata shape was treated as monitor-only drill-down input; no artificial monitor-vs-report branching was introduced
 - Remaining limits:
   - queue drill-down currently depends on the queue `title` format because the snapshot queue shape still lacks a dedicated `runId`
-  - prepared-case cards remain display-only
+  - prepared-case cards were still display-only at the end of P1-7 and are completed later in P1-8
 - Test coverage:
   - click queue row triggers the existing handoff
   - empty queue does not expose queue-row interaction
   - Run / Execution / Open Exec Monitor / contract help panel do not regress
+
+### P1-8. Execution prepared-case card drill-down ・DONE
+
+- Screens:
+  - `execution`
+  - `cases`
+- Surfaces:
+  - `ui/admin-console/src/screens/ExecutionScreen.tsx`
+  - `ui/admin-console/src/screens/CasesScreen.tsx`
+  - `ui/admin-console/src/App.tsx`
+- Resolved:
+  - execution prepared-case cards are now clickable instead of display-only
+  - the implementation reuses the existing app-level `cases` handoff rather than adding a new page or backend detail endpoint
+  - prepared-case click now emits the current `caseId` + `projectKey`
+  - `App.tsx` stores the selected cases context and switches back to `cases`
+  - `CasesScreen.tsx` now accepts lightweight initial case context and reopens the matching case in the existing detail canvas
+  - prepared-case cards now expose explicit `aria-label` text for drill-down
+- Boundary decisions:
+  - no backend endpoint was added
+  - no route system or typed router payload was added
+  - no scheduler request or event semantic was changed
+  - drill-down reuses the existing cases detail surface only; it does not introduce a prepared-case detail panel
+- Remaining limits:
+  - the handoff only carries current `projectKey` + `caseId`
+  - reopening a prepared case still depends on the case being present in the current app snapshot/draft
+- Test coverage:
+  - click prepared-case card triggers the existing handoff
+  - empty prepared-case list does not expose prepared-case interaction
+  - Run / Execution / Open Exec Monitor / contract help panel / queue row drill-down do not regress
 
 ---
 

@@ -153,7 +153,8 @@ function ExecutionHarness({
   prepared = preparedCases,
   workQueue = snapshot.workQueue,
   onOpenMonitor = () => undefined,
-  onOpenQueueItem = () => undefined
+  onOpenQueueItem = () => undefined,
+  onOpenPreparedCase = () => undefined
 }: {
   launchForm?: SchedulerMutationForm;
   reviewForm?: SchedulerMutationForm;
@@ -161,6 +162,7 @@ function ExecutionHarness({
   workQueue?: AdminConsoleSnapshot["workQueue"];
   onOpenMonitor?: () => void;
   onOpenQueueItem?: (itemTitle: string) => void;
+  onOpenPreparedCase?: (caseId: string, projectKey: string) => void;
 }) {
   const [launch, setLaunch] = useState(launchForm);
   const [review, setReview] = useState(reviewForm);
@@ -210,6 +212,7 @@ function ExecutionHarness({
       onReviewSubmit={(event: FormEvent<HTMLFormElement>) => event.preventDefault()}
       onOpenMonitor={onOpenMonitor}
       onOpenQueueItem={onOpenQueueItem}
+      onOpenPreparedCase={onOpenPreparedCase}
     />
   );
 }
@@ -287,6 +290,17 @@ describe("ExecutionScreen interactions", () => {
     expect(onOpenQueueItem).toHaveBeenCalledWith("checkout-web-smoke / prod-like");
   });
 
+  it("clicks a prepared-case card and emits the cases handoff", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ items: templates }))));
+    const onOpenPreparedCase = vi.fn();
+
+    render(<ExecutionHarness onOpenPreparedCase={onOpenPreparedCase} />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Open prepared case Checkout smoke in cases" }));
+
+    expect(onOpenPreparedCase).toHaveBeenCalledWith("checkout-smoke", "checkout-web");
+  });
+
   it("does not expose queue-row drill-down when no queue item exists", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ items: templates }))));
 
@@ -297,6 +311,14 @@ describe("ExecutionScreen interactions", () => {
     );
 
     expect(screen.queryByRole("button", { name: /Open queue item/i })).not.toBeInTheDocument();
+  });
+
+  it("does not expose prepared-case drill-down when no prepared case exists", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ items: templates }))));
+
+    render(<ExecutionHarness prepared={[]} />);
+
+    expect(screen.queryByRole("button", { name: /Open prepared case/i })).not.toBeInTheDocument();
   });
 
   it("opens contract help regardless of empty runId and queue/prepared-case variations", async () => {

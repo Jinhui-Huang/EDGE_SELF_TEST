@@ -1704,6 +1704,61 @@ describe("App", () => {
     expect(await screen.findByText("Open home")).toBeInTheDocument();
   });
 
+  it("opens cases from execution prepared-case drill-down via the existing App handoff", async () => {
+    const fetchMock = vi.fn().mockImplementation((call: unknown) => {
+      const url = String(call);
+      if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
+      if (url.endsWith("/api/phase3/data-templates")) return jsonResponse(dataTemplatesResponse);
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    await screen.findByText("Needs attention");
+
+    await userEvent.click((await screen.findAllByRole("button", { name: /Cases/ }))[0]);
+    await userEvent.click((await screen.findAllByRole("button", { name: "Detail" }))[0]);
+    await userEvent.click(await screen.findByRole("button", { name: "Pre-execution" }));
+
+    await userEvent.click((await screen.findAllByRole("button", { name: /Execution/ }))[0]);
+    await userEvent.click(screen.getByRole("button", { name: "Open prepared case Checkout smoke in cases" }));
+
+    expect(await screen.findByText("Cases / Checkout smoke")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Checkout smoke" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Opened" })).toBeInTheDocument();
+  });
+
+  it("clears the one-shot prepared-case handoff when cases is reopened from normal navigation", async () => {
+    const fetchMock = vi.fn().mockImplementation((call: unknown) => {
+      const url = String(call);
+      if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
+      if (url.endsWith("/api/phase3/data-templates")) return jsonResponse(dataTemplatesResponse);
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    await screen.findByText("Needs attention");
+
+    await userEvent.click((await screen.findAllByRole("button", { name: /Cases/ }))[0]);
+    await userEvent.click((await screen.findAllByRole("button", { name: "Detail" }))[0]);
+    await userEvent.click(await screen.findByRole("button", { name: "Pre-execution" }));
+
+    await userEvent.click((await screen.findAllByRole("button", { name: /Execution/ }))[0]);
+    await userEvent.click(screen.getByRole("button", { name: "Open prepared case Checkout smoke in cases" }));
+    expect(await screen.findByRole("heading", { name: "Checkout smoke" })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /Dashboard/ }));
+    await screen.findByText("Needs attention");
+
+    await userEvent.click((await screen.findAllByRole("button", { name: /Cases/ }))[0]);
+
+    expect(await screen.findByText("Detail area is waiting")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Opened" })).not.toBeInTheDocument();
+  });
+
   it("shows monitor idle state when no runId is provided", async () => {
     const fetchMock = vi.fn().mockImplementation(() => jsonResponse(snapshot));
     vi.stubGlobal("fetch", fetchMock);

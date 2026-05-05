@@ -3562,3 +3562,38 @@ Verification:
 Remaining limits:
 - queue drill-down still depends on queue `title` format because the current snapshot queue shape does not expose a dedicated `runId`
 - prepared-case cards remain display-only
+
+# 2026-05-05 P1-8 Execution Prepared-Case Card Drill-Down
+
+Context:
+- Continued the next `execution` gap after P1-7 and kept the current Phase 3 boundary: reuse existing app-level handoff first, no backend endpoint, no route system, no scheduler semantic change.
+
+Implemented:
+- Updated `ui/admin-console/src/screens/ExecutionScreen.tsx` so prepared-case cards are now clickable instead of display-only.
+- Added explicit prepared-case-card `aria-label` text for drill-down.
+- Reused existing App-level `cases` handoff instead of creating a prepared-case detail page:
+  - prepared-case card click -> `onOpenPreparedCase(item.id, item.projectKey)`
+  - `App.tsx` stores the current cases context via:
+    - `selectedCaseProjectKey`
+    - `selectedCaseId`
+  - `App.tsx` switches back to `cases`
+  - `CasesScreen.tsx` now accepts `initialCaseId` in addition to the existing `initialProjectKey`
+  - `CasesScreen.tsx` reopens the matching case in the current lower detail canvas
+- Updated `ui/admin-console/src/styles.css` for prepared-case button hover/focus treatment.
+- Expanded frontend coverage:
+  - `ui/admin-console/src/screens/ExecutionScreen.test.tsx`
+  - `ui/admin-console/src/App.test.tsx`
+
+Docs synced:
+- `docs/phase3/interface/execution/functional-spec.md`
+- `docs/phase3/interface/execution/interface-spec.md`
+- `docs/phase3/interface/ui-control-interface-overview.md`
+- `docs/phase3/interface/review-backlog.md`
+
+Verification:
+- `npm test -- --run src/screens/ExecutionScreen.test.tsx` in `ui/admin-console`: PASS (8/8)
+- `npm test -- --run src/App.test.tsx -t "opens cases from execution prepared-case drill-down via the existing App handoff"` in `ui/admin-console`: PASS (1 passed, 43 skipped)
+
+Remaining limits:
+- prepared-case drill-down carries only current `projectKey` + `caseId`
+- the cases reopen path still depends on the matching case being present in the current app snapshot/draft

@@ -527,12 +527,14 @@ These controls change UI or app state without directly calling the backend.
 
 #### Prepared-case card
 
-- user action: inspect only today
-- request: none today
-- intended future route:
-  - back to `cases`
-  - or forward to case/report detail
-- current state: display only
+- user action: click
+- request: none
+- owner: `App.tsx` screen-state handoff into `cases`
+- current behavior:
+  - prepared-case card emits `caseId` + `projectKey`
+  - `App.tsx` stores the current cases project/case context
+  - the screen navigates back to `cases`
+- current state: implemented
 
 #### Readiness `Open Exec Monitor`
 
@@ -722,30 +724,29 @@ Reasoning:
 
 ### 13.3 Prepared-Case Card Drill-Down
 
-Recommended implementation type:
+Implemented type:
 
-- route-state handoff into `cases`
+- app-level handoff into `cases`
 - no new backend endpoint required
 
-Concrete implementation design:
+Current implementation design:
 
-- add app-level handler:
-  - `onOpenPreparedCase(caseId: string, projectKey: string)`
-- handler behavior:
-  - set selected project/case route state
-  - set active screen to `cases`
-
-Recommended future `cases` props:
-
-```ts
-initialProjectKey?: string | null;
-initialCaseId?: string | null;
-```
+- `ExecutionScreen.tsx` exposes prepared-case cards as buttons with explicit `aria-label`
+- click calls app-level `onOpenPreparedCase(caseId, projectKey)`
+- `App.tsx` stores:
+  - `selectedCaseProjectKey`
+  - `selectedCaseId`
+- `App.tsx` switches to `cases`
+- `CasesScreen.tsx` consumes:
+  - `initialProjectKey`
+  - `initialCaseId`
+- `CasesScreen.tsx` reopens the matching case in the existing lower detail canvas
 
 Reasoning:
 
-- the data already exists in app state
-- route-state is enough to reopen the exact upstream case context
+- prepared-case data already exists in app state
+- project + case identity is enough for the current lightweight reopen behavior
+- the drill-down reuses the existing cases detail surface instead of introducing a new route, new backend detail read, or typed router payload
 
 ### 13.4 Future Backend for Compare Templates
 
@@ -827,6 +828,6 @@ Review-only findings:
 - Prepared-case gating is a front-end execution readiness rule, not a backend request requirement.
 - The compare-template selector now reads the shared backend template registry with local fallback.
 - The header contract hint and queue-row drill-down are now implemented with local/app-level behavior only.
-- Prepared-case cards remain the main visible-but-unwired control on this screen.
+- Prepared-case cards now reuse the existing app-level `cases` handoff without adding a prepared-case detail endpoint.
 
 These are documentation findings only. No implementation change is made in this stage.

@@ -55,6 +55,7 @@ type ExecutionScreenProps = {
   onReviewSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onOpenMonitor: () => void;
   onOpenQueueItem: (itemTitle: string) => void;
+  onOpenPreparedCase: (caseId: string, projectKey: string) => void;
 };
 
 type Copy = {
@@ -106,7 +107,8 @@ export function ExecutionScreen({
   onExecuteSubmit,
   onReviewSubmit,
   onOpenMonitor,
-  onOpenQueueItem
+  onOpenQueueItem,
+  onOpenPreparedCase
 }: ExecutionScreenProps) {
   const t = (value: Copy) => translate(locale, value);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -214,6 +216,16 @@ export function ExecutionScreen({
         `Open queue item ${itemTitle} in monitor`,
         `打开队列项 ${itemTitle} 到 monitor`,
         `キュー項目 ${itemTitle} を monitor で開く`
+      )
+    );
+  }
+
+  function buildPreparedCaseAriaLabel(item: PreparedCaseItem) {
+    return t(
+      copy(
+        `Open prepared case ${item.name} in cases`,
+        `在 cases 中打开预执行用例 ${item.name}`,
+        `prepared case ${item.name} を cases で開く`
       )
     );
   }
@@ -559,7 +571,13 @@ export function ExecutionScreen({
           <div className="executionPreparedCaseList">
             {preparedCasesForProject.length ? (
               preparedCasesForProject.map((item) => (
-                <article key={item.id} className="executionPreparedCaseCard">
+                <button
+                  key={item.id}
+                  type="button"
+                  className="executionPreparedCaseCard executionPreparedCaseButton"
+                  aria-label={buildPreparedCaseAriaLabel(item)}
+                  onClick={() => onOpenPreparedCase(item.id, item.projectKey)}
+                >
                   <div>
                     <strong>{item.name}</strong>
                     <p>{item.id}</p>
@@ -568,7 +586,7 @@ export function ExecutionScreen({
                     <span>{item.status}</span>
                     <small>{item.updatedAt}</small>
                   </div>
-                </article>
+                </button>
               ))
             ) : (
               <div className="executionPreparedEmptyState">{t(copy("Go back to Cases and run Pre-execution first."))}</div>

@@ -119,7 +119,7 @@ Conventions used here:
 | `Detail` textarea | textarea | Local form state | Included in scheduler payloads |
 | `Run` | button | Implemented: `POST /api/phase3/scheduler/requests` | Keep current |
 | `Execution` | button | Implemented: `POST /api/phase3/scheduler/events` | Keep current |
-| Prepared-case card | clickable card | Visual only | App-level handoff back into `cases` |
+| Prepared-case card | clickable card | Implemented: App-level handoff back into `cases`; current handoff carries existing `projectKey` + `caseId` only and reopens the existing cases detail canvas | Keep current lightweight `cases` handoff |
 | Queue row | clickable row | Implemented: App-level handoff into `monitor`; current run identity is derived from queue `title` because the snapshot queue shape does not expose a dedicated `runId` field | Keep current lightweight `monitor` handoff until queue metadata grows |
 | Review form inputs | inputs | Local form state | Included in audit event payload |
 | `Open Audit` | button | Implemented: `POST /api/phase3/scheduler/events` | Keep current |

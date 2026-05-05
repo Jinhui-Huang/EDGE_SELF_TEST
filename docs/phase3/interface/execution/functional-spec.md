@@ -178,9 +178,10 @@ Functional role:
 
 Current behavior:
 
-- display only
+- cards are clickable
 - filtered by current `launchForm.projectKey`
-- no card-level action is implemented
+- clicking a card performs an app-level handoff back into `cases`
+- the handoff reuses current project + case context only and does not add a new backend request or route payload
 
 ### 6.5 Execution Readiness Panel
 
@@ -341,11 +342,10 @@ Current implementation summary:
   - `Execution`
   - `Open Exec Monitor`
   - execution contract help panel open/close
+  - prepared-case card drill-down into `cases`
   - queue row drill-down into `monitor`
   - review field edits
   - `Open Audit`
-- visible but not implemented:
-  - prepared-case card drill-down
 
 ## 10. Functional Control Responsibility Matrix
 
@@ -389,6 +389,10 @@ Current implementation summary:
   - function: route into runtime monitor
   - output type: cross-screen navigation
   - current implementation: implemented
+- prepared-case card
+  - function: reopen the current case context in `cases`
+  - output type: cross-screen navigation
+  - current implementation: implemented via app-level handoff
 - queue row
   - function: let the operator inspect the queued run through the existing runtime-monitor handoff
   - output type: cross-screen navigation
@@ -430,8 +434,8 @@ Current implementation status:
 - template selection normalization is implemented
 - database selection fallback is implemented
 - execution contract help-panel state is implemented locally in `ExecutionScreen.tsx`
+- prepared-case drill-down state is implemented through app-level `cases` handoff
 - queue-row drill-down state is implemented through app-level monitor handoff
-- deeper prepared-case/run drill-down state is not implemented
 
 ## 12. Validation and Rules
 
@@ -502,11 +506,10 @@ The `execution` screen is not currently responsible for:
 
 Review items discovered while documenting:
 
-- queue rows are not wired to a detail or monitor drill-down.
-- prepared-case cards are not wired back to `cases` or forward to run/report context.
 - the launch form has only lightweight front-end validation, while the backend request endpoint accepts a broader but minimally validated payload.
 - the local execution contract panel is descriptive only; it does not become a protocol editor, route, or backend-owned contract surface.
 - queue row drill-down currently normalizes run identity from queue `title`; the current queue snapshot shape does not yet expose a dedicated `runId` field.
+- prepared-case drill-down is intentionally limited to current `cases` context handoff; it does not introduce a richer case-detail payload or a new prepared-case backend endpoint.
 
 These are documentation review items only. No implementation change is made in this stage.
 

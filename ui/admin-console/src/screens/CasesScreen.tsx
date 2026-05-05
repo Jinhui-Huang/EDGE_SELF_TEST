@@ -21,6 +21,7 @@ type CasesScreenProps = {
   caseDraft: CaseItem[];
   caseState: MutationState;
   initialProjectKey?: string | null;
+  initialCaseId?: string | null;
   apiBaseUrl: string;
   title: string;
   saveHint: string;
@@ -93,6 +94,7 @@ export function CasesScreen({
   caseDraft,
   caseState,
   initialProjectKey,
+  initialCaseId,
   apiBaseUrl,
   title,
   saveHint,
@@ -248,6 +250,21 @@ export function CasesScreen({
       setOpenedCaseId(null);
     }
   }, [openedCaseId, visibleCases]);
+
+  useEffect(() => {
+    const normalizedCaseId = initialCaseId?.trim();
+    if (!normalizedCaseId) {
+      return;
+    }
+    const matchedCase = visibleCases.find((item) => item.id === normalizedCaseId);
+    if (!matchedCase) {
+      return;
+    }
+    if (openedCaseId !== matchedCase.id) {
+      setOpenedCaseId(matchedCase.id);
+      setOverviewCollapsed(true);
+    }
+  }, [initialCaseId, openedCaseId, visibleCases]);
 
   // Reset tab data when case changes
   useEffect(() => {

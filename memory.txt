@@ -1306,3 +1306,25 @@
   - Remaining execution limits after this pass:
     - queue drill-down still depends on queue `title` format because the snapshot queue shape has no dedicated `runId`
     - prepared-case cards remain display-only
+- 2026-05-05: Completed P1-8 Execution Prepared-Case Card Drill-Down.
+  - Updated `ui/admin-console/src/screens/ExecutionScreen.tsx` so prepared-case cards are now clickable instead of display-only.
+  - Reused existing app-level `cases` handoff only:
+    - prepared-case card click -> `onOpenPreparedCase(item.id, item.projectKey)`
+    - `App.tsx` stores the current cases context in:
+      - `selectedCaseProjectKey`
+      - `selectedCaseId`
+    - `App.tsx` switches back to `cases`
+    - `CasesScreen.tsx` now accepts `initialCaseId` and reopens the matching case in the existing detail canvas
+  - Added explicit prepared-case-card `aria-label` text for drill-down.
+  - Kept the Phase 3 boundary:
+    - no new backend endpoint
+    - no new route system
+    - no typed router payload
+    - no scheduler request/event semantic change
+    - no standalone prepared-case detail panel
+  - Added verification:
+    - `npm test -- --run src/screens/ExecutionScreen.test.tsx`
+    - `npm test -- --run src/App.test.tsx -t "opens cases from execution prepared-case drill-down via the existing App handoff"`
+  - Remaining execution limits after this pass:
+    - prepared-case drill-down carries only `projectKey` + `caseId`
+    - the reopen path still depends on the matching case being present in the current app snapshot/draft

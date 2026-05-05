@@ -1490,6 +1490,7 @@ export function App() {
   const [projectImportState, setProjectImportState] = useState<MutationState>({ kind: "idle", message: "" });
   const [projectImportPreview, setProjectImportPreview] = useState<ProjectImportPreviewResponse | null>(null);
   const [selectedCaseProjectKey, setSelectedCaseProjectKey] = useState<string | null>(null);
+  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const [selectedReportsProjectKey, setSelectedReportsProjectKey] = useState<string | null>(null);
   const [caseDraft, setCaseDraft] = useState<CaseItem[]>(
     fallbackSnapshot.cases.map((testCase) => ({
@@ -1583,6 +1584,18 @@ export function App() {
       return;
     }
     setSelectedCaseProjectKey(normalizedProjectKey);
+    setSelectedCaseId(null);
+    setActiveScreen("cases");
+  }
+
+  function openPreparedCase(caseId: string, projectKey: string) {
+    const normalizedCaseId = caseId.trim();
+    const normalizedProjectKey = projectKey.trim();
+    if (!normalizedCaseId || !normalizedProjectKey) {
+      return;
+    }
+    setSelectedCaseProjectKey(normalizedProjectKey);
+    setSelectedCaseId(normalizedCaseId);
     setActiveScreen("cases");
   }
 
@@ -1627,6 +1640,9 @@ export function App() {
   function handleScreenChange(screen: ScreenId) {
     if (screen === "monitor") {
       setSelectedMonitorRunId(null);
+    }
+    if (screen === "cases") {
+      setSelectedCaseId(null);
     }
     setActiveScreen(screen);
   }
@@ -2374,6 +2390,7 @@ export function App() {
             caseDraft={caseDraft}
             caseState={caseState}
             initialProjectKey={selectedCaseProjectKey}
+            initialCaseId={selectedCaseId}
             apiBaseUrl={apiBaseUrl}
             title={t(localizedScreenCopy.cases.title)}
             saveHint={t(uiCopy.caseSaveHint)}
@@ -2460,6 +2477,7 @@ export function App() {
             onReviewSubmit={handleReviewSubmit}
             onOpenMonitor={() => openMonitor(launchForm.runId)}
             onOpenQueueItem={openQueueItem}
+            onOpenPreparedCase={openPreparedCase}
           />
         );
       case "monitor":
