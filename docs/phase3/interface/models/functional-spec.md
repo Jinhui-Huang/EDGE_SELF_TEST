@@ -68,7 +68,7 @@ Current implementation facts:
 - provider card click opens edit modal.
 - provider `Test` action is implemented and calls backend validation through local-admin-api.
 - routing rules are displayed.
-- routing-rule edit icon is visible but not wired.
+- routing-rule edit icon opens a local routing-rule editor.
 - `Save` is implemented and persists model config through local-admin-api.
 
 This matters for review:
@@ -140,10 +140,33 @@ Functional role:
 
 Current behavior:
 
-- rules are display-only
-- edit icon is visible only
+- rules are displayed from current front-end draft state
+- edit icon opens a local routing-rule editor
+- routing-rule edits stay local until footer `Save`
 
-### 6.4 Footer Save Area
+### 6.4 Routing Rule Editor
+
+Visible elements:
+
+- task
+- primary model
+- fallback models
+- reason
+- `Cancel`
+- `Apply`
+
+Functional role:
+
+- modify the current routing-rule draft without persisting immediately
+
+Current behavior:
+
+- editor opens from the routing-rule edit icon
+- `Apply` updates the current local `routingRules` draft only
+- `Cancel` closes without mutating the parent draft
+- persistence still happens only through footer `Save model config`
+
+### 6.5 Footer Save Area
 
 Visible elements:
 
@@ -159,7 +182,7 @@ Current behavior:
 - implemented
 - save writes multiple config items through `/api/phase3/config/model`
 
-### 6.5 Provider Modal
+### 6.6 Provider Modal
 
 Visible elements:
 
@@ -238,6 +261,7 @@ The screen consumes:
 - model mutation state
 - connection-test state
 - callbacks for provider changes, save, and test
+- callback for routing-rule changes
 
 ### 8.2 Screen Outputs
 
@@ -245,6 +269,7 @@ The screen currently produces:
 
 - local draft outputs
   - provider create/edit/delete
+  - routing-rule edit/apply
   - modal open/close state
 - backend persistence output
   - model config save
@@ -265,6 +290,9 @@ Visible actions on this screen:
 - click `Cancel`
 - click `Add provider` or `Update` in modal
 - click routing-rule edit icon
+- edit routing-rule fields in editor
+- click editor `Cancel`
+- click editor `Apply`
 - click footer `Save model config`
 
 Current implementation summary:
@@ -273,9 +301,8 @@ Current implementation summary:
   - add/edit provider modal flow
   - provider delete in local state
   - provider backend validation test
+  - local routing-rule edit flow
   - save mutation
-- visible but not implemented:
-  - routing-rule edit action
 
 ## 10. Functional Control Responsibility Matrix
 
@@ -302,8 +329,18 @@ Current implementation summary:
 
 - routing-rule edit icon
   - function: modify task-to-model routing
-  - output type: future local edit flow plus save persistence
-  - current implementation: visual only
+  - output type: local edit modal state
+  - current implementation: implemented
+
+- routing-rule editor `Apply`
+  - function: write edited fields back into current routing-rule draft
+  - output type: local draft state
+  - current implementation: implemented
+
+- routing-rule editor `Cancel`
+  - function: close editor without mutating parent draft
+  - output type: local modal state
+  - current implementation: implemented
 
 ### 10.3 Modal Controls
 
@@ -350,8 +387,8 @@ The screen should support:
 Current implementation status:
 
 - local modal and draft states are implemented
+- routing-rule editor state is implemented
 - connection-test and save mutation states are implemented
-- routing-rule edit state is not implemented
 
 ## 12. Validation and Rules
 
@@ -373,7 +410,7 @@ Current missing validation:
 
 - no real outbound endpoint reachability test
 - no duplicate provider-id conflict handling
-- no routing-rule edit validation path
+- no deeper routing-rule validation beyond non-empty task/primary and fallback splitting
 
 ## 13. Cross-Screen Relationships
 
@@ -421,7 +458,6 @@ The `models` screen is not currently responsible for:
 
 Review items discovered while documenting:
 
-- routing-rule edit icon is visible but unwired.
 - provider connection testing now uses a real backend validation interface, but it still does not perform real outbound provider connectivity in Phase 3.
 - provider delete/update changes remain local until footer save, which may be easy to misread in the UI.
 - the persistence layer is generic label/value config storage rather than a typed provider/routing API.

@@ -21,7 +21,7 @@ This document distinguishes:
 - current snapshot read context
 - current generic model-config persistence path
 - current backend provider connection-test interface
-- future interfaces required by visible but unwired routing controls
+- current local routing-rule edit flow plus the existing save pipeline
 
 ## 2. Interface Summary
 
@@ -227,10 +227,22 @@ This boundary must be explicit in review because the UI presents local edits and
 
 - user action: click
 - request: none today
-- owner: not implemented
-- intended future interface:
-  - local routing edit drawer plus model-config save
-- current state: visible only
+- owner: local routing-rule editor state
+- current state: implemented
+
+#### Routing-rule editor `Apply`
+
+- user action: click / submit
+- request: none
+- owner: local routing-rule draft state
+- current state: implemented
+
+#### Routing-rule editor `Cancel`
+
+- user action: click
+- request: none
+- owner: local routing-rule editor state
+- current state: implemented
 
 ### 7.3 Modal Controls
 
@@ -393,7 +405,7 @@ Response body:
 }
 ```
 
-## 9. Detailed Implementation Design for Currently Unwired Controls
+## 9. Detailed Implementation Design for Current Controls
 
 ### 9.1 Provider `Test` / `Test connection`
 
@@ -432,6 +444,18 @@ Concrete implementation design:
 Reasoning:
 
 - the current config-item persistence path already supports `route:{id}` entries, so routing editing does not require a brand-new save contract
+
+Current Phase 3 implementation:
+
+1. `ModelConfigScreen.tsx` opens a local routing-rule modal from the edit icon
+2. the modal edits:
+   - `task`
+   - `primary`
+   - comma-separated `fallback` input that is normalized back into `string[]`
+   - `reason`
+3. `Apply` updates the parent `modelRoutingRules` draft in `App.tsx`
+4. `Save model config` still persists via repeated:
+   - `POST /api/phase3/config/model`
 
 ### 9.3 Provider Delete
 
@@ -490,7 +514,7 @@ Review-only findings:
 
 - The page already has a real save path and should be documented as a true config screen, not a demo shell.
 - Provider connection testing is now backend-driven, but it is still deterministic validation rather than real provider connectivity.
-- Routing rules are structurally persistable today, but the page lacks any editing UI for them.
+- Routing rules now have a local editing UI and reuse the current save path, but the persistence contract is still generic config-item storage rather than a typed routing API.
 - The config-item contract works but is weaker and less explicit than a typed provider/routing API.
 
 These are documentation findings only. No implementation change is made in this stage.

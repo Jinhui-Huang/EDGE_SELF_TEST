@@ -1229,3 +1229,27 @@
     - runtime data remains deterministic mock when no real run artifacts exist
     - live page remains structured-data only
     - monitor drill-down stays local; it does not become a separate route or editor surface
+- 2026-05-05: Completed P1-5 Models Routing Rule Local Edit Flow.
+  - Updated `ui/admin-console/src/screens/ModelConfigScreen.tsx` so the routing-rule edit icon now opens a local editor modal instead of remaining visual-only.
+  - Added editable local draft fields for:
+    - `task`
+    - `primary`
+    - `fallback`
+    - `reason`
+  - `Apply` now writes the edited routing rule back into the current front-end draft only.
+  - `Cancel` now closes without mutating the parent routing-rule draft.
+  - Updated `ui/admin-console/src/App.tsx` to pass `setModelRoutingRules` into `ModelConfigScreen`.
+  - Kept persistence on the existing model-config save path:
+    - `buildModelConfigItems(modelProviders, modelRoutingRules)`
+    - repeated `POST /api/phase3/config/model`
+  - No backend endpoint or provider-connection semantics were changed.
+  - Added tests:
+    - `ui/admin-console/src/screens/ModelConfigScreen.test.tsx`
+    - `ui/admin-console/src/App.test.tsx` integration coverage for save-path reuse
+  - Verification passed:
+    - `npm test -- --run src/screens/ModelConfigScreen.test.tsx`
+    - `npm test -- --run src/App.test.tsx -t "persists locally edited routing rules through the existing model config save flow"`
+    - `npm run build`
+  - Remaining models limits after this pass:
+    - routing-rule editing is still single-rule local modal state
+    - persistence still uses generic config-item storage instead of a typed models API

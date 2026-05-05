@@ -3453,3 +3453,39 @@ Remaining limits:
 - runtime data is still deterministic mock when no real run artifacts exist
 - live page remains structured-data only; no real screenshot or DOM summary is rendered
 - `monitor` still does not become a separate run-detail/report-detail route; drill-down stays local by design
+
+# 2026-05-05 P1-5 Models Routing Rule Local Edit Flow
+
+Context:
+- Continued the next `models` gap after P1-4 and kept the Phase 3 boundary: local draft editing first, existing persistence path reused, no new backend contract unless the current config-item shape proved insufficient.
+
+Implemented:
+- Updated `ui/admin-console/src/screens/ModelConfigScreen.tsx` so the routing-rule edit icon is now clickable and opens a local editor modal.
+- Added local routing-rule editor fields for:
+  - `task`
+  - `primary`
+  - `fallback`
+  - `reason`
+- Kept routing-rule edits draft-only until footer save:
+  - editor `Apply` updates the current front-end `routingRules` state
+  - editor `Cancel` closes without mutating the parent draft
+- Updated `ui/admin-console/src/App.tsx` to pass `setModelRoutingRules` into `ModelConfigScreen`, so routing-rule edits stay inside the existing screen-level state model.
+- Reused the current model-config persistence flow unchanged:
+  - `buildModelConfigItems(modelProviders, modelRoutingRules)`
+  - repeated `POST /api/phase3/config/model`
+- Did not add a new models-specific save endpoint and did not change provider connection-test semantics.
+
+Docs synced:
+- `docs/phase3/interface/models/functional-spec.md`
+- `docs/phase3/interface/models/interface-spec.md`
+- `docs/phase3/interface/ui-control-interface-overview.md`
+- `docs/phase3/interface/review-backlog.md`
+
+Verification:
+- `npm test -- --run src/screens/ModelConfigScreen.test.tsx` in `ui/admin-console`: PASS (3/3)
+- `npm test -- --run src/App.test.tsx -t "persists locally edited routing rules through the existing model config save flow"` in `ui/admin-console`: PASS (1/1, 41 skipped)
+- `npm run build` in `ui/admin-console`: PASS
+
+Remaining limits:
+- routing-rule editing is still single-rule local modal state, not a broader routing policy management surface
+- persistence still uses generic config-item storage instead of a typed `models` document API

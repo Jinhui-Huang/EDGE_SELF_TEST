@@ -257,6 +257,33 @@ It does not authorize UI or backend changes in the current phase.
 - Acceptance target:
   - connection-test buttons return real backend validation outcomes before save.
 
+### P1-5. Models routing-rule local edit flow 窶・DONE
+
+- Screens:
+  - `models`
+- Resolved:
+  - `ModelConfigScreen.tsx` now wires the routing-rule edit icon to a local routing-rule editor
+  - the editor supports:
+    - `task`
+    - `primary`
+    - `fallback` list
+    - `reason`
+  - editor `Apply` updates the current front-end `modelRoutingRules` draft only
+  - editor `Cancel` closes without mutating the parent draft
+  - footer `Save model config` still persists the edited routing rules through repeated `POST /api/phase3/config/model`
+- Boundary decisions:
+  - no new backend endpoint was added
+  - no provider connection-test semantics changed
+  - routing-rule editing remains local to the current screen state until footer save
+- Remaining limits:
+  - routing-rule editing is still single-rule local modal state, not a broader rule orchestration surface
+  - persistence still uses generic config-item storage rather than a typed models API
+- Test coverage:
+  - click routing-rule edit icon opens the editor
+  - apply writes edited fields back to local draft
+  - cancel closes without mutating the parent draft
+  - save still uses the existing model-config persistence chain
+
 ---
 
 ## 4. Priority P2

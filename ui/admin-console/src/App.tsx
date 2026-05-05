@@ -2522,6 +2522,7 @@ export function App() {
             submitLabel={t(uiCopy.saveModelConfig)}
             locale={locale}
             onProvidersChange={setModelProviders}
+            onRoutingRulesChange={setModelRoutingRules}
             onTestConnection={handleModelConnectionTest}
             onSave={handleModelConfigSave}
           />

@@ -643,6 +643,78 @@ describe("App", () => {
     expect(await screen.findByText("OpenAI Responses API / audited")).toBeInTheDocument();
   });
 
+  it("persists locally edited routing rules through the existing model config save flow", async () => {
+    const routingRule = {
+      id: "route-case-generation",
+      task: "case generation",
+      primary: "gpt-4.1-mini",
+      fallback: ["claude-4.5-sonnet"],
+      reason: "Fast default for structured generation."
+    };
+    const snapshotWithRoutingRule = {
+      ...snapshot,
+      modelConfig: [
+        { label: "Provider", value: "OpenAI Responses API" },
+        { label: "route:route-case-generation", value: JSON.stringify(routingRule) }
+      ]
+    };
+    const savedRequestBodies: string[] = [];
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) {
+        return jsonResponse(snapshotWithRoutingRule);
+      }
+      if (url.endsWith("/api/phase3/config/model")) {
+        savedRequestBodies.push(String(init?.body ?? ""));
+        return jsonResponse({ status: "ACCEPTED" }, 202);
+      }
+      throw new Error(`Unexpected fetch: ${url} ${init?.method ?? "GET"}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    await userEvent.click(await screen.findByRole("button", { name: /Model Config/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Edit routing rule for case generation/i }));
+
+    const taskInput = screen.getByDisplayValue("case generation");
+    const primaryInput = screen.getByDisplayValue("gpt-4.1-mini");
+    const fallbackInput = screen.getByDisplayValue("claude-4.5-sonnet");
+    const reasonInput = screen.getByDisplayValue("Fast default for structured generation.");
+
+    await userEvent.clear(taskInput);
+    await userEvent.type(taskInput, "locator repair");
+    await userEvent.clear(primaryInput);
+    await userEvent.type(primaryInput, "gpt-4.1");
+    await userEvent.clear(fallbackInput);
+    await userEvent.type(fallbackInput, "claude-4.5-sonnet, gpt-4.1-mini");
+    await userEvent.clear(reasonInput);
+    await userEvent.type(reasonInput, "Prefer higher quality for repair.");
+    await userEvent.click(screen.getByRole("button", { name: "Apply" }));
+
+    await userEvent.click(screen.getByRole("button", { name: "Save model config" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "http://127.0.0.1:8787/api/phase3/config/model",
+        expect.objectContaining({ method: "POST" })
+      );
+    });
+    const savedRouteItem = savedRequestBodies
+      .map((body) => JSON.parse(body))
+      .find((item) => item.label === "route:route-case-generation");
+    expect(savedRouteItem).toEqual({
+      label: "route:route-case-generation",
+      value: JSON.stringify({
+        id: "route-case-generation",
+        task: "locator repair",
+        primary: "gpt-4.1",
+        fallback: ["claude-4.5-sonnet", "gpt-4.1-mini"],
+        reason: "Prefer higher quality for repair."
+      })
+    });
+  });
+
   it("posts editable project catalog updates and refreshes the snapshot", async () => {
     const fetchMock = vi
       .fn()

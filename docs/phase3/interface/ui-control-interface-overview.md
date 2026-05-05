@@ -196,7 +196,7 @@ Conventions used here:
 | Provider card | clickable card | Local modal open only | Keep local |
 | Provider `Test` | button | Implemented: `POST /api/phase3/config/model/test-connection` | Keep current deterministic backend validation; do not expand to real outbound provider calls in Phase 3 |
 | Provider edit icon | button | Local modal open only | Keep local |
-| Routing-rule edit icon | button | Visual only | Local routing edit drawer; persist through current model save pipeline |
+| Routing-rule edit icon | button | Implemented: local routing-rule editor updates front-end draft state only | Persist through current `Save model config` pipeline; keep routing edits local until footer save |
 | Modal `Test connection` | button | Implemented: `POST /api/phase3/config/model/test-connection` | Keep current deterministic backend validation; do not expand to real outbound provider calls in Phase 3 |
 | Modal `Delete` | button | Local draft delete only | Persist after footer save |
 | Modal `Add provider` / `Update` | button | Local draft update only | Persist after footer save |
