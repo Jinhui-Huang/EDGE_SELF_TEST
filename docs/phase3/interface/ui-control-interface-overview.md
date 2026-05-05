@@ -223,7 +223,7 @@ Conventions used here:
 |---|---|---|---|
 | `Pick element` | quick action | Implemented in real extension popup: popup -> background -> active-tab content script -> pick result render | Keep current lightweight in-extension flow; do not move DOM collection into native-host or local-admin-api |
 | `Page summary` | quick action | Implemented in real extension popup: popup -> background -> native-host -> `POST /api/phase3/extension/page-summary` | Keep current deterministic page-summary flow until content-script collection is introduced |
-| `Quick smoke test` | quick action | Visual only | `EXT_EXECUTION_START` -> `EXECUTION_START` |
+| `Quick smoke test` | quick action | Implemented in real extension popup: popup -> background -> native-host -> `POST /api/phase3/scheduler/requests`, with deterministic launch result rendered in popup | Reuse `SCHEDULER_REQUEST_CREATE`; do not add a parallel popup execution protocol |
 | `Open in platform` | quick action | Implemented in real extension popup: popup -> background -> native-host -> `POST /api/phase3/extension/platform-handoff` -> background tab-open -> platform App query handoff into `execution` | Keep lightweight App-level handoff; do not add a complex router |
 | Locator candidate row | clickable row | Implemented as rendered real candidate output from content script pick result | Local selected-locator state can be added later if review requires row selection |
 | `Copy` | button | Implemented in real extension popup as local clipboard write of the current real recommended locator | Keep local-only |
@@ -245,7 +245,7 @@ The highest-signal unresolved controls across the package are:
 
 - `monitor` step-row and runtime-log drill-down not yet implemented
 - `models` and `environments` have switched to real backend validation interfaces, but the validation remains deterministic and non-connective by Phase 3 design
-- `plugin` still lacks `Quick smoke test`; `Pick element`, page-summary, platform handoff, copy, and use-in-dsl are now implemented in the real extension popup chain
+- `plugin` quick actions are now all wired in the real extension popup chain; detailed execution monitoring still belongs to platform execution/monitor rather than the popup
 
 Resolved since last review:
 

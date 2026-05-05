@@ -51,10 +51,29 @@
         </div>
         <div class="actionGrid">
           <button id="pickElementButton" type="button">Pick element</button>
+          <button id="quickSmokeButton" type="button">Quick smoke test</button>
           <button id="pageSummaryButton" type="button">Page summary</button>
           <button id="openPlatformButton" type="button">Open in platform</button>
         </div>
         <p class="actionStatus hidden" id="quickActionStatus" role="status" aria-live="polite"></p>
+        <dl class="summary">
+          <div>
+            <dt>Quick smoke state</dt>
+            <dd id="quickSmokeState">Not started.</dd>
+          </div>
+          <div>
+            <dt>Run ID</dt>
+            <dd id="quickSmokeRunId">-</dd>
+          </div>
+          <div>
+            <dt>Queue status</dt>
+            <dd id="quickSmokeQueue">-</dd>
+          </div>
+          <div>
+            <dt>Next step</dt>
+            <dd id="quickSmokeNextStep">Use Quick smoke test to queue the current page context.</dd>
+          </div>
+        </dl>
       </section>
 
       <section class="panel">

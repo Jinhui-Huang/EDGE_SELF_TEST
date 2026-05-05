@@ -12,11 +12,16 @@ function createFormDom() {
     <input id="reviewEnvironment" value="" />
     <textarea id="reviewDetail"></textarea>
     <button id="pickElementButton" type="button">Pick element</button>
+    <button id="quickSmokeButton" type="button">Quick smoke test</button>
     <button id="pageSummaryButton" type="button">Page summary</button>
     <button id="openPlatformButton" type="button">Open in platform</button>
     <button id="copyLocatorButton" type="button">Copy locator</button>
     <button id="useDslButton" type="button">Use in DSL</button>
     <p id="quickActionStatus" class="actionStatus hidden"></p>
+    <dd id="quickSmokeState">Not started.</dd>
+    <dd id="quickSmokeRunId">-</dd>
+    <dd id="quickSmokeQueue">-</dd>
+    <dd id="quickSmokeNextStep">Use Quick smoke test to queue the current page context.</dd>
     <dd id="pickedTag">Not picked yet.</dd>
     <dd id="pickedText">Pick an element from the page to inspect it here.</dd>
     <dd id="pickedId">-</dd>
@@ -177,6 +182,142 @@ describe("popup helpers", () => {
     });
     expect(document.getElementById("pageSummaryResult").textContent).toContain("Checkout page is active.");
     expect(document.getElementById("pageSummaryRecommendation").textContent).toContain("Open the platform.");
+  });
+
+  it("submits quick smoke through the scheduler request bridge and renders the accepted result", async () => {
+    createFormDom();
+    globalThis.chrome.runtime.sendMessage = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        data: {
+          status: "ACCEPTED",
+          schedulerId: "local-phase3-scheduler",
+          entry: {
+            runId: "popup-run",
+            status: "PRE_EXECUTION"
+          }
+        }
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        data: {
+          status: "READY",
+          summary: "Bridge online",
+          runtime: {
+            mode: "Audit-first",
+            queueState: "2 queued / 0 active / 2 waiting",
+            auditState: "Idle",
+            nextAction: "Open execution monitor"
+          }
+        }
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        data: {
+          status: "idle",
+          result: null
+        }
+      });
+    const popup = await import("../../../extension/edge-extension/popup.js");
+
+    await expect(popup.runQuickSmokeAction()).resolves.toEqual({
+      state: "ACCEPTED",
+      runId: "popup-run",
+      queueStatus: "PRE_EXECUTION",
+      nextStep: "Open Platform Execution or Monitor for detailed progress."
+    });
+
+    expect(globalThis.chrome.runtime.sendMessage).toHaveBeenNthCalledWith(1, {
+      channel: "native-host",
+      type: "SCHEDULER_REQUEST_CREATE",
+      payload: {
+        runId: "popup-run",
+        projectKey: "checkout-web",
+        owner: "edge-popup",
+        environment: "staging-edge",
+        detail: "review current page | Page: Checkout | URL: https://checkout.example.test/pay",
+        status: "PRE_EXECUTION",
+        title: "popup-run / staging-edge"
+      }
+    });
+    expect(document.getElementById("quickSmokeState").textContent).toBe("ACCEPTED");
+    expect(document.getElementById("quickSmokeRunId").textContent).toBe("popup-run");
+    expect(document.getElementById("quickSmokeQueue").textContent).toBe("PRE_EXECUTION");
+    expect(document.getElementById("quickSmokeNextStep").textContent).toContain("Open Platform Execution");
+  });
+
+  it("shows a pending quick smoke state before the scheduler request resolves", async () => {
+    createFormDom();
+    let resolveScheduler;
+    const schedulerPromise = new Promise((resolve) => {
+      resolveScheduler = resolve;
+    });
+    globalThis.chrome.runtime.sendMessage = vi
+      .fn()
+      .mockReturnValueOnce(schedulerPromise)
+      .mockResolvedValueOnce({
+        ok: true,
+        data: {
+          status: "READY",
+          summary: "Bridge online",
+          runtime: {
+            mode: "Audit-first",
+            queueState: "Queued",
+            auditState: "Idle",
+            nextAction: "Open execution monitor"
+          }
+        }
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        data: {
+          status: "idle",
+          result: null
+        }
+      });
+    const popup = await import("../../../extension/edge-extension/popup.js");
+
+    const runPromise = popup.runQuickSmokeAction();
+
+    expect(document.getElementById("quickSmokeState").textContent).toBe("PENDING");
+    expect(document.getElementById("quickSmokeRunId").textContent).toBe("popup-run");
+    expect(document.getElementById("quickSmokeQueue").textContent).toBe("Submitting request");
+    expect(document.getElementById("quickActionStatus").textContent).toContain("Submitting quick smoke request");
+
+    resolveScheduler({
+      ok: true,
+      data: {
+        status: "ACCEPTED",
+        entry: {
+          runId: "popup-run",
+          status: "PRE_EXECUTION"
+        }
+      }
+    });
+
+    await expect(runPromise).resolves.toEqual({
+      state: "ACCEPTED",
+      runId: "popup-run",
+      queueStatus: "PRE_EXECUTION",
+      nextStep: "Open Platform Execution or Monitor for detailed progress."
+    });
+  });
+
+  it("renders an error state when quick smoke submission fails", async () => {
+    createFormDom();
+    globalThis.chrome.runtime.sendMessage = vi.fn().mockResolvedValue({
+      ok: false,
+      error: "scheduler offline"
+    });
+    const popup = await import("../../../extension/edge-extension/popup.js");
+
+    await expect(popup.runQuickSmokeAction()).rejects.toThrow("scheduler offline");
+
+    expect(document.getElementById("quickSmokeState").textContent).toBe("ERROR");
+    expect(document.getElementById("quickSmokeRunId").textContent).toBe("popup-run");
+    expect(document.getElementById("quickSmokeQueue").textContent).toBe("Not accepted");
+    expect(document.getElementById("quickSmokeNextStep").textContent).toBe("scheduler offline");
   });
 
   it("triggers pick mode through background and renders the real pick result", async () => {

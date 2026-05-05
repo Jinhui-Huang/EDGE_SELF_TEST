@@ -3375,3 +3375,37 @@ Remaining limits:
 - `Quick smoke test` is still visual-only
 - popup candidate rows are rendered from real pick output, but row-selection state is not yet interactive
 - popup mirror screen in `ui/admin-console` remains a demo surface; the real implementation lives in `extension/edge-extension`
+
+# 2026-05-05 P0-6 Plugin Quick Smoke Test Real Chain
+
+Context:
+- Continued the next highest-priority plugin gap after P0-5 and kept the existing Phase 3 boundary: popup trigger/render only, background bridge only, native-host forward only, local-admin-api deterministic scheduler shaping only.
+
+Implemented:
+- Added a real `Quick smoke test` action to `extension/edge-extension/popup.html`.
+- Wired `extension/edge-extension/popup.js` so the quick action:
+  - reads current active-tab context
+  - reuses the existing launch-form `runId`, `projectKey`, `owner`, `environment`, and `detail`
+  - reuses the existing scheduler request payload shape
+  - sends `channel: "native-host"` + `type: "SCHEDULER_REQUEST_CREATE"`
+  - renders deterministic `pending` / `success` / `error` plus `runId`, queue status, and next step
+- Kept `extension/edge-extension/background.js` on the existing generic native-host forward path; no new popup-specific execution protocol was introduced.
+- Reused the existing native-host and local-admin-api scheduler request chain:
+  - native-host `SCHEDULER_REQUEST_CREATE`
+  - local-admin-api `POST /api/phase3/scheduler/requests`
+- Did not change report/run protocol semantics and did not add a complex platform router; detailed monitoring still belongs to platform execution/monitor.
+
+Docs synced:
+- `docs/phase3/interface/plugin/functional-spec.md`
+- `docs/phase3/interface/plugin/interface-spec.md`
+- `docs/phase3/interface/ui-control-interface-overview.md`
+- `docs/phase3/interface/review-backlog.md`
+
+Verification:
+- `npm test -- --run src/popup.test.js` in `ui/admin-console`: PASS (14/14)
+- `npm test -- --run src/background.test.js` in `ui/admin-console`: PASS (3/3)
+
+Remaining limits:
+- popup mirror screen in `ui/admin-console` remains a demo surface; the real implementation lives in `extension/edge-extension`
+- locator row selection is still not interactive local state
+- `Use in DSL` still targets `aiGenerate`, not direct `cases` DSL insertion

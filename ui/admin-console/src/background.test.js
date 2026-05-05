@@ -89,4 +89,48 @@ describe("background bridge", () => {
       }
     });
   });
+
+  it("forwards native-host quick smoke requests without changing the scheduler payload", async () => {
+    globalThis.chrome.runtime.sendNativeMessage = vi.fn().mockResolvedValue({
+      ok: true,
+      data: {
+        status: "ACCEPTED",
+        entry: {
+          runId: "popup-run"
+        }
+      }
+    });
+    const background = await import("./../../../extension/edge-extension/background.js");
+
+    await expect(background.handleBridgeMessage({
+      channel: "native-host",
+      type: "SCHEDULER_REQUEST_CREATE",
+      payload: {
+        runId: "popup-run",
+        projectKey: "checkout-web",
+        status: "PRE_EXECUTION"
+      }
+    })).resolves.toEqual({
+      ok: true,
+      data: {
+        status: "ACCEPTED",
+        entry: {
+          runId: "popup-run"
+        }
+      }
+    });
+
+    expect(globalThis.chrome.runtime.sendNativeMessage).toHaveBeenCalledWith(
+      "com.example.webtest.phase3.nativehost",
+      expect.objectContaining({
+        version: "1.0",
+        type: "SCHEDULER_REQUEST_CREATE",
+        payload: {
+          runId: "popup-run",
+          projectKey: "checkout-web",
+          status: "PRE_EXECUTION"
+        }
+      })
+    );
+  });
 });

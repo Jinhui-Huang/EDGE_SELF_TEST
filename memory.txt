@@ -1175,3 +1175,30 @@
     - `Quick smoke test` still not implemented
     - locator row selection is not yet interactive local state
     - `Use in DSL` still targets `aiGenerate`, not direct `cases` DSL insertion
+- 2026-05-05: Completed P0-6 Plugin Quick Smoke Test Real Chain.
+  - Added a real `Quick smoke test` action to `extension/edge-extension/popup.html` + `popup.js`.
+  - The action uses the current active-tab context and reuses the existing launch-form fields:
+    - `runId`
+    - `projectKey`
+    - `owner`
+    - `environment`
+    - `detail`
+  - Reused the existing scheduler request chain instead of adding a new popup execution protocol:
+    - popup -> background `channel: "native-host"`
+    - native-host `type: "SCHEDULER_REQUEST_CREATE"`
+    - local-admin-api `POST /api/phase3/scheduler/requests`
+  - Popup now renders deterministic quick-smoke launch state:
+    - `pending`
+    - `success`
+    - `error`
+    - `runId`
+    - queue status
+    - next step back to platform execution/monitor
+  - Background remained on the generic native-host forwarding path; no new extension message type was required for this feature.
+  - Verification passed:
+    - `npm test -- --run src/popup.test.js`
+    - `npm test -- --run src/background.test.js`
+  - Remaining plugin limits after this pass:
+    - popup mirror screen in `ui/admin-console` is still a demo surface
+    - locator row selection is not yet interactive local state
+    - `Use in DSL` still targets `aiGenerate`, not direct `cases` DSL insertion

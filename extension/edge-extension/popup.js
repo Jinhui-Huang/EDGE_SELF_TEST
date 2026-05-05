@@ -104,6 +104,15 @@ export function buildRequestTitle(form) {
   return form.runId || form.projectKey || "edge-popup-request";
 }
 
+export function buildSchedulerRequestPayload(form, tab) {
+  return {
+    ...form,
+    status: "PRE_EXECUTION",
+    title: buildRequestTitle(form),
+    detail: buildContextDetail(form.detail, tab)
+  };
+}
+
 export function setMutationState(targetId, kind, message) {
   const node = document.getElementById(targetId);
   if (!node) {
@@ -130,6 +139,26 @@ export function renderPageSummaryResult(summary) {
   }
   if (recommendationNode) {
     recommendationNode.textContent = summary?.recommendedAction || "Refresh current page context or open the platform.";
+  }
+}
+
+export function renderQuickSmokeResult(result) {
+  const stateNode = document.getElementById("quickSmokeState");
+  const runIdNode = document.getElementById("quickSmokeRunId");
+  const queueNode = document.getElementById("quickSmokeQueue");
+  const nextStepNode = document.getElementById("quickSmokeNextStep");
+
+  if (stateNode) {
+    stateNode.textContent = result?.state || "Not started.";
+  }
+  if (runIdNode) {
+    runIdNode.textContent = result?.runId || "-";
+  }
+  if (queueNode) {
+    queueNode.textContent = result?.queueStatus || "-";
+  }
+  if (nextStepNode) {
+    nextStepNode.textContent = result?.nextStep || "Use Quick smoke test to queue the current page context.";
   }
 }
 
@@ -316,6 +345,22 @@ export async function postSchedulerMutation(type, payload) {
   return await requestNativeBridge(type, payload);
 }
 
+export function buildQuickSmokeResult(response, form, snapshot) {
+  const entry = response?.entry && typeof response.entry === "object" ? response.entry : {};
+  const acceptedStatus = typeof response?.status === "string" && response.status
+    ? response.status
+    : "ACCEPTED";
+  const queueStatus = typeof entry.status === "string" && entry.status
+    ? entry.status
+    : (snapshot?.runtime?.queueState || "Accepted by local scheduler");
+  return {
+    state: acceptedStatus,
+    runId: typeof entry.runId === "string" && entry.runId ? entry.runId : form.runId,
+    queueStatus,
+    nextStep: "Open Platform Execution or Monitor for detailed progress."
+  };
+}
+
 export async function submitLaunch(event) {
   event.preventDefault();
   const form = readForm("launch");
@@ -326,12 +371,7 @@ export async function submitLaunch(event) {
   setButtonPending("launchSubmitButton", true, "Running...", "Run");
   setMutationState("launchStatus", "pending", "Submitting pre-execution request through native host...");
   try {
-    await postSchedulerMutation("SCHEDULER_REQUEST_CREATE", {
-      ...form,
-      status: "PRE_EXECUTION",
-      title: buildRequestTitle(form),
-      detail: buildContextDetail(form.detail, latestTab)
-    });
+    await postSchedulerMutation("SCHEDULER_REQUEST_CREATE", buildSchedulerRequestPayload(form, latestTab));
     const refreshed = await refreshCurrentPage();
     const queueState = refreshed?.runtime?.queueState || "scheduler updated";
     setMutationState("launchStatus", "success", `Prepared ${form.runId} for pre-execution. ${queueState}`);
@@ -343,6 +383,57 @@ export async function submitLaunch(event) {
     setMutationState("launchStatus", "error", error instanceof Error ? error.message : String(error));
   } finally {
     setButtonPending("launchSubmitButton", false, "Running...", "Run");
+  }
+}
+
+export async function runQuickSmokeAction() {
+  const form = readForm("launch");
+  if (!form.runId) {
+    const error = new Error("Run ID is required.");
+    renderQuickSmokeResult({
+      state: "ERROR",
+      runId: "-",
+      queueStatus: "Missing run id",
+      nextStep: error.message
+    });
+    setMutationState("quickActionStatus", "error", error.message);
+    throw error;
+  }
+  setButtonPending("quickSmokeButton", true, "Starting...", "Quick smoke test");
+  renderQuickSmokeResult({
+    state: "PENDING",
+    runId: form.runId,
+    queueStatus: "Submitting request",
+    nextStep: "Waiting for local scheduler acceptance."
+  });
+  setMutationState("quickActionStatus", "pending", "Submitting quick smoke request through native host...");
+  try {
+    const tab = latestTab || await getCurrentTab();
+    const response = await postSchedulerMutation(
+      "SCHEDULER_REQUEST_CREATE",
+      buildSchedulerRequestPayload(form, tab)
+    );
+    const refreshed = await refreshCurrentPage();
+    const result = buildQuickSmokeResult(response, form, refreshed);
+    renderQuickSmokeResult(result);
+    setMutationState(
+      "quickActionStatus",
+      "success",
+      `Quick smoke accepted for ${result.runId}. ${result.queueStatus}`
+    );
+    return result;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    renderQuickSmokeResult({
+      state: "ERROR",
+      runId: form.runId,
+      queueStatus: "Not accepted",
+      nextStep: message
+    });
+    setMutationState("quickActionStatus", "error", message);
+    throw error;
+  } finally {
+    setButtonPending("quickSmokeButton", false, "Starting...", "Quick smoke test");
   }
 }
 
@@ -557,6 +648,9 @@ export async function refreshCurrentPage() {
 export function initPopup() {
   document.getElementById("pickElementButton")?.addEventListener("click", () => {
     void runPickElementAction();
+  });
+  document.getElementById("quickSmokeButton")?.addEventListener("click", () => {
+    void runQuickSmokeAction();
   });
   document.getElementById("refreshButton")?.addEventListener("click", () => {
     void refreshCurrentPage();

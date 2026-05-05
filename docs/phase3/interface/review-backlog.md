@@ -82,7 +82,7 @@ It does not authorize UI or backend changes in the current phase.
   - `POST /api/phase3/extension/platform-handoff`
 - Remaining limits:
   - `Pick element` was still visual-only at the end of P0-4 and was completed later in P0-5
-  - `Quick smoke test` is still visual-only because popup-side execution start is not yet wired
+  - `Quick smoke test` was still visual-only at the end of P0-5 and is completed later in P0-6 by reusing the scheduler request chain
   - `Page summary` remains deterministic from popup tab context plus local rules; no real DOM/content-script extraction exists yet
   - `Use in DSL` currently hands off into `aiGenerate`, not directly into the `cases` DSL editor
 - Test coverage:
@@ -117,13 +117,38 @@ It does not authorize UI or backend changes in the current phase.
     - `type: "CS_PICK_ELEMENT_START"`
     - `type: "CS_PICK_ELEMENT_STOP"`
 - Remaining limits:
-  - `Quick smoke test` is still visual-only
   - locator row selection is not yet an interactive local state; popup renders the content-script recommendation directly
   - popup mirror screen in `ui/admin-console` remains a demo surface; the real implementation lives in `extension/edge-extension`
 - Test coverage:
   - popup tests for pick trigger, result render, and Copy/Use-in-DSL using real locator
   - background forwarding test for popup -> content script
   - content-script tests for pick-result shaping and highlight cleanup
+
+### P0-6. Plugin Quick Smoke Test Real Chain 窶・DONE
+
+- Surfaces:
+  - `extension/edge-extension/popup.html`
+  - `extension/edge-extension/popup.js`
+  - `extension/edge-extension/background.js`
+- Resolved:
+  - `Quick smoke test` now uses the real extension popup chain instead of a visual-only placeholder
+  - popup reads current page context plus the existing launch-form `runId`, `projectKey`, `owner`, `environment`, and `detail`
+  - popup sends `channel: "native-host"` + `type: "SCHEDULER_REQUEST_CREATE"`
+  - background forwards the scheduler request unchanged to native-host
+  - native-host forwards the request to local-admin-api `POST /api/phase3/scheduler/requests`
+  - popup renders deterministic `pending` / `success` / `error` plus `runId`, queue status, and next step
+  - detailed execution follow-up remains in platform execution/monitor instead of being expanded inside popup
+- Boundary decisions:
+  - no new popup-specific execution protocol was added
+  - existing scheduler request semantics were reused as-is
+  - no `report` or `run` protocol semantics changed
+  - no complex platform router was introduced
+- Remaining limits:
+  - locator row selection is not yet an interactive local state; popup renders the content-script recommendation directly
+  - popup mirror screen in `ui/admin-console` remains a demo surface; the real implementation lives in `extension/edge-extension`
+- Test coverage:
+  - popup tests for quick smoke trigger, `pending` / `success` / `error`, and launch-result rendering
+  - background test for popup/native-host forwarding of `SCHEDULER_REQUEST_CREATE`
 
 ---
 

@@ -74,13 +74,14 @@ Current implementation facts:
 - The admin-console `plugin` screen remains a mirror/demo shell.
 - The real extension popup now wires these actions in `extension/edge-extension/popup.js`:
   - `Pick element`
+  - `Quick smoke test`
   - `Page summary`
   - `Open in platform`
   - `Copy`
   - `Use in DSL`
 - Pick mode is now implemented through popup -> background -> content script.
 - Locator candidate rendering is now populated by the real content-script pick result.
-- `Quick smoke test` is still not wired.
+- `Quick smoke test` now reuses the existing popup launch form context and submits a real scheduler request through popup -> background -> native-host -> local-admin-api.
 
 This matters for review:
 
@@ -161,9 +162,9 @@ Current behavior:
 - admin-console mirror: display-only
 - real extension popup:
   - `Pick element` requests pick mode through popup -> background -> content script, then renders selected element info and locator candidates
+  - `Quick smoke test` submits a lightweight pre-execution scheduler request from current page context and renders deterministic launch state/result
   - `Page summary` requests deterministic page summary through popup -> background -> native-host -> local-admin-api
   - `Open in platform` requests a platform handoff URL through the same chain, then background opens the platform tab
-  - `Quick smoke test` remains display-only
 
 ### 6.5 Pick Mode Panel
 
@@ -270,12 +271,11 @@ Current implementation summary:
   - loading/loaded/error state rendering
   - page and runtime data rendering from popup snapshot
   - `Pick element`
+  - `Quick smoke test`
   - `Page summary`
   - `Open in platform`
   - `Copy`
   - `Use in DSL`
-- visible but not implemented:
-  - `Quick smoke test`
 
 ## 10. Functional Control Responsibility Matrix
 
@@ -291,8 +291,8 @@ Current implementation summary:
   - current implementation: implemented in real extension popup
 - `Quick smoke test`
   - function: launch a lightweight run from current page context
-  - output type: future extension-to-host execution request
-  - current implementation: visual only
+  - output type: popup -> background -> native-host -> scheduler request write
+  - current implementation: implemented in real extension popup by reusing `SCHEDULER_REQUEST_CREATE`
 - `Open in platform`
   - function: hand off current popup context into the full platform
   - output type: platform-open action after native-host handoff preparation
@@ -386,13 +386,13 @@ The `plugin` screen is not currently responsible for:
 
 - The screen now consumes `ExtensionPopupSnapshot` from `GET /api/phase3/extension-popup` (AdminConsoleSnapshot dependency removed).
 - The admin-console `plugin` screen remains a mirror/demo shell; the real quick actions now live in `extension/edge-extension/popup.html` + `popup.js`.
-- `Pick element`, `Page summary`, `Open in platform`, `Copy`, and `Use in DSL` are now implemented in the real extension popup chain.
+- `Pick element`, `Quick smoke test`, `Page summary`, `Open in platform`, `Copy`, and `Use in DSL` are now implemented in the real extension popup chain.
 - Real pick mode stays fully inside the extension boundary:
   - popup triggers
   - background bridges
   - content script collects DOM data and handles highlight
 - native-host and local-admin-api do not collect DOM for this flow.
-- `Quick smoke test` remains unimplemented.
+- `Quick smoke test` reuses the scheduler request chain instead of introducing a separate popup execution protocol.
 - `Use in DSL` currently hands off into `aiGenerate`, not directly into the `cases` DSL editor.
 - The screen must continue to be treated as an Edge extension front-end template shell, not as a normal platform management page.
 - Popup snapshot data is deterministic mock from the backend when no real extension context exists.

@@ -124,7 +124,7 @@ The admin-console mirror page still fetches popup snapshot data only, but the re
 
 Still missing:
 
-- popup execution-start / runtime event subscriptions
+- popup execution-start / runtime event subscriptions for a dedicated long-lived execution channel
 
 ## 5. UI Control to Interface Mapping
 
@@ -147,11 +147,9 @@ Still missing:
 #### `Quick smoke test`
 
 - user action: click
-- request: none today
-- owner: not implemented
-- intended future interface:
-  - popup -> background -> host execution request
-- current state: visual only
+- request: popup -> background -> native-host -> `SCHEDULER_REQUEST_CREATE`
+- owner: `extension/edge-extension/popup.js` + `background.js` + native-host + local-admin-api
+- current state: implemented in the real extension popup by reusing the scheduler request chain
 
 #### `Open in platform`
 
@@ -274,7 +272,7 @@ Purpose:
 
 ### 6.4 Quick Smoke Test Interface
 
-#### Extension message: `EXT_EXECUTION_START`
+#### Native request reuse: `SCHEDULER_REQUEST_CREATE`
 
 Purpose:
 
@@ -283,17 +281,23 @@ Purpose:
 Background/native flow:
 
 - popup -> background:
-  - `EXT_EXECUTION_START`
+  - `chrome.runtime.sendMessage({ channel: "native-host", type: "SCHEDULER_REQUEST_CREATE" })`
 - background -> host:
-  - `EXECUTION_START`
+  - native message `SCHEDULER_REQUEST_CREATE`
+- host -> local-admin-api:
+  - `POST /api/phase3/scheduler/requests`
 
 Request body:
 
 ```json
 {
-  "mode": "caseId",
-  "caseId": "checkout-smoke",
-  "env": "staging"
+  "runId": "popup-checkout-smoke",
+  "projectKey": "checkout-web",
+  "owner": "edge-popup",
+  "environment": "staging-edge",
+  "status": "PRE_EXECUTION",
+  "title": "popup-checkout-smoke / staging-edge",
+  "detail": "Queued from popup | Page: Checkout | URL: https://checkout.example.test/pay"
 }
 ```
 
@@ -301,10 +305,19 @@ Response body:
 
 ```json
 {
-  "runId": "run_001",
-  "accepted": true
+  "status": "ACCEPTED",
+  "schedulerId": "local-phase3-scheduler",
+  "entry": {
+    "runId": "popup-checkout-smoke",
+    "status": "PRE_EXECUTION"
+  }
 }
 ```
+
+Reason for reuse:
+
+- Quick smoke test is a lightweight scheduler enqueue action, not a separate execution-runtime transport.
+- Reusing `SCHEDULER_REQUEST_CREATE` keeps popup/background/native-host/local-admin-api aligned with existing scheduler semantics and avoids inventing a second execution protocol.
 
 ### 6.5 Runtime Status Interface
 
@@ -387,18 +400,21 @@ Concrete implementation design:
 
 Recommended implementation type:
 
-- popup-side lightweight execution start
+- popup-side lightweight scheduler enqueue
 
 Concrete implementation design:
 
 1. popup sends:
-   - `EXT_EXECUTION_START`
+   - `SCHEDULER_REQUEST_CREATE` through the existing `native-host` bridge channel
 2. background forwards:
-   - `EXECUTION_START`
-3. popup subscribes to runtime updates:
-   - `RUN_STATUS_EVENT`
-   - `RUN_FINISHED_EVENT`
-4. active-run card updates in place
+   - the same scheduler request envelope to native-host
+3. native-host forwards:
+   - `POST /api/phase3/scheduler/requests`
+4. popup renders deterministic launch result:
+   - `pending` / `success` / `error`
+   - `runId`
+   - queue status
+   - next step pointing back to platform execution/monitor for detailed follow-up
 
 ### 7.4 `Open in platform`
 
@@ -480,8 +496,8 @@ These align with the extension/native-message design docs.
 
 - The popup snapshot contract is implemented and consumed (AdminConsoleSnapshot dependency removed).
 - Popup snapshot data is deterministic mock from the backend when no real extension context exists.
-- `Page summary`, `Open in platform`, `Copy`, and `Use in DSL` are now implemented in the real extension popup runtime.
+- `Page summary`, `Quick smoke test`, `Open in platform`, `Copy`, and `Use in DSL` are now implemented in the real extension popup runtime.
 - `Pick element` is now implemented through popup/background/content-script only; it does not involve native-host or local-admin-api DOM collection.
-- `Quick smoke test` still requires additional extension/background/content/native work.
-- Quick actions should primarily map to extension/background/native interfaces plus extension-specific local-admin-api endpoints, not to normal admin-console REST mutations.
+- `Quick smoke test` intentionally reuses the scheduler request interface instead of adding a dedicated popup execution protocol.
+- Quick actions should primarily map to extension/background/native interfaces plus extension-specific local-admin-api endpoints, or existing scheduler interfaces when the responsibility already matches, not to normal admin-console REST mutations.
 - The screen remains an Edge extension front-end template shell, not a normal platform management page.
