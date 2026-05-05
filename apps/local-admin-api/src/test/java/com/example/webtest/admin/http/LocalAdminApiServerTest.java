@@ -1188,6 +1188,21 @@ class LocalAdminApiServerTest {
             assertTrue(modelFailed.body().contains("API key looks like a placeholder value."));
             assertTrue(modelFailed.body().contains("\"provider-lifecycle\""));
 
+            HttpResponse<String> modelWarning = client.send(
+                    request(server, "/api/phase3/config/model/test-connection", "POST", Jsons.writeValueAsString(Map.of(
+                            "name", "OpenAI",
+                            "model", "gpt-4.1-mini",
+                            "endpoint", "https://api.openai.com/v1",
+                            "apiKey", "placeholder-key",
+                            "timeoutMs", "45000",
+                            "role", "primary",
+                            "status", "active"))),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, modelWarning.statusCode());
+            assertTrue(modelWarning.body().contains("\"status\":\"WARNING\""));
+            assertTrue(modelWarning.body().contains("placeholder value"));
+            assertTrue(modelWarning.body().contains("\"warnings\""));
+
             HttpResponse<String> datasourcePassed = client.send(
                     request(server, "/api/phase3/datasources/test-connection", "POST", Jsons.writeValueAsString(Map.of(
                             "type", "PostgreSQL",
@@ -1218,6 +1233,21 @@ class LocalAdminApiServerTest {
             assertTrue(datasourceFailed.body().contains("\"driver-type-match\""));
             assertTrue(datasourceFailed.body().contains("\"jdbc-url-shape\""));
             assertTrue(datasourceFailed.body().contains("\"mybatis-type-hint\""));
+
+            HttpResponse<String> datasourceWarning = client.send(
+                    request(server, "/api/phase3/datasources/test-connection", "POST", Jsons.writeValueAsString(Map.of(
+                            "type", "PostgreSQL",
+                            "driver", "org.postgresql.Driver",
+                            "url", "jdbc:postgresql://db.internal:5432/checkout",
+                            "schema", "checkout_app",
+                            "username", "qa_reader",
+                            "password", "******",
+                            "mybatisEnv", "qa-db"))),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, datasourceWarning.statusCode());
+            assertTrue(datasourceWarning.body().contains("\"status\":\"WARNING\""));
+            assertTrue(datasourceWarning.body().contains("\"password\""));
+            assertTrue(datasourceWarning.body().contains("\"warnings\""));
         }
     }
 

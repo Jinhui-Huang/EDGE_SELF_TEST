@@ -122,6 +122,7 @@ Current behavior:
 
 - card click opens edit modal
 - `Test` triggers backend validation and shows structured checks/warnings in the current page surface
+- backend failure is shown as an explicit error state; the UI does not synthesize local-only fallback validation output
 - edit icon opens edit modal
 
 ### 6.3 Routing Rule Board

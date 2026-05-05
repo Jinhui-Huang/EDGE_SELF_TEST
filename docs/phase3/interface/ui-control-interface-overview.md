@@ -194,10 +194,10 @@ Conventions used here:
 |---|---|---|---|
 | `Add provider` | button | Local draft modal only | Persist later via footer save |
 | Provider card | clickable card | Local modal open only | Keep local |
-| Provider `Test` | button | Implemented: `POST /api/phase3/config/model/test-connection` | Keep current deterministic backend validation; do not expand to real outbound provider calls in Phase 3 |
+| Provider `Test` | button | Implemented: `POST /api/phase3/config/model/test-connection`; UI shows explicit pending/success/warning/error state from backend validation output | Keep current deterministic backend validation; do not expand to real outbound provider calls in Phase 3 |
 | Provider edit icon | button | Local modal open only | Keep local |
 | Routing-rule edit icon | button | Implemented: local routing-rule editor updates front-end draft state only | Persist through current `Save model config` pipeline; keep routing edits local until footer save |
-| Modal `Test connection` | button | Implemented: `POST /api/phase3/config/model/test-connection` | Keep current deterministic backend validation; do not expand to real outbound provider calls in Phase 3 |
+| Modal `Test connection` | button | Implemented: `POST /api/phase3/config/model/test-connection`; backend failure is shown as explicit error and does not fall back to local-only pseudo-validation | Keep current deterministic backend validation; do not expand to real outbound provider calls in Phase 3 |
 | Modal `Delete` | button | Local draft delete only | Persist after footer save |
 | Modal `Add provider` / `Update` | button | Local draft update only | Persist after footer save |
 | `Save model config` | button | Implemented: repeated `POST /api/phase3/config/model` | Keep current; future typed save could become `PUT /api/phase3/models` |
@@ -210,8 +210,8 @@ Conventions used here:
 |---|---|---|---|
 | `New database` | button | Opens dialog only | Save in dialog persists immediately |
 | Database card | clickable card | Opens edit dialog only | Keep local open behavior |
-| Card `Test connection` | button | Implemented: `POST /api/phase3/datasources/test-connection` | Keep current deterministic backend validation; do not expand to real JDBC connectivity in Phase 3 |
-| Dialog `Test connection` | button | Implemented: `POST /api/phase3/datasources/test-connection` | Keep current deterministic backend validation; do not expand to real JDBC connectivity in Phase 3 |
+| Card `Test connection` | button | Implemented: `POST /api/phase3/datasources/test-connection`; UI shows explicit pending/success/warning/error state from backend validation output | Keep current deterministic backend validation; do not expand to real JDBC connectivity in Phase 3 |
+| Dialog `Test connection` | button | Implemented: `POST /api/phase3/datasources/test-connection`; backend failure is shown as explicit error and does not fall back to local-only pseudo-validation | Keep current deterministic backend validation; do not expand to real JDBC connectivity in Phase 3 |
 | Dialog `Save database` | button | Implemented: repeated `POST /api/phase3/config/environment` | Future typed save could become `PUT /api/phase3/datasources` |
 | Dialog `Delete` | button | Implemented: resubmits remaining list through repeated `POST /api/phase3/config/environment` | Keep immediate-persist behavior |
 

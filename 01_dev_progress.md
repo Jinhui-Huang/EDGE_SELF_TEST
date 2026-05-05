@@ -3635,3 +3635,46 @@ Remaining limits:
 - dashboard metric cards remain display-only overview widgets
 - attention items are still front-end derived from snapshot data, not a dedicated backend attention contract
 - dashboard now has explicit refresh feedback, but it still does not own full first-load loading/empty/error page states
+
+## 2026-05-06 P1-4 review hardening follow-up
+
+## Task
+- Address the remaining review gap in P1-4: the UI still downgraded backend validation failures into warning-state local fallback output.
+
+## Completed
+- `ui/admin-console/src/App.tsx`
+  - removed synthesized local fallback validation payloads for model and datasource connection tests
+  - backend validation now remains authoritative:
+    - success / warning / error still come from backend validation responses
+    - transport, malformed-response, and non-2xx failures now surface as explicit UI error state
+    - no local-only pseudo-validation output is rendered when the backend path fails
+- `ui/admin-console/src/App.test.tsx`
+  - added frontend coverage for:
+    - models pending / success / error
+    - environments pending / success / error
+    - model save and test-connection isolation
+    - environment save and test-connection isolation
+- `apps/local-admin-api/src/test/java/com/example/webtest/admin/http/LocalAdminApiServerTest.java`
+  - extended deterministic endpoint coverage with warning-path assertions for:
+    - `POST /api/phase3/config/model/test-connection`
+    - `POST /api/phase3/datasources/test-connection`
+- Synced docs and backlog:
+  - `docs/phase3/interface/models/functional-spec.md`
+  - `docs/phase3/interface/models/interface-spec.md`
+  - `docs/phase3/interface/environments/functional-spec.md`
+  - `docs/phase3/interface/environments/interface-spec.md`
+  - `docs/phase3/interface/ui-control-interface-overview.md`
+  - `docs/phase3/interface/review-backlog.md`
+
+## Verification
+- Passed: `npm test -- --run src/App.test.tsx -t "shows pending, success, and error states for model connection validation|keeps model save and test connection state isolated|shows pending, success, and error states for datasource connection validation|keeps environment save and test connection state isolated"` in `ui/admin-console`
+- Passed: `npm run build` in `ui/admin-console`
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+- Attempted: `npm test -- --run src/App.test.tsx` in `ui/admin-console`
+  - timed out in this environment and is not used as the verification result for this follow-up
+
+## Current State
+- P1-4 frontend behavior now fully matches the real backend validation-interface boundary.
+- Validation remains deterministic by design:
+  - no real provider connectivity
+  - no real JDBC connectivity

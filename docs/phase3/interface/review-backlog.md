@@ -244,18 +244,20 @@ It does not authorize UI or backend changes in the current phase.
   - dry-run is deterministic validation only
   - template versioning not yet implemented
 
-### P1-4. Convert local-only connection tests into real validation interfaces
+### P1-4. Convert local-only connection tests into real validation interfaces DONE
 
 - Screens:
   - `models`
   - `environments`
-- Current gap:
-  - model-provider test and datasource test are still local field-presence checks.
-- Required interfaces:
-  - `POST /api/phase3/config/model/test-connection`
-  - `POST /api/phase3/datasources/test-connection`
-- Acceptance target:
-  - connection-test buttons return real backend validation outcomes before save.
+- Resolved:
+  - `POST /api/phase3/config/model/test-connection` is implemented in `local-admin-api`
+  - `POST /api/phase3/datasources/test-connection` is implemented in `local-admin-api`
+  - `models` and `environments` now call those backend validation interfaces instead of local-only field-presence checks
+  - UI shows explicit `pending` / `success` / `warning` / `error` feedback from the backend validation result shape
+  - save actions remain separate from test-connection actions; backend validation failure no longer falls back to synthetic local validation output
+- Remaining limits:
+  - validation remains deterministic only by Phase 3 design
+  - no real outbound provider connectivity and no real JDBC connectivity are attempted
 
 ### P1-5. Models routing-rule local edit flow 窶・DONE
 

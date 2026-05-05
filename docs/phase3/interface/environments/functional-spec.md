@@ -118,6 +118,7 @@ Current behavior:
 
 - card click opens edit dialog
 - card `Test connection` triggers backend validation and shows structured checks/warnings in the current page surface
+- backend failure is shown as an explicit error state; the UI does not synthesize local-only fallback validation output
 
 ### 6.3 Database Dialog
 

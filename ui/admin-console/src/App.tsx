@@ -663,63 +663,6 @@ function isProjectImportCommitResponse(value: unknown): value is ProjectImportCo
   );
 }
 
-function buildLocalModelFallbackValidation(item: ModelProvider): ConnectionValidationResult {
-  return {
-    status: "API_UNAVAILABLE",
-    checks: [
-      {
-        name: "endpoint-present",
-        status: item.endpoint.trim() ? "PASSED" : "FAILED",
-        message: item.endpoint.trim() ? "Endpoint field is present." : "Endpoint field is missing."
-      },
-      {
-        name: "model-present",
-        status: item.model.trim() ? "PASSED" : "FAILED",
-        message: item.model.trim() ? "Model id field is present." : "Model id field is missing."
-      },
-      {
-        name: "api-key-present",
-        status: item.apiKey.trim() ? "PASSED" : "FAILED",
-        message: item.apiKey.trim() ? "API key field is present." : "API key field is missing."
-      }
-    ],
-    resolvedModel: item.model.trim(),
-    message: "Backend validation is unavailable. Only local draft completeness checks are shown.",
-    warnings: ["No real backend validation result was returned."]
-  };
-}
-
-function buildLocalDatasourceFallbackValidation(item: DatabaseConfig): ConnectionValidationResult {
-  return {
-    status: "API_UNAVAILABLE",
-    checks: [
-      {
-        name: "url-present",
-        status: item.url.trim() ? "PASSED" : "FAILED",
-        message: item.url.trim() ? "JDBC URL field is present." : "JDBC URL field is missing."
-      },
-      {
-        name: "driver-present",
-        status: item.driver.trim() ? "PASSED" : "FAILED",
-        message: item.driver.trim() ? "Driver field is present." : "Driver field is missing."
-      },
-      {
-        name: "username-present",
-        status: item.username.trim() ? "PASSED" : "FAILED",
-        message: item.username.trim() ? "Username field is present." : "Username field is missing."
-      },
-      {
-        name: "password-present",
-        status: item.password.trim() ? "PASSED" : "FAILED",
-        message: item.password.trim() ? "Password field is present." : "Password field is missing."
-      }
-    ],
-    resolvedDriver: item.driver.trim(),
-    message: "Backend validation is unavailable. Only local draft completeness checks are shown.",
-    warnings: ["No real backend validation result was returned."]
-  };
-}
-
 function parseProjectImportRows(raw: string): ProjectItem[] {
   const parsed: unknown = JSON.parse(raw);
   const rows =
@@ -2135,8 +2078,7 @@ export function App() {
     path: string,
     payload: Record<string, string>,
     label: string,
-    setState: (state: MutationState) => void,
-    fallback: ConnectionValidationResult
+    setState: (state: MutationState) => void
   ) {
     setState({ kind: "pending", message: `Testing connection for ${label}...` });
     try {
@@ -2173,9 +2115,8 @@ export function App() {
       });
     } catch (error) {
       setState({
-        kind: "warning",
-        message: `Backend validation unavailable for ${label}: ${error instanceof Error ? error.message : String(error)}`,
-        validationResult: fallback
+        kind: "error",
+        message: `Connection validation failed for ${label}: ${error instanceof Error ? error.message : String(error)}`
       });
     }
   }
@@ -2196,8 +2137,7 @@ export function App() {
         status: item.status
       },
       label,
-      setModelTestState,
-      buildLocalModelFallbackValidation(item)
+      setModelTestState
     );
   }
 
@@ -2217,8 +2157,7 @@ export function App() {
         mybatisEnv: item.mybatisEnv
       },
       label,
-      setDatabaseTestState,
-      buildLocalDatasourceFallbackValidation(item)
+      setDatabaseTestState
     );
   }
 

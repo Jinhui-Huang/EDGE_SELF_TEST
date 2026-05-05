@@ -104,6 +104,16 @@ function jsonResponse(body: unknown, status = 200) {
   );
 }
 
+function resolveDeferredResponse(
+  resolver: ((value: Response | PromiseLike<Response>) => void) | null,
+  response: Response
+) {
+  if (!resolver) {
+    throw new Error("Expected deferred response resolver to be set.");
+  }
+  resolver(response);
+}
+
 const dataTemplatesResponse = {
   items: [
     {
@@ -735,6 +745,226 @@ describe("App", () => {
         reason: "Prefer higher quality for repair."
       })
     });
+  });
+
+  it("shows pending, success, and error states for model connection validation", async () => {
+    let resolveValidation: ((value: Response | PromiseLike<Response>) => void) | null = null;
+    let modelValidationCalls = 0;
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) {
+        return jsonResponse(snapshot);
+      }
+      if (url.endsWith("/api/phase3/config/model/test-connection")) {
+        modelValidationCalls += 1;
+        if (modelValidationCalls === 1) {
+          return new Promise<Response>((resolve) => {
+            resolveValidation = resolve;
+          });
+        }
+        return Promise.resolve(new Response("validator offline", { status: 500 }));
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    await userEvent.click(await screen.findByRole("button", { name: /Model Config/ }));
+    await userEvent.click(screen.getAllByRole("button", { name: "Test" })[1]);
+
+    expect(await screen.findByText(/Testing connection for /)).toBeInTheDocument();
+
+    resolveDeferredResponse(
+      resolveValidation,
+      new Response(
+        JSON.stringify({
+          status: "PASSED",
+          checks: [{ name: "endpoint-format", status: "PASSED", message: "Endpoint format looks valid." }],
+          latencyMs: 120,
+          resolvedModel: "gpt-4o",
+          message: "Provider validation passed.",
+          warnings: []
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        }
+      )
+    );
+
+    expect(await screen.findByText("Provider validation passed.")).toBeInTheDocument();
+    expect(await screen.findByText("120 ms")).toBeInTheDocument();
+
+    await userEvent.click(screen.getAllByRole("button", { name: "Test" })[1]);
+
+    expect(await screen.findByText(/Connection validation failed for .*validator offline/)).toBeInTheDocument();
+  });
+
+  it("keeps model save and test connection state isolated", async () => {
+    let resolveValidation: ((value: Response | PromiseLike<Response>) => void) | null = null;
+    let saveTriggered = false;
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) {
+        return jsonResponse(snapshot);
+      }
+      if (url.endsWith("/api/phase3/config/model/test-connection")) {
+        return new Promise<Response>((resolve) => {
+          resolveValidation = resolve;
+        });
+      }
+      if (url.endsWith("/api/phase3/config/model")) {
+        saveTriggered = true;
+        return jsonResponse({ status: "ACCEPTED" }, 202);
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    await userEvent.click(await screen.findByRole("button", { name: /Model Config/ }));
+    await userEvent.click(screen.getAllByRole("button", { name: "Test" })[1]);
+
+    expect(await screen.findByText(/Testing connection for /)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Save model config" }));
+
+    await waitFor(() => {
+      expect(saveTriggered).toBe(true);
+    });
+    expect(await screen.findByText("Saved model configuration.")).toBeInTheDocument();
+    expect(screen.getByText(/Testing connection for /)).toBeInTheDocument();
+
+    resolveDeferredResponse(
+      resolveValidation,
+      new Response(
+        JSON.stringify({
+          status: "PASSED",
+          checks: [{ name: "provider-name", status: "PASSED", message: "Provider name is present." }],
+          latencyMs: 88,
+          resolvedModel: "gpt-4o",
+          message: "Provider validation passed.",
+          warnings: []
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        }
+      )
+    );
+
+    expect(await screen.findByText("Provider validation passed.")).toBeInTheDocument();
+  });
+
+  it("shows pending, success, and error states for datasource connection validation", async () => {
+    let resolveValidation: ((value: Response | PromiseLike<Response>) => void) | null = null;
+    let datasourceValidationCalls = 0;
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) {
+        return jsonResponse(snapshot);
+      }
+      if (url.endsWith("/api/phase3/datasources/test-connection")) {
+        datasourceValidationCalls += 1;
+        if (datasourceValidationCalls === 1) {
+          return new Promise<Response>((resolve) => {
+            resolveValidation = resolve;
+          });
+        }
+        return Promise.resolve(new Response("db validator offline", { status: 500 }));
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    await userEvent.click(await screen.findByRole("button", { name: /Environment Config/ }));
+    await userEvent.click(screen.getAllByRole("button", { name: "Test connection" })[0]);
+
+    expect(await screen.findByText(/Testing connection for /)).toBeInTheDocument();
+
+    resolveDeferredResponse(
+      resolveValidation,
+      new Response(
+        JSON.stringify({
+          status: "PASSED",
+          checks: [{ name: "jdbc-url-shape", status: "PASSED", message: "JDBC URL shape matches the datasource type." }],
+          resolvedDriver: "oracle.jdbc.OracleDriver",
+          message: "Datasource validation passed.",
+          warnings: []
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        }
+      )
+    );
+
+    expect(await screen.findByText("Datasource validation passed.")).toBeInTheDocument();
+
+    await userEvent.click(screen.getAllByRole("button", { name: "Test connection" })[0]);
+
+    expect(await screen.findByText(/Connection validation failed for .*db validator offline/)).toBeInTheDocument();
+  });
+
+  it("keeps environment save and test connection state isolated", async () => {
+    let resolveValidation: ((value: Response | PromiseLike<Response>) => void) | null = null;
+    let environmentSaved = false;
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) {
+        return jsonResponse(snapshot);
+      }
+      if (url.endsWith("/api/phase3/datasources/test-connection")) {
+        return new Promise<Response>((resolve) => {
+          resolveValidation = resolve;
+        });
+      }
+      if (url.endsWith("/api/phase3/config/environment")) {
+        environmentSaved = true;
+        return jsonResponse({ status: "ACCEPTED" }, 202);
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    await userEvent.click(await screen.findByRole("button", { name: /Environment Config/ }));
+    await userEvent.click(screen.getByText("checkout-oracle-main-prodlike"));
+    await userEvent.click(screen.getAllByRole("button", { name: "Test connection" })[1]);
+
+    expect(await screen.findByText(/Testing connection for /)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Save database" }));
+
+    await waitFor(() => {
+      expect(environmentSaved).toBe(true);
+    });
+    expect(await screen.findByText("Saved environment configuration.")).toBeInTheDocument();
+    expect(screen.getByText(/Testing connection for /)).toBeInTheDocument();
+
+    resolveDeferredResponse(
+      resolveValidation,
+      new Response(
+        JSON.stringify({
+          status: "PASSED",
+          checks: [{ name: "driver-type-match", status: "PASSED", message: "Driver matches the datasource type." }],
+          resolvedDriver: "oracle.jdbc.OracleDriver",
+          message: "Datasource validation passed.",
+          warnings: []
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        }
+      )
+    );
+
+    expect(await screen.findByText("Datasource validation passed.")).toBeInTheDocument();
   });
 
   it("posts editable project catalog updates and refreshes the snapshot", async () => {

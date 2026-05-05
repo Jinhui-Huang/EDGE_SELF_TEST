@@ -157,10 +157,9 @@ Provider `Test` and modal `Test connection` both call the backend.
   - `POST /api/phase3/config/model/test-connection`
 - validates the response shape before accepting it in UI state
 - renders structured `status`, `checks`, `warnings`, `latencyMs`, and `resolvedModel`
-- if the API is unavailable or malformed:
-  - shows warning-state fallback
-  - shows local-only completeness checks for operator reference
-  - does not report fake success
+- if the API is unavailable, malformed, or returns a non-2xx response:
+  - shows an explicit error state
+  - does not synthesize local-only validation output
 
 ### 5.2 Interface Meaning
 

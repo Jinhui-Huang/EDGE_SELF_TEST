@@ -1355,3 +1355,24 @@
     - metric cards remain display-only
     - attention items are still front-end derived from snapshot data
     - dashboard still does not own full first-load loading/empty/error page states
+- 2026-05-06: Completed P1-4 review hardening follow-up.
+  - Review found one remaining mismatch in the completed P1-4 flow:
+    - the UI still downgraded backend validation failure into warning-state local fallback output
+  - Fixed `ui/admin-console/src/App.tsx` so:
+    - model and datasource test-connection no longer synthesize local fallback validation payloads
+    - transport / malformed / non-2xx validation failures now surface as explicit error state
+    - backend validation remains the only authoritative validation result source
+  - Added frontend regression coverage in `ui/admin-console/src/App.test.tsx` for:
+    - models pending / success / error
+    - environments pending / success / error
+    - save/test isolation on both screens
+  - Extended backend endpoint coverage in `LocalAdminApiServerTest.java` with warning-path assertions for:
+    - `POST /api/phase3/config/model/test-connection`
+    - `POST /api/phase3/datasources/test-connection`
+  - Synced Phase 3 docs and backlog so they no longer describe local fallback validation as current behavior.
+  - Verification passed:
+    - `npm test -- --run src/App.test.tsx -t "shows pending, success, and error states for model connection validation|keeps model save and test connection state isolated|shows pending, success, and error states for datasource connection validation|keeps environment save and test connection state isolated"`
+    - `npm run build`
+    - `mvn "-Dmaven.repo.local=.m2/repository" -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+  - Attempted but not used as gate:
+    - `npm test -- --run src/App.test.tsx` timed out in the current environment
