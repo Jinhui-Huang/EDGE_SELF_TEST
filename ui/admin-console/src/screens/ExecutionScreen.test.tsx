@@ -151,12 +151,16 @@ function ExecutionHarness({
   launchForm = baseLaunchForm,
   reviewForm = baseReviewForm,
   prepared = preparedCases,
-  workQueue = snapshot.workQueue
+  workQueue = snapshot.workQueue,
+  onOpenMonitor = () => undefined,
+  onOpenQueueItem = () => undefined
 }: {
   launchForm?: SchedulerMutationForm;
   reviewForm?: SchedulerMutationForm;
   prepared?: PreparedCaseItem[];
   workQueue?: AdminConsoleSnapshot["workQueue"];
+  onOpenMonitor?: () => void;
+  onOpenQueueItem?: (itemTitle: string) => void;
 }) {
   const [launch, setLaunch] = useState(launchForm);
   const [review, setReview] = useState(reviewForm);
@@ -204,12 +208,13 @@ function ExecutionHarness({
       onLaunchSubmit={(event: FormEvent<HTMLFormElement>) => event.preventDefault()}
       onExecuteSubmit={() => undefined}
       onReviewSubmit={(event: FormEvent<HTMLFormElement>) => event.preventDefault()}
-      onOpenMonitor={() => undefined}
+      onOpenMonitor={onOpenMonitor}
+      onOpenQueueItem={onOpenQueueItem}
     />
   );
 }
 
-describe("ExecutionScreen contract panel", () => {
+describe("ExecutionScreen interactions", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -251,24 +256,50 @@ describe("ExecutionScreen contract panel", () => {
     expect(screen.queryByTestId("execution-contract-panel")).not.toBeInTheDocument();
   });
 
-  it("keeps the existing form and buttons usable while the contract panel is open", async () => {
+  it("keeps Run, Execution, Open Exec Monitor, and the help panel usable together", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ items: templates }))));
+    const onOpenMonitor = vi.fn();
 
-    render(<ExecutionHarness />);
+    render(<ExecutionHarness onOpenMonitor={onOpenMonitor} />);
 
     await userEvent.click(screen.getByRole("button", { name: "Open execution contract help" }));
+    await userEvent.click(screen.getAllByRole("button", { name: "Open Exec Monitor" })[0]);
 
     const ownerInputs = screen.getAllByDisplayValue("qa-platform");
     await userEvent.clear(ownerInputs[0]);
     await userEvent.type(ownerInputs[0], "ops-owner");
 
+    expect(onOpenMonitor).toHaveBeenCalledTimes(1);
     expect(screen.getByDisplayValue("ops-owner")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Run" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Execution" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Open Audit" })).toBeEnabled();
   });
 
-  it("opens regardless of empty runId and queue/prepared-case variations", async () => {
+  it("clicks a queue row and emits the existing queue-item handoff", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ items: templates }))));
+    const onOpenQueueItem = vi.fn();
+
+    render(<ExecutionHarness onOpenQueueItem={onOpenQueueItem} />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Open queue item checkout-web-smoke / prod-like in monitor" }));
+
+    expect(onOpenQueueItem).toHaveBeenCalledWith("checkout-web-smoke / prod-like");
+  });
+
+  it("does not expose queue-row drill-down when no queue item exists", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ items: templates }))));
+
+    render(
+      <ExecutionHarness
+        workQueue={[]}
+      />
+    );
+
+    expect(screen.queryByRole("button", { name: /Open queue item/i })).not.toBeInTheDocument();
+  });
+
+  it("opens contract help regardless of empty runId and queue/prepared-case variations", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ items: templates }))));
 
     render(

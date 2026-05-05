@@ -217,8 +217,9 @@ Functional role:
 
 Current behavior:
 
-- display only
-- rows are not clickable
+- rows are clickable
+- clicking a queue row performs a lightweight app-level handoff into `monitor`
+- current implementation derives the queue-entry run identity from the queue title and does not introduce a new backend detail panel
 
 ### 6.7 Review Board
 
@@ -340,10 +341,10 @@ Current implementation summary:
   - `Execution`
   - `Open Exec Monitor`
   - execution contract help panel open/close
+  - queue row drill-down into `monitor`
   - review field edits
   - `Open Audit`
 - visible but not implemented:
-  - queue row drill-down
   - prepared-case card drill-down
 
 ## 10. Functional Control Responsibility Matrix
@@ -389,9 +390,9 @@ Current implementation summary:
   - output type: cross-screen navigation
   - current implementation: implemented
 - queue row
-  - function: should let the operator inspect the run/queue item in more detail
-  - output type: future run drill-down
-  - current implementation: display only
+  - function: let the operator inspect the queued run through the existing runtime-monitor handoff
+  - output type: cross-screen navigation
+  - current implementation: implemented
 
 ### 10.4 Review Controls
 
@@ -429,7 +430,8 @@ Current implementation status:
 - template selection normalization is implemented
 - database selection fallback is implemented
 - execution contract help-panel state is implemented locally in `ExecutionScreen.tsx`
-- deeper queue/run drill-down state is not implemented
+- queue-row drill-down state is implemented through app-level monitor handoff
+- deeper prepared-case/run drill-down state is not implemented
 
 ## 12. Validation and Rules
 
@@ -504,6 +506,7 @@ Review items discovered while documenting:
 - prepared-case cards are not wired back to `cases` or forward to run/report context.
 - the launch form has only lightweight front-end validation, while the backend request endpoint accepts a broader but minimally validated payload.
 - the local execution contract panel is descriptive only; it does not become a protocol editor, route, or backend-owned contract surface.
+- queue row drill-down currently normalizes run identity from queue `title`; the current queue snapshot shape does not yet expose a dedicated `runId` field.
 
 These are documentation review items only. No implementation change is made in this stage.
 

@@ -544,12 +544,14 @@ These controls change UI or app state without directly calling the backend.
 
 #### Queue row
 
-- user action: inspect only today
-- request: none today
-- intended future route:
-  - `monitor`
-  - or `reportDetail`
-- current state: display only
+- user action: click
+- request: none
+- owner: `App.tsx` screen-state handoff via `openMonitor()`
+- current behavior:
+  - queue row button emits the queue `title`
+  - `App.tsx` derives the current run identity from the queue-title prefix
+  - the screen navigates to `monitor`
+- current state: implemented
 
 ### 9.5 Review Controls
 
@@ -697,25 +699,26 @@ Request behavior:
 
 ### 13.2 Queue Row Drill-Down
 
-Recommended implementation type:
+Implemented type:
 
 - route-state handoff
-- no new backend endpoint required for first implementation
+- no new backend endpoint required
 
-Concrete implementation design:
+Current implementation design:
 
-- add app-level handler:
-  - `onOpenQueueItem(itemTitle: string, runName?: string | null)`
-- route mapping:
-  - if queue item corresponds to a known run:
-    - route to `reportDetail`
-  - otherwise:
-    - route to `monitor`
+- `ExecutionScreen.tsx` exposes queue rows as buttons with explicit `aria-label`
+- click calls app-level `onOpenQueueItem(itemTitle)`
+- `App.tsx` derives the current run identity from `itemTitle`
+  - current rule: split on `" / "` and use the first segment
+  - fallback: use the whole trimmed title when no separator exists
+- `App.tsx` then reuses `openMonitor(runId)`
 
 Reasoning:
 
 - current queue data comes from shared snapshot
-- first implementation can reuse existing monitor/report screens
+- current queue item shape only exposes `title`, `owner`, `state`, and `detail`
+- that shape is sufficient for a stable monitor handoff but not sufficient for reliable monitor-vs-report branching without inventing new metadata
+- first implementation therefore fixes the drill-down target to `monitor`
 
 ### 13.3 Prepared-Case Card Drill-Down
 
@@ -823,6 +826,7 @@ Review-only findings:
 - `Run`, `Execution`, and `Open Audit` are correctly separated into request-vs-event semantics.
 - Prepared-case gating is a front-end execution readiness rule, not a backend request requirement.
 - The compare-template selector now reads the shared backend template registry with local fallback.
-- The header contract hint is now implemented as a local help panel; queue rows and prepared-case cards remain the main visible-but-unwired controls on this screen.
+- The header contract hint and queue-row drill-down are now implemented with local/app-level behavior only.
+- Prepared-case cards remain the main visible-but-unwired control on this screen.
 
 These are documentation findings only. No implementation change is made in this stage.

@@ -1674,6 +1674,36 @@ describe("App", () => {
     expect(await screen.findByText("Open home")).toBeInTheDocument();
   });
 
+  it("opens monitor from execution queue-row drill-down via the existing App handoff", async () => {
+    const fetchMock = vi.fn().mockImplementation((call: unknown) => {
+      const url = String(call);
+      if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
+      if (url.endsWith("/api/phase3/data-templates")) return jsonResponse(dataTemplatesResponse);
+      if (url.endsWith("/api/phase3/runs/checkout-web-smoke/status")) return jsonResponse(monitorStatusResponse);
+      if (url.endsWith("/api/phase3/runs/checkout-web-smoke/steps")) return jsonResponse(monitorStepsResponse);
+      if (url.endsWith("/api/phase3/runs/checkout-web-smoke/runtime-log")) return jsonResponse(monitorRuntimeLogResponse);
+      if (url.endsWith("/api/phase3/runs/checkout-web-smoke/live-page")) return jsonResponse(monitorLivePageResponse);
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    await screen.findByText("Needs attention");
+
+    const executionNavButtons = await screen.findAllByRole("button", { name: /Execution/ });
+    await userEvent.click(executionNavButtons[0]);
+
+    await userEvent.click(screen.getByRole("button", { name: "Open queue item checkout-web-smoke / prod-like in monitor" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith("http://127.0.0.1:8787/api/phase3/runs/checkout-web-smoke/status");
+    });
+
+    expect(await screen.findByText("40%")).toBeInTheDocument();
+    expect(await screen.findByText("Open home")).toBeInTheDocument();
+  });
+
   it("shows monitor idle state when no runId is provided", async () => {
     const fetchMock = vi.fn().mockImplementation(() => jsonResponse(snapshot));
     vi.stubGlobal("fetch", fetchMock);

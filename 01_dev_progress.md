@@ -3527,3 +3527,38 @@ Verification:
 Remaining limits:
 - the panel is descriptive only; it does not edit payloads or manage protocols
 - queue rows and prepared-case cards remain display-only
+
+# 2026-05-05 P1-7 Execution Queue Row Drill-Down
+
+Context:
+- Continued the next `execution` gap after P1-6 and kept the current Phase 3 boundary: reuse existing app-level handoff first, no backend endpoint, no route system, no scheduler semantic change.
+
+Implemented:
+- Updated `ui/admin-console/src/screens/ExecutionScreen.tsx` so queue rows are now clickable instead of display-only.
+- Added explicit queue-row `aria-label` text for drill-down.
+- Reused existing App-level monitor handoff instead of creating a queue-detail page:
+  - queue row click -> `onOpenQueueItem(item.title)`
+  - `App.tsx` derives the current run identity from queue `title`
+  - `App.tsx` reuses `openMonitor(runId)`
+- Fixed the first implementation to `monitor` only.
+  - Current reason: `workQueue` still exposes only `title`, `owner`, `state`, and `detail`
+  - That is sufficient for a lightweight monitor handoff, but not sufficient for reliable monitor-vs-report branching without inventing new metadata
+- Updated `ui/admin-console/src/styles.css` for queue-row button hover/focus treatment.
+- Expanded frontend coverage:
+  - `ui/admin-console/src/screens/ExecutionScreen.test.tsx`
+  - `ui/admin-console/src/App.test.tsx`
+
+Docs synced:
+- `docs/phase3/interface/execution/functional-spec.md`
+- `docs/phase3/interface/execution/interface-spec.md`
+- `docs/phase3/interface/ui-control-interface-overview.md`
+- `docs/phase3/interface/review-backlog.md`
+
+Verification:
+- `npm test -- --run src/screens/ExecutionScreen.test.tsx` in `ui/admin-console`: PASS (6/6)
+- `npm test -- --run src/App.test.tsx -t "opens monitor from execution queue-row drill-down via the existing App handoff"` in `ui/admin-console`: PASS (1 passed, 42 skipped)
+- `npm run build` in `ui/admin-console`: PASS
+
+Remaining limits:
+- queue drill-down still depends on queue `title` format because the current snapshot queue shape does not expose a dedicated `runId`
+- prepared-case cards remain display-only

@@ -54,6 +54,7 @@ type ExecutionScreenProps = {
   onExecuteSubmit: () => void;
   onReviewSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onOpenMonitor: () => void;
+  onOpenQueueItem: (itemTitle: string) => void;
 };
 
 type Copy = {
@@ -104,7 +105,8 @@ export function ExecutionScreen({
   onLaunchSubmit,
   onExecuteSubmit,
   onReviewSubmit,
-  onOpenMonitor
+  onOpenMonitor,
+  onOpenQueueItem
 }: ExecutionScreenProps) {
   const t = (value: Copy) => translate(locale, value);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -205,6 +207,16 @@ export function ExecutionScreen({
   const queueSummary = queueLead
     ? `${queueLead.title} / ${queueLead.state}`
     : t(copy("No queued item in current snapshot."));
+
+  function buildQueueRowAriaLabel(itemTitle: string) {
+    return t(
+      copy(
+        `Open queue item ${itemTitle} in monitor`,
+        `打开队列项 ${itemTitle} 到 monitor`,
+        `キュー項目 ${itemTitle} を monitor で開く`
+      )
+    );
+  }
 
   return (
     <div className="executionConsoleScreen">
@@ -610,7 +622,13 @@ export function ExecutionScreen({
           </div>
           <div className="executionQueueList">
             {snapshot.workQueue.map((item) => (
-              <article key={item.title} className="executionQueueRow">
+              <button
+                key={item.title}
+                type="button"
+                className="executionQueueRow executionQueueRowButton"
+                aria-label={buildQueueRowAriaLabel(item.title)}
+                onClick={() => onOpenQueueItem(item.title)}
+              >
                 <div>
                   <strong>{item.title}</strong>
                   <p>{item.detail}</p>
@@ -619,7 +637,7 @@ export function ExecutionScreen({
                   <span>{item.owner}</span>
                   <small>{item.state}</small>
                 </div>
-              </article>
+              </button>
             ))}
           </div>
         </section>

@@ -1560,6 +1560,23 @@ export function App() {
     setActiveScreen("monitor");
   }
 
+  function extractQueueRunId(itemTitle: string) {
+    const normalizedTitle = itemTitle.trim();
+    if (!normalizedTitle) {
+      return null;
+    }
+    const [candidateRunId] = normalizedTitle.split(" / ");
+    return candidateRunId?.trim() || normalizedTitle;
+  }
+
+  function openQueueItem(itemTitle: string) {
+    const runId = extractQueueRunId(itemTitle);
+    if (!runId) {
+      return;
+    }
+    openMonitor(runId);
+  }
+
   function openProjectCases(projectKey: string) {
     const normalizedProjectKey = projectKey.trim();
     if (!normalizedProjectKey) {
@@ -2442,6 +2459,7 @@ export function App() {
             onExecuteSubmit={handleExecuteSubmit}
             onReviewSubmit={handleReviewSubmit}
             onOpenMonitor={() => openMonitor(launchForm.runId)}
+            onOpenQueueItem={openQueueItem}
           />
         );
       case "monitor":

@@ -320,6 +320,32 @@ It does not authorize UI or backend changes in the current phase.
   - form fields and existing action buttons remain usable while panel is open
   - empty `runId` and queue/prepared-case variations do not block help-panel behavior
 
+### P1-7. Execution queue row drill-down — DONE
+
+- Screens:
+  - `execution`
+- Surfaces:
+  - `ui/admin-console/src/screens/ExecutionScreen.tsx`
+  - `ui/admin-console/src/App.tsx`
+- Resolved:
+  - execution queue rows are now clickable instead of display-only
+  - the implementation reuses the existing app-level `monitor` handoff rather than adding a new page or backend detail endpoint
+  - queue-row click now emits the current queue `title`
+  - `App.tsx` derives the current run identity from the queue-title prefix and calls `openMonitor(runId)`
+  - queue rows now expose explicit `aria-label` text for drill-down
+- Boundary decisions:
+  - no backend endpoint was added
+  - no route system or typed router payload was added
+  - no scheduler request or event semantic was changed
+  - current queue metadata shape was treated as monitor-only drill-down input; no artificial monitor-vs-report branching was introduced
+- Remaining limits:
+  - queue drill-down currently depends on the queue `title` format because the snapshot queue shape still lacks a dedicated `runId`
+  - prepared-case cards remain display-only
+- Test coverage:
+  - click queue row triggers the existing handoff
+  - empty queue does not expose queue-row interaction
+  - Run / Execution / Open Exec Monitor / contract help panel do not regress
+
 ---
 
 ## 4. Priority P2

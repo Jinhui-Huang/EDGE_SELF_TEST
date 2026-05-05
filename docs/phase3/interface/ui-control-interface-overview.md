@@ -120,7 +120,7 @@ Conventions used here:
 | `Run` | button | Implemented: `POST /api/phase3/scheduler/requests` | Keep current |
 | `Execution` | button | Implemented: `POST /api/phase3/scheduler/events` | Keep current |
 | Prepared-case card | clickable card | Visual only | App-level handoff back into `cases` |
-| Queue row | clickable row | Visual only | App-level handoff into `monitor` or `reportDetail` |
+| Queue row | clickable row | Implemented: App-level handoff into `monitor`; current run identity is derived from queue `title` because the snapshot queue shape does not expose a dedicated `runId` field | Keep current lightweight `monitor` handoff until queue metadata grows |
 | Review form inputs | inputs | Local form state | Included in audit event payload |
 | `Open Audit` | button | Implemented: `POST /api/phase3/scheduler/events` | Keep current |
 

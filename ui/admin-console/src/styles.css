@@ -683,6 +683,24 @@
   padding: 12px;
 }
 
+.executionQueueRowButton {
+  width: 100%;
+  border: 1px solid var(--line);
+  color: inherit;
+  text-align: left;
+}
+
+.executionQueueRowButton:hover {
+  border-color: color-mix(in srgb, var(--accent) 24%, var(--line));
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface-2));
+}
+
+.executionQueueRowButton:focus-visible {
+  outline: none;
+  border-color: color-mix(in srgb, var(--accent) 48%, var(--field-border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
 .executionMonitorButton {
   width: auto;
   align-self: flex-start;

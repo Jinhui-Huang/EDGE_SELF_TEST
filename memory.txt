@@ -1283,3 +1283,26 @@
   - Remaining execution limits after this pass:
     - the panel is descriptive only; it does not edit payloads
     - queue rows and prepared-case cards remain display-only
+- 2026-05-05: Completed P1-7 Execution Queue Row Drill-Down.
+  - Updated `ui/admin-console/src/screens/ExecutionScreen.tsx` so queue rows are now clickable instead of display-only.
+  - Reused existing app-level handoff only:
+    - queue row click -> `onOpenQueueItem(item.title)`
+    - `App.tsx` derives the current run identity from queue `title`
+    - `App.tsx` reuses `openMonitor(runId)`
+  - Fixed the first implementation to `monitor`, not `reportDetail`.
+    - Reason: current `workQueue` shape still only exposes `title`, `owner`, `state`, and `detail`
+    - That shape is sufficient for a stable lightweight monitor handoff
+    - It is not sufficient for reliable monitor-vs-report branching without inventing new metadata
+  - Added explicit queue-row `aria-label` text for drill-down.
+  - Kept the Phase 3 boundary:
+    - no new backend endpoint
+    - no new route system
+    - no typed router payload
+    - no scheduler request/event semantic change
+  - Added verification:
+    - `npm test -- --run src/screens/ExecutionScreen.test.tsx`
+    - `npm test -- --run src/App.test.tsx -t "opens monitor from execution queue-row drill-down via the existing App handoff"`
+    - `npm run build`
+  - Remaining execution limits after this pass:
+    - queue drill-down still depends on queue `title` format because the snapshot queue shape has no dedicated `runId`
+    - prepared-case cards remain display-only
