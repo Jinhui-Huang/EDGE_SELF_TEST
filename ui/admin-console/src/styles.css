@@ -4048,6 +4048,24 @@ button:disabled {
   border-radius: 6px;
 }
 
+.monitorInteractiveRow {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.monitorInteractiveRow:hover {
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+}
+
+.monitorInteractiveRow:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 80%, white);
+  outline-offset: 2px;
+}
+
 .monitorStepItem.run {
   background: color-mix(in srgb, var(--accent) 10%, var(--surface));
 }
@@ -4200,6 +4218,57 @@ button:disabled {
   color: var(--text);
   font-size: 11.5px;
   line-height: 1.55;
+}
+
+.monitorDetailPanel {
+  margin-top: 14px;
+}
+
+.monitorDetailHeader {
+  align-items: center;
+}
+
+.monitorDetailBody {
+  padding: 14px;
+}
+
+.monitorDetailStack {
+  display: grid;
+  gap: 16px;
+}
+
+.monitorDetailGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.monitorDetailField {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.monitorDetailField span {
+  font-size: 11px;
+  color: var(--text-soft);
+}
+
+.monitorDetailField strong {
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.monitorDetailExtras h4 {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .monitorFooter {
@@ -7482,6 +7551,10 @@ button:disabled {
 
   .monitorScreen {
     overflow: visible;
+  }
+
+  .monitorDetailGrid {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .projectsCardGrid {

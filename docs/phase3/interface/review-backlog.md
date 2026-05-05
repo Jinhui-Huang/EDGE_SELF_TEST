@@ -43,8 +43,35 @@ It does not authorize UI or backend changes in the current phase.
 - Remaining limits:
   - runtime data is deterministic mock from backend when no real run artifacts exist
   - Pause/Abort record intent only, no real execution-control workflow in Phase 3
-  - step-row and runtime-log drill-down not yet implemented
   - live page shows structured data only, no real screenshot
+
+### P0-7. Monitor Drill-Down Panels — DONE
+
+- Screens:
+  - `monitor`
+- Surfaces:
+  - `ui/admin-console/src/screens/MonitorScreen.tsx`
+- Resolved:
+  - step rows are now clickable and open a local detail panel
+  - runtime log rows are now clickable and open a local detail panel
+  - the implementation reuses the existing runtime payloads only:
+    - `GET /api/phase3/runs/{runId}/steps`
+    - `GET /api/phase3/runs/{runId}/runtime-log`
+  - switching `runId` clears the old selected drill-down state
+  - idle / loading / error / no-data states do not expose stale detail panels
+- Boundary decisions:
+  - no new backend interface was added
+  - no run/report/scheduler protocol semantics changed
+  - no new route or sub-page was added
+  - `monitor` remains a runtime observation page, not an editing or orchestration page
+- Remaining limits:
+  - runtime data is still deterministic mock when no real run artifacts exist
+  - live page remains structured-data only; no real screenshot or DOM summary is rendered
+- Test coverage:
+  - click step row opens detail
+  - click runtime log row opens detail
+  - `runId` change resets selected detail
+  - no-data and error states do not expose drill-down
 
 ### P0-3. Replace `plugin` admin-console snapshot dependency with dedicated popup contract — DONE
 

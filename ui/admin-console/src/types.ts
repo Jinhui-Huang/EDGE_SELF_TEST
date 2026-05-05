@@ -316,6 +316,10 @@ export type RuntimeLogEntry = {
   type: string;
   model: string;
   summary: string;
+  source?: string;
+  message?: string;
+  detail?: Record<string, unknown> | string | null;
+  error?: string;
 };
 
 export type RuntimeLogResponse = {

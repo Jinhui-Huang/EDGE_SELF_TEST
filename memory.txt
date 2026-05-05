@@ -1202,3 +1202,30 @@
     - popup mirror screen in `ui/admin-console` is still a demo surface
     - locator row selection is not yet interactive local state
     - `Use in DSL` still targets `aiGenerate`, not direct `cases` DSL insertion
+- 2026-05-05: Completed P0-7 Monitor Drill-Down Panels.
+  - Updated `ui/admin-console/src/screens/MonitorScreen.tsx` to add local drill-down panels for:
+    - step rows
+    - runtime log rows
+  - Kept the implementation fully frontend-local:
+    - no new route
+    - no new backend endpoint
+    - no run/report/scheduler protocol semantic change
+  - Reused existing monitor read interfaces only:
+    - `GET /api/phase3/runs/{runId}/steps`
+    - `GET /api/phase3/runs/{runId}/runtime-log`
+  - Step detail now renders the existing step payload fields:
+    - `index`
+    - `label`
+    - `state`
+    - `durationMs`
+    - `startedAt`
+    - `note`
+  - Runtime-log detail now renders the existing log payload plus optional extended fields when present.
+  - `selectedRunId` changes clear the previously opened drill-down state, and idle/loading/error/no-data states do not expose stale detail panels.
+  - Verification passed:
+    - `npm test -- --run src/screens/MonitorScreen.test.tsx`
+    - `npm run build`
+  - Remaining monitor limits after this pass:
+    - runtime data remains deterministic mock when no real run artifacts exist
+    - live page remains structured-data only
+    - monitor drill-down stays local; it does not become a separate route or editor surface

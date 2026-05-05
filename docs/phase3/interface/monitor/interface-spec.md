@@ -111,23 +111,23 @@ When `selectedRunId` is null (e.g., direct sidebar navigation), the screen shows
 
 #### Step row
 
-- user action: inspect only today
+- user action: click
 - request: none today
-- intended future behavior:
-  - open step runtime detail drawer
-  - or route to run-detail screen
-- current state: display only
+- current behavior:
+  - opens a local step-detail panel inside `MonitorScreen`
+  - reuses the existing `GET /api/phase3/runs/{runId}/steps` payload only
+- current state: implemented
 
 ### 5.3 AI Runtime Log
 
 #### Runtime log row
 
-- user action: inspect only today
+- user action: click
 - request: none today
-- intended future behavior:
-  - open full decision detail
-  - or route to report/run detail
-- current state: display only
+- current behavior:
+  - opens a local runtime-log detail panel inside `MonitorScreen`
+  - reuses the existing `GET /api/phase3/runs/{runId}/runtime-log` payload only
+- current state: implemented
 
 ### 5.4 Live Page Panel
 
@@ -437,13 +437,28 @@ Implementation:
 
 ### 9.3 Step Row Drill-Down
 
-- not yet implemented
-- step data is displayed but rows are not clickable
+- implemented as local front-end state only
+- clicking a step row opens a local detail panel with the selected step's current payload fields:
+  - `index`
+  - `label`
+  - `state`
+  - `durationMs`
+  - `startedAt`
+  - `note`
+- changing `selectedRunId` clears the previously opened step detail
+- no new backend interface or route was added
 
 ### 9.4 Runtime Log Row Drill-Down
 
-- not yet implemented
-- log entries are displayed but rows are not clickable
+- implemented as local front-end state only
+- clicking a runtime-log row opens a local detail panel with:
+  - `at`
+  - `type`
+  - `model`
+  - `summary`
+  - optional extended fields already present on the runtime payload
+- changing `selectedRunId` clears the previously opened log detail
+- no new backend interface or route was added
 
 ## 10. Error Handling Boundary
 
@@ -458,6 +473,6 @@ Current implementation:
 
 - Runtime data is deterministic mock from the backend when no real run artifacts or live execution exist.
 - Pause/Abort record intent only; the backend does not trigger real execution-control workflows in Phase 3.
-- Step rows and runtime log rows are display only — no drill-down behavior.
+- Step rows and runtime log rows now use local detail panels rather than a separate page or route.
 - Live page panel shows structured data only; no real screenshot or DOM summary is rendered.
 - `GET /api/phase3/admin-console` is still used for queue pressure in the footer; deeper runtime context comes from run-specific APIs.

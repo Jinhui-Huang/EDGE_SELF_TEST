@@ -132,8 +132,8 @@ Conventions used here:
 |---|---|---|---|
 | `Pause` | button | Implemented: `POST /api/phase3/runs/{runId}/pause` via `onPauseRun` callback | Keep current |
 | `Abort` | button | Implemented: `POST /api/phase3/runs/{runId}/abort` via `onAbortRun` callback | Keep current |
-| Step row | clickable row | Display-only; data from `GET /api/phase3/runs/{runId}/steps` | Drill-down drawer |
-| Runtime log row | clickable row | Display-only; data from `GET /api/phase3/runs/{runId}/runtime-log` | Drill-down drawer |
+| Step row | clickable row | Implemented as local detail drill-down in `MonitorScreen`; data still comes from `GET /api/phase3/runs/{runId}/steps` | Keep local detail panel; do not add a separate route unless payload needs outgrow the screen |
+| Runtime log row | clickable row | Implemented as local detail drill-down in `MonitorScreen`; data still comes from `GET /api/phase3/runs/{runId}/runtime-log` | Keep local detail panel; do not add a separate route unless payload needs outgrow the screen |
 | Live page viewport | panel | Display-only; data from `GET /api/phase3/runs/{runId}/live-page` | Screenshot/DOM rendering |
 
 ---
@@ -243,7 +243,6 @@ Plugin-specific data/source note:
 
 The highest-signal unresolved controls across the package are:
 
-- `monitor` step-row and runtime-log drill-down not yet implemented
 - `models` and `environments` have switched to real backend validation interfaces, but the validation remains deterministic and non-connective by Phase 3 design
 - `plugin` quick actions are now all wired in the real extension popup chain; detailed execution monitoring still belongs to platform execution/monitor rather than the popup
 
@@ -252,6 +251,7 @@ Resolved since last review:
 - `plugin` now reads from dedicated `GET /api/phase3/extension-popup` instead of `AdminConsoleSnapshot` (P0-3)
 - `plugin` real extension popup now wires `Page summary`, `Open in platform`, `Copy`, and `Use in DSL` through popup/background/native-host/local-admin-api plus platform App-level handoff
 - `plugin` real extension popup now wires `Pick element` through popup/background/content-script with real hover/selected highlight and locator-candidate shaping (P0-5)
+- `monitor` now supports local step-row and runtime-log drill-down panels without adding new backend interfaces or routes (P0-7)
 - `dataTemplates` now has a full backend template registry (P1-3: CRUD, import, dry-run, delete)
 - `cases` tabs are now API-backed with DSL edit/validate/save, state-machine read/save, plans read, history read (P2-3)
 - `execution -> monitor` now passes canonical `runId` through `openMonitor(launchForm.runId)` (P0-1)

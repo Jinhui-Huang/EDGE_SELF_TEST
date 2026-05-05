@@ -150,7 +150,7 @@ Functional role:
 Current behavior:
 
 - timeline driven by `steps` from `GET /api/phase3/runs/{runId}/steps`
-- rows are display only (not clickable)
+- rows are clickable and open a local step-detail panel inside `MonitorScreen`
 
 ### 6.4 Live Page Panel
 
@@ -187,7 +187,7 @@ Functional role:
 Current behavior:
 
 - log items driven by `runtimeLog` from `GET /api/phase3/runs/{runId}/runtime-log`
-- rows are display only (not clickable)
+- rows are clickable and open a local runtime-log detail panel inside `MonitorScreen`
 
 ### 6.6 Footer Summary
 
@@ -248,9 +248,9 @@ The screen produces:
 - operator control intent
   - pause via `onPauseRun(runId)` → `POST /api/phase3/runs/{runId}/pause`
   - abort via `onAbortRun(runId)` → `POST /api/phase3/runs/{runId}/abort`
-- future run drill-down intent (not yet implemented)
-  - step detail
-  - AI decision detail
+- local run drill-down intent
+  - step detail panel
+  - runtime-log detail panel
 
 ## 9. User Actions
 
@@ -269,7 +269,6 @@ Current implementation summary:
   - `Abort` (via `onAbortRun` callback)
   - idle/loading/error/loaded state rendering
   - runtime data fetch on `selectedRunId` change
-- visible but not implemented:
   - step-row drill-down
   - runtime-log drill-down
 
@@ -290,15 +289,15 @@ Current implementation summary:
 
 - step row
   - function: inspect one step's runtime detail
-  - output type: future local drawer or run-detail route
-  - current implementation: display only
+  - output type: local detail panel inside `MonitorScreen`
+  - current implementation: implemented
 
 ### 10.3 Runtime Log Controls
 
 - runtime log row
   - function: inspect one AI/runtime decision in detail
-  - output type: future local drawer or report-detail route
-  - current implementation: display only
+  - output type: local detail panel inside `MonitorScreen`
+  - current implementation: implemented
 
 ## 11. State Model
 
@@ -378,7 +377,7 @@ The `monitor` screen is not currently responsible for:
 ## 15. Remaining Limits
 
 - Runtime data is deterministic mock from the backend when no real run artifacts exist.
-- Step rows and runtime log rows do not expose a drill-down behavior.
+- Step rows and runtime log rows now open local drill-down detail panels using existing runtime payload only; no new backend interface is required.
 - Live page panel shows structured data only; no real screenshot is rendered.
 - Pause/Abort record intent only; the backend does not trigger real execution-control workflows in Phase 3.
 

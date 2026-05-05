@@ -3409,3 +3409,47 @@ Remaining limits:
 - popup mirror screen in `ui/admin-console` remains a demo surface; the real implementation lives in `extension/edge-extension`
 - locator row selection is still not interactive local state
 - `Use in DSL` still targets `aiGenerate`, not direct `cases` DSL insertion
+
+# 2026-05-05 P0-7 Monitor Drill-Down Panels
+
+Context:
+- Returned to the highest-priority remaining `monitor` gap after the plugin P0 items and kept the Phase 3 boundary: local drill-down UI first, no new route, no new backend interface unless existing runtime payload proved insufficient.
+
+Implemented:
+- Updated `ui/admin-console/src/screens/MonitorScreen.tsx` to add two local drill-down interactions:
+  - clickable step rows
+  - clickable runtime-log rows
+- Added local detail-panel state for the selected step or selected runtime log.
+- Step detail now renders existing step payload fields only:
+  - `index`
+  - `label`
+  - `state`
+  - `durationMs`
+  - `startedAt`
+  - `note`
+- Runtime-log detail now renders existing log payload plus optional extended fields when present:
+  - `at`
+  - `type`
+  - `model`
+  - `summary`
+  - optional `source` / `message` / `detail` / `error`
+- `selectedRunId` changes now clear old drill-down state, so stale detail does not carry across monitor handoffs.
+- `idle`, `loading`, `error`, and no-data states do not expose drill-down controls or stale detail panels.
+- No backend change was required; the implementation reuses:
+  - `GET /api/phase3/runs/{runId}/steps`
+  - `GET /api/phase3/runs/{runId}/runtime-log`
+
+Docs synced:
+- `docs/phase3/interface/monitor/functional-spec.md`
+- `docs/phase3/interface/monitor/interface-spec.md`
+- `docs/phase3/interface/ui-control-interface-overview.md`
+- `docs/phase3/interface/review-backlog.md`
+
+Verification:
+- `npm test -- --run src/screens/MonitorScreen.test.tsx` in `ui/admin-console`: PASS (5/5)
+- `npm run build` in `ui/admin-console`: PASS
+
+Remaining limits:
+- runtime data is still deterministic mock when no real run artifacts exist
+- live page remains structured-data only; no real screenshot or DOM summary is rendered
+- `monitor` still does not become a separate run-detail/report-detail route; drill-down stays local by design
