@@ -3597,3 +3597,41 @@ Verification:
 Remaining limits:
 - prepared-case drill-down carries only current `projectKey` + `caseId`
 - the cases reopen path still depends on the matching case being present in the current app snapshot/draft
+
+# 2026-05-06 P2-1 Dashboard Control Wiring
+
+Context:
+- Re-opened the dashboard backlog item and verified that most dashboard controls were already wired in code; the remaining real gap was explicit `Refresh` feedback plus stale backlog/documentation state.
+
+Implemented:
+- Kept the existing dashboard handoff architecture unchanged:
+  - `Refresh` -> existing shell snapshot reload path
+  - `New run` -> existing App-level handoff into `execution`
+  - recent-run row -> existing App-level handoff into `reportDetail`
+  - attention item -> existing App-level handoff into `reportDetail` / `monitor` / `dataDiff` / `models`
+  - AI provider chip -> existing App-level handoff into `models`
+- Added explicit dashboard refresh feedback:
+  - `pending`
+  - `success`
+  - `error`
+- Updated `ui/admin-console/src/screens/DashboardScreen.tsx` to render refresh feedback and disable the refresh button while pending.
+- Updated `ui/admin-console/src/App.tsx` to own `dashboardRefreshState` and drive the existing `GET /api/phase3/admin-console` reload chain without adding a new endpoint or route payload.
+- Cleaned up the dashboard screen file while preserving existing behavior and current Phase 3 boundaries.
+- Expanded frontend verification in `ui/admin-console/src/App.test.tsx` so the refresh path now proves visible feedback instead of only the fetch call count.
+
+Docs synced:
+- `docs/phase3/interface/dashboard/functional-spec.md`
+- `docs/phase3/interface/dashboard/interface-spec.md`
+- `docs/phase3/interface/ui-control-interface-overview.md`
+- `docs/phase3/interface/review-backlog.md`
+
+Verification:
+- `npm test -- --run src/App.test.tsx -t "refreshes the dashboard snapshot and hands off New run to Execution"` in `ui/admin-console`: PASS
+- `npm test -- --run src/App.test.tsx -t "opens dashboard recent-run rows with the canonical runId"` in `ui/admin-console`: PASS
+- `npm test -- --run src/App.test.tsx -t "routes dashboard attention items and provider chips through existing App handoff state"` in `ui/admin-console`: PASS
+- `npm run build` in `ui/admin-console`: PASS
+
+Remaining limits:
+- dashboard metric cards remain display-only overview widgets
+- attention items are still front-end derived from snapshot data, not a dedicated backend attention contract
+- dashboard now has explicit refresh feedback, but it still does not own full first-load loading/empty/error page states

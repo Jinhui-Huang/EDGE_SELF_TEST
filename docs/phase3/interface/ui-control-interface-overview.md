@@ -29,7 +29,7 @@ Conventions used here:
 
 | Control | Type | Current behavior / interface | Future interface / design |
 |---|---|---|---|
-| `Refresh` | button | Implemented; reuses `GET /api/phase3/admin-console` through the shell-level snapshot reload path | Keep current |
+| `Refresh` | button | Implemented; reuses `GET /api/phase3/admin-console` through the shell-level snapshot reload path and now shows explicit pending/success/error feedback | Keep current |
 | `New run` | button | Implemented as App-level handoff into `execution`; actual submission remains `POST /api/phase3/scheduler/requests` and `POST /api/phase3/scheduler/events` in `execution` | Keep current |
 | Metric cards | clickable cards | Mostly display-only | App-level handoff into related downstream page/filter |
 | Recent run row | clickable row | Implemented as App-level handoff into `reportDetail` via canonical `runId` | Keep current lightweight handoff |

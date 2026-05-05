@@ -1489,6 +1489,7 @@ export function App() {
   const [projectState, setProjectState] = useState<MutationState>({ kind: "idle", message: "" });
   const [projectImportState, setProjectImportState] = useState<MutationState>({ kind: "idle", message: "" });
   const [projectImportPreview, setProjectImportPreview] = useState<ProjectImportPreviewResponse | null>(null);
+  const [dashboardRefreshState, setDashboardRefreshState] = useState<MutationState>({ kind: "idle", message: "" });
   const [selectedCaseProjectKey, setSelectedCaseProjectKey] = useState<string | null>(null);
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const [selectedReportsProjectKey, setSelectedReportsProjectKey] = useState<string | null>(null);
@@ -1609,12 +1610,16 @@ export function App() {
   }
 
   async function refreshSnapshot() {
+    setDashboardRefreshState({ kind: "pending", message: "Refreshing dashboard snapshot..." });
     try {
       await loadSnapshot();
+      setDashboardRefreshState({ kind: "success", message: "Dashboard snapshot refreshed." });
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setDashboardRefreshState({ kind: "error", message: `Dashboard refresh failed: ${message}` });
       setSourceLabel(
         formatCopy(t(sharedCopy.sourceFallbackWithError), {
-          error: error instanceof Error ? error.message : String(error)
+          error: message
         })
       );
     }
@@ -2343,6 +2348,7 @@ export function App() {
             queueBoardLabel={t(uiCopy.queueBoard)}
             dashboardTitle={t(localizedScreenCopy.dashboard.title)}
             locale={locale}
+            refreshState={dashboardRefreshState}
             onRefresh={() => {
               void refreshSnapshot();
             }}

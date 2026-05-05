@@ -853,8 +853,10 @@ This section maps each dashboard control to its expected interface behavior and 
   - none
 - Success feedback:
   - refresh visible metric, queue, report, and timeline-related data
+  - show explicit pending/success status in the dashboard view
 - Failure feedback:
   - shell-level error or fallback handling
+  - show explicit dashboard refresh error state
 - Current implementation state:
   - implemented
   - click reuses shell-owned `loadSnapshot()`
@@ -1053,6 +1055,7 @@ This section records the implemented Phase 3 wiring for dashboard controls.
 Implemented behavior:
 
 - `DashboardScreen` exposes `onRefresh?: () => void`
+- `DashboardScreen` also consumes `refreshState: MutationState`
 - `App.tsx` passes a shell-owned refresh handler
 - clicking `Refresh` reuses the existing snapshot reload path
 
@@ -1063,8 +1066,10 @@ Interface behavior:
 - success:
   - refreshed snapshot is written back into shell state
   - dashboard re-renders from the updated snapshot
+  - `refreshState` becomes `success`
 - failure:
   - existing shell fallback/source-label handling is reused
+  - `refreshState` becomes `error`
 
 ### 17.2 `New run`
 

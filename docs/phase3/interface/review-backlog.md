@@ -379,20 +379,37 @@ It does not authorize UI or backend changes in the current phase.
 
 ## 4. Priority P2
 
-### P2-1. Complete `dashboard` control wiring
+### P2-1. Complete `dashboard` control wiring ・DONE
 
 - Screens:
   - `dashboard`
-- Current gap:
-  - `Refresh`, `New run`, recent-run rows, attention items, and AI provider chips are visible but not fully wired.
-- Required behavior:
-  - `Refresh` -> reuse `GET /api/phase3/admin-console`
-  - `New run` -> app-level handoff into `execution`
-  - recent-run row -> app-level selected-run handoff into `reportDetail`
-  - attention item -> app-level handoff into target screen
-  - AI chips -> app-level handoff into `models`
-- Acceptance target:
-  - dashboard becomes a real navigation hub rather than a passive overview screen.
+- Surfaces:
+  - `ui/admin-console/src/screens/DashboardScreen.tsx`
+  - `ui/admin-console/src/App.tsx`
+- Resolved:
+  - `Refresh` reuses the existing shell snapshot chain:
+    - `GET /api/phase3/admin-console`
+  - `Refresh` now exposes explicit pending/success/error feedback instead of remaining silent
+  - `New run` reuses the existing app-level handoff into `execution`
+  - recent-run rows reuse the existing app-level handoff into `reportDetail` via canonical `runId`
+  - attention items reuse the existing app-level handoff into `reportDetail` / `monitor` / `dataDiff` / `models`
+  - AI provider chips reuse the existing app-level handoff into `models`
+- Boundary decisions:
+  - no dashboard-specific backend endpoint was added
+  - no route system or typed router payload was added
+  - no execution / monitor / reportDetail protocol semantic was changed
+  - attention items keep the current conservative front-end target mapping derived from snapshot data
+- Remaining limits:
+  - metric cards remain display-only overview elements
+  - attention items are still derived in the front end rather than coming from a dedicated backend attention model
+  - dashboard still does not own full first-load loading/empty/error page states
+- Test coverage:
+  - refresh triggers snapshot re-fetch and shows explicit feedback
+  - `New run` opens `execution`
+  - recent-run row opens `reportDetail`
+  - attention items hand off to their target screens
+  - AI provider chips open `models`
+  - existing dashboard overview rendering remains intact
 
 ### P2-2. Complete `projects` import and navigation actions
 

@@ -92,6 +92,7 @@ Functional intent:
 Current behavior:
 
 - `Refresh` reloads the current admin-console snapshot through `App.tsx`.
+- `Refresh` now shows explicit pending/success/error feedback instead of staying silent while the shell reload runs.
 - `New run` switches the active screen to `execution`.
 
 Expected relationship to other screens:
@@ -293,6 +294,7 @@ Current implementation status:
 - recent-run rows are wired.
 - attention items are wired.
 - provider chips are wired.
+- `Refresh` feedback is wired.
 
 Functional definition for documentation:
 
@@ -313,7 +315,7 @@ No inline editing, delete, approve, or submit action currently exists on this sc
   - function: refresh dashboard overview state
   - output type: reload current screen data
   - downstream relation: remains on `dashboard`
-  - current implementation: implemented via shell snapshot reload
+  - current implementation: implemented via shell snapshot reload plus explicit refresh status feedback
 - `New run`
   - function: enter execution initiation flow
   - output type: route to `execution`
@@ -384,7 +386,7 @@ The screen is primarily read-only and should support the following conceptual st
 Current implementation status:
 
 - The surrounding shell handles snapshot loading.
-- `DashboardScreen.tsx` itself does not currently render dedicated loading/empty/error sub-states.
+- `DashboardScreen.tsx` now renders explicit refresh mutation feedback, but it still does not own full first-load loading/empty/error page states.
 
 ## 12. Validation and Rules
 

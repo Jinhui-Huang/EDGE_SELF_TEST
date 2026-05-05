@@ -326,10 +326,20 @@ describe("App", () => {
   });
 
   it("refreshes the dashboard snapshot and hands off New run to Execution", async () => {
+    let adminConsoleCalls = 0;
+    const refreshResolver: {
+      current: ((value: Response | PromiseLike<Response>) => void) | null;
+    } = { current: null };
     const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
       const url = String(input);
       if (url.endsWith("/api/phase3/admin-console")) {
-        return jsonResponse(snapshot);
+        adminConsoleCalls += 1;
+        if (adminConsoleCalls === 1) {
+          return jsonResponse(snapshot);
+        }
+        return new Promise<Response>((resolve) => {
+          refreshResolver.current = resolve;
+        });
       }
       if (url.endsWith("/api/phase3/data-templates")) {
         return jsonResponse(dataTemplatesResponse);
@@ -343,11 +353,23 @@ describe("App", () => {
     await screen.findByText("Recent runs");
     await userEvent.click(screen.getByRole("button", { name: "Refresh" }));
 
+    expect(await screen.findByRole("button", { name: "Refreshing..." })).toBeDisabled();
+
+    if (refreshResolver.current) {
+      refreshResolver.current(new Response(JSON.stringify(snapshot), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json"
+        }
+      }));
+    }
+
     await waitFor(() => {
       expect(
         fetchMock.mock.calls.filter(([input]) => String(input).endsWith("/api/phase3/admin-console"))
       ).toHaveLength(2);
     });
+    expect(await screen.findByText("Dashboard snapshot refreshed.")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: /New run/i }));
 

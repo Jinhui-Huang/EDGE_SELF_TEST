@@ -1328,3 +1328,30 @@
   - Remaining execution limits after this pass:
     - prepared-case drill-down carries only `projectKey` + `caseId`
     - the reopen path still depends on the matching case being present in the current app snapshot/draft
+- 2026-05-06: Completed P2-1 Dashboard Control Wiring.
+  - Re-checked the current dashboard code instead of assuming the backlog state was still accurate.
+  - Confirmed these handoffs were already implemented and kept them unchanged:
+    - `Refresh` -> existing shell `GET /api/phase3/admin-console` reload path
+    - `New run` -> App-level handoff into `execution`
+    - recent-run row -> App-level handoff into `reportDetail`
+    - attention item -> App-level handoff into `reportDetail` / `monitor` / `dataDiff` / `models`
+    - AI provider chip -> App-level handoff into `models`
+  - Added the remaining missing UX piece:
+    - explicit dashboard refresh feedback with `pending` / `success` / `error`
+  - Updated `ui/admin-console/src/App.tsx` to own `dashboardRefreshState`.
+  - Updated `ui/admin-console/src/screens/DashboardScreen.tsx` to:
+    - disable `Refresh` while pending
+    - render refresh feedback through `MutationStatus`
+  - Kept the Phase 3 boundary:
+    - no dashboard-specific backend endpoint
+    - no route system or typed router payload
+    - no execution / monitor / reportDetail protocol semantic change
+  - Added verification:
+    - `npm test -- --run src/App.test.tsx -t "refreshes the dashboard snapshot and hands off New run to Execution"`
+    - `npm test -- --run src/App.test.tsx -t "opens dashboard recent-run rows with the canonical runId"`
+    - `npm test -- --run src/App.test.tsx -t "routes dashboard attention items and provider chips through existing App handoff state"`
+    - `npm run build`
+  - Remaining dashboard limits after this pass:
+    - metric cards remain display-only
+    - attention items are still front-end derived from snapshot data
+    - dashboard still does not own full first-load loading/empty/error page states

@@ -1,5 +1,6 @@
 import { translate } from "../i18n";
-import { AdminConsoleSnapshot, Locale } from "../types";
+import { AdminConsoleSnapshot, Locale, MutationState } from "../types";
+import { MutationStatus } from "../ui-kit/MutationStatus";
 
 type Copy = { en: string; zh: string; ja: string };
 
@@ -20,6 +21,7 @@ type DashboardScreenProps = {
   queueBoardLabel: string;
   dashboardTitle: string;
   locale: Locale;
+  refreshState: MutationState;
   onRefresh?: () => void;
   onNewRun?: () => void;
   onOpenRunDetail?: (runId: string) => void;
@@ -96,14 +98,14 @@ function buildAttentionItems(snapshot: AdminConsoleSnapshot, t: (value: Copy) =>
   if (failedReport) {
     const runId = failedReport.runId || failedReport.runName;
     items.push({
-      title: t(copy("Recent failed run requires triage", "最近失败运行需要排查", "直近の失敗実行を確認")),
+      title: t(copy("Recent failed run requires triage", "最近失败运行需要排查", "直近の失敗実行は切り分けが必要です")),
       detail: `${failedReport.runName} - ${failedReport.entry}`,
       tone: "danger",
       target: { kind: "reportDetail", runId }
     });
     items.push({
-      title: t(copy("Data diff review recommended", "建议复核数据差异", "データ差分の確認を推奨")),
-      detail: `${failedReport.runName} - ${t(copy("Open diff and restore evidence for the failed run.", "打开失败运行的数据差异和恢复证据。", "失敗実行の差分と復元証跡を開きます。"))}`,
+      title: t(copy("Data diff review recommended", "建议复核数据对比", "データ差分の確認を推奨")),
+      detail: `${failedReport.runName} - ${t(copy("Open diff and restore evidence for the failed run.", "打开失败运行的数据对比与恢复证据。", "失敗実行の差分と復旧証跡を確認します。"))}`,
       tone: "warning",
       target: { kind: "dataDiff", runId }
     });
@@ -111,7 +113,7 @@ function buildAttentionItems(snapshot: AdminConsoleSnapshot, t: (value: Copy) =>
 
   if (queuePressure) {
     items.push({
-      title: t(copy("Execution pressure needs monitoring", "执行压力需要关注", "実行負荷の監視が必要")),
+      title: t(copy("Execution pressure needs monitoring", "执行压力需要关注", "実行負荷の監視が必要です")),
       detail: `${queuePressure.title} - ${queuePressure.detail}`,
       tone: "warning",
       target: { kind: "monitor", runId: extractRunIdFromQueueTitle(queuePressure.title) }
@@ -133,6 +135,7 @@ function buildAttentionItems(snapshot: AdminConsoleSnapshot, t: (value: Copy) =>
 export function DashboardScreen({
   snapshot,
   locale,
+  refreshState,
   onRefresh,
   onNewRun,
   onOpenRunDetail,
@@ -167,23 +170,34 @@ export function DashboardScreen({
         <div className="dashboardHeroCopy">
           <h2>{t(copy("Operations cockpit", "运行总览", "運用コックピット"))}</h2>
           <p>
-            {t(copy(
-              "Keep projects, execution, audit, and restore checkpoints on one control surface.",
-              "把项目、执行、审计和恢复检查点放在同一个控制面板中查看。",
-              "プロジェクト、実行、監査、復元チェックポイントを 1 つの画面で確認します。"
-            ))}
+            {t(
+              copy(
+                "Keep projects, execution, audit, and restore checkpoints on one control surface.",
+                "把项目、执行、审计和恢复检查点集中在一个控制面板里。",
+                "プロジェクト、実行、監査、復旧チェックポイントを1つの画面で確認します。"
+              )
+            )}
           </p>
         </div>
 
         <div className="dashboardActions">
-          <button type="button" className="dashboardButton secondary" onClick={onRefresh}>
-            {t(copy("Refresh", "刷新", "更新"))}
+          <button
+            type="button"
+            className="dashboardButton secondary"
+            onClick={onRefresh}
+            disabled={refreshState.kind === "pending"}
+          >
+            {refreshState.kind === "pending"
+              ? t(copy("Refreshing...", "刷新中...", "更新中..."))
+              : t(copy("Refresh", "刷新", "更新"))}
           </button>
           <button type="button" className="dashboardButton primary" onClick={onNewRun}>
             + {t(copy("New run", "新建运行", "新規実行"))}
           </button>
         </div>
       </div>
+
+      <MutationStatus state={refreshState} />
 
       <div className="dashboardMetricGrid">
         {metricCards.map((item) => (
@@ -202,7 +216,7 @@ export function DashboardScreen({
         <section className="dashboardPanel dashboardRunsPanel">
           <div className="dashboardPanelHeader">
             <div className="dashboardPanelTitle">{t(copy("Recent runs", "最近运行", "最近の実行"))}</div>
-            <div className="dashboardPanelMeta">{t(copy("from admin snapshot", "来自当前快照", "現在のスナップショット"))}</div>
+            <div className="dashboardPanelMeta">{t(copy("from admin snapshot", "来自 admin snapshot", "admin snapshot 由来"))}</div>
           </div>
 
           <div className="dashboardRunList">
@@ -266,7 +280,9 @@ export function DashboardScreen({
               <div>
                 <span className="dashboardAiLabel">{t(copy("Constraints", "约束", "制約"))}</span>
                 <div className="dashboardAiValue">{snapshot.constraints.length}</div>
-                <p className="dashboardAiHint">{snapshot.constraints[0] ?? t(copy("No active constraints.", "当前无约束。", "有効な制約はありません。"))}</p>
+                <p className="dashboardAiHint">
+                  {snapshot.constraints[0] ?? t(copy("No active constraints.", "当前没有约束。", "現在有効な制約はありません。"))}
+                </p>
               </div>
 
               <div>
