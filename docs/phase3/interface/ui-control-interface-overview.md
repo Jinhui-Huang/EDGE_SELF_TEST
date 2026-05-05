@@ -107,7 +107,7 @@ Conventions used here:
 | Control | Type | Current behavior / interface | Future interface / design |
 |---|---|---|---|
 | `Open Exec Monitor` | button | Implemented: `openMonitor(launchForm.runId)` passes canonical `runId` into `monitor` | Keep current |
-| Execution contract hint button | button | Visual only | Local help/contract drawer |
+| Execution contract hint button | button | Implemented: opens a local execution-contract help panel inside `execution`; no backend request or route change | Keep current local help panel |
 | `Run ID` input | input | Local form state | Included in `POST /api/phase3/scheduler/requests` and `POST /api/phase3/scheduler/events` payloads |
 | `Project` select | select | Local form state | Included in scheduler payloads |
 | `Owner` input | input | Local form state | Included in scheduler payloads |

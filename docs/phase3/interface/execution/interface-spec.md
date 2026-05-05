@@ -416,12 +416,13 @@ These controls change UI or app state without directly calling the backend.
 #### Execution contract hint button
 
 - user action: click
-- request: none today
-- owner: not implemented
-- intended future behavior:
-  - open a local execution-contract help panel
-  - or a launch/event interface drawer
-- current state: visible only
+- request: none
+- owner: `ExecutionScreen.tsx` local UI state
+- current behavior:
+  - opens a local execution-contract help panel
+  - shows current key inputs, request targets, mutation states, and handoff boundaries
+  - does not call a backend endpoint or change routes
+- current state: implemented
 
 ### 9.2 Launch Controls
 
@@ -473,7 +474,8 @@ These controls change UI or app state without directly calling the backend.
 - request: none today
 - owner: local app state
 - data source:
-  - front-end `dataTemplates`
+  - `GET /api/phase3/data-templates`
+  - local fallback `dataTemplates` when API is unavailable
 - current state: implemented
 
 #### `Database connection` select
@@ -646,7 +648,7 @@ Recommended rule for this phase:
 
 ## 13. Detailed Implementation Design for Currently Unwired Controls
 
-This section gives concrete implementation design for visible controls that still do not have real behavior.
+This section gives concrete implementation design for visible controls that still do not have real behavior, plus the current design notes for newly wired local controls.
 
 ### 13.1 Execution Contract Hint Button
 
@@ -654,7 +656,7 @@ Current visible label:
 
 - `POST /scheduler/requests + /scheduler/events`
 
-Recommended implementation type:
+Implemented type:
 
 - local help drawer or side panel
 - no backend endpoint required
@@ -664,14 +666,30 @@ Reasoning:
 - the label is documentation-oriented, not a business action
 - routing it to a backend mutation would be incorrect
 
-Concrete implementation design:
+Current implementation design:
 
-- rename ownership conceptually as `Open launch contract`
 - click opens a local drawer containing:
-  - request payload example for `Run`
-  - event payload example for `Execution`
-  - event payload example for `Open Audit`
-  - field-to-endpoint mapping
+  - current key inputs:
+    - `Run ID`
+    - `Project`
+    - `Owner`
+    - `Environment`
+    - `Target URL`
+    - `Execution model`
+    - `Compare data templates`
+    - `Database connection`
+  - request mapping for:
+    - `Run -> POST /api/phase3/scheduler/requests`
+    - `Execution -> POST /api/phase3/scheduler/events`
+    - `Open Audit -> POST /api/phase3/scheduler/events`
+  - current mutation-state summary:
+    - `launchState`
+    - `executeState`
+    - `reviewState`
+  - current handoff boundary summary:
+    - prepared cases are app-state-only input from `cases`
+    - queue is read-only snapshot data from `GET /api/phase3/admin-console`
+    - monitor handoff is `openMonitor(launchForm.runId)`
 
 Request behavior:
 
@@ -804,7 +822,7 @@ Review-only findings:
 - This screen already owns the first real scheduler mutations in the Phase 3 shell.
 - `Run`, `Execution`, and `Open Audit` are correctly separated into request-vs-event semantics.
 - Prepared-case gating is a front-end execution readiness rule, not a backend request requirement.
-- The compare-template selector currently depends on front-end seed data and should be documented as such.
-- The header contract hint and display-only lists still need real operator behavior design, which is now defined here without changing UI or backend code.
+- The compare-template selector now reads the shared backend template registry with local fallback.
+- The header contract hint is now implemented as a local help panel; queue rows and prepared-case cards remain the main visible-but-unwired controls on this screen.
 
 These are documentation findings only. No implementation change is made in this stage.

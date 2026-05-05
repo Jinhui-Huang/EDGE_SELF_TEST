@@ -1253,3 +1253,33 @@
   - Remaining models limits after this pass:
     - routing-rule editing is still single-rule local modal state
     - persistence still uses generic config-item storage instead of a typed models API
+- 2026-05-05: Completed P1-6 Execution Contract Hint Local Drawer.
+  - Updated `ui/admin-console/src/screens/ExecutionScreen.tsx` so the header contract hint button now opens a local execution-contract help panel.
+  - Kept the implementation fully frontend-local:
+    - no new backend endpoint
+    - no scheduler request or event semantic change
+    - no new route
+    - `execution` remains a run-preparation / submission page
+  - The panel documents the current execution-page contract only:
+    - `Run ID`
+    - `Project`
+    - `Owner`
+    - `Environment`
+    - `Target URL`
+    - `Execution model`
+    - `Compare data templates`
+    - `Database connection`
+    - `Run -> POST /api/phase3/scheduler/requests`
+    - `Execution / Open Audit -> POST /api/phase3/scheduler/events`
+    - prepared-case / queue / monitor handoff boundaries
+  - Added `ui/admin-console/src/screens/ExecutionScreen.test.tsx` for:
+    - open help panel
+    - close help panel
+    - form/button non-regression while panel is open
+    - empty `runId` and queue/prepared-case variation tolerance
+  - Verification passed:
+    - `npm test -- --run src/screens/ExecutionScreen.test.tsx`
+    - `npm run build`
+  - Remaining execution limits after this pass:
+    - the panel is descriptive only; it does not edit payloads
+    - queue rows and prepared-case cards remain display-only

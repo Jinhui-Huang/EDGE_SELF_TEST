@@ -695,6 +695,140 @@
   align-self: flex-start;
 }
 
+.executionContractPanel {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--line));
+  border-radius: 12px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 5%, var(--surface)), var(--surface));
+  box-shadow: var(--shadow);
+}
+
+.executionContractPanelHead,
+.executionContractList,
+.executionContractList div {
+  display: grid;
+}
+
+.executionContractPanelHead {
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+}
+
+.executionContractPanelHead strong,
+.executionContractSection h3 {
+  color: var(--text);
+}
+
+.executionContractPanelHead strong {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.executionContractPanelHead p {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.executionContractGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.executionContractSection {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface) 72%, var(--surface-2));
+}
+
+.executionContractSection h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.executionContractList {
+  gap: 10px;
+  margin: 0;
+}
+
+.executionContractList div {
+  gap: 4px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.executionContractList div:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.executionContractList dt {
+  color: var(--text-soft);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.executionContractList dd {
+  margin: 0;
+  color: var(--text);
+  font-family: "Geist Mono", monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.executionContractBulletList {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.executionContractBulletList li {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.executionContractBulletList strong {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.executionContractBulletList span {
+  color: var(--accent);
+  font-family: "Geist Mono", monospace;
+  font-size: 11px;
+}
+
+.executionContractBulletList p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.executionContractStateList {
+  margin-top: 2px;
+}
+
 .databaseConfigScreen {
   display: grid;
   gap: 16px;
@@ -888,7 +1022,8 @@
   .dataTemplatesWorkbench,
   .executionConsoleGrid,
   .executionConsoleBottomGrid,
-  .databaseConfigGrid {
+  .databaseConfigGrid,
+  .executionContractGrid {
     grid-template-columns: 1fr;
   }
 
@@ -920,6 +1055,10 @@
   .executionConsoleHeadActions,
   .executionConsoleActions {
     width: 100%;
+  }
+
+  .executionContractPanelHead {
+    grid-template-columns: 1fr;
   }
 
   .dataTemplatesTableHead {

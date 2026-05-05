@@ -284,6 +284,42 @@ It does not authorize UI or backend changes in the current phase.
   - cancel closes without mutating the parent draft
   - save still uses the existing model-config persistence chain
 
+### P1-6. Execution contract hint local drawer — DONE
+
+- Screens:
+  - `execution`
+- Surfaces:
+  - `ui/admin-console/src/screens/ExecutionScreen.tsx`
+- Resolved:
+  - the header execution contract hint button now opens a local execution-contract help panel instead of remaining visual-only
+  - the panel stays inside the current `execution` screen; no new route was added
+  - the panel documents the current screen contract only:
+    - `Run ID`
+    - `Project`
+    - `Owner`
+    - `Environment`
+    - `Target URL`
+    - `Execution model`
+    - `Compare data templates`
+    - `Database connection`
+    - `Run -> POST /api/phase3/scheduler/requests`
+    - `Execution / Open Audit -> POST /api/phase3/scheduler/events`
+    - prepared-case / queue / monitor handoff boundaries
+  - close action is implemented and does not change existing launch/review form semantics
+- Boundary decisions:
+  - no backend endpoint was added
+  - no scheduler request or event semantic was changed
+  - no new route or protocol-management page was introduced
+  - `execution` remains a run-preparation and submission page
+- Remaining limits:
+  - the panel is descriptive only; it does not edit protocol payloads
+  - queue rows and prepared-case cards are still display-only
+- Test coverage:
+  - click hint button opens help panel
+  - click close button closes help panel
+  - form fields and existing action buttons remain usable while panel is open
+  - empty `runId` and queue/prepared-case variations do not block help-panel behavior
+
 ---
 
 ## 4. Priority P2

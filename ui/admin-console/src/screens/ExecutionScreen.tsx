@@ -108,6 +108,7 @@ export function ExecutionScreen({
 }: ExecutionScreenProps) {
   const t = (value: Copy) => translate(locale, value);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [contractPanelOpen, setContractPanelOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const [apiTemplates, setApiTemplates] = useState<DataTemplateItem[] | null>(null);
   const primaryProject = snapshot.projects.find((item) => item.key === launchForm.projectKey) ?? snapshot.projects[0];
@@ -193,6 +194,18 @@ export function ExecutionScreen({
     onSelectedTemplateIdsChange([...selectedTemplateIds, templateId]);
   }
 
+  function formatValue(value: string | null | undefined) {
+    return value && value.trim() ? value : "--";
+  }
+
+  const selectedTemplateSummary = selectedTemplates.length
+    ? selectedTemplates.map((item) => item.name).join(", ")
+    : t(copy("None selected"));
+
+  const queueSummary = queueLead
+    ? `${queueLead.title} / ${queueLead.state}`
+    : t(copy("No queued item in current snapshot."));
+
   return (
     <div className="executionConsoleScreen">
       <div className="dataTemplatesPath">{t(copy("Executions / run_8f2a1c3e", "执行 / run_8f2a1c3e", "実行 / run_8f2a1c3e"))}</div>
@@ -211,11 +224,154 @@ export function ExecutionScreen({
           <button type="button" className="projectsActionButton executionMonitorButton" onClick={onOpenMonitor}>
             {openMonitorLabel}
           </button>
-          <button type="button" className="projectsActionButton">
+          <button
+            type="button"
+            className="projectsActionButton"
+            aria-label="Open execution contract help"
+            onClick={() => setContractPanelOpen(true)}
+          >
             {executionSaveHint}
           </button>
         </div>
       </div>
+
+      {contractPanelOpen ? (
+        <aside
+          className="executionContractPanel"
+          role="dialog"
+          aria-label="Execution contract help panel"
+          data-testid="execution-contract-panel"
+        >
+          <div className="executionContractPanelHead">
+            <div>
+              <strong>{t(copy("Execution contract help"))}</strong>
+              <p>
+                {t(
+                  copy(
+                    "This panel explains the current local execution-page contract only. It does not create a new API, route, or scheduler semantic."
+                  )
+                )}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="projectsActionButton"
+              aria-label="Close execution contract help"
+              onClick={() => setContractPanelOpen(false)}
+            >
+              {t(copy("Close"))}
+            </button>
+          </div>
+
+          <div className="executionContractGrid">
+            <section className="executionContractSection">
+              <h3>{t(copy("Key inputs"))}</h3>
+              <dl className="executionContractList">
+                <div>
+                  <dt>{fieldRunIdLabel}</dt>
+                  <dd>{formatValue(launchForm.runId)}</dd>
+                </div>
+                <div>
+                  <dt>{fieldProjectLabel}</dt>
+                  <dd>{formatValue(primaryProject?.name ?? launchForm.projectKey)}</dd>
+                </div>
+                <div>
+                  <dt>{fieldOwnerLabel}</dt>
+                  <dd>{formatValue(launchForm.owner)}</dd>
+                </div>
+                <div>
+                  <dt>{fieldEnvironmentLabel}</dt>
+                  <dd>{formatValue(launchForm.environment)}</dd>
+                </div>
+                <div>
+                  <dt>{fieldTargetUrlLabel}</dt>
+                  <dd>{formatValue(launchForm.targetUrl)}</dd>
+                </div>
+                <div>
+                  <dt>{fieldExecutionModelLabel}</dt>
+                  <dd>{formatValue(launchForm.executionModel)}</dd>
+                </div>
+                <div>
+                  <dt>{t(copy("Compare data templates"))}</dt>
+                  <dd>{selectedTemplateSummary}</dd>
+                </div>
+                <div>
+                  <dt>{t(copy("Database connection"))}</dt>
+                  <dd>{formatValue(selectedDatabase?.name ?? selectedDatabaseId)}</dd>
+                </div>
+              </dl>
+            </section>
+
+            <section className="executionContractSection">
+              <h3>{t(copy("Requests and status"))}</h3>
+              <ul className="executionContractBulletList">
+                <li>
+                  <strong>{runLabel}</strong>
+                  <span>{` -> POST /api/phase3/scheduler/requests`}</span>
+                  <p>{t(copy("Queues the run request and then reloads the shared admin snapshot."))}</p>
+                </li>
+                <li>
+                  <strong>{executionLabel}</strong>
+                  <span>{` -> POST /api/phase3/scheduler/events`}</span>
+                  <p>{t(copy("Records the start event for the current run and then reloads the shared admin snapshot."))}</p>
+                </li>
+                <li>
+                  <strong>{openAuditLabel}</strong>
+                  <span>{` -> POST /api/phase3/scheduler/events`}</span>
+                  <p>{t(copy("Records the review or audit event for the current run context."))}</p>
+                </li>
+              </ul>
+              <dl className="executionContractList executionContractStateList">
+                <div>
+                  <dt>{t(copy("Launch state"))}</dt>
+                  <dd>{launchState.kind}</dd>
+                </div>
+                <div>
+                  <dt>{t(copy("Execution state"))}</dt>
+                  <dd>{executeState.kind}</dd>
+                </div>
+                <div>
+                  <dt>{t(copy("Audit state"))}</dt>
+                  <dd>{reviewState.kind}</dd>
+                </div>
+              </dl>
+            </section>
+
+            <section className="executionContractSection">
+              <h3>{t(copy("Current handoff boundary"))}</h3>
+              <ul className="executionContractBulletList">
+                <li>
+                  <strong>{t(copy("Prepared cases"))}</strong>
+                  <span>{` -> ${preparedCasesForProject.length}`}</span>
+                  <p>
+                    {t(
+                      copy(
+                        "Prepared cases come from the cases screen through app state only. They are filtered by the selected project and gate the Execution button."
+                      )
+                    )}
+                  </p>
+                </li>
+                <li>
+                  <strong>{t(copy("Queue"))}</strong>
+                  <span>{` -> GET /api/phase3/admin-console`}</span>
+                  <p>{queueSummary}</p>
+                </li>
+                <li>
+                  <strong>{t(copy("Monitor handoff"))}</strong>
+                  <span>{` -> ${formatValue(launchForm.runId)}`}</span>
+                  <p>
+                    {t(
+                      copy(
+                        "Open Exec Monitor is an app-level runId handoff only. The monitor screen owns runtime APIs after navigation."
+                      )
+                    )}
+                  </p>
+                </li>
+              </ul>
+            </section>
+          </div>
+        </aside>
+      ) : null}
 
       <div className="executionConsoleProgressCard">
         <div className="executionConsoleRing">

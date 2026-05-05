@@ -3489,3 +3489,41 @@ Verification:
 Remaining limits:
 - routing-rule editing is still single-rule local modal state, not a broader routing policy management surface
 - persistence still uses generic config-item storage instead of a typed `models` document API
+
+# 2026-05-05 P1-6 Execution Contract Hint Local Drawer
+
+Context:
+- Continued the next `execution` gap after P1-5 and kept the existing Phase 3 boundary: local front-end help only, no new backend endpoint, no scheduler semantic change, no new route.
+
+Implemented:
+- Updated `ui/admin-console/src/screens/ExecutionScreen.tsx` so the header contract hint button is now clickable.
+- Added a local execution-contract help panel inside the current `execution` screen.
+- The panel documents the current execution-page contract only and covers:
+  - `Run ID`
+  - `Project`
+  - `Owner`
+  - `Environment`
+  - `Target URL`
+  - `Execution model`
+  - `Compare data templates`
+  - `Database connection`
+  - `Run -> POST /api/phase3/scheduler/requests`
+  - `Execution / Open Audit -> POST /api/phase3/scheduler/events`
+  - prepared-case / queue / monitor handoff boundaries
+- Added local open/close state only; no route or backend ownership changed.
+- Updated `ui/admin-console/src/styles.css` for the new panel layout.
+- Added `ui/admin-console/src/screens/ExecutionScreen.test.tsx` with focused component coverage for open, close, non-regression while open, and empty run/queue variations.
+
+Docs synced:
+- `docs/phase3/interface/execution/functional-spec.md`
+- `docs/phase3/interface/execution/interface-spec.md`
+- `docs/phase3/interface/ui-control-interface-overview.md`
+- `docs/phase3/interface/review-backlog.md`
+
+Verification:
+- `npm test -- --run src/screens/ExecutionScreen.test.tsx` in `ui/admin-console`: PASS (4/4)
+- `npm run build` in `ui/admin-console`: PASS
+
+Remaining limits:
+- the panel is descriptive only; it does not edit payloads or manage protocols
+- queue rows and prepared-case cards remain display-only

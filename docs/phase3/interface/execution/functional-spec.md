@@ -86,7 +86,8 @@ This distinction matters:
 
 - scheduler mutations are real
 - monitor navigation is real
-- compare-template content is still front-end seeded rather than backend-backed
+- compare-template content is read from the shared data-template registry with local fallback
+- the execution contract hint now opens a local help panel instead of remaining visual-only
 
 ## 6. Functional Areas
 
@@ -110,7 +111,8 @@ Functional role:
 Current behavior:
 
 - `Open Exec Monitor` is implemented — passes `launchForm.runId` into `monitor` as canonical run context
-- the execution contract hint is visible but not wired
+- the execution contract hint opens a local execution-contract help panel
+- the help panel explains current field meanings, request targets, mutation states, and handoff boundaries without creating a new route or backend request
 
 ### 6.2 Execution Progress Card
 
@@ -259,8 +261,8 @@ The screen derives display context from:
 
 ### 7.3 Compare Template Data
 
-- compare-template options are currently provided by front-end seeded `dataTemplates`
-- this is not yet a true backend-backed execution-template catalog
+- compare-template options are read from `GET /api/phase3/data-templates`
+- `App.tsx` still keeps local fallback `dataTemplates` when the API is unavailable
 
 ### 7.4 Database Config Data
 
@@ -337,10 +339,10 @@ Current implementation summary:
   - `Run`
   - `Execution`
   - `Open Exec Monitor`
+  - execution contract help panel open/close
   - review field edits
   - `Open Audit`
 - visible but not implemented:
-  - execution contract hint button in header
   - queue row drill-down
   - prepared-case card drill-down
 
@@ -353,9 +355,9 @@ Current implementation summary:
   - output type: cross-screen navigation with `runId` handoff
   - current implementation: implemented — `openMonitor(launchForm.runId)` sets `selectedMonitorRunId` and switches screen
 - execution contract hint button
-  - function: should expose launch/event contract or operator guidance
-  - output type: future local help panel or interface reference
-  - current implementation: visual only
+  - function: expose launch/event contract and operator guidance for the current screen
+  - output type: local help panel
+  - current implementation: implemented
 
 ### 10.2 Launch Controls
 
@@ -426,6 +428,7 @@ Current implementation status:
 - execution readiness gate is implemented
 - template selection normalization is implemented
 - database selection fallback is implemented
+- execution contract help-panel state is implemented locally in `ExecutionScreen.tsx`
 - deeper queue/run drill-down state is not implemented
 
 ## 12. Validation and Rules
@@ -455,7 +458,7 @@ The screen depends on:
 - prepared case context from `cases`
 - model provider configuration from `models`
 - database config from `environments`
-- compare-template source from `dataTemplates` seed data
+- compare-template source from the shared `dataTemplates` registry with local fallback
 
 ### 13.2 Downstream Screens
 
@@ -491,17 +494,16 @@ The `execution` screen is not currently responsible for:
 - building prepared cases itself
 - loading true runtime monitor detail
 - loading full run report detail
-- loading true backend-backed compare-template catalog
+- managing compare-template catalog ownership beyond consuming the shared registry
 
 ## 15. Known Gaps and Review Items
 
 Review items discovered while documenting:
 
-- the header contract hint is rendered as a button but has no behavior.
 - queue rows are not wired to a detail or monitor drill-down.
 - prepared-case cards are not wired back to `cases` or forward to run/report context.
-- compare templates are still front-end seeded data, not backend-backed execution assets.
 - the launch form has only lightweight front-end validation, while the backend request endpoint accepts a broader but minimally validated payload.
+- the local execution contract panel is descriptive only; it does not become a protocol editor, route, or backend-owned contract surface.
 
 These are documentation review items only. No implementation change is made in this stage.
 
