@@ -273,6 +273,7 @@ Current behavior:
 - detail title/status/project identity come from the currently opened row plus `snapshot.cases`
 - detail hero subtitle now reuses current-case `historyState` summary when available and otherwise shows explicit preload/loading/unavailable text
 - Overview tab step list is front-end generated summary data, and the displayed assertion count is now derived from that same summary (`action === "assert"`)
+- the Overview step-card now explicitly labels this block as a local derived preview rather than a backend-authored execution timeline
 - DSL, state-machine, plans, and history tab content are loaded from dedicated backend APIs via `CaseDetailService`
 - opening a case in detail now preloads `plansState` and `historyState` for that case while keeping `activeTab` unchanged
 - sidebar `Plans` reuses `plansState.data` from that preload or from the `Plans` tab

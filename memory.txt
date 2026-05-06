@@ -1747,3 +1747,18 @@
     - no save-flow change
     - no test run
     - no build run
+- 2026-05-07: Completed the `cases` step-card derived-preview label cleanup.
+  - Updated `ui/admin-console/src/screens/CasesScreen.tsx`:
+    - added explicit step-card note: `Local derived preview; not a backend-loaded execution timeline.`
+    - kept the existing front-end-generated `detailSteps` model unchanged
+  - Synced docs/backlog:
+    - `docs/phase3/interface/cases/functional-spec.md`
+    - `docs/phase3/interface/cases/interface-spec.md`
+    - `docs/phase3/interface/review-backlog.md`
+  - Keep the explicit boundary:
+    - no new backend interface
+    - no route change
+    - no App-level handoff change
+    - no save-flow change
+    - no test run
+    - no build run

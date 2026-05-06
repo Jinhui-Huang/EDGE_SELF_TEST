@@ -986,6 +986,7 @@ export function CasesScreen({
                     <div className="casesPanelTitle">{t(copy("Steps"))}</div>
                     <span className="casesPanelPill">{`${detailSteps.length} steps | ${assertionStepCount} assertions`}</span>
                   </div>
+                  <p className="casesPanelText">{t(copy("Local derived preview; not a backend-loaded execution timeline."))}</p>
                   <div className="casesStepsList">
                     {detailSteps.map((step) => (
                       <div key={step.index} className="casesStepRow">
