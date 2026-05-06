@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Dispatch, FormEvent, SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatCopy, sharedCopy, translate } from "../i18n";
 import {
   AdminConsoleSnapshot,
@@ -43,7 +43,7 @@ type CasesScreenProps = {
   onSubmit: CasesScreenSubmitHandler;
 };
 
-type CasesScreenSubmitHandler = (event: React.FormEvent<HTMLFormElement>) => void;
+type CasesScreenSubmitHandler = (event: FormEvent<HTMLFormElement>) => void;
 
 type LocalizedCopy = {
   en: string;
@@ -60,33 +60,91 @@ type DetailStep = {
   healed?: boolean;
 };
 
+type RemoteState<T> = {
+  status: "idle" | "loading" | "success" | "empty" | "error";
+  data: T | null;
+  message: string;
+  caseId: string | null;
+};
+
+type MutationRequestKey = "dslValidate" | "dslSave" | "stateMachineSave";
+
 const copy = (en: string, zh = en, ja = en): LocalizedCopy => ({ en, zh, ja });
 const accentClasses = ["accent", "accent2", "accent3", "accent4"] as const;
 
-const detailTabs = [
-  copy("Overview", "概览", "概要"),
-  copy("DSL", "DSL", "DSL"),
-  copy("State machine", "状态机", "状態機械"),
-  copy("Plans", "计划", "計画"),
-  copy("History", "历史", "履历")
+const detailTabs: Array<{ key: CaseDetailTab; label: LocalizedCopy }> = [
+  { key: "overview", label: copy("Overview") },
+  { key: "dsl", label: copy("DSL") },
+  { key: "stateMachine", label: copy("State machine") },
+  { key: "plans", label: copy("Plans") },
+  { key: "history", label: copy("History") }
 ];
 
-function buildDetailSteps(testCase: CaseItem, locale: Locale): DetailStep[] {
-  const t = (value: LocalizedCopy) => translate(locale, value);
+function buildDetailSteps(testCase: CaseItem): DetailStep[] {
   const normalizedProject = testCase.projectKey || "project";
   const normalizedCase = testCase.id || "case";
   const successPath = `/${normalizedProject.replace(/-web|-center|-console/g, "").replace(/-/g, "/") || "flow"}`;
 
   return [
-    { index: 1, action: "open", selector: successPath, note: t(copy("Navigate to entry", "进入入口页", "入口ページへ移動")) },
-    { index: 2, action: "click", selector: "#primary-entry", note: t(copy("Locator healed once", "定位已修复 1 次", "ロケーターを 1 回修復")), healed: true },
+    { index: 1, action: "open", selector: successPath, note: "Navigate to entry." },
+    { index: 2, action: "click", selector: "#primary-entry", note: "Locator healed once.", healed: true },
     { index: 3, action: "fill", selector: "[name=account]", value: `${normalizedCase}@demo.local` },
     { index: 4, action: "type", selector: "[name=token]", value: "AUTO-E2E-2026" },
-    { index: 5, action: "click", selector: "button.primary", note: t(copy("Submit the happy path", "提交主路径流程", "ハッピーパスを送信")) },
-    { index: 6, action: "assert", selector: "url", value: `${successPath}/success/*`, note: t(copy("URL assertion", "URL 断言", "URL アサーション")) },
-    { index: 7, action: "assert", selector: "db", value: `${normalizedProject}.status = "done"`, note: t(copy("Database assertion", "数据库断言", "DB アサーション")) },
-    { index: 8, action: "assert", selector: "delta", value: "snapshot diff = expected", note: t(copy("Snapshot diff", "快照比对", "スナップショット差分")) }
+    { index: 5, action: "click", selector: "button.primary", note: "Submit the happy path." },
+    { index: 6, action: "assert", selector: "url", value: `${successPath}/success/*`, note: "URL assertion." },
+    { index: 7, action: "assert", selector: "db", value: `${normalizedProject}.status = "done"`, note: "Database assertion." },
+    { index: 8, action: "assert", selector: "delta", value: "snapshot diff = expected", note: "Snapshot diff." }
   ];
+}
+
+function createRemoteState<T>(): RemoteState<T> {
+  return {
+    status: "idle",
+    data: null,
+    message: "",
+    caseId: null
+  };
+}
+
+function renderRemoteState(
+  locale: Locale,
+  state: RemoteState<unknown>,
+  loading: LocalizedCopy,
+  fallbackEmpty: LocalizedCopy
+) {
+  const t = (value: LocalizedCopy) => translate(locale, value);
+  if (state.status === "loading") {
+    return (
+      <section className="casesPanelCard">
+        <p className="casesPanelText">{t(loading)}</p>
+      </section>
+    );
+  }
+  if (state.status === "empty" || state.status === "error") {
+    return (
+      <section className="casesPanelCard">
+        <p className="casesPanelText">{state.message || t(fallbackEmpty)}</p>
+      </section>
+    );
+  }
+  return null;
+}
+
+function hasAnyItems(value: unknown): boolean {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const data = value as Record<string, unknown>;
+  if (Array.isArray(data.plans)) {
+    return data.plans.length > 0 || (Array.isArray(data.preconditions) && data.preconditions.length > 0);
+  }
+  if (Array.isArray(data.runs)) {
+    return data.runs.length > 0 || (Array.isArray(data.maintenanceEvents) && data.maintenanceEvents.length > 0);
+  }
+  if (Array.isArray(data.nodes)) {
+    return data.nodes.length > 0 || Array.isArray(data.edges) || Array.isArray(data.guards);
+  }
+  return true;
 }
 
 export function CasesScreen({
@@ -110,119 +168,326 @@ export function CasesScreen({
   const [overviewCollapsed, setOverviewCollapsed] = useState(true);
   const [activeTab, setActiveTab] = useState<CaseDetailTab>("overview");
 
-  // ---- API-backed tab data ----
-  const [dslData, setDslData] = useState<CaseDslResponse | null>(null);
-  const [dslDraft, setDslDraft] = useState<string>("");
+  const [dslState, setDslState] = useState<RemoteState<CaseDslResponse>>(() => createRemoteState());
+  const [dslDraft, setDslDraft] = useState("");
   const [dslValidation, setDslValidation] = useState<CaseDslValidateResponse | null>(null);
-  const [dslSaving, setDslSaving] = useState(false);
-  const [smData, setSmData] = useState<CaseStateMachineResponse | null>(null);
-  const [plansData, setPlansData] = useState<CasePlansResponse | null>(null);
-  const [historyData, setHistoryData] = useState<CaseHistoryResponse | null>(null);
-  const [tabLoading, setTabLoading] = useState(false);
+  const [dslActionState, setDslActionState] = useState<MutationState>({ kind: "idle", message: "" });
 
-  const tabKeys: CaseDetailTab[] = ["overview", "dsl", "stateMachine", "plans", "history"];
+  const [stateMachineState, setStateMachineState] = useState<RemoteState<CaseStateMachineResponse>>(() => createRemoteState());
+  const [stateMachineActionState, setStateMachineActionState] = useState<MutationState>({ kind: "idle", message: "" });
+
+  const [plansState, setPlansState] = useState<RemoteState<CasePlansResponse>>(() => createRemoteState());
+  const [historyState, setHistoryState] = useState<RemoteState<CaseHistoryResponse>>(() => createRemoteState());
+  const openedCaseIdRef = useRef<string | null>(null);
+  const consumedHandoffRef = useRef<string | null>(null);
+  const requestVersionRef = useRef<Record<CaseDetailTab, number>>({
+    overview: 0,
+    dsl: 0,
+    stateMachine: 0,
+    plans: 0,
+    history: 0
+  });
+  const requestAbortRef = useRef<Partial<Record<CaseDetailTab, AbortController>>>({});
+  const mutationVersionRef = useRef<Record<MutationRequestKey, number>>({
+    dslValidate: 0,
+    dslSave: 0,
+    stateMachineSave: 0
+  });
+
+  const isCurrentCaseMutation = useCallback((caseId: string, key: MutationRequestKey, version: number) => {
+    return openedCaseIdRef.current === caseId && mutationVersionRef.current[key] === version;
+  }, []);
 
   const fetchTabData = useCallback(
-    async (tab: CaseDetailTab, caseId: string) => {
-      setTabLoading(true);
+    async <T,>(
+      tab: CaseDetailTab,
+      url: string,
+      caseId: string,
+      setState: Dispatch<SetStateAction<RemoteState<T>>>,
+      emptyMessage: LocalizedCopy
+    ) => {
+      requestAbortRef.current[tab]?.abort();
+      const controller = new AbortController();
+      requestAbortRef.current[tab] = controller;
+      const requestVersion = (requestVersionRef.current[tab] ?? 0) + 1;
+      requestVersionRef.current[tab] = requestVersion;
+      setState({ status: "loading", data: null, message: "", caseId });
       try {
-        if (tab === "dsl") {
-          const res = await fetch(`${apiBaseUrl}/api/phase3/cases/${caseId}/dsl`);
-          if (res.ok) {
-            const data: CaseDslResponse = await res.json();
-            setDslData(data);
-            setDslDraft(JSON.stringify(data.definition, null, 2));
-            setDslValidation(null);
-          }
-        } else if (tab === "stateMachine") {
-          const res = await fetch(`${apiBaseUrl}/api/phase3/cases/${caseId}/state-machine`);
-          if (res.ok) setSmData(await res.json());
-        } else if (tab === "plans") {
-          const res = await fetch(`${apiBaseUrl}/api/phase3/cases/${caseId}/plans`);
-          if (res.ok) setPlansData(await res.json());
-        } else if (tab === "history") {
-          const res = await fetch(`${apiBaseUrl}/api/phase3/cases/${caseId}/history`);
-          if (res.ok) setHistoryData(await res.json());
+        const response = await fetch(url, { signal: controller.signal });
+        if (requestVersionRef.current[tab] !== requestVersion) {
+          return null;
         }
-      } catch {
-        /* network error – keep previous data */
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const data = (await response.json()) as T;
+        if (requestVersionRef.current[tab] !== requestVersion) {
+          return null;
+        }
+        if (!hasAnyItems(data)) {
+          setState({ status: "empty", data: null, message: t(emptyMessage), caseId });
+          return null;
+        }
+        setState({ status: "success", data, message: "", caseId });
+        return data;
+      } catch (error) {
+        if (controller.signal.aborted || (error instanceof Error && error.name === "AbortError")) {
+          return null;
+        }
+        if (requestVersionRef.current[tab] !== requestVersion) {
+          return null;
+        }
+        setState({
+          status: "error",
+          data: null,
+          message: t(copy("Failed to load case detail.")),
+          caseId
+        });
+        return null;
       } finally {
-        setTabLoading(false);
+        if (requestAbortRef.current[tab] === controller) {
+          delete requestAbortRef.current[tab];
+        }
       }
     },
-    [apiBaseUrl]
+    [t]
+  );
+
+  const loadDsl = useCallback(
+    async (caseId: string) => {
+      const data = await fetchTabData<CaseDslResponse>(
+        "dsl",
+        `${apiBaseUrl}/api/phase3/cases/${encodeURIComponent(caseId)}/dsl`,
+        caseId,
+        setDslState,
+        copy("No DSL document yet.")
+      );
+      if (data) {
+        setDslDraft(JSON.stringify(data.definition, null, 2));
+        setDslValidation(null);
+        setDslActionState({ kind: "idle", message: "" });
+      }
+    },
+    [apiBaseUrl, fetchTabData]
+  );
+
+  const loadStateMachine = useCallback(
+    async (caseId: string) => {
+      await fetchTabData<CaseStateMachineResponse>(
+        "stateMachine",
+        `${apiBaseUrl}/api/phase3/cases/${encodeURIComponent(caseId)}/state-machine`,
+        caseId,
+        setStateMachineState,
+        copy("No state-machine data yet.")
+      );
+    },
+    [apiBaseUrl, fetchTabData]
+  );
+
+  const loadPlans = useCallback(
+    async (caseId: string) => {
+      await fetchTabData<CasePlansResponse>(
+        "plans",
+        `${apiBaseUrl}/api/phase3/cases/${encodeURIComponent(caseId)}/plans`,
+        caseId,
+        setPlansState,
+        copy("No plans yet.")
+      );
+    },
+    [apiBaseUrl, fetchTabData]
+  );
+
+  const loadHistory = useCallback(
+    async (caseId: string) => {
+      await fetchTabData<CaseHistoryResponse>(
+        "history",
+        `${apiBaseUrl}/api/phase3/cases/${encodeURIComponent(caseId)}/history`,
+        caseId,
+        setHistoryState,
+        copy("No history yet.")
+      );
+    },
+    [apiBaseUrl, fetchTabData]
   );
 
   const handleValidateDsl = useCallback(
     async (caseId: string) => {
+      const requestVersion = mutationVersionRef.current.dslValidate + 1;
+      mutationVersionRef.current.dslValidate = requestVersion;
+      setDslActionState({ kind: "pending", message: t(copy("Validating DSL...")) });
+      let definition: unknown;
       try {
-        const definition = JSON.parse(dslDraft);
-        const res = await fetch(`${apiBaseUrl}/api/phase3/cases/${caseId}/dsl/validate`, {
+        definition = JSON.parse(dslDraft);
+      } catch {
+        if (!isCurrentCaseMutation(caseId, "dslValidate", requestVersion)) {
+          return;
+        }
+        setDslValidation({ status: "INVALID", errors: ["Invalid JSON"], warnings: [] });
+        setDslActionState({ kind: "error", message: t(copy("Invalid JSON.")) });
+        return;
+      }
+
+      try {
+        const response = await fetch(`${apiBaseUrl}/api/phase3/cases/${encodeURIComponent(caseId)}/dsl/validate`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ definition })
         });
-        if (res.ok) setDslValidation(await res.json());
-      } catch {
-        setDslValidation({ status: "INVALID", errors: ["Invalid JSON"], warnings: [] });
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const result: CaseDslValidateResponse = await response.json();
+        if (!isCurrentCaseMutation(caseId, "dslValidate", requestVersion)) {
+          return;
+        }
+        setDslValidation(result);
+        setDslActionState({
+          kind: result.status === "VALID" ? "success" : "warning",
+          message: result.status === "VALID" ? t(copy("DSL validation passed.")) : t(copy("DSL validation returned issues."))
+        });
+      } catch (error) {
+        if (!isCurrentCaseMutation(caseId, "dslValidate", requestVersion)) {
+          return;
+        }
+        setDslValidation(null);
+        setDslActionState({
+          kind: "error",
+          message: error instanceof Error ? error.message : t(copy("Failed to validate DSL."))
+        });
       }
     },
-    [apiBaseUrl, dslDraft]
+    [apiBaseUrl, dslDraft, isCurrentCaseMutation, t]
   );
 
   const handleSaveDsl = useCallback(
     async (caseId: string, projectKey: string) => {
-      setDslSaving(true);
+      const requestVersion = mutationVersionRef.current.dslSave + 1;
+      mutationVersionRef.current.dslSave = requestVersion;
+      setDslActionState({ kind: "pending", message: t(copy("Saving DSL...")) });
       try {
         const definition = JSON.parse(dslDraft);
-        const res = await fetch(`${apiBaseUrl}/api/phase3/cases/${caseId}/dsl`, {
+        const response = await fetch(`${apiBaseUrl}/api/phase3/cases/${encodeURIComponent(caseId)}/dsl`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ definition, projectKey, updatedBy: "operator" })
         });
-        if (res.ok) {
-          const saved: CaseDslSaveResponse = await res.json();
-          setDslData((prev) => (prev ? { ...prev, dslVersion: saved.dslVersion, updatedAt: saved.updatedAt } : prev));
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
         }
+        const saved: CaseDslSaveResponse = await response.json();
+        if (!isCurrentCaseMutation(caseId, "dslSave", requestVersion)) {
+          return;
+        }
+        setDslState((current) =>
+          current.data && current.caseId === caseId
+            ? {
+                ...current,
+                status: "success",
+                data: {
+                  ...current.data,
+                  dslVersion: saved.dslVersion,
+                  updatedAt: saved.updatedAt,
+                  updatedBy: "operator",
+                  definition
+                }
+              }
+            : current
+        );
+        setDslValidation(null);
+        setDslActionState({ kind: "success", message: t(copy("DSL saved.")) });
       } catch {
-        /* save failed */
-      } finally {
-        setDslSaving(false);
+        if (!isCurrentCaseMutation(caseId, "dslSave", requestVersion)) {
+          return;
+        }
+        setDslActionState({ kind: "error", message: t(copy("Failed to save DSL.")) });
       }
     },
-    [apiBaseUrl, dslDraft]
+    [apiBaseUrl, dslDraft, isCurrentCaseMutation, t]
   );
 
   const handleSaveStateMachine = useCallback(
     async (caseId: string) => {
-      if (!smData) return;
+      const current = stateMachineState.data;
+      if (!current) {
+        return;
+      }
+      const requestVersion = mutationVersionRef.current.stateMachineSave + 1;
+      mutationVersionRef.current.stateMachineSave = requestVersion;
+      setStateMachineActionState({ kind: "pending", message: t(copy("Saving state machine...")) });
       try {
-        const res = await fetch(`${apiBaseUrl}/api/phase3/cases/${caseId}/state-machine`, {
+        const response = await fetch(`${apiBaseUrl}/api/phase3/cases/${encodeURIComponent(caseId)}/state-machine`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ projectKey: smData.projectKey, nodes: smData.nodes, edges: smData.edges, guards: smData.guards })
+          body: JSON.stringify({
+            projectKey: current.projectKey,
+            nodes: current.nodes,
+            edges: current.edges,
+            guards: current.guards
+          })
         });
-        if (res.ok) {
-          const saved = await res.json();
-          setSmData((prev) => (prev ? { ...prev, updatedAt: saved.updatedAt } : prev));
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
         }
+        const saved = (await response.json()) as { updatedAt: string };
+        if (!isCurrentCaseMutation(caseId, "stateMachineSave", requestVersion)) {
+          return;
+        }
+        setStateMachineState((previous) =>
+          previous.data && previous.caseId === caseId
+            ? {
+                ...previous,
+                status: "success",
+                data: {
+                  ...previous.data,
+                  updatedAt: saved.updatedAt
+                }
+              }
+            : previous
+        );
+        setStateMachineActionState({ kind: "success", message: t(copy("State machine saved.")) });
       } catch {
-        /* save failed */
+        if (!isCurrentCaseMutation(caseId, "stateMachineSave", requestVersion)) {
+          return;
+        }
+        setStateMachineActionState({ kind: "error", message: t(copy("Failed to save state machine.")) });
       }
     },
-    [apiBaseUrl, smData]
+    [apiBaseUrl, isCurrentCaseMutation, stateMachineState.data, t]
   );
 
   useEffect(() => {
     const normalizedProjectKey = initialProjectKey?.trim();
-    if (!normalizedProjectKey) {
+    const normalizedCaseId = initialCaseId?.trim();
+    if (!normalizedProjectKey && !normalizedCaseId) {
       return;
     }
-    if (snapshot.projects.some((project) => project.key === normalizedProjectKey) && normalizedProjectKey !== selectedProjectKey) {
-      setSelectedProjectKey(normalizedProjectKey);
-      setOpenedCaseId(null);
+    const handoffKey = `${normalizedProjectKey ?? ""}::${normalizedCaseId ?? ""}`;
+    if (consumedHandoffRef.current === handoffKey) {
+      return;
     }
-  }, [initialProjectKey, selectedProjectKey, snapshot.projects]);
+
+    let nextProjectKey = normalizedProjectKey ?? null;
+    let nextOpenedCaseId: string | null = null;
+    const matchedCase = normalizedCaseId ? caseDraft.find((item) => item.id === normalizedCaseId) ?? null : null;
+
+    if (matchedCase) {
+      if (!nextProjectKey || matchedCase.projectKey === nextProjectKey) {
+        nextProjectKey = matchedCase.projectKey;
+        nextOpenedCaseId = matchedCase.id;
+      }
+    }
+
+    if (nextProjectKey && snapshot.projects.some((project) => project.key === nextProjectKey) && nextProjectKey !== selectedProjectKey) {
+      setSelectedProjectKey(nextProjectKey);
+    }
+    if (nextOpenedCaseId !== openedCaseId) {
+      setOpenedCaseId(nextOpenedCaseId);
+    }
+    if (nextOpenedCaseId) {
+      setOverviewCollapsed(true);
+    }
+    consumedHandoffRef.current = handoffKey;
+  }, [caseDraft, initialCaseId, initialProjectKey, openedCaseId, selectedProjectKey, snapshot.projects]);
 
   useEffect(() => {
     if (selectedProjectKey === "all") {
@@ -252,37 +517,49 @@ export function CasesScreen({
   }, [openedCaseId, visibleCases]);
 
   useEffect(() => {
-    const normalizedCaseId = initialCaseId?.trim();
-    if (!normalizedCaseId) {
-      return;
-    }
-    const matchedCase = visibleCases.find((item) => item.id === normalizedCaseId);
-    if (!matchedCase) {
-      return;
-    }
-    if (openedCaseId !== matchedCase.id) {
-      setOpenedCaseId(matchedCase.id);
-      setOverviewCollapsed(true);
-    }
-  }, [initialCaseId, openedCaseId, visibleCases]);
-
-  // Reset tab data when case changes
-  useEffect(() => {
-    setActiveTab("overview");
-    setDslData(null);
-    setDslDraft("");
-    setDslValidation(null);
-    setSmData(null);
-    setPlansData(null);
-    setHistoryData(null);
+    openedCaseIdRef.current = openedCaseId;
   }, [openedCaseId]);
 
-  // Fetch data when tab changes
   useEffect(() => {
-    if (openedCaseId && activeTab !== "overview") {
-      fetchTabData(activeTab, openedCaseId);
+    setActiveTab("overview");
+    for (const controller of Object.values(requestAbortRef.current)) {
+      controller?.abort();
     }
-  }, [activeTab, openedCaseId, fetchTabData]);
+    requestAbortRef.current = {};
+    setDslState(createRemoteState());
+    setDslDraft("");
+    setDslValidation(null);
+    setDslActionState({ kind: "idle", message: "" });
+    setStateMachineState(createRemoteState());
+    setStateMachineActionState({ kind: "idle", message: "" });
+    setPlansState(createRemoteState());
+    setHistoryState(createRemoteState());
+  }, [openedCaseId]);
+
+  useEffect(() => () => {
+    for (const controller of Object.values(requestAbortRef.current)) {
+      controller?.abort();
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!openedCaseId || activeTab === "overview") {
+      return;
+    }
+    if (activeTab === "dsl") {
+      void loadDsl(openedCaseId);
+      return;
+    }
+    if (activeTab === "stateMachine") {
+      void loadStateMachine(openedCaseId);
+      return;
+    }
+    if (activeTab === "plans") {
+      void loadPlans(openedCaseId);
+      return;
+    }
+    void loadHistory(openedCaseId);
+  }, [activeTab, loadDsl, loadHistory, loadPlans, loadStateMachine, openedCaseId]);
 
   const openedCase = visibleCases.find((item) => item.id === openedCaseId) ?? null;
   const selectedProject =
@@ -295,7 +572,7 @@ export function CasesScreen({
   const activeCases = visibleCases.filter((item) => !item.archived).length;
   const archivedCases = visibleCases.filter((item) => item.archived).length;
   const happyCases = visibleCases.filter((item) => /active|happy|pass/i.test(item.status)).length;
-  const detailSteps = openedCase ? buildDetailSteps(openedCase, locale) : [];
+  const detailSteps = openedCase ? buildDetailSteps(openedCase) : [];
   const passBlocks = Array.from({ length: 20 }, (_, index) => {
     if (index === 7 || index === 13) {
       return "fail";
@@ -314,13 +591,7 @@ export function CasesScreen({
             <p className="eyebrow">{snapshot.navigation.find((item) => item.id === "cases")?.label}</p>
             <h2>{title}</h2>
             <p className="casesOverviewLead">
-              {t(
-                copy(
-                  "Switch projects first, then open one case in detail view. Pre-execution is available only inside the lower detail canvas.",
-                  "先切项目，再打开某个用例明细。预执行只在下方详情画布内可用。",
-                  "先にプロジェクトを切り替え、ケース詳細を開きます。事前実行は下の詳細キャンバスでのみ使えます。"
-                )
-              )}
+              {t(copy("Switch projects first, then open one case in detail view. Pre-execution is available only inside the lower detail canvas."))}
             </p>
           </div>
           <div className="casesOverviewActions">
@@ -329,7 +600,7 @@ export function CasesScreen({
               type="button"
               className="casesCollapseButton"
               aria-expanded={!overviewCollapsed}
-              aria-label={overviewCollapsed ? t(copy("Expand case overview", "展开用例概览", "ケース概要を展開")) : t(copy("Collapse case overview", "收起用例概览", "ケース概要を折りたたむ"))}
+              aria-label={overviewCollapsed ? t(copy("Expand case overview")) : t(copy("Collapse case overview"))}
               onClick={() => setOverviewCollapsed((current) => !current)}
             >
               <span className={`casesCollapseIcon ${overviewCollapsed ? "isCollapsed" : ""}`}>^</span>
@@ -339,8 +610,8 @@ export function CasesScreen({
 
         {overviewCollapsed ? (
           <div className="casesCollapsedSummary">
-            <span className="casesCollapsedLabel">{t(copy("Overview collapsed", "概览已收起", "概要を折りたたみ"))}</span>
-            <strong>{openedCase?.name ?? selectedProject?.name ?? t(copy("Expand above to choose a case", "展开后选择用例", "展開してケースを選択"))}</strong>
+            <span className="casesCollapsedLabel">{t(copy("Overview collapsed"))}</span>
+            <strong>{openedCase?.name ?? selectedProject?.name ?? t(copy("Expand above to choose a case"))}</strong>
           </div>
         ) : null}
 
@@ -369,8 +640,8 @@ export function CasesScreen({
                       <span>{projectCases.length}</span>
                     </div>
                     <div className="casesProjectCardMeta">
-                      <span>{t(copy("Cases", "用例", "ケース"))}</span>
-                      <span>{t(copy("Env", "环境", "環境"))}: {project.environments}</span>
+                      <span>{t(copy("Cases"))}</span>
+                      <span>{t(copy("Env"))}: {project.environments}</span>
                     </div>
                   </button>
                 );
@@ -380,19 +651,19 @@ export function CasesScreen({
 
           <div className="casesCatalogSummary">
             <div className="casesMetric">
-              <span>{t(copy("Visible cases", "当前用例", "表示ケース"))}</span>
+              <span>{t(copy("Visible cases"))}</span>
               <strong>{totalCases}</strong>
             </div>
             <div className="casesMetric">
-              <span>{t(copy("Active", "活跃", "アクティブ"))}</span>
+              <span>{t(copy("Active"))}</span>
               <strong>{activeCases}</strong>
             </div>
             <div className="casesMetric">
-              <span>{t(copy("Archived", "归档", "アーカイブ"))}</span>
+              <span>{t(copy("Archived"))}</span>
               <strong>{archivedCases}</strong>
             </div>
             <div className="casesMetric">
-              <span>{t(copy("Happy path", "主路径", "ハッピーパス"))}</span>
+              <span>{t(copy("Happy path"))}</span>
               <strong>{happyCases}</strong>
             </div>
           </div>
@@ -400,10 +671,10 @@ export function CasesScreen({
           <div className="casesListPanel">
             <div className="casesListPanelHead">
               <div>
-                <p className="eyebrow">{t(copy("Case catalog", "用例目录", "ケースカタログ"))}</p>
-                <h3>{selectedProject?.name ?? t(copy("All projects", "全部项目", "すべてのプロジェクト"))}</h3>
+                <p className="eyebrow">{t(copy("Case catalog"))}</p>
+                <h3>{selectedProject?.name ?? t(copy("All projects"))}</h3>
               </div>
-              <span className="casesListHint">{t(copy("Open detail to unlock actions", "打开明细后才解锁动作", "詳細を開くと操作が有効になります"))}</span>
+              <span className="casesListHint">{t(copy("Open detail to unlock actions"))}</span>
             </div>
 
             <div className="casesListTable">
@@ -418,7 +689,7 @@ export function CasesScreen({
                     </div>
                     <div className="casesListMeta">
                       <span className={`casesStatusBadge ${/active/i.test(testCase.status) ? "isActive" : ""}`}>{testCase.status}</span>
-                      <span>{snapshotCase?.updatedAt ?? t(copy("New row", "新行", "新規行"))}</span>
+                      <span>{snapshotCase?.updatedAt ?? t(copy("New row"))}</span>
                     </div>
                     <div className="casesListTags">
                       {(testCase.tags || "")
@@ -438,7 +709,7 @@ export function CasesScreen({
                         setOverviewCollapsed(true);
                       }}
                     >
-                      {isOpened ? t(copy("Opened", "已打开", "表示中")) : t(copy("Detail", "详情", "詳細"))}
+                      {isOpened ? t(copy("Opened")) : t(copy("Detail"))}
                     </button>
                   </article>
                 );
@@ -451,36 +722,29 @@ export function CasesScreen({
 
       <section className="casesDetailScreen">
         <div className="casesDetailPath">
-          {openedCase ? `${t(copy("Cases", "用例", "ケース"))} / ${openedCase.name || openedCase.id}` : t(copy("Cases / Select one row above", "用例 / 先从上方选择一条", "ケース / 上で 1 件選択"))}
+          {openedCase ? `${t(copy("Cases"))} / ${openedCase.name || openedCase.id}` : t(copy("Cases / Select one row above"))}
         </div>
 
         <div className="casesDetailHero">
           <div>
             <div className="casesDetailTitleRow">
-              <h3>{openedCase?.name ?? t(copy("Case detail locked", "用例详情未激活", "ケース詳細は未選択"))}</h3>
-              <span className="casesHappyBadge">{openedCase?.status ?? t(copy("Locked", "未激活", "未選択"))}</span>
+              <h3>{openedCase?.name ?? t(copy("Case detail locked"))}</h3>
+              <span className="casesHappyBadge">{openedCase?.status ?? t(copy("Locked"))}</span>
             </div>
             <p className="casesDetailSubtitle">
               {openedCase
                 ? t(
                     copy(
-                      `From project ${openedCase.projectKey} | updated ${snapshot.cases.find((item) => item.id === openedCase.id)?.updatedAt ?? "recently"} | 14 runs this week | 100% pass`,
-                      `来自项目 ${openedCase.projectKey} | 更新于 ${snapshot.cases.find((item) => item.id === openedCase.id)?.updatedAt ?? "最近"} | 本周 14 次运行 | 100% 通过`,
-                      `プロジェクト ${openedCase.projectKey} | 更新 ${snapshot.cases.find((item) => item.id === openedCase.id)?.updatedAt ?? "recently"} | 今週 14 実行 | 成功率 100%`
+                      `From project ${openedCase.projectKey} | updated ${snapshot.cases.find((item) => item.id === openedCase.id)?.updatedAt ?? "recently"} | 14 runs this week | 100% pass`
                     )
                   )
-                : t(copy("Choose one case from the overview list to load the detail canvas.", "先从上面的列表选择用例，再加载详情画布。", "上の一覧からケースを選ぶと詳細キャンバスを表示します。"))}
+                : t(copy("Choose one case from the overview list to load the detail canvas."))}
             </p>
           </div>
 
           <div className="casesHeroActions">
-            <button
-              type="button"
-              className="casesActionButton ghost"
-              disabled={!openedCase}
-              onClick={() => setActiveTab("dsl")}
-            >
-              {t(copy("Edit DSL", "编辑 DSL", "DSL 編集"))}
+            <button type="button" className="casesActionButton ghost" disabled={!openedCase} onClick={() => setActiveTab("dsl")}>
+              {t(copy("Edit DSL"))}
             </button>
             <button
               type="button"
@@ -488,7 +752,7 @@ export function CasesScreen({
               disabled={!openedCase}
               onClick={() => setActiveTab("stateMachine")}
             >
-              {t(copy("State machine", "状态机", "状態機械"))}
+              {t(copy("State machine"))}
             </button>
             <button
               type="button"
@@ -500,21 +764,21 @@ export function CasesScreen({
                 }
               }}
             >
-              {t(copy("Pre-execution", "预执行", "事前実行"))}
+              {t(copy("Pre-execution"))}
             </button>
           </div>
         </div>
 
         <div className="casesTabs">
-          {detailTabs.map((tab, index) => (
+          {detailTabs.map((tab) => (
             <button
-              key={tab.en}
+              key={tab.key}
               type="button"
-              className={`casesTab ${activeTab === tabKeys[index] ? "isActive" : ""}`}
+              className={`casesTab ${activeTab === tab.key ? "isActive" : ""}`}
               disabled={!openedCase}
-              onClick={() => setActiveTab(tabKeys[index])}
+              onClick={() => setActiveTab(tab.key)}
             >
-              {t(tab)}
+              {t(tab.label)}
             </button>
           ))}
         </div>
@@ -522,14 +786,10 @@ export function CasesScreen({
         {openedCase ? (
           <div className="casesDetailGrid">
             <div className="casesDetailMain">
-              {tabLoading ? (
-                <section className="casesPanelCard">
-                  <p className="casesPanelText">{t(copy("Loading…", "加载中…", "読み込み中…"))}</p>
-                </section>
-              ) : activeTab === "overview" ? (
+              {activeTab === "overview" ? (
                 <section className="casesPanelCard casesStepsCard">
                   <div className="casesPanelHead">
-                    <div className="casesPanelTitle">{t(copy("Steps", "步骤", "ステップ"))}</div>
+                    <div className="casesPanelTitle">{t(copy("Steps"))}</div>
                     <span className="casesPanelPill">{detailSteps.length} steps | 5 assertions</span>
                   </div>
                   <div className="casesStepsList">
@@ -544,98 +804,107 @@ export function CasesScreen({
                     ))}
                   </div>
                 </section>
-              ) : activeTab === "dsl" ? (
-                <section className="casesPanelCard">
-                  <div className="casesPanelHead">
-                    <div className="casesPanelTitle">
-                      {t(copy("DSL Editor", "DSL 编辑器", "DSL エディタ"))}
-                      {dslData ? ` (v${dslData.dslVersion})` : ""}
-                    </div>
-                    <div className="casesPanelActions">
-                      <button type="button" className="casesActionButton ghost" onClick={() => handleValidateDsl(openedCase.id)}>
-                        {t(copy("Validate", "校验", "検証"))}
-                      </button>
-                      <button
-                        type="button"
-                        className="casesActionButton primary"
-                        disabled={dslSaving}
-                        onClick={() => handleSaveDsl(openedCase.id, openedCase.projectKey)}
-                      >
-                        {dslSaving ? t(copy("Saving…", "保存中…", "保存中…")) : t(copy("Save DSL", "保存 DSL", "DSL 保存"))}
-                      </button>
-                    </div>
-                  </div>
-                  {dslValidation ? (
-                    <div className={`casesDslValidation ${dslValidation.status === "VALID" ? "isValid" : "isInvalid"}`}>
-                      <strong>{dslValidation.status}</strong>
-                      {dslValidation.errors.map((e, i) => (
-                        <p key={i} className="errorText">{e}</p>
-                      ))}
-                      {dslValidation.warnings.map((w, i) => (
-                        <p key={i} className="warningText">{w}</p>
-                      ))}
-                    </div>
-                  ) : null}
-                  <textarea
-                    className="casesDslEditor"
-                    rows={16}
-                    value={dslDraft}
-                    onChange={(e) => setDslDraft(e.target.value)}
-                  />
-                  {dslData ? (
-                    <div className="casesDslMeta">
-                      <span>{t(copy("Updated by", "更新者", "更新者"))}: {dslData.updatedBy}</span>
-                      <span>{t(copy("Updated at", "更新于", "更新日時"))}: {dslData.updatedAt}</span>
-                    </div>
-                  ) : null}
-                </section>
-              ) : activeTab === "stateMachine" ? (
-                <section className="casesPanelCard">
-                  <div className="casesPanelHead">
-                    <div className="casesPanelTitle">{t(copy("State Machine", "状态机", "状態機械"))}</div>
-                    <button type="button" className="casesActionButton primary" onClick={() => handleSaveStateMachine(openedCase.id)}>
-                      {t(copy("Save", "保存", "保存"))}
-                    </button>
-                  </div>
-                  {smData ? (
-                    <>
+              ) : null}
+
+              {activeTab === "dsl"
+                ? dslState.status !== "success" || !dslState.data
+                  ? renderRemoteState(locale, dslState, copy("Loading DSL..."), copy("No DSL document yet."))
+                  : (
+                    <section className="casesPanelCard">
+                      <div className="casesPanelHead">
+                        <div className="casesPanelTitle">
+                          {t(copy("DSL Editor"))} (v{dslState.data.dslVersion})
+                        </div>
+                        <div className="casesPanelActions">
+                          <button type="button" className="casesActionButton ghost" onClick={() => handleValidateDsl(openedCase.id)}>
+                            {t(copy("Validate"))}
+                          </button>
+                          <button
+                            type="button"
+                            className="casesActionButton primary"
+                            disabled={dslActionState.kind === "pending"}
+                            onClick={() => handleSaveDsl(openedCase.id, openedCase.projectKey)}
+                          >
+                            {dslActionState.kind === "pending" ? t(copy("Saving...")) : t(copy("Save DSL"))}
+                          </button>
+                        </div>
+                      </div>
+                      <MutationStatus state={dslActionState} />
+                      {dslValidation ? (
+                        <div className={`casesDslValidation ${dslValidation.status === "VALID" ? "isValid" : "isInvalid"}`}>
+                          <strong>{dslValidation.status}</strong>
+                          {dslValidation.errors.map((error) => (
+                            <p key={error} className="errorText">{error}</p>
+                          ))}
+                          {dslValidation.warnings.map((warning) => (
+                            <p key={warning} className="warningText">{warning}</p>
+                          ))}
+                        </div>
+                      ) : null}
+                      <textarea className="casesDslEditor" rows={16} value={dslDraft} onChange={(event) => setDslDraft(event.target.value)} />
+                      <div className="casesDslMeta">
+                        <span>{t(copy("Updated by"))}: {dslState.data.updatedBy}</span>
+                        <span>{t(copy("Updated at"))}: {dslState.data.updatedAt}</span>
+                      </div>
+                    </section>
+                    )
+                : null}
+
+              {activeTab === "stateMachine"
+                ? stateMachineState.status !== "success" || !stateMachineState.data
+                  ? renderRemoteState(locale, stateMachineState, copy("Loading state machine..."), copy("No state-machine data yet."))
+                  : (
+                    <section className="casesPanelCard">
+                      <div className="casesPanelHead">
+                        <div className="casesPanelTitle">{t(copy("State machine"))}</div>
+                        <button type="button" className="casesActionButton primary" onClick={() => handleSaveStateMachine(openedCase.id)}>
+                          {t(copy("Save"))}
+                        </button>
+                      </div>
+                      <MutationStatus state={stateMachineActionState} />
                       <div className="casesSmNodes">
-                        <strong>{t(copy("Nodes", "节点", "ノード"))}</strong>
+                        <strong>{t(copy("Nodes"))}</strong>
                         <div className="casesSmNodeList">
-                          {smData.nodes.map((node) => (
+                          {stateMachineState.data.nodes.map((node) => (
                             <span key={node.id} className="casesSmNode">{node.label} ({node.id})</span>
                           ))}
                         </div>
                       </div>
                       <div className="casesSmEdges">
-                        <strong>{t(copy("Edges", "边", "エッジ"))}</strong>
-                        {smData.edges.map((edge, i) => (
-                          <div key={i} className="casesSmEdge">
-                            {edge.from} → {edge.to} <span className="casesPanelPill">{edge.action}</span>
-                          </div>
-                        ))}
+                        <strong>{t(copy("Edges"))}</strong>
+                        {stateMachineState.data.edges.length ? (
+                          stateMachineState.data.edges.map((edge, index) => (
+                            <div key={`${edge.from}-${edge.to}-${index}`} className="casesSmEdge">
+                              {edge.from} to {edge.to} <span className="casesPanelPill">{edge.action}</span>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="casesPanelText">{t(copy("No edges."))}</p>
+                        )}
                       </div>
-                      {smData.guards.length > 0 ? (
-                        <div className="casesSmGuards">
-                          <strong>{t(copy("Guards", "守卫条件", "ガード"))}</strong>
-                          {smData.guards.map((g) => (
-                            <div key={g.id} className="casesSmGuard">{g.id}: {g.description}</div>
-                          ))}
-                        </div>
-                      ) : null}
-                    </>
-                  ) : (
-                    <p className="casesPanelText">{t(copy("No data", "无数据", "データなし"))}</p>
-                  )}
-                </section>
-              ) : activeTab === "plans" ? (
-                <section className="casesPanelCard">
-                  <div className="casesPanelTitle">{t(copy("Plans", "计划", "計画"))}</div>
-                  {plansData ? (
-                    <>
-                      {plansData.plans.map((plan) => (
+                      <div className="casesSmGuards">
+                        <strong>{t(copy("Guards"))}</strong>
+                        {stateMachineState.data.guards.length ? (
+                          stateMachineState.data.guards.map((guard) => (
+                            <div key={guard.id} className="casesSmGuard">{guard.id}: {guard.description}</div>
+                          ))
+                        ) : (
+                          <p className="casesPanelText">{t(copy("No guards."))}</p>
+                        )}
+                      </div>
+                    </section>
+                    )
+                : null}
+
+              {activeTab === "plans"
+                ? plansState.status !== "success" || !plansState.data
+                  ? renderRemoteState(locale, plansState, copy("Loading plans..."), copy("No plans yet."))
+                  : (
+                    <section className="casesPanelCard">
+                      <div className="casesPanelTitle">{t(copy("Plans"))}</div>
+                      {plansState.data.plans.map((plan) => (
                         <div key={plan.id} className="casesPlanRow">
-                          <span className="casesPlanDot accent2">•</span>
+                          <span className="casesPlanDot accent2">*</span>
                           <div>
                             <strong>{plan.name}</strong>
                             <p>{plan.summary}</p>
@@ -643,67 +912,70 @@ export function CasesScreen({
                           </div>
                         </div>
                       ))}
-                      {plansData.preconditions.length > 0 ? (
+                      {plansState.data.preconditions.length ? (
                         <div className="casesPlanPreconditions">
-                          <strong>{t(copy("Preconditions", "前置条件", "前提条件"))}</strong>
+                          <strong>{t(copy("Preconditions"))}</strong>
                           <ul>
-                            {plansData.preconditions.map((pc, i) => (
-                              <li key={i}>{pc}</li>
+                            {plansState.data.preconditions.map((item) => (
+                              <li key={item}>{item}</li>
                             ))}
                           </ul>
                         </div>
                       ) : null}
-                    </>
-                  ) : (
-                    <p className="casesPanelText">{t(copy("No data", "无数据", "データなし"))}</p>
-                  )}
-                </section>
-              ) : activeTab === "history" ? (
-                <section className="casesPanelCard">
-                  <div className="casesPanelTitle">{t(copy("History", "历史", "履历"))}</div>
-                  {historyData ? (
-                    <>
+                    </section>
+                    )
+                : null}
+
+              {activeTab === "history"
+                ? historyState.status !== "success" || !historyState.data
+                  ? renderRemoteState(locale, historyState, copy("Loading history..."), copy("No history yet."))
+                  : (
+                    <section className="casesPanelCard">
+                      <div className="casesPanelTitle">{t(copy("History"))}</div>
                       <div className="casesHistoryRuns">
-                        <strong>{t(copy("Runs", "运行记录", "実行履歴"))}</strong>
-                        {historyData.runs.map((run, i) => (
-                          <div key={i} className="casesHistoryRun">
-                            <span className={`casesStatusBadge ${run.status === "SUCCESS" ? "isActive" : ""}`}>{run.status}</span>
-                            <strong>{run.runName}</strong>
-                            <span>{run.finishedAt}</span>
-                            <span>{run.reportEntry}</span>
-                          </div>
-                        ))}
-                      </div>
-                      {historyData.maintenanceEvents.length > 0 ? (
-                        <div className="casesHistoryMaintenance">
-                          <strong>{t(copy("Maintenance events", "维护事件", "保守イベント"))}</strong>
-                          {historyData.maintenanceEvents.map((evt, i) => (
-                            <div key={i} className="casesHistoryEvent">
-                              <span>{evt.type}</span>
-                              <span>{evt.operator}</span>
-                              <span>{evt.summary}</span>
-                              <small>{evt.at}</small>
+                        <strong>{t(copy("Runs"))}</strong>
+                        {historyState.data.runs.length ? (
+                          historyState.data.runs.map((run) => (
+                            <div key={`${run.runName}-${run.finishedAt}`} className="casesHistoryRun">
+                              <span className={`casesStatusBadge ${run.status === "SUCCESS" ? "isActive" : ""}`}>{run.status}</span>
+                              <strong>{run.runName}</strong>
+                              <span>{run.finishedAt}</span>
+                              <span>{run.reportEntry}</span>
                             </div>
-                          ))}
-                        </div>
-                      ) : null}
-                    </>
-                  ) : (
-                    <p className="casesPanelText">{t(copy("No data", "无数据", "データなし"))}</p>
-                  )}
-                </section>
-              ) : null}
+                          ))
+                        ) : (
+                          <p className="casesPanelText">{t(copy("No runs yet."))}</p>
+                        )}
+                      </div>
+                      <div className="casesHistoryMaintenance">
+                        <strong>{t(copy("Maintenance events"))}</strong>
+                        {historyState.data.maintenanceEvents.length ? (
+                          historyState.data.maintenanceEvents.map((event) => (
+                            <div key={`${event.type}-${event.at}`} className="casesHistoryEvent">
+                              <span>{event.type}</span>
+                              <span>{event.operator}</span>
+                              <span>{event.summary}</span>
+                              <small>{event.at}</small>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="casesPanelText">{t(copy("No maintenance events yet."))}</p>
+                        )}
+                      </div>
+                    </section>
+                    )
+                : null}
             </div>
 
             <aside className="casesDetailSide">
               <section className="casesPanelCard">
-                <div className="casesPanelTitle">{t(copy("Info", "信息", "情報"))}</div>
+                <div className="casesPanelTitle">{t(copy("Info"))}</div>
                 <div className="casesMetaRow">
-                  <span>{t(copy("Source", "来源", "ソース"))}</span>
+                  <span>{t(copy("Source"))}</span>
                   <strong>{`${openedCase.projectKey}.md`}</strong>
                 </div>
                 <div className="casesMetaRow">
-                  <span>{t(copy("Tags", "标签", "タグ"))}</span>
+                  <span>{t(copy("Tags"))}</span>
                   <div className="casesInlineTags">
                     {(openedCase.tags || "")
                       .split(",")
@@ -715,46 +987,46 @@ export function CasesScreen({
                   </div>
                 </div>
                 <div className="casesMetaRow">
-                  <span>{t(copy("Owner", "负责人", "担当"))}</span>
+                  <span>{t(copy("Owner"))}</span>
                   <strong>Lin Chen</strong>
                 </div>
                 <div className="casesMetaRow">
-                  <span>{t(copy("Last run", "最近运行", "前回実行"))}</span>
+                  <span>{t(copy("Last run"))}</span>
                   <strong className="successText">pass | 2m ago</strong>
                 </div>
                 <div className="casesMetaRow">
-                  <span>{t(copy("Updated", "更新时间", "更新"))}</span>
+                  <span>{t(copy("Updated"))}</span>
                   <strong>{snapshot.cases.find((item) => item.id === openedCase.id)?.updatedAt ?? "--"}</strong>
                 </div>
               </section>
 
               <section className="casesPanelCard">
-                <div className="casesPanelTitle">{t(copy("Plans", "计划", "計画"))}</div>
+                <div className="casesPanelTitle">{t(copy("Plans"))}</div>
                 <div className="casesPlanRow">
-                  <span className="casesPlanDot accent2">•</span>
+                  <span className="casesPlanDot accent2">*</span>
                   <div>
                     <strong>{`plan.${openedCase.projectKey}.seed.v2`}</strong>
-                    <p>{t(copy("Data plan seeds account and fixtures.", "数据计划会预置账号和夹具。", "データ計画でアカウントとフィクスチャを準備します。"))}</p>
+                    <p>{t(copy("Data plan seeds account and fixtures."))}</p>
                   </div>
                 </div>
                 <div className="casesPlanRow">
-                  <span className="casesPlanDot accent3">•</span>
+                  <span className="casesPlanDot accent3">*</span>
                   <div>
                     <strong>plan.restore.snapshot</strong>
-                    <p>{t(copy("Restore from SQL snapshot after run.", "运行后按 SQL 快照恢复。", "実行後に SQL スナップショットから復元します。"))}</p>
+                    <p>{t(copy("Restore from SQL snapshot after run."))}</p>
                   </div>
                 </div>
                 <div className="casesPlanRow">
-                  <span className="casesPlanDot accent">•</span>
+                  <span className="casesPlanDot accent">*</span>
                   <div>
                     <strong>plan.diff.expected</strong>
-                    <p>{t(copy("Compare the expected delta before sign-off.", "签收前比对预期差异。", "サインオフ前に期待差分を比較します。"))}</p>
+                    <p>{t(copy("Compare the expected delta before sign-off."))}</p>
                   </div>
                 </div>
               </section>
 
               <section className="casesPanelCard">
-                <div className="casesPanelTitle">{t(copy("Recent runs", "最近运行", "最近の実行"))}</div>
+                <div className="casesPanelTitle">{t(copy("Recent runs"))}</div>
                 <div className="casesRunBars">
                   {passBlocks.map((block, index) => (
                     <span key={index} className={`casesRunBar ${block}`} />
@@ -773,9 +1045,9 @@ export function CasesScreen({
               </section>
 
               <section className="casesPanelCard">
-                <div className="casesPanelTitle">{t(copy("Catalog status", "目录状态", "カタログ状態"))}</div>
+                <div className="casesPanelTitle">{t(copy("Catalog status"))}</div>
                 <p className="casesPanelText">
-                  {formatCopy(t(copy("Current project: {name}", "当前项目：{name}", "現在のプロジェクト: {name}")), {
+                  {formatCopy(t(copy("Current project: {name}")), {
                     name: selectedProject?.name ?? "--"
                   })}
                 </p>
@@ -786,8 +1058,8 @@ export function CasesScreen({
         ) : (
           <div className="casesLockedState">
             <div className="casesLockedCard">
-              <strong>{t(copy("Detail area is waiting", "详情区域等待中", "詳細エリアは待機中"))}</strong>
-              <p>{t(copy("Pick one case above and click Detail. The lower canvas will switch to the exact case-detail layout and enable Pre-execution.", "先在上方选择一条用例并点击详情，下方画布就会切到该用例的详情布局，并启用预执行。", "上でケースを選び Detail を押すと、下のキャンバスがそのケース詳細に切り替わり、事前実行が有効になります。"))}</p>
+              <strong>{t(copy("Detail area is waiting"))}</strong>
+              <p>{t(copy("Pick one case above and click Detail. The lower canvas will switch to the exact case-detail layout and enable Pre-execution."))}</p>
             </div>
           </div>
         )}

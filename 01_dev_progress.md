@@ -3820,3 +3820,130 @@ Remaining limits:
 - uploaded documents are still not restored from backend on remount / fresh app load because the document catalog remains synthetic
 - there is still no canonical `GET /api/phase3/documents`
 - version history is still event metadata only; it does not expose per-version raw snapshots or diffs
+
+## 2026-05-06 P2-3 Cases editor-side UX hardening and backlog sync
+
+## Task
+- Re-check the real `cases` implementation against the current docs and backlog.
+- Keep scope inside the existing Phase 3 boundary:
+  - no new route system
+  - no execution/report/plugin protocol changes
+  - no new backend surface unless the current case-detail chain proved incomplete
+
+## Completed
+- Re-verified the current `cases` chain end-to-end:
+  - backend `CaseDetailService` and `LocalAdminApiServer` already implement the documented `dsl`, `dsl/validate`, `state-machine`, `plans`, and `history` endpoints
+  - backend endpoint coverage for those interfaces already exists in `LocalAdminApiServerTest`
+- Rewrote `ui/admin-console/src/screens/CasesScreen.tsx` into a clean, backend-first detail screen because the existing file had both weak UX state handling and heavy text corruption.
+- Kept the same Phase 3 interface boundary, but tightened the screen behavior:
+  - `DSL`, `State machine`, `Plans`, and `History` now each surface explicit loading / empty / error states
+  - DSL validate/save now surface explicit mutation feedback
+  - state-machine save now surfaces explicit mutation feedback
+  - switching the opened case resets the active tab to `overview` and clears stale tab-specific backend data
+  - first opening a case still stays local; backend reads are tab-driven as designed
+- Added focused frontend coverage in `ui/admin-console/src/screens/CasesScreen.test.tsx` for:
+  - DSL load / validate / save
+  - invalid-JSON validation feedback
+  - plans/history empty-vs-success surfacing
+  - state-machine save feedback
+  - case-switch reset behavior
+- Synced stale documentation state:
+  - `docs/phase3/interface/review-backlog.md` now marks `P2-3` as DONE with the current boundary and remaining limits
+  - `docs/phase3/interface/cases/functional-spec.md`
+  - `docs/phase3/interface/cases/interface-spec.md`
+
+## Modified Files
+- `ui/admin-console/src/screens/CasesScreen.tsx`
+- `ui/admin-console/src/screens/CasesScreen.test.tsx`
+- `docs/phase3/interface/cases/functional-spec.md`
+- `docs/phase3/interface/cases/interface-spec.md`
+- `docs/phase3/interface/review-backlog.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Passed: `npm run build` in `ui/admin-console`
+- Attempted but not used as gate:
+  - `npm test -- --run src/screens/CasesScreen.test.tsx`
+  - `npx vitest run src/screens/CasesScreen.test.tsx --pool=forks --poolOptions.forks.singleFork --reporter=verbose`
+  - both remained unstable in the current machine environment (timeout / Vitest worker startup pressure), so build plus code/test inspection is the reliable verification result for this pass
+
+## Remaining Limits
+- sidebar info/plans/recent-run panels are still presentational snapshot-derived display
+- app-level case catalog save exists, but the visible `cases` screen still does not expose an editable catalog form
+- history run rows still do not hand off into `reportDetail`
+- plans and history remain read-only on the current Phase 3 boundary
+
+## 2026-05-06 CasesScreen handoff and validate review follow-up
+
+## Task
+- Fix the two new `CasesScreen` review findings without expanding scope:
+  - make `initialProjectKey` / `initialCaseId` one-shot handoff input only, so later manual project switching is not overwritten by stale handoff props
+  - separate local DSL JSON parse failure from backend/network validate failure so only local parse errors show `Invalid JSON`
+
+## Completed
+- Updated `ui/admin-console/src/screens/CasesScreen.tsx`:
+  - added one-shot handoff consumption for `initialProjectKey` / `initialCaseId`
+  - old handoff props no longer re-open or re-select the prior case after the operator manually switches project
+  - `handleValidateDsl()` now parses JSON in a dedicated local step before the backend request
+  - local parse failure still renders `Invalid JSON`
+  - backend/non-2xx validation failure now keeps real error state and no longer synthesizes fake `dslValidation` output
+- Updated `ui/admin-console/src/App.tsx`:
+  - normal sidebar navigation into `cases` now clears stored case handoff project/id so remounting the screen does not replay an old handoff
+- Extended frontend coverage:
+  - `ui/admin-console/src/App.test.tsx`
+    - manual project switch still works after prepared-case handoff into `cases`
+  - `ui/admin-console/src/screens/CasesScreen.test.tsx`
+    - local invalid JSON stays local-only
+    - validate non-2xx shows real error state instead of fake `Invalid JSON`
+
+## Modified Files
+- `ui/admin-console/src/screens/CasesScreen.tsx`
+- `ui/admin-console/src/screens/CasesScreen.test.tsx`
+- `ui/admin-console/src/App.tsx`
+- `ui/admin-console/src/App.test.tsx`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Passed: `npm test -- --run src/App.test.tsx -t "allows manual project switching after a cases handoff without reapplying the old handoff|clears the one-shot prepared-case handoff when cases is reopened from normal navigation|opens cases from execution prepared-case drill-down via the existing App handoff"` in `ui/admin-console`
+- Passed: `npm run build` in `ui/admin-console`
+- Attempted but not used as gate:
+  - `npm test -- --run src/screens/CasesScreen.test.tsx`
+  - `npx vitest run src/screens/CasesScreen.test.tsx -t "shows invalid JSON feedback without sending validate request|keeps backend validation failures as real error state without synthesizing invalid JSON" --pool=forks --poolOptions.forks.singleFork`
+  - current machine still shows the same Vitest hang / worker-startup instability for this test file, so `build` plus the App-targeted run are the stable verification results here
+
+## 2026-05-06 P2-3 CasesScreen race and URL-encoding review follow-up
+
+## Task
+- Address the current review findings in `CasesScreen` without expanding scope:
+  - isolate or abort in-flight tab requests so stale responses cannot overwrite a newly opened case
+  - apply `encodeURIComponent` to all case-detail fetch URLs
+  - add focused frontend coverage for the stale-response race and caseId URL encoding
+
+## Completed
+- Updated `ui/admin-console/src/screens/CasesScreen.tsx`:
+  - added per-tab abort + request-version isolation for `dsl`, `stateMachine`, `plans`, and `history`
+  - switching case or reopening the same tab now aborts the old in-flight request for that tab
+  - late responses from an older request version are ignored even if they still resolve
+  - all case-detail fetch URLs now encode `caseId` via `encodeURIComponent`
+- Extended `ui/admin-console/src/screens/CasesScreen.test.tsx` with two focused cases:
+  - stale DSL response arrives after switching to another case and must not overwrite the newer case detail
+  - encoded `caseId` is used in the backend detail URL
+
+## Modified Files
+- `ui/admin-console/src/screens/CasesScreen.tsx`
+- `ui/admin-console/src/screens/CasesScreen.test.tsx`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Passed: `npm run build` in `ui/admin-console`
+- Not run by design in this pass:
+  - targeted Vitest execution was skipped per current local workflow preference because frontend tests on this machine are frequently unstable / blocking
+
+## Remaining Limits
+- sidebar info/plans/recent-run panels are still presentational snapshot-derived display
+- app-level case catalog save exists, but the visible `cases` screen still does not expose an editable catalog form
+- history run rows still do not hand off into `reportDetail`
+- plans and history remain read-only on the current Phase 3 boundary

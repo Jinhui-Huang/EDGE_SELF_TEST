@@ -1590,6 +1590,7 @@ export function App() {
       setSelectedMonitorRunId(null);
     }
     if (screen === "cases") {
+      setSelectedCaseProjectKey(null);
       setSelectedCaseId(null);
     }
     setActiveScreen(screen);

@@ -66,6 +66,7 @@ Current implementation facts:
 - The page is rendered by `CasesScreen.tsx`.
 - The page behaves as a case overview plus lower detail canvas with API-backed tab switching.
 - The page performs direct `fetch` calls to the backend for case-detail artifacts (DSL, state-machine, plans, history).
+- The page now surfaces explicit loading / empty / error feedback for each backend-backed detail tab.
 - Implemented outward actions on the screen:
   - `Pre-execution`: stores prepared case context in app state for later use by `execution`
   - `Edit DSL`: switches to DSL tab, fetches `GET /api/phase3/cases/{caseId}/dsl`, provides validate (`POST .../dsl/validate`) and save (`PUT .../dsl`)
@@ -79,6 +80,7 @@ This matters for review:
 - the screen now includes both read-and-handoff and read/write capabilities for case detail artifacts
 - app-level write capability for case catalog exists in the shell but is not exposed by this screen UI
 - the DSL editor and state-machine viewer are functional with backend persistence
+- switching cases now resets backend-backed tab state so stale DSL/state-machine/plans/history data does not bleed across cases
 
 ## 6. Functional Areas
 
@@ -211,6 +213,7 @@ Current behavior:
 - `Plans` tab fetches and displays plans list with preconditions
 - `History` tab fetches and displays run history and maintenance events
 - tab state resets to `overview` when the opened case changes
+- backend-backed tabs surface loading / empty / error states explicitly
 
 ### 6.7 Detail Main Panel
 
@@ -229,8 +232,8 @@ Functional role:
 Current behavior:
 
 - Overview tab: steps are derived by front-end helper `buildDetailSteps` (local presentational view model)
-- DSL tab: loaded from `GET /api/phase3/cases/{caseId}/dsl`, editable as JSON, validate via `POST .../dsl/validate`, save via `PUT .../dsl`
-- State machine tab: loaded from `GET /api/phase3/cases/{caseId}/state-machine`, save via `PUT .../state-machine`
+- DSL tab: loaded from `GET /api/phase3/cases/{caseId}/dsl`, editable as JSON, validate via `POST .../dsl/validate`, save via `PUT .../dsl`, and surfaces mutation feedback
+- State machine tab: loaded from `GET /api/phase3/cases/{caseId}/state-machine`, save via `PUT .../state-machine`, and surfaces mutation feedback
 - Plans tab: loaded from `GET /api/phase3/cases/{caseId}/plans`
 - History tab: loaded from `GET /api/phase3/cases/{caseId}/history`
 
@@ -505,6 +508,8 @@ Resolved items (P2-3):
 - `State machine` is now implemented with backend-backed read/save.
 - Tabs now switch the detail canvas with API-backed data loading.
 - Detail main panel content is now driven by per-tab backend data for DSL, state-machine, plans, and history tabs.
+- backend-backed tabs now show explicit loading / empty / error states.
+- changing the opened case now resets tab selection and clears stale backend-backed tab state.
 
 Remaining items:
 

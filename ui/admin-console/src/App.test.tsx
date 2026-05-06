@@ -2207,6 +2207,35 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "Opened" })).toBeInTheDocument();
   });
 
+  it("allows manual project switching after a cases handoff without reapplying the old handoff", async () => {
+    const fetchMock = vi.fn().mockImplementation((call: unknown) => {
+      const url = String(call);
+      if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
+      if (url.endsWith("/api/phase3/data-templates")) return jsonResponse(dataTemplatesResponse);
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    await screen.findByText("Needs attention");
+
+    await userEvent.click((await screen.findAllByRole("button", { name: /Cases/ }))[0]);
+    await userEvent.click((await screen.findAllByRole("button", { name: "Detail" }))[0]);
+    await userEvent.click(await screen.findByRole("button", { name: "Pre-execution" }));
+
+    await userEvent.click((await screen.findAllByRole("button", { name: /Execution/ }))[0]);
+    await userEvent.click(screen.getByRole("button", { name: "Open prepared case Checkout smoke in cases" }));
+    expect(await screen.findByRole("heading", { name: "Checkout smoke" })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /member-center/i }));
+
+    expect(await screen.findByRole("heading", { name: "member-center" })).toBeInTheDocument();
+    expect(await screen.findByText("Detail area is waiting")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Checkout smoke" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Opened" })).not.toBeInTheDocument();
+  });
+
   it("clears the one-shot prepared-case handoff when cases is reopened from normal navigation", async () => {
     const fetchMock = vi.fn().mockImplementation((call: unknown) => {
       const url = String(call);

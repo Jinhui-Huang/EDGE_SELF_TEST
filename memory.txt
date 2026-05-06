@@ -1464,3 +1464,73 @@
     - `01_dev_progress.md`
   - Verification:
     - `npm run build` in `ui/admin-console`: PASS
+- 2026-05-06: Completed the current `P2-3 cases` follow-up within the existing Phase 3 boundary.
+  - Re-checked the real implementation first instead of trusting the stale backlog text.
+  - Confirmed the backend case-detail chain was already implemented:
+    - `GET /api/phase3/cases/{caseId}/dsl`
+    - `POST /api/phase3/cases/{caseId}/dsl/validate`
+    - `PUT /api/phase3/cases/{caseId}/dsl`
+    - `GET /api/phase3/cases/{caseId}/state-machine`
+    - `PUT /api/phase3/cases/{caseId}/state-machine`
+    - `GET /api/phase3/cases/{caseId}/plans`
+    - `GET /api/phase3/cases/{caseId}/history`
+  - Rewrote `ui/admin-console/src/screens/CasesScreen.tsx` because the prior screen file had both weak UX state handling and heavy text corruption.
+  - Kept the same Phase 3 boundary and tightened the frontend behavior only:
+    - explicit loading / empty / error surfacing for backend-backed tabs
+    - explicit mutation feedback for DSL validate/save and state-machine save
+    - case switch resets active tab to `overview` and clears stale tab-specific data
+  - Added focused frontend coverage in `ui/admin-console/src/screens/CasesScreen.test.tsx` for:
+    - DSL load / validate / save
+    - invalid JSON validation feedback
+    - plans/history state surfacing
+    - state-machine save feedback
+    - case-switch reset behavior
+  - Synced stale docs so `P2-3` is now marked DONE in:
+    - `docs/phase3/interface/cases/functional-spec.md`
+    - `docs/phase3/interface/cases/interface-spec.md`
+    - `docs/phase3/interface/review-backlog.md`
+  - Verification:
+    - `npm run build` in `ui/admin-console`: PASS
+  - Attempted but not used as gate:
+    - `npm test -- --run src/screens/CasesScreen.test.tsx`
+    - `npx vitest run src/screens/CasesScreen.test.tsx --pool=forks --poolOptions.forks.singleFork --reporter=verbose`
+    - current machine still shows Vitest timeout / worker startup instability, so build is the stable verification result
+- 2026-05-06: Completed the current `CasesScreen` review-fix follow-up.
+  - Added real in-flight request isolation to `ui/admin-console/src/screens/CasesScreen.tsx`:
+    - per-tab `AbortController`
+    - per-tab request-version guards
+    - old case/tab responses can no longer overwrite the currently opened case detail
+  - Applied `encodeURIComponent(caseId)` to all case-detail fetch URLs:
+    - DSL read / validate / save
+    - state-machine read / save
+    - plans read
+    - history read
+  - Extended `ui/admin-console/src/screens/CasesScreen.test.tsx` with focused coverage for:
+    - stale response race after switching case
+    - encoded caseId in backend detail URL
+  - Verification:
+    - `npm run build` in `ui/admin-console`: PASS
+  - Not run by design in this pass:
+    - targeted Vitest execution was skipped under the current local workflow preference because frontend tests on this machine are frequently unstable / blocking
+- 2026-05-06: Completed the `CasesScreen` one-shot handoff and validate-error review follow-up.
+  - Updated `ui/admin-console/src/screens/CasesScreen.tsx` so:
+    - `initialProjectKey` / `initialCaseId` are consumed as one-shot handoff input only
+    - manual project switching after a `cases` handoff is no longer overwritten by the stale handoff props
+    - `handleValidateDsl()` now separates local JSON parse failure from backend/non-2xx validate failure
+    - only local parse failure synthesizes `Invalid JSON`
+    - backend validate failure now preserves the real error state and no longer fabricates `dslValidation`
+  - Updated `ui/admin-console/src/App.tsx` so normal sidebar navigation into `cases` clears the stored case handoff project/id before remount.
+  - Extended frontend coverage:
+    - `ui/admin-console/src/App.test.tsx`
+      - manual project switch still works after prepared-case handoff into `cases`
+      - existing prepared-case handoff / clear-on-normal-navigation coverage kept passing
+    - `ui/admin-console/src/screens/CasesScreen.test.tsx`
+      - local invalid JSON stays local-only
+      - validate non-2xx shows real error state instead of fake `Invalid JSON`
+  - Verification:
+    - `npm test -- --run src/App.test.tsx -t "allows manual project switching after a cases handoff without reapplying the old handoff|clears the one-shot prepared-case handoff when cases is reopened from normal navigation|opens cases from execution prepared-case drill-down via the existing App handoff"` in `ui/admin-console`: PASS
+    - `npm run build` in `ui/admin-console`: PASS
+  - Attempted but not used as gate:
+    - `npm test -- --run src/screens/CasesScreen.test.tsx`
+    - `npx vitest run src/screens/CasesScreen.test.tsx -t "shows invalid JSON feedback without sending validate request|keeps backend validation failures as real error state without synthesizing invalid JSON" --pool=forks --poolOptions.forks.singleFork`
+    - this machine still shows the same Vitest hang / worker-startup instability for the `CasesScreen` test file

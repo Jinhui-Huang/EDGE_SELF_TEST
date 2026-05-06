@@ -441,20 +441,31 @@ It does not authorize UI or backend changes in the current phase.
   - reports/view reports -> reports handoff
   - existing project catalog save/list rendering non-regression
 
-### P2-3. Complete `cases` editor-side read/write interfaces
+### P2-3. Complete `cases` editor-side read/write interfaces DONE
 
 - Screens:
   - `cases`
-- Current gap:
-  - `Edit DSL`, `State machine`, plans/history tabs, and case-detail reads remain incomplete.
-- Required interfaces:
-  - `GET /api/phase3/cases/{caseId}/dsl`
-  - `POST /api/phase3/cases/{caseId}/dsl/validate`
-  - `PUT /api/phase3/cases/{caseId}/dsl`
-  - `GET /api/phase3/cases/{caseId}/state-machine`
-  - `PUT /api/phase3/cases/{caseId}/state-machine`
-  - `GET /api/phase3/cases/{caseId}/plans`
-  - `GET /api/phase3/cases/{caseId}/history`
+- Resolved:
+  - backend-backed case-detail interfaces are implemented and consumed by `CasesScreen`:
+    - `GET /api/phase3/cases/{caseId}/dsl`
+    - `POST /api/phase3/cases/{caseId}/dsl/validate`
+    - `PUT /api/phase3/cases/{caseId}/dsl`
+    - `GET /api/phase3/cases/{caseId}/state-machine`
+    - `PUT /api/phase3/cases/{caseId}/state-machine`
+    - `GET /api/phase3/cases/{caseId}/plans`
+    - `GET /api/phase3/cases/{caseId}/history`
+  - `Edit DSL` and `State machine` hero actions now switch to the corresponding backend-backed tabs
+  - all detail tabs are now functional with explicit loading / empty / error surfacing
+  - DSL validate/save and state-machine save now expose explicit mutation feedback
+  - changing the opened case resets the active tab to `overview` and clears stale tab-specific detail state
+- Remaining limits:
+  - sidebar info/plans/recent-run panels are still presentational snapshot-derived display
+  - app-level case catalog save already exists, but the visible `cases` screen still does not expose an editable catalog form
+  - history run rows still do not hand off into `reportDetail`
+  - plans and history remain read-only on the current Phase 3 boundary
+- Test coverage:
+  - backend case-detail endpoint coverage in `LocalAdminApiServerTest`
+  - frontend `CasesScreen` coverage for DSL load/validate/save, plans/history state surfacing, state-machine save feedback, and case-switch reset behavior
 
 ### P2-4. Complete `docParse` document-service actions DONE
 

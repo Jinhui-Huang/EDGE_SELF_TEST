@@ -43,6 +43,7 @@ Current `cases` screen conclusion:
   - `PUT /api/phase3/cases/{caseId}/state-machine` (save state-machine)
   - `GET /api/phase3/cases/{caseId}/plans` (read plans)
   - `GET /api/phase3/cases/{caseId}/history` (read history)
+- backend-backed tabs now surface explicit loading / empty / error states, plus local mutation feedback where save or validate exists
 - real implemented handoff:
   - `Pre-execution` updates app-level prepared-case state and later feeds `execution`
 - app-level case catalog write capability exists in the shell:
@@ -87,11 +88,9 @@ Relevant snapshot fields for this screen:
   - `openedCaseId`
   - `overviewCollapsed`
   - `activeTab` (`CaseDetailTab`)
-  - `dslData`, `dslDraft`, `dslValidation`, `dslSaving`
-  - `smData`
-  - `plansData`
-  - `historyData`
-  - `tabLoading`
+  - per-tab remote states for DSL, state-machine, plans, and history
+  - `dslDraft`, `dslValidation`
+  - local mutation feedback for DSL validate/save and state-machine save
 
 ## 4. Screen-Adjacent Handoff: Pre-execution to Execution
 
@@ -308,6 +307,7 @@ These controls change screen state but do not call the backend directly.
 - effect:
   - switches the detail main panel content to the selected tab's API-backed data
   - tab state resets to `overview` when the opened case changes
+  - stale tab data is cleared when the opened case changes
 
 ## 7. UI Control to Interface Mapping
 
@@ -399,6 +399,7 @@ These controls change screen state but do not call the backend directly.
 - user action: click
 - request: `GET /api/phase3/cases/{caseId}/dsl` on tab activation
 - provides: JSON textarea editor, validate button (`POST .../dsl/validate`), save button (`PUT .../dsl`)
+- explicit states: loading / success / error, plus validate/save mutation feedback
 - current state: implemented
 
 #### `State machine`
@@ -406,6 +407,7 @@ These controls change screen state but do not call the backend directly.
 - user action: click
 - request: `GET /api/phase3/cases/{caseId}/state-machine` on tab activation
 - provides: nodes/edges/guards display, save button (`PUT .../state-machine`)
+- explicit states: loading / success / error, plus save mutation feedback
 - current state: implemented
 
 #### `Plans`
@@ -413,6 +415,7 @@ These controls change screen state but do not call the backend directly.
 - user action: click
 - request: `GET /api/phase3/cases/{caseId}/plans` on tab activation
 - provides: plans list with name/summary/type, preconditions list
+- explicit states: loading / empty / error
 - current state: implemented
 
 #### `History`
@@ -420,6 +423,7 @@ These controls change screen state but do not call the backend directly.
 - user action: click
 - request: `GET /api/phase3/cases/{caseId}/history` on tab activation
 - provides: run records with status/name/time/reportEntry, maintenance events
+- explicit states: loading / empty / error
 - current state: implemented
 
 ### 7.6 Side Panels
@@ -722,16 +726,16 @@ Tab behavior:
   - reuses current mixed summary panels (front-end-generated steps)
 - `DSL`
   - request: `GET /api/phase3/cases/{caseId}/dsl`
-  - provides: JSON editor, validate, save
+  - provides: JSON editor, validate, save, mutation feedback
 - `State machine`
   - request: `GET /api/phase3/cases/{caseId}/state-machine`
-  - provides: nodes/edges/guards display, save
+  - provides: nodes/edges/guards display, save, mutation feedback
 - `Plans`
   - request: `GET /api/phase3/cases/{caseId}/plans`
-  - provides: read-only plans list with preconditions
+  - provides: read-only plans list with preconditions and explicit empty/error surfacing
 - `History`
   - request: `GET /api/phase3/cases/{caseId}/history`
-  - provides: read-only run history and maintenance events
+  - provides: read-only run history and maintenance events with explicit empty/error surfacing
 
 Tab state resets to `overview` when the opened case changes.
 
@@ -906,6 +910,8 @@ Resolved findings (P2-3):
 - `Edit DSL` and `State machine` hero buttons are now wired to switch tabs and load data.
 - Tab switching is implemented with `CaseDetailTab` state and API-backed data loading.
 - `CaseDetailService.java` provides file-backed persistence for all case-detail artifacts.
+- backend-backed tabs now surface explicit loading / empty / error states and local mutation feedback.
+- switching the opened case clears stale tab-specific backend data and resets the active tab to `overview`.
 
 Remaining findings:
 
