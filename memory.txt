@@ -1979,3 +1979,18 @@
     - no backend-contract change
     - no test run
     - no build run
+- 2026-05-07: Completed the `reportDetail` interface-spec fallback review follow-up.
+  - Re-reviewed `docs/phase3/interface/reportDetail/interface-spec.md` against current `ReportDetailScreen.tsx` semantics:
+    - `GET /api/phase3/runs/{runId}/report` remains documented as the primary detail path
+    - fallback to `selectReportViewModel(snapshot, selectedRunId)` is already documented
+    - artifact, recovery, and AI-decisions sections already distinguish backend-backed reads from fallback/mock behavior
+  - Result:
+    - no interface-spec正文 change was needed in this pass
+  - Keep the explicit boundary:
+    - no code change
+    - no new backend interface
+    - no route change
+    - no App-level handoff change
+    - no backend-contract change
+    - no test run
+    - no build run

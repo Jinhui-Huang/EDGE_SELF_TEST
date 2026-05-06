@@ -4654,6 +4654,32 @@ Remaining limits:
 - `reportDetail` still uses snapshot-derived fallback view-model data when backend detail reads fail
 - `case-history` payload still has no dedicated canonical `runId`, so upstream `cases` history handoff may still fall back to `runName`
 
+## 2026-05-07 ReportDetail interface-spec fallback review follow-up
+
+## Task
+- Re-check `docs/phase3/interface/reportDetail/interface-spec.md` for wording that would conflict with the current backend-first-but-still-has-fallback implementation:
+  - do not change code
+  - only change正文 if interface-spec still implies API-only / no-fallback semantics
+
+## Completed
+- Re-reviewed `docs/phase3/interface/reportDetail/interface-spec.md` against current `ReportDetailScreen.tsx` semantics:
+  - `GET /api/phase3/runs/{runId}/report` remains documented as the primary detail path
+  - fallback to `selectReportViewModel(snapshot, selectedRunId)` is already documented
+  - artifact, recovery, and AI-decisions sections already distinguish backend-backed reads from fallback/mock behavior
+- Result:
+  - no interface-spec正文 change was needed in this pass
+- Updated records:
+  - `01_dev_progress.md`
+  - `memory.txt`
+
+## Verification
+- Not run by design:
+  - documentation-only follow-up
+
+## Remaining Limits
+- `reportDetail` still uses snapshot-derived fallback view-model data when backend detail reads fail
+- `case-history` payload still has no dedicated canonical `runId`, so upstream `cases` history handoff may still fall back to `runName`
+
 ## 2026-05-06 CasesScreen handoff and validate review follow-up
 
 ## Task
