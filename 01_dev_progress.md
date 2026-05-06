@@ -3901,6 +3901,29 @@ Remaining limits:
 - `docs/phase3/interface/cases/interface-spec.md`
 - `docs/phase3/interface/review-backlog.md`
 
+- 2026-05-07: Completed the `cases` derived-preview residual-scan follow-up.
+  - Scanned `docs/phase3/interface/cases/` for old sample shapes already removed from `CasesScreen` derived-preview UI:
+    - `#primary-entry`
+    - `/checkout`
+    - `AUTO-E2E-2026`
+    - `@demo.local`
+    - `snapshot diff = expected`
+    - `status = "done"`
+    - `button.primary`
+    - `[name=account]`
+    - `[name=token]`
+  - Result:
+    - no remaining matches inside `docs/phase3/interface/cases/`
+    - no additional doc正文 change was needed in this pass
+  - Keep the explicit boundary:
+    - no code change
+    - no new backend interface
+    - no route change
+    - no App-level handoff change
+    - no backend-contract change
+    - no test run
+    - no build run
+
 - 2026-05-07: Completed the `cases` derived-preview path-example alignment follow-up.
   - Updated `docs/phase3/interface/cases/interface-spec.md`:
     - replaced the remaining `"/checkout"` DSL example URLs with `<preview-entry-path>`
@@ -4438,6 +4461,59 @@ Remaining limits:
 - `docs/phase3/interface/reportDetail/interface-spec.md`
 - `01_dev_progress.md`
 - `memory.txt`
+
+## Verification
+- Not run by design:
+  - documentation-only follow-up
+
+## Remaining Limits
+- `reportDetail` still uses snapshot-derived fallback view-model data when backend detail reads fail
+- `case-history` payload still has no dedicated canonical `runId`, so upstream `cases` history handoff may still fall back to `runName`
+
+## 2026-05-07 Canonical runId cross-screen terminology follow-up
+
+## Task
+- Do a tiny doc-only terminology review around canonical run identifiers without changing implementation:
+  - re-check adjacent `reportDetail` / `reports` / `dataDiff` docs against current `App.tsx`
+  - remove any wording that still treats selected run context as `runName`
+  - keep current residual note only where upstream `cases` history may still fall back to `runName`
+
+## Completed
+- Updated `docs/phase3/interface/reports/interface-spec.md`:
+  - identifier note now says current UI selection uses canonical `runId`
+  - transition note now scopes `runName -> runId` resolution to history-adjacent fallback only
+- Updated `docs/phase3/interface/dataDiff/interface-spec.md`:
+  - current run-context source now uses `selectedReportRunId`
+  - App-level handoff from `reportDetail` now describes `openDataDiff(selectedReportRunId)`
+  - relationship / identifier / remaining-limit notes now use canonical `runId` wording instead of `selectedRunName`
+- Updated records:
+  - `01_dev_progress.md`
+  - `memory.txt`
+
+## Verification
+- Not run by design:
+  - documentation-only follow-up
+
+## Remaining Limits
+- `reportDetail` still uses snapshot-derived fallback view-model data when backend detail reads fail
+- `case-history` payload still has no dedicated canonical `runId`, so upstream `cases` history handoff may still fall back to `runName`
+
+## 2026-05-07 Canonical runId structured-model doc follow-up
+
+## Task
+- Apply one tiny doc-only cleanup to the remaining structured-model wording around canonical run identifiers:
+  - fix the leftover `TimelineTarget` example in `reports/interface-spec.md`
+  - re-scan adjacent `reportDetail` / `reports` / `dataDiff` specs for similar structured `selectedRunName` / `selectedReportRunName` conflicts
+
+## Completed
+- Updated `docs/phase3/interface/reports/interface-spec.md`:
+  - `TimelineTarget` now uses `{ kind: "reportDetail"; runId: string }`
+  - the same model still keeps `{ kind: "monitor"; runId?: string | null }`
+- Re-scanned `docs/phase3/interface/reportDetail/interface-spec.md`, `docs/phase3/interface/reports/interface-spec.md`, and `docs/phase3/interface/dataDiff/interface-spec.md`:
+  - no other structured-model conflicts remained in this target range
+- Updated records:
+  - `01_dev_progress.md`
+  - `memory.txt`
 
 ## Verification
 - Not run by design:

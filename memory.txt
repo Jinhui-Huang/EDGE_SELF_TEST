@@ -1851,3 +1851,55 @@
     - no backend-contract change
     - no test run
     - no build run
+- 2026-05-07: Completed the `cases` derived-preview residual-scan follow-up.
+  - Scanned `docs/phase3/interface/cases/` for old sample shapes already removed from current `CasesScreen` preview UI:
+    - `#primary-entry`
+    - `/checkout`
+    - `AUTO-E2E-2026`
+    - `@demo.local`
+    - `snapshot diff = expected`
+    - `status = "done"`
+    - `button.primary`
+    - `[name=account]`
+    - `[name=token]`
+  - Result:
+    - no remaining matches inside `docs/phase3/interface/cases/`
+    - no additional doc正文 change was needed in this pass
+  - Keep the explicit boundary:
+    - no code change
+    - no new backend interface
+    - no route change
+    - no App-level handoff change
+    - no backend-contract change
+    - no test run
+    - no build run
+- 2026-05-07: Completed the canonical `runId` cross-screen terminology follow-up.
+  - Updated `docs/phase3/interface/reports/interface-spec.md`:
+    - current selected-run wording now uses canonical `runId`
+    - remaining `runName -> runId` wording is limited to upstream history-adjacent fallback resolution
+  - Updated `docs/phase3/interface/dataDiff/interface-spec.md`:
+    - current run-context source now uses `selectedReportRunId`
+    - App-level handoff now describes `openDataDiff(selectedReportRunId)`
+    - relationship / identifier / remaining-limit notes no longer describe page entry as `selectedRunName`
+  - Keep the explicit boundary:
+    - no code change
+    - no new backend interface
+    - no route change
+    - no App-level handoff change
+    - no backend-contract change
+    - no test run
+    - no build run
+- 2026-05-07: Completed the canonical `runId` structured-model doc follow-up.
+  - Updated `docs/phase3/interface/reports/interface-spec.md`:
+    - `TimelineTarget` now uses `{ kind: "reportDetail"; runId: string }`
+    - the paired `monitor` target remains `{ kind: "monitor"; runId?: string | null }`
+  - Re-scanned adjacent `reportDetail` / `reports` / `dataDiff` specs:
+    - no other structured-model conflicts remained in this target range
+  - Keep the explicit boundary:
+    - no code change
+    - no new backend interface
+    - no route change
+    - no App-level handoff change
+    - no backend-contract change
+    - no test run
+    - no build run

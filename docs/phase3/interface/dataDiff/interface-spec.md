@@ -40,7 +40,7 @@ Current `dataDiff` screen conclusion:
 - current direct write source:
   - `POST /api/phase3/runs/{runId}/restore/retry` (re-restore action)
 - current run context source:
-  - `selectedRunName` App-level selected-run handoff from `App.tsx`
+  - `selectedReportRunId` App-level selected-run handoff from `App.tsx`
 - diff table is backed by the backend data-diff endpoint, with fallback to synthetic local data when API is unavailable
 
 ## 3. Current Read Context: GET /api/phase3/admin-console
@@ -108,8 +108,8 @@ This means the current diff table should be documented as:
 Current App-level handoff behavior:
 
 - `ReportDetailScreen.tsx` calls `onOpenDataDiff()`
-- `App.tsx` uses `openDataDiff(selectedReportRunName)`
-- `selectedReportRunName` is kept as the current run context
+- `App.tsx` uses `openDataDiff(selectedReportRunId)`
+- `selectedReportRunId` is kept as the current run context
 - `activeScreen("dataDiff")` is set
 
 No backend request is sent by this route change.
@@ -146,7 +146,7 @@ No backend request is sent by this route change.
 ### 7.1 Relationship to Report Detail
 
 - `dataDiff` is currently entered from `reportDetail`
-- App-level handoff passes only the selected run name
+- App-level handoff passes the selected canonical `runId`
 
 ### 7.2 Relationship to Restore/Data Preparation Concepts
 
@@ -162,9 +162,9 @@ The screen should therefore be backed by run-specific diff and restore-result in
 
 Identifier note:
 
-- current page entry still depends on selected `runName` kept in `App.tsx`
+- current page entry depends on selected canonical `runId` kept in `App.tsx`
 - future backend path parameters should use canonical `{runId}`
-- transition logic may temporarily map the selected `runName` onto backend `runId`
+- history-adjacent handoff code may still temporarily resolve incoming `runName` onto canonical `runId` when the upstream payload has no dedicated `runId`
 
 ### 8.1 Diff Summary Interface
 
@@ -327,7 +327,7 @@ Recommended future mutation errors:
 
 Remaining limits:
 
-- `selectedRunName` App-level handoff is enough for page entry; backend run-diff endpoints now exist.
+- App-level `selectedReportRunId` handoff is enough for page entry; backend run-diff endpoints now exist.
 - `View raw JSON` and `Re-restore` are implemented and wired to backend endpoints.
 - Raw diff data is deterministic mock when no real `data-diff-raw.json` exists in the run directory.
 - Restore result is deterministic mock when no real `restore-result.json` exists.

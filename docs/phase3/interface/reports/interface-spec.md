@@ -223,9 +223,9 @@ Recommended Phase 3 evolution:
 
 Identifier note:
 
-- current UI selection still revolves around `runName`
+- current UI selection now revolves around canonical `runId`
 - future backend path parameters should treat `{runId}` as the canonical run identifier
-- transition code may temporarily map selected `runName` onto backend `runId`
+- history-adjacent handoff code may still temporarily resolve incoming `runName` onto canonical `runId` when the upstream payload has no dedicated `runId`
 
 Because the current list is synthetic, the screen would benefit from dedicated report-list/report-summary interfaces.
 
@@ -358,7 +358,7 @@ Recommended model:
 
 ```ts
 type TimelineTarget =
-  | { kind: "reportDetail"; runName: string }
+  | { kind: "reportDetail"; runId: string }
   | { kind: "monitor"; runId?: string | null };
 ```
 
