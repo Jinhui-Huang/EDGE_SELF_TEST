@@ -1903,3 +1903,19 @@
     - no backend-contract change
     - no test run
     - no build run
+- 2026-05-07: Completed the canonical `runId` monitor/dashboard terminology follow-up.
+  - Updated `docs/phase3/interface/dashboard/interface-spec.md`:
+    - downstream handoff now describes `dataDiff -> openDataDiff(runId ?? selectedReportRunId)`
+  - Re-scanned:
+    - `docs/phase3/interface/monitor/interface-spec.md`
+    - `docs/phase3/interface/dashboard/functional-spec.md`
+    - `docs/phase3/interface/dashboard/interface-spec.md`
+    - no other direct `selectedRunName` / `selectedReportRunName` conflicts remained in this target range
+  - Keep the explicit boundary:
+    - no code change
+    - no new backend interface
+    - no route change
+    - no App-level handoff change
+    - no backend-contract change
+    - no test run
+    - no build run

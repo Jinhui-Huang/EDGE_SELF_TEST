@@ -1119,7 +1119,7 @@ type DashboardAttentionTarget =
 - `App.tsx` routes the handoff as:
   - `reportDetail` -> `openReportDetail(runId)`
   - `monitor` -> `openMonitor(runId)`
-  - `dataDiff` -> `openDataDiff(runId ?? selectedReportRunName)`
+  - `dataDiff` -> `openDataDiff(runId ?? selectedReportRunId)`
   - `models` -> `handleScreenChange("models")`
 
 Interface behavior:

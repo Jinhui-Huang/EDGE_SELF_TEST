@@ -4523,6 +4523,33 @@ Remaining limits:
 - `reportDetail` still uses snapshot-derived fallback view-model data when backend detail reads fail
 - `case-history` payload still has no dedicated canonical `runId`, so upstream `cases` history handoff may still fall back to `runName`
 
+## 2026-05-07 Canonical runId monitor/dashboard terminology follow-up
+
+## Task
+- Do one tiny adjacent doc-only terminology review around runtime/report handoff:
+  - re-scan `monitor` / `dashboard` specs for direct conflicts with current canonical run identifier semantics
+  - fix only wording that still describes cross-screen selected run context as `runName`
+
+## Completed
+- Updated `docs/phase3/interface/dashboard/interface-spec.md`:
+  - downstream handoff now describes `dataDiff -> openDataDiff(runId ?? selectedReportRunId)`
+- Re-scanned:
+  - `docs/phase3/interface/monitor/interface-spec.md`
+  - `docs/phase3/interface/dashboard/functional-spec.md`
+  - `docs/phase3/interface/dashboard/interface-spec.md`
+  - no other direct `selectedRunName` / `selectedReportRunName` conflicts remained in this target range
+- Updated records:
+  - `01_dev_progress.md`
+  - `memory.txt`
+
+## Verification
+- Not run by design:
+  - documentation-only follow-up
+
+## Remaining Limits
+- `reportDetail` still uses snapshot-derived fallback view-model data when backend detail reads fail
+- `case-history` payload still has no dedicated canonical `runId`, so upstream `cases` history handoff may still fall back to `runName`
+
 ## 2026-05-06 CasesScreen handoff and validate review follow-up
 
 ## Task
