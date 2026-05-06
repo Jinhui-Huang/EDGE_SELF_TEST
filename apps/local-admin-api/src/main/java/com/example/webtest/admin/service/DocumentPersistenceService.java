@@ -50,6 +50,7 @@ public final class DocumentPersistenceService {
 
         Path docDir = resolveDocDir(documentId);
         Files.createDirectories(docDir);
+        Instant now = Instant.now(clock);
 
         // Save raw content
         Map<String, Object> rawDoc = new LinkedHashMap<>();
@@ -57,7 +58,7 @@ public final class DocumentPersistenceService {
         rawDoc.put("name", fileName);
         rawDoc.put("projectKey", projectKey);
         rawDoc.put("content", content);
-        rawDoc.put("uploadedAt", Instant.now(clock).toString());
+        rawDoc.put("uploadedAt", now.toString());
         Files.writeString(docDir.resolve("raw.json"), Jsons.writeValueAsString(rawDoc), StandardCharsets.UTF_8);
 
         // Generate initial parse result
@@ -70,9 +71,11 @@ public final class DocumentPersistenceService {
         meta.put("name", fileName);
         meta.put("projectKey", projectKey);
         meta.put("status", "PARSED");
-        meta.put("updatedAt", Instant.now(clock).toString());
+        meta.put("updatedAt", now.toString());
         meta.put("model", "claude-4.5");
         Files.writeString(docDir.resolve("meta.json"), Jsons.writeValueAsString(meta), StandardCharsets.UTF_8);
+
+        writeVersions(docDir, List.of(buildVersionEntry("v1", now.toString(), "Uploaded document and generated initial parse result.")));
 
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("status", "ACCEPTED");
@@ -89,6 +92,7 @@ public final class DocumentPersistenceService {
         if (!Files.isRegularFile(metaFile)) {
             return Map.of("status", "NOT_FOUND", "documentId", documentId);
         }
+        Instant now = Instant.now(clock);
 
         Map<String, Object> meta = Jsons.readValue(Files.readString(metaFile, StandardCharsets.UTF_8), Map.class);
         String fileName = stringValue(meta.get("name"));
@@ -101,13 +105,17 @@ public final class DocumentPersistenceService {
         if (!operator.isEmpty()) {
             parseResult.put("reparsedBy", operator);
         }
-        parseResult.put("reparsedAt", Instant.now(clock).toString());
+        parseResult.put("reparsedAt", now.toString());
         Files.writeString(docDir.resolve("parse-result.json"), Jsons.writeValueAsString(parseResult), StandardCharsets.UTF_8);
 
         // Update metadata
         meta.put("status", "PARSED");
-        meta.put("updatedAt", Instant.now(clock).toString());
+        meta.put("updatedAt", now.toString());
         Files.writeString(metaFile, Jsons.writeValueAsString(meta), StandardCharsets.UTF_8);
+
+        appendVersion(docDir, now.toString(), operator.isEmpty()
+                ? "Re-parsed document and refreshed detected cases."
+                : "Re-parsed document by " + operator + " and refreshed detected cases.");
 
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("status", "ACCEPTED");
@@ -125,6 +133,7 @@ public final class DocumentPersistenceService {
         if (!Files.isRegularFile(metaFile)) {
             return Map.of("status", "NOT_FOUND", "documentId", documentId);
         }
+        Instant now = Instant.now(clock);
 
         Map<String, Object> payload = Jsons.readValue(requestBody, Map.class);
         Map<String, Object> meta = Jsons.readValue(Files.readString(metaFile, StandardCharsets.UTF_8), Map.class);
@@ -151,7 +160,7 @@ public final class DocumentPersistenceService {
         if (!updatedBy.isEmpty()) {
             parseResult.put("updatedBy", updatedBy);
         }
-        parseResult.put("updatedAt", Instant.now(clock).toString());
+        parseResult.put("updatedAt", now.toString());
         parseResult.put("reasoning", List.of(
                 Map.of("label", "Manual edit", "body", "Parse result was manually updated.")));
         parseResult.put("missing", List.of());
@@ -160,8 +169,12 @@ public final class DocumentPersistenceService {
 
         // Update metadata
         meta.put("status", "PARSED");
-        meta.put("updatedAt", Instant.now(clock).toString());
+        meta.put("updatedAt", now.toString());
         Files.writeString(metaFile, Jsons.writeValueAsString(meta), StandardCharsets.UTF_8);
+
+        appendVersion(docDir, now.toString(), updatedBy.isEmpty()
+                ? "Manually edited detected cases."
+                : "Manually edited detected cases by " + updatedBy + ".");
 
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("status", "ACCEPTED");
@@ -180,6 +193,32 @@ public final class DocumentPersistenceService {
             return Jsons.readValue(Files.readString(parseFile, StandardCharsets.UTF_8), Map.class);
         }
         return Map.of("status", "NOT_FOUND", "documentId", documentId);
+    }
+
+    // ---- GET /api/phase3/documents/{documentId}/raw ----
+
+    @SuppressWarnings("unchecked")
+    public Object getRawDocument(String documentId) throws IOException {
+        Path docDir = resolveDocDir(documentId);
+        Path rawFile = docDir.resolve("raw.json");
+        if (Files.isRegularFile(rawFile)) {
+            return Jsons.readValue(Files.readString(rawFile, StandardCharsets.UTF_8), Map.class);
+        }
+        return Map.of("status", "NOT_FOUND", "documentId", documentId);
+    }
+
+    // ---- GET /api/phase3/documents/{documentId}/versions ----
+
+    public Object getVersions(String documentId) throws IOException {
+        Path docDir = resolveDocDir(documentId);
+        Path metaFile = docDir.resolve("meta.json");
+        if (!Files.isRegularFile(metaFile)) {
+            return Map.of("status", "NOT_FOUND", "documentId", documentId);
+        }
+
+        return Map.of(
+                "documentId", documentId,
+                "items", readVersions(docDir));
     }
 
     // ---- internal ----
@@ -220,6 +259,48 @@ public final class DocumentPersistenceService {
         result.put("missing", List.of("Expected stock decrement delta"));
         result.put("parsedAt", Instant.now(clock).toString());
         return result;
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> readVersions(Path docDir) throws IOException {
+        Path versionsFile = docDir.resolve("versions.json");
+        if (!Files.isRegularFile(versionsFile)) {
+            return List.of();
+        }
+        Object raw = Jsons.readValue(Files.readString(versionsFile, StandardCharsets.UTF_8), Object.class);
+        if (raw instanceof List<?> items) {
+            List<Map<String, Object>> versions = new ArrayList<>();
+            for (Object item : items) {
+                if (item instanceof Map<?, ?> map) {
+                    Map<String, Object> version = new LinkedHashMap<>();
+                    for (Map.Entry<?, ?> entry : map.entrySet()) {
+                        version.put(String.valueOf(entry.getKey()), entry.getValue());
+                    }
+                    versions.add(version);
+                }
+            }
+            return versions;
+        }
+        return List.of();
+    }
+
+    private void writeVersions(Path docDir, List<Map<String, Object>> versions) throws IOException {
+        Files.writeString(docDir.resolve("versions.json"), Jsons.writeValueAsString(versions), StandardCharsets.UTF_8);
+    }
+
+    private void appendVersion(Path docDir, String time, String summary) throws IOException {
+        List<Map<String, Object>> versions = new ArrayList<>(readVersions(docDir));
+        String label = "v" + (versions.size() + 1);
+        versions.add(0, buildVersionEntry(label, time, summary));
+        writeVersions(docDir, versions);
+    }
+
+    private Map<String, Object> buildVersionEntry(String label, String time, String summary) {
+        return Map.of(
+                "id", label,
+                "label", label,
+                "time", time,
+                "summary", summary);
     }
 
     private static String toDocumentId(String projectKey, String fileName) {

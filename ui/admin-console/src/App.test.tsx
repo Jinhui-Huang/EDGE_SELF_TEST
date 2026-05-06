@@ -1075,6 +1075,52 @@ describe("App", () => {
     expect((await screen.findAllByText("ops-console")).length).toBeGreaterThan(0);
   });
 
+  it("shows project import error feedback when preview fails", async () => {
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) {
+        return jsonResponse(snapshot);
+      }
+      if (url.endsWith("/api/phase3/catalog/project/import/preview")) {
+        return jsonResponse({ error: "BAD_REQUEST", message: "Missing required field: scope" }, 400);
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    await userEvent.click(await screen.findByRole("button", { name: /Projects/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Import" }));
+
+    const importInput = screen.getByLabelText("Import JSON");
+    fireEvent.change(importInput, {
+      target: {
+        value: JSON.stringify(
+          [
+            {
+              key: "ops-console",
+              name: "ops-console"
+            }
+          ],
+          null,
+          2
+        )
+      }
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: "Preview import" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "http://127.0.0.1:8787/api/phase3/catalog/project/import/preview",
+        expect.objectContaining({ method: "POST" })
+      );
+    });
+    expect(await screen.findByText("Missing required field: scope")).toBeInTheDocument();
+    expect(screen.queryByText("Preview ready for 1 project row(s).")).not.toBeInTheDocument();
+  });
+
   it("adds a new project row and persists it through the existing catalog save flow", async () => {
     let snapshotAfterSave = snapshot;
     const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
@@ -1230,6 +1276,58 @@ describe("App", () => {
     expect(await screen.findByText("member-center-daily")).toBeInTheDocument();
   }, 20000);
 
+  it("opens reports from projects handoff via existing App state", async () => {
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) {
+        return jsonResponse(snapshot);
+      }
+      if (url.endsWith("/api/phase3/runs/")) {
+        return jsonResponse({
+          items: [
+            {
+              runId: "member-center-daily",
+              runName: "member-center-daily",
+              status: "SUCCESS",
+              startedAt: "2026-04-18T08:00:00Z",
+              finishedAt: "2026-04-18T08:30:00Z",
+              durationMs: 1800000,
+              projectKey: "member-center",
+              projectName: "member-center",
+              caseId: "member-profile-save",
+              caseName: "Profile save",
+              environment: "staging-edge",
+              model: "gpt-4.1-mini",
+              operator: "qa-platform",
+              entry: "5 artifacts exported",
+              stepsTotal: 8,
+              stepsPassed: 8,
+              assertionsTotal: 5,
+              assertionsPassed: 5,
+              artifactCount: 5,
+              outputDir: "runs/member-center-daily"
+            }
+          ]
+        });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    await userEvent.click(await screen.findByRole("button", { name: /Projects/ }));
+    const openButtons = await screen.findAllByRole("button", { name: "Open" });
+    await userEvent.click(openButtons[1]);
+    await userEvent.click(await screen.findByRole("button", { name: "View reports" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith("http://127.0.0.1:8787/api/phase3/runs/");
+    });
+    expect(await screen.findByRole("heading", { name: "member-center" })).toBeInTheDocument();
+    expect(await screen.findByText("member-center-daily")).toBeInTheDocument();
+  });
+
   it("hands off reports -> reportDetail -> dataDiff with canonical runId", async () => {
     const restoreResultResponse = {
       runId: "checkout-web-nightly",
@@ -1331,6 +1429,13 @@ describe("App", () => {
       status: "ACCEPTED",
       uploaded: [{ id: "checkout-web-test-doc-md", name: "test-doc.md" }]
     };
+    const rawResponse = {
+      documentId: "checkout-web-primary",
+      name: "checkout-regression-v3.md",
+      projectKey: "checkout-web",
+      content: "# Checkout regression\n\nUploaded raw source",
+      uploadedAt: "2026-04-25T10:00:00Z"
+    };
     const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.endsWith("/api/phase3/admin-console")) {
@@ -1338,6 +1443,15 @@ describe("App", () => {
       }
       if (url.endsWith("/api/phase3/documents/upload")) {
         return jsonResponse(uploadResponse, 202);
+      }
+       if (url.endsWith("/api/phase3/documents/checkout-web-primary/parse-result")) {
+        return jsonResponse({ status: "NOT_FOUND", documentId: "checkout-web-primary" });
+      }
+      if (url.endsWith("/api/phase3/documents/checkout-web-primary/raw")) {
+        return jsonResponse(rawResponse);
+      }
+      if (url.endsWith("/api/phase3/documents/checkout-web-primary/versions")) {
+        return jsonResponse({ documentId: "checkout-web-primary", items: [] });
       }
       throw new Error(`Unexpected fetch: ${url} ${init?.method ?? "GET"}`);
     });
@@ -1384,6 +1498,67 @@ describe("App", () => {
     await userEvent.click(detailButtons[0]);
     await userEvent.click(await screen.findByRole("button", { name: "Raw document" }));
     expect(await screen.findByText("test-doc.md")).toBeInTheDocument();
+    expect(await screen.findByText("Uploaded raw source")).toBeInTheDocument();
+  });
+
+  it("loads raw document and version history from backend when opening DocParse detail", async () => {
+    const parseResultResponse = {
+      documentId: "checkout-web-primary",
+      projectKey: "checkout-web",
+      detectedCases: [
+        { id: "checkout-api", name: "Checkout API-backed case", category: "happy", confidence: "high" }
+      ],
+      reasoning: [
+        { label: "Structure", body: "Loaded from backend parse result." }
+      ],
+      missing: ["DB seed baseline"]
+    };
+    const rawResponse = {
+      documentId: "checkout-web-primary",
+      name: "checkout-regression-v3.md",
+      projectKey: "checkout-web",
+      content: "# Backend raw document",
+      uploadedAt: "2026-04-25T10:00:00Z"
+    };
+    const versionsResponse = {
+      documentId: "checkout-web-primary",
+      items: [
+        { id: "v2", label: "v2", time: "2026-04-25T10:10:00Z", summary: "Re-parsed document and refreshed detected cases." },
+        { id: "v1", label: "v1", time: "2026-04-25T10:00:00Z", summary: "Uploaded document and generated initial parse result." }
+      ]
+    };
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) {
+        return jsonResponse(snapshot);
+      }
+      if (url.endsWith("/api/phase3/documents/checkout-web-primary/parse-result")) {
+        return jsonResponse(parseResultResponse);
+      }
+      if (url.endsWith("/api/phase3/documents/checkout-web-primary/raw")) {
+        return jsonResponse(rawResponse);
+      }
+      if (url.endsWith("/api/phase3/documents/checkout-web-primary/versions")) {
+        return jsonResponse(versionsResponse);
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    await userEvent.click(await screen.findByRole("button", { name: /Doc Parse/ }));
+    await userEvent.click((await screen.findAllByRole("button", { name: /Detail/ }))[0]);
+
+    expect(await screen.findByText("Checkout API-backed case")).toBeInTheDocument();
+    expect(await screen.findByText("Loaded from backend parse result.")).toBeInTheDocument();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Raw document" }));
+    expect(await screen.findByText("# Backend raw document")).toBeInTheDocument();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Version history" }));
+    expect(await screen.findByText("Uploaded document and generated initial parse result.")).toBeInTheDocument();
+    expect(await screen.findByText("Re-parsed document and refreshed detected cases.")).toBeInTheDocument();
   });
 
   it("re-parses a document and refreshes the parse result in UI", async () => {
@@ -1413,6 +1588,21 @@ describe("App", () => {
       }
       if (url.endsWith("/api/phase3/documents/checkout-web-primary/parse-result")) {
         return jsonResponse(parseResultResponse);
+      }
+      if (url.endsWith("/api/phase3/documents/checkout-web-primary/raw")) {
+        return jsonResponse({
+          documentId: "checkout-web-primary",
+          name: "checkout-regression-v3.md",
+          projectKey: "checkout-web",
+          content: "# Checkout regression\n\nRaw source",
+          uploadedAt: "2026-04-25T10:00:00Z"
+        });
+      }
+      if (url.endsWith("/api/phase3/documents/checkout-web-primary/versions")) {
+        return jsonResponse({
+          documentId: "checkout-web-primary",
+          items: [{ id: "v1", label: "v1", time: "2026-04-25T10:00:00Z", summary: "Uploaded document and generated initial parse result." }]
+        });
       }
       throw new Error(`Unexpected fetch: ${url}`);
     });
@@ -1451,13 +1641,49 @@ describe("App", () => {
       kind: "document-parse-edit",
       documentId: "checkout-web-primary"
     };
+    let currentParseResult = {
+      documentId: "checkout-web-primary",
+      projectKey: "checkout-web",
+      detectedCases: [
+        { id: "checkout-smoke", name: "Checkout smoke", category: "happy", confidence: "high" }
+      ],
+      reasoning: [{ label: "Structure", body: "Initial parse result." }],
+      missing: []
+    };
     const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.endsWith("/api/phase3/admin-console")) {
         return jsonResponse(snapshot);
       }
+      if (url.endsWith("/api/phase3/documents/checkout-web-primary/parse-result") && !init?.method) {
+        return jsonResponse(currentParseResult);
+      }
       if (url.endsWith("/api/phase3/documents/checkout-web-primary/parse-result") && init?.method === "PUT") {
+        currentParseResult = {
+          documentId: "checkout-web-primary",
+          projectKey: "checkout-web",
+          detectedCases: [
+            { id: "custom-1", name: "Custom edited case", category: "boundary", confidence: "low" }
+          ],
+          reasoning: [{ label: "Manual edit", body: "Parse result was manually updated." }],
+          missing: []
+        };
         return jsonResponse(saveResponse, 202);
+      }
+      if (url.endsWith("/api/phase3/documents/checkout-web-primary/raw")) {
+        return jsonResponse({
+          documentId: "checkout-web-primary",
+          name: "checkout-regression-v3.md",
+          projectKey: "checkout-web",
+          content: "# Checkout regression\n\nRaw source",
+          uploadedAt: "2026-04-25T10:00:00Z"
+        });
+      }
+      if (url.endsWith("/api/phase3/documents/checkout-web-primary/versions")) {
+        return jsonResponse({
+          documentId: "checkout-web-primary",
+          items: [{ id: "v2", label: "v2", time: "2026-04-25T10:10:00Z", summary: "Manually edited detected cases by operator." }]
+        });
       }
       throw new Error(`Unexpected fetch: ${url} ${init?.method ?? "GET"}`);
     });

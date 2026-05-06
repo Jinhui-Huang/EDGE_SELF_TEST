@@ -295,7 +295,9 @@ public final class LocalAdminApiServer implements AutoCloseable {
         }
         String path = exchange.getRequestURI().getPath();
         // /api/phase3/documents/{documentId}/reparse       -> POST reparse
-        // /api/phase3/documents/{documentId}/parse-result   -> GET or PUT
+        // /api/phase3/documents/{documentId}/parse-result  -> GET or PUT
+        // /api/phase3/documents/{documentId}/raw           -> GET
+        // /api/phase3/documents/{documentId}/versions      -> GET
         String[] segments = path.split("/");
         // segments: ["", "api", "phase3", "documents", "{documentId}", "{action}"]
 
@@ -327,6 +329,20 @@ public final class LocalAdminApiServer implements AutoCloseable {
                     } else {
                         writeJson(exchange, 405, Map.of("error", "METHOD_NOT_ALLOWED"));
                     }
+                }
+                case "raw" -> {
+                    if (!"GET".equals(method)) {
+                        writeJson(exchange, 405, Map.of("error", "METHOD_NOT_ALLOWED"));
+                        return;
+                    }
+                    writeJson(exchange, 200, service.getRawDocument(documentId));
+                }
+                case "versions" -> {
+                    if (!"GET".equals(method)) {
+                        writeJson(exchange, 405, Map.of("error", "METHOD_NOT_ALLOWED"));
+                        return;
+                    }
+                    writeJson(exchange, 200, service.getVersions(documentId));
                 }
                 default -> writeJson(exchange, 404, Map.of("error", "NOT_FOUND", "action", action));
             }

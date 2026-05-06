@@ -91,6 +91,7 @@ Current behavior:
 
 - search box filters visible project cards locally
 - `Import` opens the import review flow and uses backend preview/commit interfaces
+- the current import surface is a deterministic JSON review panel, not a CSV/file wizard
 - `New project` appends a new draft row in the editor and reuses the current save flow
 
 ### 6.2 Project Card Grid
@@ -292,6 +293,10 @@ Current implementation summary:
   - remove row
   - add row
   - save project catalog
+- current import boundary:
+  - accepts JSON array payload or JSON object with `rows`
+  - preview first, commit second
+  - explicit `pending` / `success` / `error` feedback via shared mutation status
 - still local/Phase 3 lightweight by design:
   - card selection
   - inline detail open/close

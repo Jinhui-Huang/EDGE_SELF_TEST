@@ -64,22 +64,24 @@ It is intentionally separated from:
 Current implementation facts:
 
 - The page is rendered by `DocParseScreen.tsx`.
-- The page performs direct `fetch` calls to the backend for document upload, re-parse, and manual parse-result editing.
-- The page builds its document catalog through local helper `buildDocuments(snapshot)` and updates it with API-returned data after re-parse and manual edit.
+- The page performs direct `fetch` calls to the backend for document upload, re-parse, manual parse-result editing, raw-document read, version-history read, and first-open parse-result hydration.
+- The page builds its document catalog through local helper `buildDocuments(snapshot)` and now attempts backend detail hydration when a document is opened.
 - project switching is implemented.
 - document detail opening is implemented.
 - `Generate tests` is implemented as App-level focus handoff into `aiGenerate`.
-- parse/raw/history tabs are implemented as local tab state.
+- parse/raw/history tabs are implemented as local tab state, while their detail content is backend-first on document open.
 - `Upload file` reads file content and uploads via `POST /api/phase3/documents/upload`.
-- `Re-parse` is implemented: calls `POST /api/phase3/documents/{documentId}/reparse`, then refreshes parse result.
-- `Manual edit` is implemented: opens JSON editor for detected cases, saves via `PUT /api/phase3/documents/{documentId}/parse-result`.
-- Backend implementation: `DocumentPersistenceService.java` provides file-backed persistence under `config/phase3/documents/<documentId>/`.
+- `Re-parse` is implemented: calls `POST /api/phase3/documents/{documentId}/reparse`, then refreshes parse-result/raw/version detail.
+- `Manual edit` is implemented: opens JSON editor for detected cases, saves via `PUT /api/phase3/documents/{documentId}/parse-result`, then refreshes parse-result/raw/version detail.
+- Backend implementation: `DocumentPersistenceService.java` provides file-backed persistence under `config/phase3/documents/<documentId>/` and records lightweight version-history entries for upload, re-parse, and manual edit.
 
 This matters for review:
 
 - the page owns real upstream handoff into `aiGenerate` and real document-service write capabilities
-- document list and version history are still synthetic front-end data from snapshot
-- parse result can now be persisted and refreshed from the backend after upload, re-parse, or manual edit
+- document list still starts from synthetic front-end data from snapshot because there is no canonical `GET /api/phase3/documents` yet
+- uploaded documents are merged into the current front-end session so snapshot rebuilds in the same session do not immediately drop them
+- uploaded documents are still lost after remount / fresh app load because the catalog remains synthetic and session-local
+- parse result, raw document, and version history can now be persisted and refreshed from the backend after upload, re-parse, or manual edit
 
 ## 6. Functional Areas
 
@@ -200,7 +202,7 @@ Functional role:
 
 Current behavior:
 
-- all content is front-end-generated from the selected document model
+- detail prefers backend parse-result hydration on first open and keeps synthetic fallback only when the selected shell document has no persisted backend artifact yet
 - case-name button can open `aiGenerate` directly for that case
 
 ### 6.7 Raw Document View
@@ -216,7 +218,7 @@ Functional role:
 
 Current behavior:
 
-- raw source is local generated text
+- raw source prefers backend `GET /api/phase3/documents/{documentId}/raw`
 - uploaded files list is local UI state only
 
 ### 6.8 Version History View
@@ -233,13 +235,13 @@ Functional role:
 
 Current behavior:
 
-- version history is local generated data
+- version history prefers backend `GET /api/phase3/documents/{documentId}/versions`
 
 ## 7. Data Semantics by Area
 
 ### 7.1 Document Catalog Data
 
-- documents are currently built by `buildDocuments(snapshot)`
+- documents are currently built by `buildDocuments(snapshot)` and then merged with session-local uploaded documents
 - source domains:
   - `snapshot.projects`
   - `snapshot.cases`
@@ -253,7 +255,7 @@ Current behavior:
 - versions
 - reasoning
 
-are all currently front-end document-model data, not backend parser output
+prefer backend document-service output when a persisted document exists; otherwise they fall back to front-end document-model data
 
 ### 7.3 AI Generate Focus Output
 
@@ -411,8 +413,10 @@ Current implemented rules:
 
 Current upload rule:
 
-- selected files are stored as filenames only
-- no persistence or parser submission occurs
+- selected files are stored as filenames for local display
+- file content is uploaded to `POST /api/phase3/documents/upload`
+- uploaded document rows are merged into the current front-end session only
+- remount / fresh app load still loses uploaded rows until a canonical backend document-list interface exists
 
 ## 13. Cross-Screen Relationships
 
@@ -456,14 +460,18 @@ The `docParse` screen is not currently responsible for:
 Resolved items (P2-4):
 
 - `Upload file` now reads content and uploads to backend via `POST /api/phase3/documents/upload`.
-- `Re-parse` now calls `POST /api/phase3/documents/{documentId}/reparse` and refreshes parse result.
+- `Re-parse` now calls `POST /api/phase3/documents/{documentId}/reparse` and refreshes parse-result/raw/version detail.
 - `Manual edit` now opens JSON editor and saves via `PUT /api/phase3/documents/{documentId}/parse-result`.
+- `Raw document` now reads the persisted artifact through `GET /api/phase3/documents/{documentId}/raw`.
+- `Version history` now reads backend audit entries through `GET /api/phase3/documents/{documentId}/versions`.
+- first opening a document now attempts backend parse-result hydration through `GET /api/phase3/documents/{documentId}/parse-result` instead of waiting for a later mutation.
 
 Remaining items:
 
 - Document catalog is still synthetic front-end data from `buildDocuments(snapshot)`, not a backend document list.
-- Raw document and version history are placeholder data rather than true persisted document artifacts.
-- Parse result tab content is not yet API-backed on initial load (only refreshed after re-parse or manual edit).
+- Uploaded documents now survive snapshot rebuilds inside the same front-end session only; they still disappear after remount / fresh app load because there is no canonical backend document-list API.
+- parse-result detail still keeps synthetic fallback content when the selected shell document has no persisted backend artifact.
+- version history is still lightweight event metadata only; it does not yet expose per-version raw snapshots or diffs.
 
 ## 16. Suggested Output Files for This Screen Folder
 

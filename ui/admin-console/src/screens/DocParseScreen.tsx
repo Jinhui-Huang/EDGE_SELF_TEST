@@ -1,11 +1,13 @@
-import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, Dispatch, SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { translate } from "../i18n";
 import {
   AdminConsoleSnapshot,
   DocumentParseResult,
   DocumentParseResultSaveResponse,
+  DocumentRawResponse,
   DocumentReparseResponse,
   DocumentUploadResponse,
+  DocumentVersionsResponse,
   Locale
 } from "../types";
 
@@ -47,6 +49,13 @@ type CaseCandidate = {
   confidence: "high" | "medium" | "low";
 };
 
+type VersionEntry = {
+  id: string;
+  label: string;
+  time: string;
+  summary: string;
+};
+
 type ParsedDocument = {
   id: string;
   name: string;
@@ -59,131 +68,185 @@ type ParsedDocument = {
   subtitle: string;
   cases: CaseCandidate[];
   rawDocument: string;
-  versions: Array<{
-    id: string;
-    label: string;
-    time: string;
-    summary: string;
-  }>;
+  versions: VersionEntry[];
   reasoning: Array<{
     label: LocalizedCopy;
     body: LocalizedCopy;
   }>;
+  missing: string[];
 };
 
 type TabKey = "parse" | "raw" | "hist";
 
+type RemoteSectionState<T> = {
+  status: "idle" | "loading" | "success" | "empty" | "error";
+  data: T | null;
+  message: string;
+  documentId: string | null;
+};
+
 const copy = (en: string, zh = en, ja = en): LocalizedCopy => ({ en, zh, ja });
+
+function toLocalizedCopy(value: string): LocalizedCopy {
+  return copy(value);
+}
+
+function isNotFoundPayload(value: unknown): value is { status: string } {
+  return value !== null && typeof value === "object" && "status" in value && (value as { status?: unknown }).status === "NOT_FOUND";
+}
+
+function toDocumentId(projectKey: string, fileName: string): string {
+  const base = fileName.replace(/\.[^.]+$/, "");
+  return `${projectKey}-${base}`
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+function buildCaseCandidates(snapshot: AdminConsoleSnapshot, projectKey: string): CaseCandidate[] {
+  const projectCases = snapshot.cases.filter((item) => item.projectKey === projectKey);
+  const sourceCases = (projectCases.length ? projectCases : snapshot.cases.slice(0, 2)).map((item, index) => ({
+    id: item.id,
+    name: item.name,
+    category: (index % 3 === 0 ? "happy" : index % 3 === 1 ? "exception" : "boundary") as CaseCandidate["category"],
+    confidence: (index % 2 === 0 ? "high" : "medium") as CaseCandidate["confidence"]
+  }));
+  return sourceCases.length
+    ? sourceCases
+    : [{ id: `${projectKey}-smoke`, name: `${projectKey} smoke`, category: "happy", confidence: "high" }];
+}
+
+function createDocument(
+  snapshot: AdminConsoleSnapshot,
+  project: AdminConsoleSnapshot["projects"][number],
+  fileName: string,
+  status: ParsedDocument["status"],
+  updatedAt: string,
+  model: string,
+  subtitle: string,
+  rawDocument: string,
+  reasoning: Array<{ label: LocalizedCopy; body: LocalizedCopy }>,
+  missing: string[]
+): ParsedDocument {
+  const cases = buildCaseCandidates(snapshot, project.key);
+  const documentId = toDocumentId(project.key, fileName);
+  return {
+    id: documentId,
+    name: fileName,
+    projectKey: project.key,
+    projectName: project.name,
+    status,
+    updatedAt,
+    model,
+    detectedCases: cases.length,
+    subtitle,
+    cases,
+    rawDocument,
+    versions: [
+      { id: `${documentId}-v2`, label: "v2", time: updatedAt, summary: "Latest synthetic review snapshot." },
+      { id: `${documentId}-v1`, label: "v1", time: snapshot.generatedAt, summary: "Initial synthetic document seed." }
+    ],
+    reasoning,
+    missing
+  };
+}
 
 function buildDocuments(snapshot: AdminConsoleSnapshot): ParsedDocument[] {
   return snapshot.projects.flatMap((project, projectIndex) => {
-    const projectCases = snapshot.cases.filter((item) => item.projectKey === project.key);
-    const baseCases = (projectCases.length ? projectCases : snapshot.cases.slice(0, 3)).map((item, index) => ({
-      id: item.id,
-      name: item.name,
-      category: (index % 3 === 0 ? "happy" : index % 3 === 1 ? "exception" : "boundary") as CaseCandidate["category"],
-      confidence: (index % 3 === 0 ? "high" : "medium") as CaseCandidate["confidence"]
-    }));
-
+    const cases = buildCaseCandidates(snapshot, project.key);
+    const updatedAt = snapshot.cases.find((item) => item.projectKey === project.key)?.updatedAt ?? snapshot.generatedAt;
     const primaryName = projectIndex === 0 ? "checkout-regression-v3.md" : `${project.key}-requirements-v${projectIndex + 2}.md`;
-    const changeCases = baseCases.slice(0, Math.max(1, Math.min(3, baseCases.length))).map((item, index) => ({
-      ...item,
-      id: `${item.id}-change-${index + 1}`,
-      name: `${item.name} / change review`,
-      confidence: (index === 0 ? "high" : "medium") as CaseCandidate["confidence"]
-    }));
+    const changeName = `${project.key}-change-note-${projectIndex + 1}.md`;
 
-    const primary: ParsedDocument = {
-      id: `${project.key}-primary`,
-      name: primaryName,
-      projectKey: project.key,
-      projectName: project.name,
-      status: "Parsed",
-      updatedAt: baseCases[0] ? snapshot.cases.find((item) => item.id === baseCases[0].id)?.updatedAt ?? snapshot.generatedAt : snapshot.generatedAt,
-      model: "claude-4.5",
-      detectedCases: Math.max(baseCases.length, 3),
-      subtitle: `Parsed recently / claude-4.5 / ${Math.max(baseCases.length, 3)} cases detected`,
-      cases: baseCases,
-      rawDocument: `# ${project.name} requirement packet
-
-## Scope
-- ${project.scope}
-- environments: ${project.environments}
-
-## Scenario
-${baseCases.map((item) => `- ${item.name}`).join("\n")}`,
-      versions: [
-        { id: `${project.key}-v3`, label: "v3", time: snapshot.generatedAt, summary: "Added payment assertions and restore notes." },
-        { id: `${project.key}-v2`, label: "v2", time: "2026-04-16 10:15", summary: "Aligned steps with latest UI text." }
-      ],
-      reasoning: [
+    const primary = createDocument(
+      snapshot,
+      project,
+      primaryName,
+      "Parsed",
+      updatedAt,
+      "claude-4.5",
+      `Parsed recently / claude-4.5 / ${cases.length} cases detected`,
+      `# ${project.name}\n\nScope: ${project.scope}\n\nScenarios:\n${cases.map((item) => `- ${item.name}`).join("\n")}`,
+      [
         {
-          label: copy("Structure", "Structure", "Structure"),
-          body: copy(
-            `Grouped the source text into ${Math.max(baseCases.length, 3)} executable scenarios.`,
-            `已整理为 ${Math.max(baseCases.length, 3)} 个可执行场景。`,
-            `${Math.max(baseCases.length, 3)} 件の実行シナリオへ整理済み。`
-          )
+          label: copy("Structure"),
+          body: copy(`Grouped the source text into ${cases.length} executable scenarios.`)
         },
         {
-          label: copy("Coverage", "Coverage", "Coverage"),
-          body: copy(
-            "UI flow, assertions, and data-plan placeholders were extracted together.",
-            "已抽取 UI 流程、断言与数据计划占位。",
-            "UI フロー、アサーション、データ計画を抽出済み。"
-          )
+          label: copy("Coverage"),
+          body: copy("UI flow, assertions, and data-plan placeholders were extracted together.")
         }
-      ]
-    };
-
-    const change: ParsedDocument = {
-      id: `${project.key}-change`,
-      name: `${project.key}-change-note-${projectIndex + 1}.md`,
-      projectKey: project.key,
-      projectName: project.name,
-      status: "Changed",
-      updatedAt: "2026-04-18 20:40",
-      model: projectIndex % 2 === 0 ? "gpt-5.4" : "claude-4.5",
-      detectedCases: changeCases.length,
-      subtitle: `Change note / ${changeCases.length} cases impacted / model ${projectIndex % 2 === 0 ? "gpt-5.4" : "claude-4.5"}`,
-      cases: changeCases,
-      rawDocument: `# ${project.name} change note
-
-## Summary
-- UI copy updated
-- extra validation on submit button
-- response message changed`,
-      versions: [
-        { id: `${project.key}-c2`, label: "v2", time: "2026-04-18 20:40", summary: "Added impact summary and latest screenshots." },
-        { id: `${project.key}-c1`, label: "v1", time: "2026-04-18 19:20", summary: "Initial change packet import." }
       ],
-      reasoning: [
+      ["Expected stock decrement delta", "DB seed baseline"]
+    );
+
+    const change = createDocument(
+      snapshot,
+      project,
+      changeName,
+      "Changed",
+      snapshot.generatedAt,
+      projectIndex % 2 === 0 ? "gpt-5.4" : "claude-4.5",
+      `Change note / ${Math.max(1, cases.length - 1)} cases impacted / model ${projectIndex % 2 === 0 ? "gpt-5.4" : "claude-4.5"}`,
+      `# ${project.name} change note\n\n- UI copy updated\n- Validation changed\n- Review impacted flows`,
+      [
         {
-          label: copy("Structure", "Structure", "Structure"),
-          body: copy(
-            "Change notes were ranked before generation so impacted scenarios stay focused.",
-            "变更说明已按影响优先级排序。",
-            "変更ノートを影響順に整理しました。"
-          )
-        },
-        {
-          label: copy("Risk", "Risk", "Risk"),
-          body: copy(
-            "Submit validation changed and can affect both happy-path and negative checks.",
-            "提交校验发生变化，可能同时影响正向与异常断言。",
-            "送信バリデーション変更が正常系と異常系の両方へ影響します。"
-          )
+          label: copy("Impact"),
+          body: copy("Change notes were ranked before generation so impacted scenarios stay focused.")
         }
-      ]
-    };
+      ],
+      ["Updated assertion wording"]
+    );
 
     return [primary, change];
   });
 }
 
+function mergeDocuments(baseDocuments: ParsedDocument[], sessionDocuments: ParsedDocument[]): ParsedDocument[] {
+  const merged = new Map<string, ParsedDocument>();
+  for (const document of baseDocuments) {
+    merged.set(document.id, document);
+  }
+  for (const document of sessionDocuments) {
+    const existing = merged.get(document.id);
+    merged.set(document.id, existing ? { ...existing, ...document } : document);
+  }
+  return Array.from(merged.values());
+}
+
+function renderSectionState(
+  locale: Locale,
+  state: RemoteSectionState<unknown>,
+  loading: LocalizedCopy,
+  fallbackEmpty: LocalizedCopy
+) {
+  const t = (value: LocalizedCopy) => translate(locale, value);
+  if (state.status === "loading") {
+    return (
+      <div className="casesLockedState">
+        <div className="casesLockedCard">
+          <strong>{t(loading)}</strong>
+        </div>
+      </div>
+    );
+  }
+  if (state.status === "empty" || state.status === "error") {
+    return (
+      <div className="casesLockedState">
+        <div className="casesLockedCard">
+          <strong>{state.message || t(fallbackEmpty)}</strong>
+        </div>
+      </div>
+    );
+  }
+  return null;
+}
+
 export function DocParseScreen({ snapshot, apiBaseUrl, title, locale, onOpenAiGenerate }: DocParseScreenProps) {
   const t = (value: LocalizedCopy) => translate(locale, value);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [sessionDocuments, setSessionDocuments] = useState<ParsedDocument[]>([]);
   const [documents, setDocuments] = useState<ParsedDocument[]>(() => buildDocuments(snapshot));
   const [selectedProjectKey, setSelectedProjectKey] = useState(snapshot.projects[0]?.key ?? "");
   const [openedDocumentId, setOpenedDocumentId] = useState<string | null>(null);
@@ -194,118 +257,286 @@ export function DocParseScreen({ snapshot, apiBaseUrl, title, locale, onOpenAiGe
   const [actionStatus, setActionStatus] = useState<string | null>(null);
   const [manualEditMode, setManualEditMode] = useState(false);
   const [manualEditDraft, setManualEditDraft] = useState("");
+  const [parseResultState, setParseResultState] = useState<RemoteSectionState<DocumentParseResult>>({
+    status: "idle",
+    data: null,
+    message: "",
+    documentId: null
+  });
+  const [rawState, setRawState] = useState<RemoteSectionState<DocumentRawResponse>>({
+    status: "idle",
+    data: null,
+    message: "",
+    documentId: null
+  });
+  const [versionsState, setVersionsState] = useState<RemoteSectionState<DocumentVersionsResponse>>({
+    status: "idle",
+    data: null,
+    message: "",
+    documentId: null
+  });
+
+  const applyDocumentUpdate = useCallback((documentId: string, updater: (document: ParsedDocument) => ParsedDocument) => {
+    setDocuments((current) => current.map((document) => (document.id === documentId ? updater(document) : document)));
+    setSessionDocuments((current) => current.map((document) => (document.id === documentId ? updater(document) : document)));
+  }, []);
+
+  const applyParseResultToDocument = useCallback(
+    (documentId: string, parseResult: DocumentParseResult) => {
+      applyDocumentUpdate(documentId, (document) => ({
+        ...document,
+        status: "Parsed",
+        cases: parseResult.detectedCases.map((item) => ({
+          id: item.id,
+          name: item.name,
+          category: item.category as CaseCandidate["category"],
+          confidence: item.confidence as CaseCandidate["confidence"]
+        })),
+        detectedCases: parseResult.detectedCases.length,
+        reasoning: parseResult.reasoning.map((item) => ({
+          label: toLocalizedCopy(item.label),
+          body: toLocalizedCopy(item.body)
+        })),
+        missing: parseResult.missing
+      }));
+    },
+    [applyDocumentUpdate]
+  );
+
+  const applyRawToDocument = useCallback(
+    (documentId: string, raw: DocumentRawResponse) => {
+      applyDocumentUpdate(documentId, (document) => ({
+        ...document,
+        name: raw.name,
+        rawDocument: raw.content
+      }));
+    },
+    [applyDocumentUpdate]
+  );
+
+  const applyVersionsToDocument = useCallback(
+    (documentId: string, versions: DocumentVersionsResponse) => {
+      applyDocumentUpdate(documentId, (document) => ({
+        ...document,
+        versions: versions.items,
+        updatedAt: versions.items[0]?.time ?? document.updatedAt
+      }));
+    },
+    [applyDocumentUpdate]
+  );
+
+  const upsertSessionDocument = useCallback(
+    (projectKey: string, fileName: string, documentId: string) => {
+      const project = snapshot.projects.find((item) => item.key === projectKey);
+      if (!project) {
+        return;
+      }
+      setSessionDocuments((current) => {
+        const existing = current.find((item) => item.id === documentId);
+        if (existing) {
+          return current.map((item) =>
+            item.id === documentId
+              ? {
+                  ...item,
+                  name: fileName,
+                  status: "Parsed",
+                  subtitle: "Uploaded / waiting for backend hydration"
+                }
+              : item
+          );
+        }
+        const uploaded = createDocument(
+          snapshot,
+          project,
+          fileName,
+          "Parsed",
+          snapshot.generatedAt,
+          "claude-4.5",
+          "Uploaded / waiting for backend hydration",
+          `# ${fileName}\n\nUploaded document placeholder`,
+          [
+            {
+              label: copy("Upload"),
+              body: copy("Uploaded document is waiting for backend hydration.")
+            }
+          ],
+          []
+        );
+        return [uploaded, ...current];
+      });
+      setOpenedDocumentId(documentId);
+      setActiveTab("parse");
+      setOverviewCollapsed(true);
+    },
+    [snapshot]
+  );
+
+  const fetchDocumentSection = useCallback(
+    async <T,>(
+      url: string,
+      documentId: string,
+      setState: Dispatch<SetStateAction<RemoteSectionState<T>>>,
+      emptyMessage: LocalizedCopy
+    ) => {
+      setState({ status: "loading", data: null, message: "", documentId });
+      try {
+        const response = await fetch(url);
+        const payload = (await response.json()) as T | { status: string };
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        if (isNotFoundPayload(payload)) {
+          setState({ status: "empty", data: null, message: t(emptyMessage), documentId });
+          return null;
+        }
+        setState({ status: "success", data: payload as T, message: "", documentId });
+        return payload as T;
+      } catch {
+        setState({
+          status: "error",
+          data: null,
+          message: t(copy("Failed to load document detail.")),
+          documentId
+        });
+        return null;
+      }
+    },
+    [t]
+  );
+
+  const refreshDocumentDetails = useCallback(
+    async (documentId: string) => {
+      const [parseResult, rawDocument, versions] = await Promise.all([
+        fetchDocumentSection<DocumentParseResult>(
+          `${apiBaseUrl}/api/phase3/documents/${documentId}/parse-result`,
+          documentId,
+          setParseResultState,
+          copy("No persisted parse result yet.")
+        ),
+        fetchDocumentSection<DocumentRawResponse>(
+          `${apiBaseUrl}/api/phase3/documents/${documentId}/raw`,
+          documentId,
+          setRawState,
+          copy("No raw document stored yet.")
+        ),
+        fetchDocumentSection<DocumentVersionsResponse>(
+          `${apiBaseUrl}/api/phase3/documents/${documentId}/versions`,
+          documentId,
+          setVersionsState,
+          copy("No version history yet.")
+        )
+      ]);
+
+      if (parseResult) {
+        applyParseResultToDocument(documentId, parseResult);
+      }
+      if (rawDocument) {
+        applyRawToDocument(documentId, rawDocument);
+      }
+      if (versions) {
+        applyVersionsToDocument(documentId, versions);
+      }
+    },
+    [apiBaseUrl, applyParseResultToDocument, applyRawToDocument, applyVersionsToDocument, fetchDocumentSection]
+  );
 
   const handleUploadToBackend = useCallback(
     async (fileName: string, content: string, projectKey: string) => {
-      setActionStatus(t(copy("Uploading…", "上传中…", "アップロード中…")));
+      setActionStatus(t(copy("Uploading...")));
       try {
-        const res = await fetch(`${apiBaseUrl}/api/phase3/documents/upload`, {
+        const response = await fetch(`${apiBaseUrl}/api/phase3/documents/upload`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ projectKey, fileName, content })
         });
-        if (res.ok) {
-          const data: DocumentUploadResponse = await res.json();
-          setActionStatus(t(copy("Upload complete", "上传完成", "アップロード完了")));
-          return data;
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
         }
+        const payload: DocumentUploadResponse = await response.json();
+        const uploaded = payload.uploaded[0];
+        if (uploaded) {
+          upsertSessionDocument(projectKey, fileName, uploaded.id);
+          await refreshDocumentDetails(uploaded.id);
+        }
+        setActionStatus(t(copy("Upload complete")));
+        return payload;
       } catch {
-        /* network error */
+        setActionStatus(t(copy("Upload failed")));
+        return null;
       }
-      setActionStatus(t(copy("Upload failed", "上传失败", "アップロード失敗")));
-      return null;
     },
-    [apiBaseUrl, t]
+    [apiBaseUrl, refreshDocumentDetails, t, upsertSessionDocument]
   );
 
   const handleReparse = useCallback(
     async (documentId: string) => {
-      setActionStatus(t(copy("Re-parsing…", "重新解析中…", "再解析中…")));
+      setActionStatus(t(copy("Re-parsing...")));
       try {
-        const res = await fetch(`${apiBaseUrl}/api/phase3/documents/${documentId}/reparse`, {
+        const response = await fetch(`${apiBaseUrl}/api/phase3/documents/${documentId}/reparse`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ operator: "operator" })
         });
-        if (res.ok) {
-          const data: DocumentReparseResponse = await res.json();
-          setActionStatus(data.status === "ACCEPTED"
-            ? t(copy("Re-parse complete", "重新解析完成", "再解析完了"))
-            : t(copy("Document not found", "文档未找到", "文書が見つかりません")));
-          // Refresh parse result
-          const prRes = await fetch(`${apiBaseUrl}/api/phase3/documents/${documentId}/parse-result`);
-          if (prRes.ok) {
-            const pr: DocumentParseResult = await prRes.json();
-            setDocuments((prev) =>
-              prev.map((doc) =>
-                doc.id === documentId
-                  ? {
-                      ...doc,
-                      cases: pr.detectedCases.map((c) => ({
-                        id: c.id,
-                        name: c.name,
-                        category: c.category as CaseCandidate["category"],
-                        confidence: c.confidence as CaseCandidate["confidence"]
-                      })),
-                      detectedCases: pr.detectedCases.length,
-                      status: "Parsed" as const
-                    }
-                  : doc
-              )
-            );
-          }
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const payload: DocumentReparseResponse = await response.json();
+        setActionStatus(payload.status === "ACCEPTED" ? t(copy("Re-parse complete")) : t(copy("Document not found")));
+        if (payload.status === "ACCEPTED") {
+          await refreshDocumentDetails(documentId);
         }
       } catch {
-        setActionStatus(t(copy("Re-parse failed", "重新解析失败", "再解析失敗")));
+        setActionStatus(t(copy("Re-parse failed")));
       }
     },
-    [apiBaseUrl, t]
+    [apiBaseUrl, refreshDocumentDetails, t]
   );
 
   const handleSaveParseResult = useCallback(
     async (documentId: string) => {
-      setActionStatus(t(copy("Saving…", "保存中…", "保存中…")));
+      setActionStatus(t(copy("Saving...")));
       try {
         const detectedCases = JSON.parse(manualEditDraft);
-        const res = await fetch(`${apiBaseUrl}/api/phase3/documents/${documentId}/parse-result`, {
+        const response = await fetch(`${apiBaseUrl}/api/phase3/documents/${documentId}/parse-result`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ updatedBy: "operator", changes: { detectedCases } })
         });
-        if (res.ok) {
-          const data: DocumentParseResultSaveResponse = await res.json();
-          setActionStatus(data.status === "ACCEPTED"
-            ? t(copy("Saved", "已保存", "保存済み"))
-            : t(copy("Document not found", "文档未找到", "文書が見つかりません")));
-          setManualEditMode(false);
-          // Refresh local doc data
-          setDocuments((prev) =>
-            prev.map((doc) =>
-              doc.id === documentId
-                ? {
-                    ...doc,
-                    cases: (Array.isArray(detectedCases) ? detectedCases : []).map((c: CaseCandidate) => ({
-                      id: c.id,
-                      name: c.name,
-                      category: (c.category || "happy") as CaseCandidate["category"],
-                      confidence: (c.confidence || "medium") as CaseCandidate["confidence"]
-                    })),
-                    detectedCases: Array.isArray(detectedCases) ? detectedCases.length : 0
-                  }
-                : doc
-            )
-          );
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const payload: DocumentParseResultSaveResponse = await response.json();
+        setActionStatus(payload.status === "ACCEPTED" ? t(copy("Saved")) : t(copy("Document not found")));
+        setManualEditMode(false);
+        if (payload.status === "ACCEPTED") {
+          await refreshDocumentDetails(documentId);
         }
       } catch {
-        setActionStatus(t(copy("Invalid JSON or save failed", "JSON 无效或保存失败", "不正な JSON または保存失敗")));
+        setActionStatus(t(copy("Invalid JSON or save failed")));
       }
     },
-    [apiBaseUrl, manualEditDraft, t]
+    [apiBaseUrl, manualEditDraft, refreshDocumentDetails, t]
   );
 
   useEffect(() => {
-    setDocuments(buildDocuments(snapshot));
-  }, [snapshot]);
+    setDocuments(mergeDocuments(buildDocuments(snapshot), sessionDocuments));
+  }, [sessionDocuments, snapshot]);
+
+  useEffect(() => {
+    if (!snapshot.projects.some((item) => item.key === selectedProjectKey)) {
+      setSelectedProjectKey(snapshot.projects[0]?.key ?? "");
+    }
+  }, [selectedProjectKey, snapshot.projects]);
+
+  useEffect(() => {
+    if (!openedDocumentId) {
+      setParseResultState({ status: "idle", data: null, message: "", documentId: null });
+      setRawState({ status: "idle", data: null, message: "", documentId: null });
+      setVersionsState({ status: "idle", data: null, message: "", documentId: null });
+      return;
+    }
+    void refreshDocumentDetails(openedDocumentId);
+  }, [openedDocumentId, refreshDocumentDetails]);
 
   const visibleDocuments = useMemo(
     () => documents.filter((item) => item.projectKey === selectedProjectKey),
@@ -313,14 +544,8 @@ export function DocParseScreen({ snapshot, apiBaseUrl, title, locale, onOpenAiGe
   );
 
   const openedDocument = visibleDocuments.find((item) => item.id === openedDocumentId) ?? null;
-  const selectedCase = openedDocument?.cases.find((item) => item.id === selectedCaseId) ?? openedDocument?.cases[0] ?? null;
   const selectedProject = snapshot.projects.find((item) => item.key === selectedProjectKey) ?? snapshot.projects[0] ?? null;
-
-  useEffect(() => {
-    if (!snapshot.projects.some((item) => item.key === selectedProjectKey)) {
-      setSelectedProjectKey(snapshot.projects[0]?.key ?? "");
-    }
-  }, [selectedProjectKey, snapshot.projects]);
+  const selectedCase = openedDocument?.cases.find((item) => item.id === selectedCaseId) ?? openedDocument?.cases[0] ?? null;
 
   useEffect(() => {
     if (!openedDocument) {
@@ -347,12 +572,11 @@ export function DocParseScreen({ snapshot, apiBaseUrl, title, locale, onOpenAiGe
     const names = Array.from(fileList).map((item) => item.name);
     setUploadedFiles((current) => [...names, ...current].slice(0, 6));
 
-    // Upload each file to backend
     Array.from(fileList).forEach((file) => {
       const reader = new FileReader();
       reader.onload = () => {
         const content = typeof reader.result === "string" ? reader.result : "";
-        handleUploadToBackend(file.name, content, selectedProjectKey);
+        void handleUploadToBackend(file.name, content, selectedProjectKey);
       };
       reader.readAsText(file);
     });
@@ -393,17 +617,9 @@ export function DocParseScreen({ snapshot, apiBaseUrl, title, locale, onOpenAiGe
       <section className="docParseOverviewCard">
         <div className="docParseOverviewHead">
           <div>
-            <p className="eyebrow">{t(copy("Projects / documents", "项目 / 文档", "プロジェクト / 文書"))}</p>
+            <p className="eyebrow">{t(copy("Projects / documents"))}</p>
             <h2>{title}</h2>
-            <p className="docParseOverviewLead">
-              {t(
-                copy(
-                  "Doc Parse is isolated from Cases. Open a document here to review parse output before generation.",
-                  "Doc Parse 与 Cases 已隔离。请在这里打开文档查看解析结果。",
-                  "Doc Parse は Cases と分離されています。ここで文書を開いて解析結果を確認します。"
-                )
-              )}
-            </p>
+            <p className="docParseOverviewLead">{t(copy("Review parsed documents here before handing focused cases into AI Generate."))}</p>
           </div>
           <div className="docParseOverviewActions">
             <button
@@ -419,7 +635,7 @@ export function DocParseScreen({ snapshot, apiBaseUrl, title, locale, onOpenAiGe
 
         <div className={`docParseOverviewBody ${overviewCollapsed ? "isCollapsed" : ""}`}>
           <div className="docParseProjectRail">
-            <span className="casesRailLabel">{t(copy("Project switch", "项目切换", "プロジェクト切替"))}</span>
+            <span className="casesRailLabel">{t(copy("Project switch"))}</span>
             <div className="casesProjectSwitches">
               {snapshot.projects.map((project, index) => {
                 const projectDocuments = documents.filter((item) => item.projectKey === project.key);
@@ -442,8 +658,8 @@ export function DocParseScreen({ snapshot, apiBaseUrl, title, locale, onOpenAiGe
                       <span>{projectDocuments.length}</span>
                     </div>
                     <div className="casesProjectCardMeta">
-                      <span>{t(copy("Docs", "文档", "文書"))}</span>
-                      <span>{t(copy("Cases", "用例", "ケース"))}: {projectDocuments.reduce((sum, item) => sum + item.detectedCases, 0)}</span>
+                      <span>{t(copy("Docs"))}</span>
+                      <span>{t(copy("Cases"))}: {projectDocuments.reduce((sum, item) => sum + item.detectedCases, 0)}</span>
                     </div>
                   </button>
                 );
@@ -454,8 +670,8 @@ export function DocParseScreen({ snapshot, apiBaseUrl, title, locale, onOpenAiGe
           <div className="docParseDocumentPanel">
             <div className="casesListPanelHead">
               <div>
-                <p className="eyebrow">{t(copy("Document catalog", "文档一览", "文書一覧"))}</p>
-                <h3>{selectedProject?.name ?? t(copy("No project", "未选择项目", "未選択"))}</h3>
+                <p className="eyebrow">{t(copy("Document catalog"))}</p>
+                <h3>{selectedProject?.name ?? t(copy("No project"))}</h3>
               </div>
             </div>
 
@@ -473,11 +689,11 @@ export function DocParseScreen({ snapshot, apiBaseUrl, title, locale, onOpenAiGe
                       <span>{document.updatedAt}</span>
                     </div>
                     <div className="docParseDocumentStats">
-                      <span>{document.detectedCases} {t(copy("cases", "个用例", "件"))}</span>
-                      <span>{document.versions.length} {t(copy("versions", "版本", "版"))}</span>
+                      <span>{document.detectedCases} {t(copy("cases"))}</span>
+                      <span>{document.versions.length} {t(copy("versions"))}</span>
                     </div>
                     <button type="button" className="casesInlineAction" onClick={() => handleOpenDocument(document)}>
-                      {isOpened ? t(copy("Opened", "已打开", "表示中")) : t(copy("Detail", "详细", "詳細"))}
+                      {isOpened ? t(copy("Opened")) : t(copy("Detail"))}
                     </button>
                   </article>
                 );
@@ -490,30 +706,24 @@ export function DocParseScreen({ snapshot, apiBaseUrl, title, locale, onOpenAiGe
       <section className="docParseCanvas">
         <div className="docParsePath">
           {openedDocument
-            ? `${t(copy("Projects", "项目", "プロジェクト"))} / ${openedDocument.projectName} / ${t(copy("Documents", "文档", "文書"))}`
-            : t(copy("Projects / Pick one document above", "项目 / 请先在上方选择文档", "プロジェクト / 上で文書を選択"))}
+            ? `${t(copy("Projects"))} / ${openedDocument.projectName} / ${t(copy("Documents"))}`
+            : t(copy("Projects / Pick one document above"))}
         </div>
 
         <div className="docParseHero">
           <div>
             <div className="docParseHeroTitleRow">
-              <h3>{openedDocument?.name ?? t(copy("Document detail locked", "文档详情未激活", "文書詳細は未選択"))}</h3>
-              <span className="casesHappyBadge">{openedDocument?.status ?? t(copy("Locked", "未激活", "未選択"))}</span>
+              <h3>{openedDocument?.name ?? t(copy("Document detail locked"))}</h3>
+              <span className="casesHappyBadge">{openedDocument?.status ?? t(copy("Locked"))}</span>
             </div>
             <p className="docParseHeroSubtitle">
-              {openedDocument?.subtitle ??
-                t(copy("Open one document above to load the parse canvas.", "请先在上方打开一个文档。", "上で文書を開いてください。"))}
+              {openedDocument?.subtitle ?? t(copy("Open one document above to load the parse canvas."))}
             </p>
           </div>
 
           <div className="docParseHeroActions">
-            <button
-              type="button"
-              className="casesActionButton ghost"
-              disabled={!openedDocument}
-              onClick={() => openedDocument && handleReparse(openedDocument.id)}
-            >
-              {t(copy("Re-parse", "重新解析", "再解析"))}
+            <button type="button" className="casesActionButton ghost" disabled={!openedDocument} onClick={() => openedDocument && handleReparse(openedDocument.id)}>
+              {t(copy("Re-parse"))}
             </button>
             <button
               type="button"
@@ -526,15 +736,10 @@ export function DocParseScreen({ snapshot, apiBaseUrl, title, locale, onOpenAiGe
                 }
               }}
             >
-              {t(copy("Manual edit", "手动修正", "手動修正"))}
+              {t(copy("Manual edit"))}
             </button>
-            <button
-              type="button"
-              className="casesActionButton primary"
-              disabled={!openedDocument}
-              onClick={() => openAiGenerate(selectedCase?.id ?? "")}
-            >
-              {t(copy("Generate tests", "生成测试", "テスト生成"))}
+            <button type="button" className="casesActionButton primary" disabled={!openedDocument || !selectedCase} onClick={() => openAiGenerate(selectedCase?.id ?? "")}>
+              {t(copy("Generate tests"))}
             </button>
           </div>
         </div>
@@ -542,46 +747,37 @@ export function DocParseScreen({ snapshot, apiBaseUrl, title, locale, onOpenAiGe
         {actionStatus ? (
           <div className="docParseActionStatus">
             <span>{actionStatus}</span>
-            <button type="button" className="docParseDismiss" onClick={() => setActionStatus(null)}>×</button>
+            <button type="button" className="docParseDismiss" onClick={() => setActionStatus(null)}>
+              x
+            </button>
           </div>
         ) : null}
 
         {manualEditMode && openedDocument ? (
           <div className="docParseManualEdit">
             <div className="casesPanelHead">
-              <div className="casesPanelTitle">{t(copy("Manual edit — detected cases", "手动修正 — 检出用例", "手動修正 — 検出ケース"))}</div>
+              <div className="casesPanelTitle">{t(copy("Manual edit - detected cases"))}</div>
               <div className="casesPanelActions">
                 <button type="button" className="casesActionButton ghost" onClick={() => setManualEditMode(false)}>
-                  {t(copy("Cancel", "取消", "キャンセル"))}
+                  {t(copy("Cancel"))}
                 </button>
                 <button type="button" className="casesActionButton primary" onClick={() => handleSaveParseResult(openedDocument.id)}>
-                  {t(copy("Save", "保存", "保存"))}
+                  {t(copy("Save"))}
                 </button>
               </div>
             </div>
-            <textarea
-              className="casesDslEditor"
-              rows={12}
-              value={manualEditDraft}
-              onChange={(e) => setManualEditDraft(e.target.value)}
-            />
+            <textarea className="casesDslEditor" rows={12} value={manualEditDraft} onChange={(event) => setManualEditDraft(event.target.value)} />
           </div>
         ) : null}
 
         <div className="docParseTabs">
           <div className="docParseTabRail">
             {([
-              ["parse", copy("Parse result", "解析结果", "解析結果")],
-              ["raw", copy("Raw document", "原始文档", "原文書")],
-              ["hist", copy("Version history", "版本历史", "履歴")]
+              ["parse", copy("Parse result")],
+              ["raw", copy("Raw document")],
+              ["hist", copy("Version history")]
             ] as Array<[TabKey, LocalizedCopy]>).map(([key, label]) => (
-              <button
-                key={key}
-                type="button"
-                className={`docParseTab ${activeTab === key ? "isActive" : ""}`}
-                disabled={!openedDocument}
-                onClick={() => setActiveTab(key)}
-              >
+              <button key={key} type="button" className={`docParseTab ${activeTab === key ? "isActive" : ""}`} disabled={!openedDocument} onClick={() => setActiveTab(key)}>
                 {t(label)}
               </button>
             ))}
@@ -589,7 +785,7 @@ export function DocParseScreen({ snapshot, apiBaseUrl, title, locale, onOpenAiGe
 
           <div className="docParseTabActions">
             <button type="button" className="docParseUploadButton" onClick={() => fileInputRef.current?.click()}>
-              {t(copy("Upload file", "上传文件", "ファイルアップロード"))}
+              {t(copy("Upload file"))}
             </button>
             <input ref={fileInputRef} type="file" hidden multiple onChange={handleUpload} />
           </div>
@@ -601,9 +797,14 @@ export function DocParseScreen({ snapshot, apiBaseUrl, title, locale, onOpenAiGe
               <div className="docParseGrid">
                 <section className="docParsePanel">
                   <div className="docParsePanelHead">
-                    <div className="docParsePanelTitle">{t(copy("Cases detected", "检出用例", "検出ケース"))}</div>
+                    <div className="docParsePanelTitle">{t(copy("Cases detected"))}</div>
                     <span className="docParseDocumentBadge info">{openedDocument.detectedCases}</span>
                   </div>
+                  {parseResultState.documentId === openedDocument.id && parseResultState.status !== "success" ? (
+                    <div className="docParseActionStatus">
+                      <span>{parseResultState.status === "loading" ? t(copy("Loading parse result...")) : parseResultState.message}</span>
+                    </div>
+                  ) : null}
                   <div className="docParseCaseList">
                     {openedDocument.cases.map((item) => (
                       <div
@@ -639,63 +840,31 @@ export function DocParseScreen({ snapshot, apiBaseUrl, title, locale, onOpenAiGe
                 <section className="docParsePanel">
                   <div className="docParsePanelHead column">
                     <div className="docParsePanelTitle">{selectedCase?.name ?? openedDocument.name}</div>
-                    <p className="docParsePanelSubtitle">2 pages / 5 assertions / 1 data plan / restore: sql</p>
+                    <p className="docParsePanelSubtitle">
+                      {t(copy("Parse detail prefers backend data and falls back only when the selected shell document has not been persisted yet."))}
+                    </p>
                   </div>
                   <div className="docParseResultBody">
-                    <div className="docParseInsightStrip">
-                      <article className="docParseInsightCard accent">
-                        <span>{t(copy("Pages", "页面", "ページ"))}</span>
-                        <strong>3</strong>
-                        <small>/cart /checkout /order/confirm</small>
-                      </article>
-                      <article className="docParseInsightCard success">
-                        <span>{t(copy("Assertions", "断言", "アサーション"))}</span>
-                        <strong>5</strong>
-                        <small>UI + email + DB</small>
-                      </article>
-                      <article className="docParseInsightCard warning">
-                        <span>{t(copy("Pending fill", "待补充", "補完待ち"))}</span>
-                        <strong>2</strong>
-                        <small>{t(copy("Data seed and stock delta", "种子数据与库存变化", "データ投入と在庫差分"))}</small>
-                      </article>
-                    </div>
-
                     <div className="docParseBlock">
-                      <span className="docParseBlockLabel accent2">{t(copy("Test goal", "测试目标", "テスト目的"))}</span>
-                      <p>{`${selectedCase?.name ?? openedDocument.name} is translated into one end-to-end flow with UI, email and DB checkpoints.`}</p>
+                      <span className="docParseBlockLabel accent2">{t(copy("Test goal"))}</span>
+                      <p>{`${selectedCase?.name ?? openedDocument.name} is translated into one end-to-end flow with UI, email, and DB checkpoints.`}</p>
                     </div>
-
                     <div className="docParseBlock">
-                      <span className="docParseBlockLabel accent">{t(copy("Pages involved", "涉及页面", "対象ページ"))}</span>
-                      <div className="docParsePillRow">
-                        <span className="pill">/cart</span>
-                        <span className="pill">/checkout</span>
-                        <span className="pill">/order/confirm</span>
-                      </div>
-                    </div>
-
-                    <div className="docParseBlock">
-                      <span className="docParseBlockLabel success">{t(copy("Explicit (from doc)", "明确项", "明示項目"))}</span>
+                      <span className="docParseBlockLabel success">{t(copy("Reasoning"))}</span>
                       <ul className="docParseChecklist success">
-                        <li>Coupon code "SAVE10"</li>
-                        <li>Card 4242 4242 4242 4242</li>
-                        <li>Expected total: $89.10</li>
+                        {openedDocument.reasoning.map((item) => (
+                          <li key={item.label.en}>
+                            <strong>{t(item.label)}:</strong> {t(item.body)}
+                          </li>
+                        ))}
                       </ul>
                     </div>
-
                     <div className="docParseBlock">
-                      <span className="docParseBlockLabel warning">{t(copy("Inferred by AI", "AI 推断项", "AI 推定項目"))}</span>
-                      <ul className="docParseChecklist warning">
-                        <li>{t(copy("Shipping address pre-filled from profile", "收货地址来自默认资料", "配送先はプロフィール既定値"))}</li>
-                        <li>{t(copy("Email template: order_confirmation_v2", "邮件模板: order_confirmation_v2", "メールテンプレート: order_confirmation_v2"))}</li>
-                      </ul>
-                    </div>
-
-                    <div className="docParseBlock">
-                      <span className="docParseBlockLabel danger">{t(copy("Missing / please fill", "缺失项 / 请补充", "不足項目 / 補完"))}</span>
+                      <span className="docParseBlockLabel danger">{t(copy("Missing / please fill"))}</span>
                       <ul className="docParseChecklist danger">
-                        <li>{t(copy("What DB rows need seed data?", "哪些 DB 行需要种子数据?", "どの DB 行に seed が必要か?"))}</li>
-                        <li>{t(copy("Expected stock decrement delta?", "预期库存扣减值?", "期待在庫減少量は?"))}</li>
+                        {(openedDocument.missing.length ? openedDocument.missing : [t(copy("No missing items."))]).map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
                       </ul>
                     </div>
                   </div>
@@ -703,7 +872,7 @@ export function DocParseScreen({ snapshot, apiBaseUrl, title, locale, onOpenAiGe
 
                 <aside className="docParsePanel docParseReasoningPanel">
                   <div className="docParsePanelHead">
-                    <div className="docParsePanelTitle">{t(copy("AI reasoning", "AI 推理", "AI reasoning"))}</div>
+                    <div className="docParsePanelTitle">{t(copy("AI reasoning"))}</div>
                     <span className="pill">{openedDocument.model}</span>
                   </div>
                   <div className="docParseReasoningBody">
@@ -722,16 +891,18 @@ export function DocParseScreen({ snapshot, apiBaseUrl, title, locale, onOpenAiGe
               <div className="docParseSinglePanel">
                 <section className="docParsePanel">
                   <div className="docParsePanelHead">
-                    <div className="docParsePanelTitle">{t(copy("Raw source", "原始文档", "原文書"))}</div>
+                    <div className="docParsePanelTitle">{t(copy("Raw source"))}</div>
                     <span className="docParseDocumentBadge neutral">{openedDocument.name}</span>
                   </div>
-                  <div className="docParseRawBody">
-                    <pre>{openedDocument.rawDocument}</pre>
-                    <aside className="docParseUploadList">
-                      <strong>{t(copy("Uploaded in tab bar", "本页已上传", "このタブでアップロード"))}</strong>
-                      {uploadedFiles.length ? uploadedFiles.map((item) => <span key={item}>{item}</span>) : <span>{t(copy("No uploaded files yet", "暂无上传文件", "アップロードなし"))}</span>}
-                    </aside>
-                  </div>
+                  {rawState.documentId === openedDocument.id && rawState.status === "success" && rawState.data ? (
+                    <div className="docParseRawBody">
+                      <pre>{rawState.data.content}</pre>
+                      <aside className="docParseUploadList">
+                        <strong>{t(copy("Uploaded in tab bar"))}</strong>
+                        {uploadedFiles.length ? uploadedFiles.map((item) => <span key={item}>{item}</span>) : <span>{t(copy("No uploaded files yet"))}</span>}
+                      </aside>
+                    </div>
+                  ) : renderSectionState(locale, rawState, copy("Loading raw document..."), copy("No raw document stored yet."))}
                 </section>
               </div>
             ) : null}
@@ -740,20 +911,28 @@ export function DocParseScreen({ snapshot, apiBaseUrl, title, locale, onOpenAiGe
               <div className="docParseSinglePanel">
                 <section className="docParsePanel">
                   <div className="docParsePanelHead">
-                    <div className="docParsePanelTitle">{t(copy("Version history", "版本历史", "履歴"))}</div>
+                    <div className="docParsePanelTitle">{t(copy("Version history"))}</div>
                     <span className="docParseDocumentBadge warning">{openedDocument.versions.length}</span>
                   </div>
-                  <div className="docParseHistoryList">
-                    {openedDocument.versions.map((version) => (
-                      <article key={version.id} className="docParseHistoryRow">
-                        <div className="docParseHistoryTag">{version.label}</div>
-                        <div className="docParseHistoryBody">
-                          <strong>{version.time}</strong>
-                          <p>{version.summary}</p>
+                  {versionsState.documentId === openedDocument.id && versionsState.status === "success" && versionsState.data ? (
+                    <div className="docParseHistoryList">
+                      {versionsState.data.items.length ? versionsState.data.items.map((version) => (
+                        <article key={version.id} className="docParseHistoryRow">
+                          <div className="docParseHistoryTag">{version.label}</div>
+                          <div className="docParseHistoryBody">
+                            <strong>{version.time}</strong>
+                            <p>{version.summary}</p>
+                          </div>
+                        </article>
+                      )) : (
+                        <div className="casesLockedState">
+                          <div className="casesLockedCard">
+                            <strong>{t(copy("No version history yet."))}</strong>
+                          </div>
                         </div>
-                      </article>
-                    ))}
-                  </div>
+                      )}
+                    </div>
+                  ) : renderSectionState(locale, versionsState, copy("Loading version history..."), copy("No version history yet."))}
                 </section>
               </div>
             ) : null}
@@ -761,8 +940,8 @@ export function DocParseScreen({ snapshot, apiBaseUrl, title, locale, onOpenAiGe
         ) : (
           <div className="casesLockedState">
             <div className="casesLockedCard">
-              <strong>{t(copy("Document detail area is waiting", "文档详情区域等待中", "文書詳細エリア待機中"))}</strong>
-              <p>{t(copy("Pick one document above and click Detail.", "请先在上方选择文档并点击详细。", "上で文書を選択して詳細を押してください。"))}</p>
+              <strong>{t(copy("Document detail area is waiting"))}</strong>
+              <p>{t(copy("Pick one document above and click Detail."))}</p>
             </div>
           </div>
         )}

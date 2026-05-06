@@ -3678,3 +3678,145 @@ Remaining limits:
 - Validation remains deterministic by design:
   - no real provider connectivity
   - no real JDBC connectivity
+
+## 2026-05-06 P2-2 Projects Import And Navigation Actions
+
+## Task
+- Close the remaining `projects` control gap within the current Phase 3 boundary:
+  - `Import`
+  - `New project`
+  - `Enter project`
+  - `View reports`
+
+## Completed
+- Re-checked the live code path instead of re-implementing from backlog text.
+- Confirmed the current implementation already reuses the intended Phase 3 architecture:
+  - `Import` -> `POST /api/phase3/catalog/project/import/preview` -> `POST /api/phase3/catalog/project/import/commit`
+  - `New project` -> existing add-row draft flow -> existing `POST /api/phase3/catalog/project` save path
+  - `Enter project` -> existing App-level handoff into `cases`
+  - `View reports` / card `Reports` -> existing App-level handoff into `reports`
+- Added focused frontend regression coverage for import error feedback so the required `pending / success / error` mutation surface is now explicitly tested.
+- Synced the Phase 3 interface docs to the real implementation boundary:
+  - current import UI is deterministic JSON review only
+  - no CSV parser or file-upload wizard is part of the implemented P2-2 scope
+
+## Modified Files
+- `ui/admin-console/src/App.test.tsx`
+- `docs/phase3/interface/projects/functional-spec.md`
+- `docs/phase3/interface/projects/interface-spec.md`
+- `docs/phase3/interface/ui-control-interface-overview.md`
+- `docs/phase3/interface/review-backlog.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Passed: `npm test -- --run src/App.test.tsx -t "runs project import preview and commit through the new catalog import endpoints"` in `ui/admin-console`
+- Passed: `npm test -- --run src/App.test.tsx -t "shows project import error feedback when preview fails"` in `ui/admin-console`
+- Passed: `npm test -- --run src/App.test.tsx -t "adds a new project row and persists it through the existing catalog save flow"` in `ui/admin-console`
+- Passed: `npm test -- --run src/App.test.tsx -t "hands off Enter project into Cases with the selected project context"` in `ui/admin-console`
+- Passed: `npm run build` in `ui/admin-console`
+- Attempted but not used as gate:
+  - aggregated `App.test.tsx` pattern run timed out / OOMed in this environment
+  - isolated legacy `projects -> reports` handoff test selection remained unstable under the current Vitest worker/filter behavior on this machine
+
+## Current State
+- `P2-2` is complete on the current Phase 3 boundary.
+- No new route system, no new projects-specific handoff payload, and no new project-detail contract were introduced.
+
+## Remaining Limits
+- import remains deterministic JSON review only
+- project cards still rely on front-end-composed summary data from the shared snapshot
+
+## 2026-05-06 P2-4 DocParse read-side completion follow-up
+
+## Task
+- Close the remaining real `docParse` read-side gaps after the earlier P2-4 write-path work:
+  - `GET /api/phase3/documents/{documentId}/raw`
+  - `GET /api/phase3/documents/{documentId}/versions`
+  - first-open parse-result hydration instead of backend refresh only after re-parse/manual-edit
+
+## Completed
+- `apps/local-admin-api`
+  - extended `DocumentPersistenceService` with:
+    - `getRawDocument(documentId)`
+    - `getVersions(documentId)`
+    - lightweight version-entry persistence on upload / re-parse / manual edit
+  - extended `LocalAdminApiServer` document routing with:
+    - `GET /api/phase3/documents/{documentId}/raw`
+    - `GET /api/phase3/documents/{documentId}/versions`
+- `ui/admin-console`
+  - rewrote `DocParseScreen.tsx` into a clean backend-first detail flow
+  - opening a document now attempts:
+    - `GET /api/phase3/documents/{documentId}/parse-result`
+    - `GET /api/phase3/documents/{documentId}/raw`
+    - `GET /api/phase3/documents/{documentId}/versions`
+  - `Raw document` and `Version history` now show explicit loading / empty / error states
+  - `Re-parse` and `Manual edit` now refresh parse/raw/version detail together after success
+  - parse-result detail now prefers backend data on first open and keeps synthetic shell fallback only when the backend document does not exist yet
+- Docs synced:
+  - `docs/phase3/interface/docParse/functional-spec.md`
+  - `docs/phase3/interface/docParse/interface-spec.md`
+  - `docs/phase3/interface/review-backlog.md`
+  - `docs/phase3/interface/ui-control-interface-overview.md`
+
+## Modified Files
+- `apps/local-admin-api/src/main/java/com/example/webtest/admin/http/LocalAdminApiServer.java`
+- `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/DocumentPersistenceService.java`
+- `apps/local-admin-api/src/test/java/com/example/webtest/admin/http/LocalAdminApiServerTest.java`
+- `ui/admin-console/src/screens/DocParseScreen.tsx`
+- `ui/admin-console/src/screens/DocParseScreen.test.tsx`
+- `ui/admin-console/src/types.ts`
+- `ui/admin-console/src/App.test.tsx`
+- `docs/phase3/interface/docParse/functional-spec.md`
+- `docs/phase3/interface/docParse/interface-spec.md`
+- `docs/phase3/interface/review-backlog.md`
+- `docs/phase3/interface/ui-control-interface-overview.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Passed: `mvn "-Dmaven.repo.local=.m2/repository" -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest#documentServiceEndpoints test`
+- Passed: `npm run build` in `ui/admin-console`
+- Attempted but not used as gate:
+  - targeted Vitest runs for `App.test.tsx` and the new `DocParseScreen.test.tsx` timed out in the current environment before producing stable per-test output
+
+## Current State
+- `P2-4` is now complete on the current Phase 3 boundary for document upload, re-parse, manual edit, parse-result read, raw read, and version-history read.
+
+## Remaining Limits
+- document catalog is still synthetic front-end data from `GET /api/phase3/admin-console`; there is still no canonical `GET /api/phase3/documents`
+- parse-result still keeps shell fallback content when a selected synthetic document has not yet been uploaded/persisted
+- version history is event metadata only; it does not yet expose per-version raw snapshots or diffs
+
+## 2026-05-06 P2-4 DocParse text cleanup and session-catalog boundary follow-up
+
+## Task
+- Keep the follow-up scope small:
+  - clean any remaining garbled copy in `ui/admin-console/src/screens/DocParseScreen.tsx`
+  - document the current uploaded-document catalog limit precisely
+  - optionally keep uploaded rows visible across snapshot rebuilds in the same frontend session without adding `GET /api/phase3/documents`
+
+## Completed
+- Rewrote `ui/admin-console/src/screens/DocParseScreen.tsx` copy so the screen now uses clean, readable text only; no garbled zh/ja/en strings remain in this file.
+- Kept the current no-new-endpoint boundary and added a small frontend-only guard:
+  - synthetic catalog rows from `buildDocuments(snapshot)` are now merged with session-local uploaded rows
+  - uploaded rows therefore survive snapshot rebuilds during the same frontend session
+- Synced the docParse documentation and backlog wording to make the current limit explicit:
+  - there is still no canonical `GET /api/phase3/documents`
+  - uploaded rows are still session-local and disappear after remount / fresh app load
+
+## Modified Files
+- `ui/admin-console/src/screens/DocParseScreen.tsx`
+- `docs/phase3/interface/docParse/functional-spec.md`
+- `docs/phase3/interface/docParse/interface-spec.md`
+- `docs/phase3/interface/review-backlog.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Passed: `npm run build` in `ui/admin-console`
+
+## Remaining Limits
+- uploaded documents are still not restored from backend on remount / fresh app load because the document catalog remains synthetic
+- there is still no canonical `GET /api/phase3/documents`
+- version history is still event metadata only; it does not expose per-version raw snapshots or diffs

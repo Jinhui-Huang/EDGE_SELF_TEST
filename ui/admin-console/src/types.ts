@@ -710,6 +710,26 @@ export type DocumentParseResult = {
   missing: string[];
 };
 
+export type DocumentRawResponse = {
+  documentId: string;
+  name: string;
+  projectKey: string;
+  content: string;
+  uploadedAt: string;
+};
+
+export type DocumentVersionItem = {
+  id: string;
+  label: string;
+  time: string;
+  summary: string;
+};
+
+export type DocumentVersionsResponse = {
+  documentId: string;
+  items: DocumentVersionItem[];
+};
+
 // ---- Extension popup snapshot (P0-3) ----
 
 export type ExtensionPopupSnapshot = {

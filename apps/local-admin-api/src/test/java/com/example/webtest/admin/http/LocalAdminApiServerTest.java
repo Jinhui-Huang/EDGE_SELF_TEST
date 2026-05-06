@@ -1725,6 +1725,20 @@ class LocalAdminApiServerTest {
             assertTrue(parseResult.body().contains("\"detectedCases\""));
             assertTrue(parseResult.body().contains("\"reasoning\""));
 
+            HttpResponse<String> raw = client.send(
+                    request(server, "/api/phase3/documents/" + documentId + "/raw"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, raw.statusCode());
+            assertTrue(raw.body().contains("\"content\":\"# Checkout regression"));
+            assertTrue(raw.body().contains("\"uploadedAt\":\"2026-04-25T10:00:00Z\""));
+
+            HttpResponse<String> versionsAfterUpload = client.send(
+                    request(server, "/api/phase3/documents/" + documentId + "/versions"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, versionsAfterUpload.statusCode());
+            assertTrue(versionsAfterUpload.body().contains("\"items\""));
+            assertTrue(versionsAfterUpload.body().contains("Uploaded document and generated initial parse result."));
+
             // 3. Re-parse document
             HttpResponse<String> reparse = client.send(
                     request(server, "/api/phase3/documents/" + documentId + "/reparse", "POST",
@@ -1733,6 +1747,12 @@ class LocalAdminApiServerTest {
             assertEquals(202, reparse.statusCode());
             assertTrue(reparse.body().contains("\"ACCEPTED\""));
             assertTrue(reparse.body().contains("\"document-reparse\""));
+
+            HttpResponse<String> versionsAfterReparse = client.send(
+                    request(server, "/api/phase3/documents/" + documentId + "/versions"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, versionsAfterReparse.statusCode());
+            assertTrue(versionsAfterReparse.body().contains("Re-parsed document by tester and refreshed detected cases."));
 
             // 4. Save parse result (manual edit)
             HttpResponse<String> saveParseResult = client.send(
@@ -1755,6 +1775,12 @@ class LocalAdminApiServerTest {
             assertTrue(parseResultAfterEdit.body().contains("\"checkout-custom\""));
             assertTrue(parseResultAfterEdit.body().contains("\"Custom case\""));
 
+            HttpResponse<String> versionsAfterEdit = client.send(
+                    request(server, "/api/phase3/documents/" + documentId + "/versions"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, versionsAfterEdit.statusCode());
+            assertTrue(versionsAfterEdit.body().contains("Manually edited detected cases by tester."));
+
             // 6. Re-parse nonexistent document
             HttpResponse<String> reparseNotFound = client.send(
                     request(server, "/api/phase3/documents/nonexistent/reparse", "POST",
@@ -1770,6 +1796,18 @@ class LocalAdminApiServerTest {
                     HttpResponse.BodyHandlers.ofString());
             assertEquals(400, uploadBad.statusCode());
             assertTrue(uploadBad.body().contains("projectKey"));
+
+            HttpResponse<String> rawNotFound = client.send(
+                    request(server, "/api/phase3/documents/nonexistent/raw"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, rawNotFound.statusCode());
+            assertTrue(rawNotFound.body().contains("\"NOT_FOUND\""));
+
+            HttpResponse<String> versionsNotFound = client.send(
+                    request(server, "/api/phase3/documents/nonexistent/versions"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, versionsNotFound.statusCode());
+            assertTrue(versionsNotFound.body().contains("\"NOT_FOUND\""));
         }
     }
 

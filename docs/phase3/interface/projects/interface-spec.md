@@ -465,6 +465,7 @@ Current implementation type:
 
 - backend-assisted import flow
 - preview first, then explicit commit
+- deterministic JSON review only in the current UI
 
 #### `POST /api/phase3/catalog/project/import/preview`
 
@@ -493,12 +494,17 @@ Request body:
 
 Current request fields:
 
-- `format`
-  - `json` or `csv`
 - `mode`
   - `merge` or `replace`
 - `rows`
   - normalized project rows
+
+Current UI input boundary:
+
+- the current `projects` screen accepts:
+  - a JSON array of project rows
+  - or a JSON object containing `rows`
+- the current implementation does not provide CSV parsing or file-upload import UI
 
 Response body:
 
@@ -580,8 +586,8 @@ Current post-commit reflection:
 
 Current UI implementation:
 
-- `Import` opens import drawer/modal
-- operator pastes JSON/CSV or uploads a file
+- `Import` opens import review panel
+- operator pastes deterministic JSON only
 - preview call runs first
 - commit call runs only after confirmation
 

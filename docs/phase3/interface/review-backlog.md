@@ -413,19 +413,33 @@ It does not authorize UI or backend changes in the current phase.
   - AI provider chips open `models`
   - existing dashboard overview rendering remains intact
 
-### P2-2. Complete `projects` import and navigation actions
+### P2-2. Complete `projects` import and navigation actions DONE
 
 - Screens:
   - `projects`
-- Current gap:
-  - `Import`, `New project`, `Enter project`, and `View reports` are not fully wired.
-- Required interfaces:
-  - `POST /api/phase3/catalog/project/import/preview`
-  - `POST /api/phase3/catalog/project/import/commit`
-- Required behavior:
-  - `New project` should reuse add-row draft flow then persist through `POST /api/phase3/catalog/project`
-  - `Enter project` should hand off into `cases`
-  - `View reports` should hand off into `reports`
+- Resolved:
+  - `Import` now uses the real deterministic preview/commit chain:
+    - `POST /api/phase3/catalog/project/import/preview`
+    - `POST /api/phase3/catalog/project/import/commit`
+  - the screen shows explicit `pending` / `success` / `error` feedback through the shared mutation-status surface
+  - `New project` reuses the current add-row draft flow and persists through the existing `POST /api/phase3/catalog/project` save path
+  - `Enter project` reuses the existing App-level handoff into `cases` with current `projectKey`
+  - `View reports` and card `Reports` reuse the existing App-level handoff into `reports` with current `projectKey`
+- Boundary decisions:
+  - no new route system was added
+  - no new projects-specific route payload was added
+  - no new project-detail protocol was introduced
+  - no cases/reports handoff semantic was changed
+- Remaining limits:
+  - the current import UI is deterministic JSON review only; it does not introduce CSV parsing or a multi-step wizard
+  - the project-card summary remains a front-end composed view model rather than a typed backend project-summary contract
+- Test coverage:
+  - import preview + commit happy path
+  - import preview error feedback
+  - new project row add + save
+  - enter project -> cases handoff
+  - reports/view reports -> reports handoff
+  - existing project catalog save/list rendering non-regression
 
 ### P2-3. Complete `cases` editor-side read/write interfaces
 
@@ -442,16 +456,27 @@ It does not authorize UI or backend changes in the current phase.
   - `GET /api/phase3/cases/{caseId}/plans`
   - `GET /api/phase3/cases/{caseId}/history`
 
-### P2-4. Complete `docParse` document-service actions
+### P2-4. Complete `docParse` document-service actions DONE
 
 - Screens:
   - `docParse`
-- Current gap:
-  - upload, re-parse, and manual edit are still placeholder actions.
-- Required interfaces:
-  - `POST /api/phase3/documents/upload`
-  - `POST /api/phase3/documents/{documentId}/reparse`
-  - `PUT /api/phase3/documents/{documentId}/parse-result`
+- Resolved:
+  - write actions are implemented:
+    - `POST /api/phase3/documents/upload`
+    - `POST /api/phase3/documents/{documentId}/reparse`
+    - `PUT /api/phase3/documents/{documentId}/parse-result`
+  - read actions are now implemented and consumed by `DocParseScreen`:
+    - `GET /api/phase3/documents/{documentId}/parse-result`
+    - `GET /api/phase3/documents/{documentId}/raw`
+    - `GET /api/phase3/documents/{documentId}/versions`
+  - first open of a document now attempts backend hydration for parse result, raw document, and version history instead of waiting for re-parse/manual-edit refresh only
+  - `Raw document` and `Version history` tabs now surface explicit loading / empty / error states
+  - backend file-backed document persistence now records simple version-history entries for upload, re-parse, and manual-edit events
+- Remaining limits:
+  - document catalog is still front-end synthesized from `GET /api/phase3/admin-console`; there is still no canonical `GET /api/phase3/documents` list interface
+  - uploaded documents are merged into the current front-end session only; they survive snapshot rebuilds in that session but still disappear after remount / fresh app load because the catalog remains synthetic
+  - parse-result detail still keeps synthetic fallback content when no persisted backend document exists, so placeholder shell documents remain reviewable before real upload
+  - version history is lightweight audit metadata only; it does not yet store per-version raw-content snapshots or diff payloads
 
 ---
 

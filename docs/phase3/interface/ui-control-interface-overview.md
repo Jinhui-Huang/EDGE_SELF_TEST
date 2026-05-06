@@ -45,7 +45,7 @@ Conventions used here:
 | Control | Type | Current behavior / interface | Future interface / design |
 |---|---|---|---|
 | Search input | input | Local filter only | Keep local |
-| `Import` | button | Implemented: opens import review flow and uses `POST /api/phase3/catalog/project/import/preview` -> `POST /api/phase3/catalog/project/import/commit` | Keep current deterministic file-backed import flow |
+| `Import` | button | Implemented: opens deterministic JSON import review flow and uses `POST /api/phase3/catalog/project/import/preview` -> `POST /api/phase3/catalog/project/import/commit` with explicit pending/success/error feedback | Keep current deterministic file-backed import flow |
 | `New project` | button | Implemented: reuses add-row draft flow, then persists through `POST /api/phase3/catalog/project` on save | Keep current lightweight create flow |
 | Project card body | clickable card | Local selection only | Keep local |
 | `Open` / `Close` | button | Local expand/collapse only | Keep local |
@@ -80,11 +80,11 @@ Conventions used here:
 |---|---|---|---|
 | Collapse / expand | button | Local only | Keep local |
 | Project button | button | Local project switch only | Keep local |
-| `Detail` | button | Local document open only | Keep local |
-| `Re-parse` | button | Implemented: `POST /api/phase3/documents/{documentId}/reparse`, refreshes parse result on success | Keep current |
-| `Manual edit` | button | Implemented: opens JSON editor for detected cases, saves via `PUT /api/phase3/documents/{documentId}/parse-result` | Keep current |
+| `Detail` | button | Implemented: opens the local document canvas and immediately attempts backend hydration through `GET /api/phase3/documents/{documentId}/parse-result`, `GET /raw`, and `GET /versions` | Keep current lightweight open + hydrate flow until a document-list API exists |
+| `Re-parse` | button | Implemented: `POST /api/phase3/documents/{documentId}/reparse`, then refreshes parse result/raw/version detail through the existing document reads | Keep current |
+| `Manual edit` | button | Implemented: opens JSON editor for detected cases, saves via `PUT /api/phase3/documents/{documentId}/parse-result`, then refreshes parse result/raw/version detail through the existing document reads | Keep current |
 | `Generate tests` | button | Implemented as App-level focus handoff into `aiGenerate` | Keep current handoff until typed routing is introduced |
-| `Parse result` / `Raw document` / `Version history` | tabs | Local only | Keep local tab state; content later from dedicated document reads |
+| `Parse result` / `Raw document` / `Version history` | tabs | Implemented: local tab state only for switching, but document content is now backend-first on document open via `GET /api/phase3/documents/{documentId}/parse-result`, `GET /raw`, and `GET /versions`; raw/history also expose loading / empty / error states | Keep current backend-first detail hydration; a future `GET /api/phase3/documents` list can remove the remaining synthetic catalog seed |
 | `Upload file` | file input | Implemented: reads file content and uploads via `POST /api/phase3/documents/upload` with projectKey, fileName, and content | Keep current |
 | Case row | clickable row | Local case selection only | Keep local |
 | Case-name generate button | button | Implemented as App-level focus handoff into `aiGenerate` | Keep current handoff |
@@ -248,6 +248,11 @@ The highest-signal unresolved controls across the package are:
 
 Resolved since last review:
 
+- `projects` P2-2 is now completed on the current App-level handoff boundary:
+  - `Import` uses preview/commit plus explicit mutation feedback
+  - `New project` reuses add-row draft flow plus `POST /api/phase3/catalog/project`
+  - `Enter project` reuses existing App handoff into `cases`
+  - `View reports` / card `Reports` reuse existing App handoff into `reports`
 - `plugin` now reads from dedicated `GET /api/phase3/extension-popup` instead of `AdminConsoleSnapshot` (P0-3)
 - `plugin` real extension popup now wires `Page summary`, `Open in platform`, `Copy`, and `Use in DSL` through popup/background/native-host/local-admin-api plus platform App-level handoff
 - `plugin` real extension popup now wires `Pick element` through popup/background/content-script with real hover/selected highlight and locator-candidate shaping (P0-5)

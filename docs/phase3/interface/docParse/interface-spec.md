@@ -32,11 +32,13 @@ Current `docParse` screen conclusion:
   - `POST /api/phase3/documents/upload` (upload document)
   - `POST /api/phase3/documents/{documentId}/reparse` (re-parse document)
   - `PUT /api/phase3/documents/{documentId}/parse-result` (save manual edit)
-  - `GET /api/phase3/documents/{documentId}/parse-result` (read parse result after mutation)
+  - `GET /api/phase3/documents/{documentId}/parse-result` (read parse result on first open and after mutation)
+  - `GET /api/phase3/documents/{documentId}/raw` (read raw document on first open / raw tab)
+  - `GET /api/phase3/documents/{documentId}/versions` (read version history on first open / history tab)
 - current real cross-screen output:
   - App-level focus handoff into `aiGenerate`
-- document list is still front-end-generated from snapshot; parse result can be persisted and refreshed from backend after upload/reparse/manual-edit
-- backend implementation: `DocumentPersistenceService.java` provides file-backed persistence under `config/phase3/documents/<documentId>/`
+- document list is still front-end-generated from snapshot and then merged with session-local uploaded entries; detail payload now attempts backend hydration on first open
+- backend implementation: `DocumentPersistenceService.java` provides file-backed persistence under `config/phase3/documents/<documentId>/` and maintains lightweight version-history entries
 
 ## 3. Current Read Context: GET /api/phase3/admin-console
 
@@ -92,7 +94,8 @@ The page currently synthesizes:
 This means the current page should be documented as:
 
 - a document-parse UI shell
-- not yet a backend-authored document parser contract
+- not yet a backend-authored document catalog contract
+- a backend-first detail reader layered on top of a synthetic/session-local catalog
 
 ## 5. Current Real App-Level Focus Handoff: DocParse -> AiGenerate
 
@@ -343,7 +346,7 @@ Response body (HTTP 202):
   "status": "ACCEPTED",
   "uploaded": [
     {
-      "id": "checkout-web-checkout-regression-v3-md",
+      "id": "checkout-web-checkout-regression-v3",
       "name": "checkout-regression-v3.md"
     }
   ]
@@ -360,7 +363,7 @@ Frontend caller:
 
 Backend behavior:
 
-- generates document ID from `projectKey` + `fileName` (lowercase, alphanumeric + hyphens)
+- generates document ID from `projectKey` + filename stem (lowercase, alphanumeric + hyphens, extension removed)
 - persists `raw.json`, `parse-result.json`, `meta.json` under `config/phase3/documents/<documentId>/`
 - auto-generates initial parse result with deterministic detected cases and reasoning
 
@@ -383,7 +386,7 @@ Response body (HTTP 200):
 
 ```json
 {
-  "documentId": "checkout-web-checkout-regression-v3-md",
+  "documentId": "checkout-web-checkout-regression-v3",
   "projectKey": "checkout-web",
   "detectedCases": [
     {
@@ -413,29 +416,61 @@ Frontend caller:
 
 - `DocParseScreen.tsx` calls this after successful re-parse to refresh UI
 
-### 9.4 Raw Source Interface (future)
+### 9.4 Raw Source Interface
 
 #### `GET /api/phase3/documents/{documentId}/raw`
 
-Status: not yet implemented as a dedicated read endpoint
+Status: implemented (P2-4 follow-up)
 
 Purpose:
 
 - return raw source content for the document
 
-Note: raw content is persisted by `DocumentPersistenceService` as `raw.json` during upload, but no dedicated GET endpoint is exposed yet; raw document tab content is still front-end synthetic data
+Response body:
 
-### 9.5 Version History Interface (future)
+```json
+{
+  "documentId": "checkout-web-checkout-regression-v3",
+  "name": "checkout-regression-v3.md",
+  "projectKey": "checkout-web",
+  "content": "# Checkout regression ...",
+  "uploadedAt": "2026-04-25T10:00:00Z"
+}
+```
+
+Frontend caller:
+
+- `DocParseScreen.tsx` reads this on document open and renders it in `Raw document`
+
+### 9.5 Version History Interface
 
 #### `GET /api/phase3/documents/{documentId}/versions`
 
-Status: not yet implemented
+Status: implemented (P2-4 follow-up)
 
 Purpose:
 
 - return stored version history for one document
 
-Note: version history tab content is still front-end synthetic data
+Response body:
+
+```json
+{
+  "documentId": "checkout-web-checkout-regression-v3",
+  "items": [
+    {
+      "id": "v3",
+      "label": "v3",
+      "time": "2026-04-25T10:10:00Z",
+      "summary": "Re-parsed document and refreshed detected cases."
+    }
+  ]
+}
+```
+
+Frontend caller:
+
+- `DocParseScreen.tsx` reads this on document open and renders it in `Version history`
 
 ### 9.6 Re-Parse Interface
 
@@ -467,7 +502,7 @@ Response body (HTTP 202):
 {
   "status": "ACCEPTED",
   "kind": "document-reparse",
-  "documentId": "checkout-web-checkout-regression-v3-md"
+  "documentId": "checkout-web-checkout-regression-v3"
 }
 ```
 
@@ -477,7 +512,7 @@ Error responses:
 
 Frontend caller:
 
-- `DocParseScreen.tsx` calls this on Re-parse button click, then fetches `GET .../parse-result` to refresh UI
+- `DocParseScreen.tsx` calls this on Re-parse button click, then refreshes `GET .../parse-result`, `GET .../raw`, and `GET .../versions`
 
 Backend behavior:
 
@@ -523,7 +558,7 @@ Response body (HTTP 202):
 {
   "status": "ACCEPTED",
   "kind": "document-parse-edit",
-  "documentId": "checkout-web-checkout-regression-v3-md"
+  "documentId": "checkout-web-checkout-regression-v3"
 }
 ```
 
@@ -546,7 +581,9 @@ Implementation:
 - `DocParseScreen.tsx` calls `handleUploadToBackend`:
   - `POST /api/phase3/documents/upload` with JSON body `{ projectKey, fileName, content }`
 - after success:
-  - updates local filename list and local document data with API-returned parse result
+  - updates local filename list
+  - merges the uploaded entry into the current front-end session catalog
+  - hydrates parse/raw/version detail from backend using the returned `documentId`
 
 ### 10.2 `Re-parse`
 
@@ -566,7 +603,7 @@ Implementation:
 - Save button calls `handleSaveParseResult(documentId)`:
   - `PUT /api/phase3/documents/{documentId}/parse-result` with `{ changes: { detectedCases: parsedDraft } }`
 - after success:
-  - updates local document model with edited cases
+  - refreshes backend-backed parse/raw/version detail
   - closes editor
 
 ### 10.4 Parse/Raw/History Tabs
@@ -574,14 +611,12 @@ Implementation:
 Current state:
 
 - tab switching is local state only
-- `Parse result` content is refreshed from backend after re-parse or manual edit; initial load is still from front-end synthetic data
-- `Raw document` content is still front-end synthetic data
-- `Version history` content is still front-end synthetic data
-
-Future:
-
-- `Raw document` can be backed by `GET /api/phase3/documents/{documentId}/raw`
-- `Version history` can be backed by `GET /api/phase3/documents/{documentId}/versions`
+- opening a document now triggers backend hydration for:
+  - `GET /api/phase3/documents/{documentId}/parse-result`
+  - `GET /api/phase3/documents/{documentId}/raw`
+  - `GET /api/phase3/documents/{documentId}/versions`
+- `Raw document` and `Version history` now expose loading / empty / error states
+- parse-result detail still keeps synthetic fallback content when no persisted backend artifact exists
 
 ## 11. Error Handling Boundary
 
@@ -590,26 +625,30 @@ Current implementation:
 - upload, re-parse, and manual-edit mutations surface success/error status through an `actionStatus` bar in DocParseScreen
 - upload validates that `projectKey` is available before submission
 - re-parse returns `NOT_FOUND` status (not HTTP 404) when the document has not been uploaded yet
-- `GET .../parse-result` returns HTTP 404 when document does not exist
+- `GET .../parse-result`, `GET .../raw`, and `GET .../versions` surface empty-state payloads when the document does not exist
 - no opened document results in locked-state UI (hero actions disabled)
 
 Remaining gaps:
 
-- raw-document and version-history reads are still front-end synthetic and have no backend error surface
+- document detail still depends on synthetic shell catalog IDs until a canonical document-list API exists
+- uploaded entries survive snapshot rebuilds only inside the current front-end session; remount / fresh app load still loses them because there is no canonical `GET /api/phase3/documents`
 
 ## 12. Review Items
 
 Resolved items (P2-4):
 
 - `Upload file` is now a real document-upload action via `POST /api/phase3/documents/upload` with file content read by `FileReader`.
-- `Re-parse` is now a real backend mutation via `POST /api/phase3/documents/{documentId}/reparse` with parse-result refresh.
+- `Re-parse` is now a real backend mutation via `POST /api/phase3/documents/{documentId}/reparse` with parse/raw/version refresh.
 - `Manual edit` is now a real backend mutation via `PUT /api/phase3/documents/{documentId}/parse-result` with inline JSON editor.
 - Backend persistence is implemented through `DocumentPersistenceService` with file-backed storage under `config/phase3/documents/<documentId>/`.
+- `Raw document` is now backed by `GET /api/phase3/documents/{documentId}/raw`.
+- `Version history` is now backed by `GET /api/phase3/documents/{documentId}/versions`.
+- first-open detail hydration now attempts backend `parse-result` read instead of waiting for a later mutation refresh.
 - The page now has a real App-level focus handoff into `aiGenerate` and real document-service write capabilities.
 
 Remaining items:
 
 - Document catalog is still synthetic front-end data from `buildDocuments(snapshot)`, not a backend document list via `GET /api/phase3/documents`.
-- Raw document tab content is still front-end synthetic data, not backed by `GET /api/phase3/documents/{documentId}/raw`.
-- Version history tab content is still front-end synthetic data, not backed by `GET /api/phase3/documents/{documentId}/versions`.
-- Parse result tab content is not API-backed on initial load (only refreshed after re-parse or manual edit).
+- Uploaded documents are merged into the current front-end session only; they survive snapshot rebuilds in that session but still disappear after remount / fresh app load.
+- parse-result detail still falls back to synthetic shell content when no persisted backend document exists.
+- version history is event-level metadata only; it does not yet expose per-version raw snapshots or diffs.

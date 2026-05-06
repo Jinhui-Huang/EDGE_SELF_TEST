@@ -1376,3 +1376,91 @@
     - `mvn "-Dmaven.repo.local=.m2/repository" -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
   - Attempted but not used as gate:
     - `npm test -- --run src/App.test.tsx` timed out in the current environment
+- 2026-05-06: Completed P2-2 Projects Import And Navigation Actions.
+  - Re-checked the current `projects` implementation before changing code.
+  - Confirmed the intended Phase 3 boundary was already respected in code:
+    - `Import` uses:
+      - `POST /api/phase3/catalog/project/import/preview`
+      - `POST /api/phase3/catalog/project/import/commit`
+    - `New project` reuses add-row draft flow and persists through:
+      - `POST /api/phase3/catalog/project`
+    - `Enter project` reuses existing App-level handoff into `cases`
+    - `View reports` and card `Reports` reuse existing App-level handoff into `reports`
+  - Added focused frontend regression coverage for import error feedback so `pending / success / error` is explicitly covered.
+  - Synced docs to the real implemented import boundary:
+    - deterministic JSON review only
+    - no CSV parser
+    - no file-upload wizard
+  - Docs synced:
+    - `docs/phase3/interface/projects/functional-spec.md`
+    - `docs/phase3/interface/projects/interface-spec.md`
+    - `docs/phase3/interface/ui-control-interface-overview.md`
+    - `docs/phase3/interface/review-backlog.md`
+  - Verification for this pass:
+    - `npm test -- --run src/App.test.tsx -t "runs project import preview and commit through the new catalog import endpoints"`: PASS
+    - `npm test -- --run src/App.test.tsx -t "shows project import error feedback when preview fails"`: PASS
+    - `npm test -- --run src/App.test.tsx -t "adds a new project row and persists it through the existing catalog save flow"`: PASS
+    - `npm test -- --run src/App.test.tsx -t "hands off Enter project into Cases with the selected project context"`: PASS
+    - `npm run build` in `ui/admin-console`: PASS
+  - Attempted but not used as gate:
+    - aggregated `App.test.tsx` pattern run timed out / OOMed in the current environment
+    - isolated `projects -> reports` handoff test selection was unstable under current Vitest worker/filter behavior on this machine
+  - Keep this boundary:
+    - no new route system
+    - no new projects-specific handoff payload
+    - no new project-detail protocol
+    - no cases/reports handoff semantic change
+- 2026-05-06: Completed P2-4 DocParse read-side completion follow-up.
+  - Re-checked the real `docParse` gap instead of trusting the older P2-4 wording.
+  - Confirmed write-side P2-4 was already present:
+    - `POST /api/phase3/documents/upload`
+    - `POST /api/phase3/documents/{documentId}/reparse`
+    - `PUT /api/phase3/documents/{documentId}/parse-result`
+  - Added the remaining read-side document interfaces in `local-admin-api`:
+    - `GET /api/phase3/documents/{documentId}/raw`
+    - `GET /api/phase3/documents/{documentId}/versions`
+  - `DocumentPersistenceService` now also records lightweight version-history entries for:
+    - upload
+    - re-parse
+    - manual edit
+  - Reworked `ui/admin-console/src/screens/DocParseScreen.tsx` so opening a document now attempts backend hydration for:
+    - parse result
+    - raw document
+    - version history
+  - `Raw document` and `Version history` now expose explicit:
+    - loading
+    - empty
+    - error
+    states
+  - `Re-parse` and `Manual edit` now refresh parse/raw/version detail together after success.
+  - Kept the current Phase 3 boundary:
+    - document catalog is still synthetic shell data from the admin snapshot
+    - parse detail still keeps synthetic fallback when no persisted backend document exists yet
+    - version history remains lightweight event metadata only
+  - Docs synced:
+    - `docs/phase3/interface/docParse/functional-spec.md`
+    - `docs/phase3/interface/docParse/interface-spec.md`
+    - `docs/phase3/interface/review-backlog.md`
+    - `docs/phase3/interface/ui-control-interface-overview.md`
+  - Verification:
+    - `mvn "-Dmaven.repo.local=.m2/repository" -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest#documentServiceEndpoints test`: PASS
+    - `npm run build` in `ui/admin-console`: PASS
+  - Attempted but not used as gate:
+    - targeted Vitest runs for `App.test.tsx` and `DocParseScreen.test.tsx` timed out in the current environment
+- 2026-05-06: Completed the small P2-4 follow-up for DocParse copy cleanup and session-catalog boundary clarification.
+  - Cleaned `ui/admin-console/src/screens/DocParseScreen.tsx` so the screen no longer contains garbled UI copy.
+  - Kept scope intentionally small:
+    - no `GET /api/phase3/documents`
+    - no backend catalog contract change
+  - Added a small frontend-only guard:
+    - synthetic document rows from `buildDocuments(snapshot)` are merged with session-local uploaded rows
+    - uploaded rows therefore survive snapshot rebuilds in the same frontend session
+  - Keep the explicit boundary:
+    - uploaded rows still disappear after remount / fresh app load because the catalog is still synthetic and session-local
+  - Synced this limitation into:
+    - `docs/phase3/interface/docParse/functional-spec.md`
+    - `docs/phase3/interface/docParse/interface-spec.md`
+    - `docs/phase3/interface/review-backlog.md`
+    - `01_dev_progress.md`
+  - Verification:
+    - `npm run build` in `ui/admin-console`: PASS
