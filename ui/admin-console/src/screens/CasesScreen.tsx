@@ -91,6 +91,10 @@ function classifyRunStatus(status: string): "pass" | "fail" | "warn" {
   return "warn";
 }
 
+function shouldSkipSameCaseReload(state: RemoteState<unknown>, caseId: string): boolean {
+  return state.caseId === caseId && (state.status === "loading" || state.status === "success");
+}
+
 function buildDetailSteps(testCase: CaseItem): DetailStep[] {
   const normalizedProject = testCase.projectKey || "project";
   const normalizedCase = testCase.id || "case";
@@ -584,11 +588,40 @@ export function CasesScreen({
       return;
     }
     if (activeTab === "plans") {
+      if (shouldSkipSameCaseReload(plansState, openedCaseId)) {
+        return;
+      }
       void loadPlans(openedCaseId);
       return;
     }
+    if (shouldSkipSameCaseReload(historyState, openedCaseId)) {
+      return;
+    }
     void loadHistory(openedCaseId);
-  }, [activeTab, loadDsl, loadHistory, loadPlans, loadStateMachine, openedCaseId]);
+  }, [
+    activeTab,
+    historyState.caseId,
+    historyState.status,
+    loadDsl,
+    loadHistory,
+    loadPlans,
+    loadStateMachine,
+    openedCaseId,
+    plansState.caseId,
+    plansState.status
+  ]);
+
+  useEffect(() => {
+    if (!openedCaseId || activeTab !== "overview") {
+      return;
+    }
+    if (plansState.caseId !== openedCaseId) {
+      void loadPlans(openedCaseId);
+    }
+    if (historyState.caseId !== openedCaseId) {
+      void loadHistory(openedCaseId);
+    }
+  }, [activeTab, historyState.caseId, loadHistory, loadPlans, openedCaseId, plansState.caseId]);
 
   const openedCase = visibleCases.find((item) => item.id === openedCaseId) ?? null;
   const selectedProject =

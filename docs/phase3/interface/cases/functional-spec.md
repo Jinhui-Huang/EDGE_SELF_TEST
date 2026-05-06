@@ -253,9 +253,10 @@ Functional role:
 
 Current behavior:
 
-- `Info` and `Recent runs` now opportunistically reuse already loaded `History` tab data when available
-- `Plans` now opportunistically reuses already loaded `Plans` tab data when available
-- before `History` / `Plans` are loaded, sidebar panels stay explicit about being unloaded instead of inventing synthetic summaries
+- opening a case now preloads `Plans` / `History` data in the background so sidebar summaries can hydrate without forcing a tab switch
+- `Info` and `Recent runs` reuse the same `History` state as the `History` tab
+- `Plans` reuses the same `Plans` state as the `Plans` tab
+- before the preload finishes, sidebar panels stay explicit about being unloaded instead of inventing synthetic summaries
 - `Catalog status` is the only area that reflects real mutation state from app-level `caseState`
 - sidebar controls still do not trigger independent requests
 
@@ -272,8 +273,10 @@ Current behavior:
 - detail title/status/project identity come from the currently opened row plus `snapshot.cases`
 - Overview tab step list is front-end generated summary data
 - DSL, state-machine, plans, and history tab content are loaded from dedicated backend APIs via `CaseDetailService`
-- sidebar `Plans` reuses `plansState.data` only after the `Plans` tab has loaded the current case
-- sidebar `Info` / `Recent runs` reuse `historyState.data` only after the `History` tab has loaded the current case
+- opening a case in detail now preloads `plansState` and `historyState` for that case while keeping `activeTab` unchanged
+- sidebar `Plans` reuses `plansState.data` from that preload or from the `Plans` tab
+- sidebar `Info` / `Recent runs` reuse `historyState.data` from that preload or from the `History` tab
+- `Plans` / `History` tab activation skips only same-case `loading` / `success` duplicates; it still allows retry after failed preload
 - sidebar `Recent runs` click-through reuses the same app-level `reportDetail` handoff as the `History` tab
 
 ### 7.3 Prepared Case Handoff Data
@@ -521,8 +524,7 @@ Resolved items (P2-3):
 Remaining items:
 
 - History tab run-row handoff now resolves canonical `runId` from `snapshot.reports` by matching `runName`, and only falls back to `runName` when the snapshot has no matching report row.
-- Sidebar `Plans` still depends on `Plans` tab data being loaded first; it does not issue an independent request.
-- Sidebar `Info` / `Recent runs` still depend on `History` tab data being loaded first; they do not issue an independent request.
+- Sidebar `Plans` / `Info` / `Recent runs` still depend on the existing `plans` / `history` reads succeeding; they do not introduce a second data source.
 
 ## 16. Suggested Output Files for This Screen Folder
 

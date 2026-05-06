@@ -3987,6 +3987,75 @@ Remaining limits:
 - sidebar `Plans` still depends on `Plans` tab data being loaded first and does not issue an independent request
 - sidebar `Info` / `Recent runs` still depend on `History` tab data being loaded first and do not issue an independent request
 
+## 2026-05-07 Cases sidebar preload warmup follow-up
+
+## Task
+- Keep this follow-up narrowly inside the current `P2-3 cases` cleanup:
+  - preload existing `plans` / `history` reads when a case is opened so sidebar summaries can hydrate without manual tab switching
+  - keep `activeTab` unchanged and avoid a second request path
+  - do not run tests or build in this pass
+
+## Completed
+- Updated `ui/admin-console/src/screens/CasesScreen.tsx`:
+  - opening a case while staying on `overview` now preloads the existing `loadPlans()` / `loadHistory()` reads for that case
+  - preloaded sidebar state still reuses the same `plansState` / `historyState` consumed by the corresponding tabs
+  - `plans` / `history` tab activation now skips a redundant same-case reload when that state is already present
+  - case-switch reset behavior remains unchanged, so stale per-case state is still cleared before the next preload
+- Synced docs/backlog:
+  - `docs/phase3/interface/cases/functional-spec.md`
+  - `docs/phase3/interface/cases/interface-spec.md`
+  - `docs/phase3/interface/review-backlog.md`
+
+## Modified Files
+- `ui/admin-console/src/screens/CasesScreen.tsx`
+- `docs/phase3/interface/cases/functional-spec.md`
+- `docs/phase3/interface/cases/interface-spec.md`
+- `docs/phase3/interface/review-backlog.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Not run by design in this pass:
+  - planner explicitly constrained this follow-up to no test execution and no build
+
+## Remaining Limits
+- case-history payload still has no dedicated canonical `runId`, so downstream App-level handoff still relies on `snapshot.reports` to resolve one when possible
+- sidebar `Plans` / `Info` / `Recent runs` still depend on the existing `plans` / `history` reads succeeding and do not introduce a second data source
+
+## 2026-05-07 Cases sidebar preload retry fix follow-up
+
+## Task
+- Keep this follow-up narrowly inside the current `P2-3 cases` cleanup:
+  - preserve same-case preload dedupe for `plans` / `history`
+  - but allow manual `Plans` / `History` tab activation to retry after failed preload
+  - do not change routes, save flows, tests, or build
+
+## Completed
+- Updated `ui/admin-console/src/screens/CasesScreen.tsx`:
+  - extracted same-case skip logic into a helper
+  - same-case reload is now skipped only when the current `plans` / `history` state is `loading` or `success`
+  - `error` no longer blocks a manual tab retry for the same case
+- Synced docs/backlog:
+  - `docs/phase3/interface/cases/functional-spec.md`
+  - `docs/phase3/interface/cases/interface-spec.md`
+  - `docs/phase3/interface/review-backlog.md`
+
+## Modified Files
+- `ui/admin-console/src/screens/CasesScreen.tsx`
+- `docs/phase3/interface/cases/functional-spec.md`
+- `docs/phase3/interface/cases/interface-spec.md`
+- `docs/phase3/interface/review-backlog.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Not run by design in this pass:
+  - planner explicitly constrained this follow-up to no test execution and no build
+
+## Remaining Limits
+- case-history payload still has no dedicated canonical `runId`, so downstream App-level handoff still relies on `snapshot.reports` to resolve one when possible
+- sidebar `Plans` / `Info` / `Recent runs` still depend on the existing `plans` / `history` reads succeeding and do not introduce a second data source
+
 ## 2026-05-07 Cases catalog editor add-row context fix follow-up
 
 ## Task

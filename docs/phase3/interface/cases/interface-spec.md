@@ -432,16 +432,16 @@ These controls change screen state but do not call the backend directly.
 #### `Recent runs` summary bars
 
 - user action: inspect summary, optionally click a recent run
-- request: no independent request; reuses already loaded `historyState.data` from the `History` tab
+- request: no independent request; opening a case preloads the existing `historyState` read and the sidebar reuses that same state
 - intended future route:
   - `reports` or `reportDetail`
-- current state: implemented as history-derived summary when history for the current case is already loaded; otherwise shows explicit unloaded/loading/error/empty text
+- current state: implemented as history-derived summary after case-open preload or after the `History` tab loads; otherwise shows explicit unloaded/loading/error/empty text
 
 #### `Plans` sidebar summary
 
 - user action: inspect only
-- request: no independent request; reuses already loaded `plansState.data` from the `Plans` tab
-- current state: implemented as plans/preconditions summary when plans for the current case are already loaded; otherwise shows explicit unloaded/loading/error/empty text
+- request: no independent request; opening a case preloads the existing `plansState` read and the sidebar reuses that same state
+- current state: implemented as plans/preconditions summary after case-open preload or after the `Plans` tab loads; otherwise shows explicit unloaded/loading/error/empty text
 
 #### `Catalog status`
 
@@ -849,11 +849,13 @@ Current state: implemented by reusing loaded history data
 Current implementation:
 
 - no new request is added for the sidebar
-- before `History` loads, the sidebar shows an explicit hint instead of synthetic run totals
+- opening a case in detail preloads the existing `GET /api/phase3/cases/{caseId}/history` read without changing `activeTab`
+- before that preload finishes, the sidebar shows an explicit hint instead of synthetic run totals
 - after `GET /api/phase3/cases/{caseId}/history` succeeds for the current case, the sidebar derives:
   - pass / fail / warn counts
   - recent run status bars
   - a short clickable recent-run list
+- same-case duplicate loads are skipped only while the current history read is `loading` or already `success`; manual tab activation can still retry after failure
 - sidebar recent-run clicks reuse the same `onOpenHistoryRun(runName)` -> `openReportDetail(runName)` App-level path as the main `History` tab
 
 ### 10.7 `Plans` Sidebar Panel
@@ -863,10 +865,12 @@ Current state: implemented by reusing loaded plans data
 Current implementation:
 
 - no new request is added for the sidebar
-- before `Plans` loads, the sidebar shows an explicit hint instead of synthetic plan rows
+- opening a case in detail preloads the existing `GET /api/phase3/cases/{caseId}/plans` read without changing `activeTab`
+- before that preload finishes, the sidebar shows an explicit hint instead of synthetic plan rows
 - after `GET /api/phase3/cases/{caseId}/plans` succeeds for the current case, the sidebar derives:
   - a short plans summary list
   - a short preconditions list when available
+- same-case duplicate loads are skipped only while the current plans read is `loading` or already `success`; manual tab activation can still retry after failure
 - the sidebar remains read-only and does not introduce a separate editor or handoff
 
 ### 10.8 Visible Case-Catalog Editor
@@ -941,7 +945,6 @@ Resolved findings (P2-3):
 Remaining findings:
 
 - `Pre-execution` is correctly a state handoff, not a backend request.
-- Sidebar `Plans` depends on already loaded `Plans` tab data and does not trigger a separate request.
-- Sidebar `Info` / `Recent runs` depend on already loaded `History` tab data and do not trigger a separate request.
+- Sidebar `Plans` / `Info` / `Recent runs` depend on the existing `plans` / `history` reads succeeding and do not introduce a separate request path.
 - History tab handoff now resolves canonical `runId` from `snapshot.reports` when `runName` matches an existing report row, and falls back to `runName` only when no match exists.
 - Plans and history are read-only; write endpoints can be added when editing is required.

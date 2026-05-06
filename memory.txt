@@ -1669,3 +1669,35 @@
     - no detail-flow change
     - no test run
     - no build run
+- 2026-05-07: Completed the `cases` sidebar preload warmup follow-up.
+  - Updated `ui/admin-console/src/screens/CasesScreen.tsx`:
+    - opening a case now preloads the existing `loadPlans()` and `loadHistory()` reads while keeping `activeTab` unchanged
+    - sidebar `Plans` / `Info` / `Recent runs` now hydrate from the same warmed `plansState` / `historyState`
+    - `Plans` / `History` tab activation now skips a redundant same-case reload when that state is already present
+    - case-switch reset behavior still clears stale state before the next case preloads
+  - Synced docs/backlog:
+    - `docs/phase3/interface/cases/functional-spec.md`
+    - `docs/phase3/interface/cases/interface-spec.md`
+    - `docs/phase3/interface/review-backlog.md`
+  - Keep the explicit boundary:
+    - no new backend interface
+    - no route change
+    - no App-level handoff semantic change
+    - no DSL/state-machine save-flow change
+    - no test run
+    - no build run
+- 2026-05-07: Completed the tiny `cases` sidebar preload retry fix.
+  - Updated `ui/admin-console/src/screens/CasesScreen.tsx`:
+    - same-case preload dedupe now skips only `loading` / `success`
+    - failed same-case `plans` / `history` state no longer blocks manual tab retry
+  - Synced docs/backlog:
+    - `docs/phase3/interface/cases/functional-spec.md`
+    - `docs/phase3/interface/cases/interface-spec.md`
+    - `docs/phase3/interface/review-backlog.md`
+  - Keep the explicit boundary:
+    - no new backend interface
+    - no route change
+    - no App-level handoff change
+    - no save-flow change
+    - no test run
+    - no build run

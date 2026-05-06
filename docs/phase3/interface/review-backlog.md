@@ -461,12 +461,13 @@ It does not authorize UI or backend changes in the current phase.
   - History tab run rows now reuse the existing App-level handoff into `reportDetail`
   - overview region now exposes the existing App-level case catalog editor and save flow
   - overview editor `Add row` now respects the current project-filter context so new draft rows stay visible
+  - opening a case now preloads the existing `plans` / `history` reads so sidebar summaries can hydrate without a manual tab switch
+  - same-case preload dedupe no longer blocks manual `Plans` / `History` tab retry after a failed read
   - sidebar `Plans` now reuses already loaded case-plan data instead of static local plan rows
   - sidebar `Info` / `Recent runs` now reuse already loaded case-history data instead of static placeholder run summaries
 - Remaining limits:
   - case-history payload still has no dedicated canonical `runId`, so history run-row handoff still falls back to `runName` when `snapshot.reports` cannot resolve a matching canonical `runId`
-  - sidebar `Plans` still depends on `Plans` tab data being loaded first and does not issue an independent request
-  - sidebar `Info` / `Recent runs` still depend on `History` tab data being loaded first and do not issue an independent request
+  - sidebar `Plans` / `Info` / `Recent runs` still depend on the existing `plans` / `history` reads succeeding and do not introduce a separate request path
   - plans and history remain read-only on the current Phase 3 boundary
 - Test coverage:
   - backend case-detail endpoint coverage in `LocalAdminApiServerTest`
