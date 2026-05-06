@@ -4630,6 +4630,30 @@ Remaining limits:
 - `reportDetail` still uses snapshot-derived fallback view-model data when backend detail reads fail
 - `case-history` payload still has no dedicated canonical `runId`, so upstream `cases` history handoff may still fall back to `runName`
 
+## 2026-05-07 ReportDetail fallback wording cleanup follow-up
+
+## Task
+- Re-check `reportDetail` docs for wording that conflicts with the current backend-first-but-still-has-fallback implementation:
+  - do not change code
+  - only correct statements that still imply the detail screen is purely view-model-backed
+
+## Completed
+- Updated `docs/phase3/interface/reportDetail/functional-spec.md`:
+  - summary-panel wording now says API report is primary and snapshot-derived view model is fallback
+  - screenshot/assertion sections now distinguish API-backed primary rendering from fallback view-model rendering
+  - detail-model section now explicitly describes `GET /api/phase3/runs/{runId}/report` as primary and `selectReportViewModel(snapshot, selectedRunId)` as fallback-only
+- Updated records:
+  - `01_dev_progress.md`
+  - `memory.txt`
+
+## Verification
+- Not run by design:
+  - documentation-only follow-up
+
+## Remaining Limits
+- `reportDetail` still uses snapshot-derived fallback view-model data when backend detail reads fail
+- `case-history` payload still has no dedicated canonical `runId`, so upstream `cases` history handoff may still fall back to `runName`
+
 ## 2026-05-06 CasesScreen handoff and validate review follow-up
 
 ## Task

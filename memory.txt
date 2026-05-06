@@ -1966,3 +1966,16 @@
     - no backend-contract change
     - no test run
     - no build run
+- 2026-05-07: Completed the `reportDetail` fallback wording cleanup follow-up.
+  - Updated `docs/phase3/interface/reportDetail/functional-spec.md`:
+    - summary-panel wording now says API report is primary and snapshot-derived view model is fallback
+    - screenshot/assertion wording now distinguishes API-backed primary rendering from fallback view-model rendering
+    - detail-model section now explicitly describes `GET /api/phase3/runs/{runId}/report` as primary and `selectReportViewModel(snapshot, selectedRunId)` as fallback-only
+  - Keep the explicit boundary:
+    - no code change
+    - no new backend interface
+    - no route change
+    - no App-level handoff change
+    - no backend-contract change
+    - no test run
+    - no build run

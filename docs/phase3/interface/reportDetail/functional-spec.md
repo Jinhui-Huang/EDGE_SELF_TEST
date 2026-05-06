@@ -179,7 +179,7 @@ Functional role:
 
 Current behavior:
 
-- values come from the report view model
+- values come from the API report when backend detail read succeeds, and otherwise fall back to the snapshot-derived report view model
 
 ### 6.5 Page Screenshots Panel
 
@@ -195,7 +195,7 @@ Functional role:
 
 Current behavior:
 
-- screenshot cards are rendered from the current report view model
+- screenshot cards are rendered from API report artifacts when available, and otherwise fall back to the current report view model
 - artifact access is implemented as backend-backed listing via `GET /api/phase3/runs/{runId}/artifacts`
 - the current screen does not support inline artifact open/download content; it shows a listing drawer with file paths only
 
@@ -213,7 +213,7 @@ Functional role:
 
 Current behavior:
 
-- assertions are front-end synthetic detail payloads from the report view model
+- assertions render API-backed detail when available, and otherwise fall back to the synthetic report view model payload
 
 ## 7. Data Semantics by Area
 
@@ -221,10 +221,11 @@ Current behavior:
 
 - the page uses `selectedReportRunId` from app state as its detail target
 
-### 7.2 Front-End Detail View Model
+### 7.2 Primary and Fallback Detail Model
 
-- `selectReportViewModel(snapshot, selectedRunId)` supplies the current detail data
-- this means the detail page currently inherits the synthetic derivation rules already used in `reportViewModel.ts`
+- `GET /api/phase3/runs/{runId}/report` is the primary detail source
+- `selectReportViewModel(snapshot, selectedRunId)` is used only as snapshot-derived fallback when the backend detail read fails
+- this means the detail page is backend-first, but still inherits the synthetic derivation rules from `reportViewModel.ts` on fallback
 
 ### 7.3 Data-Diff Handoff
 
