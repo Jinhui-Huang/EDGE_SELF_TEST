@@ -559,7 +559,7 @@ Response body:
     "name": "Checkout smoke",
     "steps": [
       { "action": "goto", "url": "/checkout" },
-      { "action": "click", "target": "#primary-entry" }
+      { "action": "click", "target": "<preview-entry-locator>" }
     ]
   }
 }
@@ -620,7 +620,7 @@ Request body:
     "name": "Checkout smoke",
     "steps": [
       { "action": "goto", "url": "/checkout" },
-      { "action": "click", "target": "#primary-entry" }
+      { "action": "click", "target": "<preview-entry-locator>" }
     ]
   }
 }

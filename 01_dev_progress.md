@@ -3901,6 +3901,19 @@ Remaining limits:
 - `docs/phase3/interface/cases/interface-spec.md`
 - `docs/phase3/interface/review-backlog.md`
 
+- 2026-05-07: Completed the `cases` derived-preview doc example alignment follow-up.
+  - Updated `docs/phase3/interface/cases/interface-spec.md`:
+    - replaced the two remaining `#primary-entry` DSL example targets with `<preview-entry-locator>`
+    - aligned the interface-spec example blocks with the current `CasesScreen` derived-preview wording instead of old real-locator-shaped samples
+  - Keep the explicit boundary:
+    - no code change
+    - no new backend interface
+    - no route change
+    - no App-level handoff change
+    - no backend-contract change
+    - no test run
+    - no build run
+
 - 2026-05-07: Completed the `cases` locator/path placeholder cleanup.
   - Updated `ui/admin-console/src/screens/CasesScreen.tsx`:
     - replaced the entry path sample with `<preview-entry-path>`
