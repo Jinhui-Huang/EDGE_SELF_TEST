@@ -37,6 +37,7 @@ type CasesScreenProps = {
   saveCaseCatalogLabel: string;
   locale: Locale;
   onPrepareCase: (caseId: string) => void;
+  onOpenHistoryRun: (runName: string) => void;
   onCaseChange: (index: number, key: keyof CaseItem, value: string | boolean) => void;
   onAddCaseRow: () => void;
   onRemoveCaseRow: (index: number) => void;
@@ -159,7 +160,8 @@ export function CasesScreen({
   caseTagsLabel,
   fieldProjectKeyLabel,
   locale,
-  onPrepareCase
+  onPrepareCase,
+  onOpenHistoryRun
 }: CasesScreenProps) {
   const t = (value: LocalizedCopy) => translate(locale, value);
   const initialSelection = initialProjectKey?.trim() || snapshot.projects[0]?.key || caseDraft[0]?.projectKey || "all";
@@ -936,12 +938,18 @@ export function CasesScreen({
                         <strong>{t(copy("Runs"))}</strong>
                         {historyState.data.runs.length ? (
                           historyState.data.runs.map((run) => (
-                            <div key={`${run.runName}-${run.finishedAt}`} className="casesHistoryRun">
+                            <button
+                              key={`${run.runName}-${run.finishedAt}`}
+                              type="button"
+                              className="casesHistoryRun"
+                              aria-label={`Open history run ${run.runName} in report detail`}
+                              onClick={() => onOpenHistoryRun(run.runName)}
+                            >
                               <span className={`casesStatusBadge ${run.status === "SUCCESS" ? "isActive" : ""}`}>{run.status}</span>
                               <strong>{run.runName}</strong>
                               <span>{run.finishedAt}</span>
                               <span>{run.reportEntry}</span>
-                            </div>
+                            </button>
                           ))
                         ) : (
                           <p className="casesPanelText">{t(copy("No runs yet."))}</p>

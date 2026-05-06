@@ -3913,6 +3913,52 @@ Remaining limits:
   - `npx vitest run src/screens/CasesScreen.test.tsx -t "shows invalid JSON feedback without sending validate request|keeps backend validation failures as real error state without synthesizing invalid JSON" --pool=forks --poolOptions.forks.singleFork`
   - current machine still shows the same Vitest hang / worker-startup instability for this test file, so `build` plus the App-targeted run are the stable verification results here
 
+## 2026-05-06 Cases history run-row handoff follow-up
+
+## Task
+- Continue the current `cases` follow-up without adding any backend endpoint:
+  - wire `History` tab run rows into the existing App-level `reportDetail` handoff
+  - prefer reusing `openReportDetail(runName)`
+  - add frontend regression coverage
+  - sync the Phase 3 `cases` docs and backlog
+
+## Completed
+- Updated `ui/admin-console/src/screens/CasesScreen.tsx`:
+  - added an App-level `onOpenHistoryRun(runName)` callback
+  - changed `History` run rows from passive display into clickable buttons
+  - row click now reuses the current shell handoff instead of introducing a new route or backend API
+- Updated `ui/admin-console/src/App.tsx`:
+  - passed existing `openReportDetail` into `CasesScreen` as the history run-row handoff target
+- Extended frontend coverage:
+  - `ui/admin-console/src/App.test.tsx`
+    - added `cases` history -> `reportDetail` handoff regression coverage
+  - `ui/admin-console/src/screens/CasesScreen.test.tsx`
+    - added direct callback coverage for history run-row click
+- Synced docs:
+  - `docs/phase3/interface/cases/functional-spec.md`
+  - `docs/phase3/interface/cases/interface-spec.md`
+  - `docs/phase3/interface/review-backlog.md`
+
+## Modified Files
+- `ui/admin-console/src/screens/CasesScreen.tsx`
+- `ui/admin-console/src/screens/CasesScreen.test.tsx`
+- `ui/admin-console/src/App.tsx`
+- `ui/admin-console/src/App.test.tsx`
+- `docs/phase3/interface/cases/functional-spec.md`
+- `docs/phase3/interface/cases/interface-spec.md`
+- `docs/phase3/interface/review-backlog.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Passed: `npx vitest run src/App.test.tsx -t "opens cases from execution prepared-case drill-down via the existing App handoff"` in `ui/admin-console`
+- Passed: `npm run build` in `ui/admin-console`
+- Attempted but not used as gate:
+  - `npx vitest run src/App.test.tsx -t "opens reportDetail from cases history run rows via the existing App handoff"`
+  - `npx vitest run src/App.test.tsx -t "opens reportDetail from cases history run rows via the existing App handoff" --pool=forks --poolOptions.forks.singleFork`
+  - `npx vitest run src/screens/CasesScreen.test.tsx -t "hands off history run rows through the existing app-level callback" --pool=forks --poolOptions.forks.singleFork`
+  - this machine still shows the same Vitest hang / worker-startup instability for some targeted tests, so `build` is the stable gate in this pass
+
 ## 2026-05-06 P2-3 CasesScreen race and URL-encoding review follow-up
 
 ## Task

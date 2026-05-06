@@ -423,6 +423,7 @@ These controls change screen state but do not call the backend directly.
 - user action: click
 - request: `GET /api/phase3/cases/{caseId}/history` on tab activation
 - provides: run records with status/name/time/reportEntry, maintenance events
+- run-row action: app-level handoff into `reportDetail` by reusing existing `openReportDetail(runName)`
 - explicit states: loading / empty / error
 - current state: implemented
 
@@ -460,9 +461,9 @@ These controls change screen state but do not call the backend directly.
 
 ### 8.3 Relationship to Reports and Report Detail
 
-- current case screen shows only synthetic recent-run summary
-- true report drill-down is not implemented here
-- future case history should route to or reuse report-oriented interfaces
+- current case screen still shows only synthetic sidebar recent-run summary
+- `History` tab run rows now reuse the existing App-level `reportDetail` handoff
+- the current handoff passes `runName` because the case-history payload does not yet expose a dedicated canonical `runId`
 
 ### 8.4 Relationship to DSL and State-Machine Capabilities
 
@@ -790,7 +791,7 @@ Response body:
 Implementation type:
 
 - read-only interface backed by `CaseDetailService`
-- future: route-state handoff from run rows into `reportDetail`
+- read-side interface plus app-level run-row handoff into `reportDetail`
 
 #### `GET /api/phase3/cases/{caseId}/history`
 
@@ -829,10 +830,11 @@ Response body:
 }
 ```
 
-Future row click behavior:
+Current row click behavior:
 
-- clicking a run row should route to `reportDetail`
-- no new report-detail endpoint required for the first Phase 3 linkage if existing report screen state is reused
+- clicking a run row routes to `reportDetail`
+- the first implementation reuses existing App-level selected-run state via `openReportDetail(runName)`
+- no new report-detail endpoint is added for this linkage
 
 ### 10.6 `Recent runs` Summary Panel
 
@@ -912,11 +914,12 @@ Resolved findings (P2-3):
 - `CaseDetailService.java` provides file-backed persistence for all case-detail artifacts.
 - backend-backed tabs now surface explicit loading / empty / error states and local mutation feedback.
 - switching the opened case clears stale tab-specific backend data and resets the active tab to `overview`.
+- History tab run rows now hand off to `reportDetail` through the existing App-level path.
 
 Remaining findings:
 
 - `Pre-execution` is correctly a state handoff, not a backend request.
 - App-level case-catalog save already exists, but the visible screen does not expose an editor form.
 - Sidebar info/plans/recent-run panels remain snapshot-derived display, not yet connected to per-tab API data.
-- History tab run row click does not yet hand off to `reportDetail`.
+- History tab currently hands off by `runName`; the case-history payload still lacks a dedicated canonical `runId`.
 - Plans and history are read-only; write endpoints can be added when editing is required.

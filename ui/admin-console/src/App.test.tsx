@@ -2207,6 +2207,54 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "Opened" })).toBeInTheDocument();
   });
 
+  it("opens reportDetail from cases history run rows via the existing App handoff", async () => {
+    const historyReportResponse = {
+      ...reportResponse,
+      runId: "checkout-web-smoke-001",
+      runName: "checkout-web-smoke-001",
+      entry: "History drill-down report",
+      outputDir: "runs/checkout-web-smoke-001"
+    };
+    const fetchMock = vi.fn().mockImplementation((call: unknown) => {
+      const url = String(call);
+      if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
+      if (url.endsWith("/api/phase3/cases/checkout-smoke/history")) {
+        return jsonResponse({
+          caseId: "checkout-smoke",
+          runs: [
+            {
+              runName: "checkout-web-smoke-001",
+              status: "SUCCESS",
+              finishedAt: "2026-05-06T09:20:00Z",
+              reportEntry: "HTML / artifacts / cleanup"
+            }
+          ],
+          maintenanceEvents: []
+        });
+      }
+      if (url.endsWith("/api/phase3/runs/checkout-web-smoke-001/report")) {
+        return jsonResponse(historyReportResponse);
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    await screen.findByText("Needs attention");
+
+    await userEvent.click((await screen.findAllByRole("button", { name: /Cases/ }))[0]);
+    await userEvent.click((await screen.findAllByRole("button", { name: "Detail" }))[0]);
+    await userEvent.click(await screen.findByRole("button", { name: "History" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Open history run checkout-web-smoke-001 in report detail" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith("http://127.0.0.1:8787/api/phase3/runs/checkout-web-smoke-001/report");
+    });
+    expect(await screen.findByText("Download artifacts")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Checkout smoke" })).toBeInTheDocument();
+  });
+
   it("allows manual project switching after a cases handoff without reapplying the old handoff", async () => {
     const fetchMock = vi.fn().mockImplementation((call: unknown) => {
       const url = String(call);

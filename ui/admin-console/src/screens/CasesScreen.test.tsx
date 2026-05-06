@@ -114,6 +114,7 @@ function renderScreen(overrides?: Partial<ComponentProps<typeof CasesScreen>>) {
       saveCaseCatalogLabel="Save catalog"
       locale="en"
       onPrepareCase={vi.fn()}
+      onOpenHistoryRun={vi.fn()}
       onCaseChange={vi.fn()}
       onAddCaseRow={vi.fn()}
       onRemoveCaseRow={vi.fn()}
@@ -292,6 +293,37 @@ describe("CasesScreen", () => {
     expect(await screen.findByText("No maintenance events yet.")).toBeInTheDocument();
   });
 
+  it("hands off history run rows through the existing app-level callback", async () => {
+    const onOpenHistoryRun = vi.fn();
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/cases/checkout-smoke/history")) {
+        return jsonResponse({
+          caseId: "checkout-smoke",
+          runs: [
+            {
+              runName: "checkout-web-smoke-001",
+              status: "SUCCESS",
+              finishedAt: "2026-05-06T09:20:00Z",
+              reportEntry: "HTML / artifacts / cleanup"
+            }
+          ],
+          maintenanceEvents: []
+        });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderScreen({ onOpenHistoryRun });
+
+    await userEvent.click(screen.getByRole("button", { name: "Detail" }));
+    await userEvent.click(screen.getByRole("button", { name: "History" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Open history run checkout-web-smoke-001 in report detail" }));
+
+    expect(onOpenHistoryRun).toHaveBeenCalledWith("checkout-web-smoke-001");
+  });
+
   it("saves state machine and resets tab state when switching cases", async () => {
     const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
@@ -348,6 +380,7 @@ describe("CasesScreen", () => {
         saveCaseCatalogLabel="Save catalog"
         locale="en"
         onPrepareCase={vi.fn()}
+        onOpenHistoryRun={vi.fn()}
         onCaseChange={vi.fn()}
         onAddCaseRow={vi.fn()}
         onRemoveCaseRow={vi.fn()}

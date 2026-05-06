@@ -458,14 +458,15 @@ It does not authorize UI or backend changes in the current phase.
   - all detail tabs are now functional with explicit loading / empty / error surfacing
   - DSL validate/save and state-machine save now expose explicit mutation feedback
   - changing the opened case resets the active tab to `overview` and clears stale tab-specific detail state
+  - History tab run rows now reuse the existing App-level handoff into `reportDetail`
 - Remaining limits:
   - sidebar info/plans/recent-run panels are still presentational snapshot-derived display
   - app-level case catalog save already exists, but the visible `cases` screen still does not expose an editable catalog form
-  - history run rows still do not hand off into `reportDetail`
+  - history run-row handoff currently depends on `runName` because the case-history payload still has no dedicated canonical `runId`
   - plans and history remain read-only on the current Phase 3 boundary
 - Test coverage:
   - backend case-detail endpoint coverage in `LocalAdminApiServerTest`
-  - frontend `CasesScreen` coverage for DSL load/validate/save, plans/history state surfacing, state-machine save feedback, and case-switch reset behavior
+  - frontend `CasesScreen` coverage for DSL load/validate/save, plans/history state surfacing, history run-row handoff, state-machine save feedback, and case-switch reset behavior
 
 ### P2-4. Complete `docParse` document-service actions DONE
 

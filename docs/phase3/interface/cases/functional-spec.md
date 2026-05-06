@@ -235,7 +235,7 @@ Current behavior:
 - DSL tab: loaded from `GET /api/phase3/cases/{caseId}/dsl`, editable as JSON, validate via `POST .../dsl/validate`, save via `PUT .../dsl`, and surfaces mutation feedback
 - State machine tab: loaded from `GET /api/phase3/cases/{caseId}/state-machine`, save via `PUT .../state-machine`, and surfaces mutation feedback
 - Plans tab: loaded from `GET /api/phase3/cases/{caseId}/plans`
-- History tab: loaded from `GET /api/phase3/cases/{caseId}/history`
+- History tab: loaded from `GET /api/phase3/cases/{caseId}/history`, and run rows hand off into `reportDetail` through existing app-level state
 
 ### 6.8 Detail Side Panels
 
@@ -313,6 +313,7 @@ The screen produces:
   - opened case change
 - shell-level handoff output
   - prepared case intent via `onPrepareCase`
+  - history run drill-down intent via existing app-level `reportDetail` handoff
 - mutation-state display output
   - rendering of `caseState` in the detail side panel
 
@@ -408,6 +409,7 @@ Current implementation summary:
 - `History`
   - function: load and show run history and maintenance events
   - request: `GET /api/phase3/cases/{caseId}/history` on tab activation
+  - output type: backend-backed read plus app-level `reportDetail` handoff from run rows
   - current implementation: implemented
 
 ## 11. State Model
@@ -473,7 +475,8 @@ The screen serves as an upstream context for:
 - State-machine viewer (implemented inline as State machine tab with `CaseDetailService` backend)
 - Plans viewer (implemented inline as Plans tab)
 - History viewer (implemented inline as History tab)
-- future history/report drill-down (clicking run rows → `reportDetail`)
+- `reportDetail`
+  - through history run-row click handoff using current app-level selected-run state
 
 ### 13.3 Shared Data Context
 
@@ -510,12 +513,13 @@ Resolved items (P2-3):
 - Detail main panel content is now driven by per-tab backend data for DSL, state-machine, plans, and history tabs.
 - backend-backed tabs now show explicit loading / empty / error states.
 - changing the opened case now resets tab selection and clears stale backend-backed tab state.
+- History tab run rows now hand off into `reportDetail` through the existing App-level path.
 
 Remaining items:
 
 - Sidebar info/plans/recent-run panels remain presentational snapshot-derived display (not yet connected to per-tab API data).
 - App-level case save capability exists, but the current `cases` screen does not expose an actual editable catalog form.
-- History tab run row click does not yet hand off to `reportDetail`.
+- History tab handoff currently depends on `runName` because the case-history payload does not yet expose a dedicated canonical `runId`.
 - `Recent runs` summary bars in sidebar are still display-only placeholders.
 
 ## 16. Suggested Output Files for This Screen Folder

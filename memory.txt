@@ -1534,3 +1534,31 @@
     - `npm test -- --run src/screens/CasesScreen.test.tsx`
     - `npx vitest run src/screens/CasesScreen.test.tsx -t "shows invalid JSON feedback without sending validate request|keeps backend validation failures as real error state without synthesizing invalid JSON" --pool=forks --poolOptions.forks.singleFork`
     - this machine still shows the same Vitest hang / worker-startup instability for the `CasesScreen` test file
+- 2026-05-06: Completed the `cases` History -> `reportDetail` handoff follow-up.
+  - Updated `ui/admin-console/src/screens/CasesScreen.tsx`:
+    - added App-level `onOpenHistoryRun(runName)` callback wiring
+    - `History` tab run rows are now clickable buttons instead of passive display rows
+    - row click reuses the existing shell `reportDetail` handoff rather than adding any backend endpoint
+  - Updated `ui/admin-console/src/App.tsx`:
+    - passed existing `openReportDetail` into `CasesScreen` for history run-row drill-down
+  - Extended frontend coverage:
+    - `ui/admin-console/src/App.test.tsx`
+      - added `cases` history -> `reportDetail` handoff regression coverage
+    - `ui/admin-console/src/screens/CasesScreen.test.tsx`
+      - added direct callback coverage for history run-row click
+  - Synced Phase 3 docs and backlog:
+    - `docs/phase3/interface/cases/functional-spec.md`
+    - `docs/phase3/interface/cases/interface-spec.md`
+    - `docs/phase3/interface/review-backlog.md`
+  - Keep the explicit boundary:
+    - no new backend endpoint
+    - no new route system
+    - first implementation still hands off by `runName` because case history payload has no dedicated canonical `runId`
+  - Verification:
+    - `npx vitest run src/App.test.tsx -t "opens cases from execution prepared-case drill-down via the existing App handoff"` in `ui/admin-console`: PASS
+    - `npm run build` in `ui/admin-console`: PASS
+  - Attempted but not used as gate:
+    - `npx vitest run src/App.test.tsx -t "opens reportDetail from cases history run rows via the existing App handoff"`
+    - `npx vitest run src/App.test.tsx -t "opens reportDetail from cases history run rows via the existing App handoff" --pool=forks --poolOptions.forks.singleFork`
+    - `npx vitest run src/screens/CasesScreen.test.tsx -t "hands off history run rows through the existing app-level callback" --pool=forks --poolOptions.forks.singleFork`
+    - this machine still shows the same Vitest hang / worker-startup instability for some targeted Vitest runs

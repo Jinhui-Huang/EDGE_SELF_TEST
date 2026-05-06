@@ -2352,6 +2352,7 @@ export function App() {
             saveCaseCatalogLabel={t(uiCopy.saveCaseCatalog)}
             locale={locale}
             onPrepareCase={handlePrepareCase}
+            onOpenHistoryRun={openReportDetail}
             onCaseChange={updateCaseDraft}
             onAddCaseRow={addCaseDraftRow}
             onRemoveCaseRow={removeCaseDraftRow}
