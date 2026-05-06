@@ -4550,6 +4550,32 @@ Remaining limits:
 - `reportDetail` still uses snapshot-derived fallback view-model data when backend detail reads fail
 - `case-history` payload still has no dedicated canonical `runId`, so upstream `cases` history handoff may still fall back to `runName`
 
+## 2026-05-07 Canonical runId overview-doc terminology follow-up
+
+## Task
+- Do one tiny doc-only terminology review in summary/overview documents:
+  - re-scan `ui-control-interface-overview.md` and `review-backlog.md`
+  - confirm there is no remaining name-based selected-run wording conflicting with current canonical run identifier semantics
+
+## Completed
+- Re-scanned:
+  - `docs/phase3/interface/ui-control-interface-overview.md`
+  - `docs/phase3/interface/review-backlog.md`
+- Result:
+  - no direct `selectedRunName` / `selectedReportRunName` / `selected run name` conflicts remained in this target range
+  - no summary-doc正文 change was needed in this pass
+- Updated records:
+  - `01_dev_progress.md`
+  - `memory.txt`
+
+## Verification
+- Not run by design:
+  - documentation-only follow-up
+
+## Remaining Limits
+- `reportDetail` still uses snapshot-derived fallback view-model data when backend detail reads fail
+- `case-history` payload still has no dedicated canonical `runId`, so upstream `cases` history handoff may still fall back to `runName`
+
 ## 2026-05-06 CasesScreen handoff and validate review follow-up
 
 ## Task

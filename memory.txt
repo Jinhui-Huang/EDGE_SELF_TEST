@@ -1919,3 +1919,18 @@
     - no backend-contract change
     - no test run
     - no build run
+- 2026-05-07: Completed the canonical `runId` overview-doc terminology follow-up.
+  - Re-scanned:
+    - `docs/phase3/interface/ui-control-interface-overview.md`
+    - `docs/phase3/interface/review-backlog.md`
+  - Result:
+    - no direct `selectedRunName` / `selectedReportRunName` / `selected run name` conflicts remained in this target range
+    - no summary-doc正文 change was needed in this pass
+  - Keep the explicit boundary:
+    - no code change
+    - no new backend interface
+    - no route change
+    - no App-level handoff change
+    - no backend-contract change
+    - no test run
+    - no build run
