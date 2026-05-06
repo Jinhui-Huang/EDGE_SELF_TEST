@@ -468,6 +468,7 @@ It does not authorize UI or backend changes in the current phase.
   - overview step-card no longer shows a fixed `5 assertions` placeholder; it now derives the count from the current `detailSteps` summary
   - overview step-card now explicitly labels itself as a local derived preview instead of implying a backend-authored real execution timeline
   - step-row selector/value/note fields now render as preview/sample/derived-note wording rather than looking like runtime-collected execution facts
+  - the most concrete `buildDetailSteps()` sample literals now use obvious preview placeholders instead of production-looking account/token/db strings
   - sidebar `Plans` now reuses already loaded case-plan data instead of static local plan rows
   - sidebar `Info` / `Recent runs` now reuse already loaded case-history data instead of static placeholder run summaries
 - Remaining limits:

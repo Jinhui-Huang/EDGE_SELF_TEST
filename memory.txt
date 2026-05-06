@@ -1778,3 +1778,20 @@
     - no save-flow change
     - no test run
     - no build run
+- 2026-05-07: Completed the `cases` sample-literal placeholder cleanup.
+  - Updated `ui/admin-console/src/screens/CasesScreen.tsx`:
+    - replaced the email-like account sample with `<preview-account>`
+    - replaced the token-like sample with `<preview-token>`
+    - replaced the DB-style assertion sample with `<preview-db-assertion>`
+    - replaced the diff assertion sample with `<preview-diff-assertion>`
+  - Synced docs/backlog:
+    - `docs/phase3/interface/cases/functional-spec.md`
+    - `docs/phase3/interface/cases/interface-spec.md`
+    - `docs/phase3/interface/review-backlog.md`
+  - Keep the explicit boundary:
+    - no new backend interface
+    - no route change
+    - no App-level handoff change
+    - no save-flow change
+    - no test run
+    - no build run

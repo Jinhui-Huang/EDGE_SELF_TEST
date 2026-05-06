@@ -275,6 +275,7 @@ Current behavior:
 - Overview tab step list is front-end generated summary data, and the displayed assertion count is now derived from that same summary (`action === "assert"`)
 - the Overview step-card now explicitly labels this block as a local derived preview rather than a backend-authored execution timeline
 - step-row field labels now explicitly read as preview/sample/derived-note fields so selector/value/note text is not mistaken for runtime-collected execution detail
+- the most concrete sample literals in `buildDetailSteps()` now use obvious preview placeholders (for example account/token/db-assertion text) rather than production-looking values
 - DSL, state-machine, plans, and history tab content are loaded from dedicated backend APIs via `CaseDetailService`
 - opening a case in detail now preloads `plansState` and `historyState` for that case while keeping `activeTab` unchanged
 - sidebar `Plans` reuses `plansState.data` from that preload or from the `Plans` tab

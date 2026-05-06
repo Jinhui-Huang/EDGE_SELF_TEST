@@ -103,12 +103,12 @@ function buildDetailSteps(testCase: CaseItem): DetailStep[] {
   return [
     { index: 1, action: "open", selector: successPath, note: "Navigate to entry." },
     { index: 2, action: "click", selector: "#primary-entry", note: "Locator healed once.", healed: true },
-    { index: 3, action: "fill", selector: "[name=account]", value: `${normalizedCase}@demo.local` },
-    { index: 4, action: "type", selector: "[name=token]", value: "AUTO-E2E-2026" },
+    { index: 3, action: "fill", selector: "[name=account]", value: "<preview-account>" },
+    { index: 4, action: "type", selector: "[name=token]", value: "<preview-token>" },
     { index: 5, action: "click", selector: "button.primary", note: "Submit the happy path." },
     { index: 6, action: "assert", selector: "url", value: `${successPath}/success/*`, note: "URL assertion." },
-    { index: 7, action: "assert", selector: "db", value: `${normalizedProject}.status = "done"`, note: "Database assertion." },
-    { index: 8, action: "assert", selector: "delta", value: "snapshot diff = expected", note: "Snapshot diff." }
+    { index: 7, action: "assert", selector: "db", value: "<preview-db-assertion>", note: "Database assertion." },
+    { index: 8, action: "assert", selector: "delta", value: "<preview-diff-assertion>", note: "Snapshot diff." }
   ];
 }
 

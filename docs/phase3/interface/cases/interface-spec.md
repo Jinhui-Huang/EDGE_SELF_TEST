@@ -474,6 +474,7 @@ These controls change screen state but do not call the backend directly.
 - the overview step-card assertion count is now derived from the same local `detailSteps` summary instead of a fixed placeholder value
 - the overview step-card also renders an explicit local-derived-preview note so it is not mistaken for a backend-authored execution timeline
 - step-row fields now render explicit preview/sample/derived-note wording so selector/value/note cells are not presented as runtime-authored facts
+- the most realistic sample literals inside `buildDetailSteps()` are now reduced to obvious preview placeholders instead of account/token/db-style concrete values
 
 ### 8.4 Relationship to DSL and State-Machine Capabilities
 
