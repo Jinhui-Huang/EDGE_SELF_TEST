@@ -2015,3 +2015,22 @@
     - no backend-contract change
     - no test run
     - no build run
+- 2026-05-07: Completed the `cases` sidebar data-source/failure-state wording review follow-up.
+  - Re-reviewed:
+    - `docs/phase3/interface/cases/functional-spec.md`
+    - `docs/phase3/interface/cases/interface-spec.md`
+    - `docs/phase3/interface/review-backlog.md`
+  - Result:
+    - the current wording is already consistent for this remaining limit
+    - the docs already agree that the sidebar does not issue independent requests
+    - the docs already agree that sidebar summaries reuse existing `plansState` / `historyState`
+    - the docs already agree that failure/unloaded/empty states are surfaced explicitly instead of introducing a second data source
+    - no正文 change was needed in this pass
+  - Keep the explicit boundary:
+    - no code change
+    - no new backend interface
+    - no route change
+    - no App-level handoff change
+    - no backend-contract change
+    - no test run
+    - no build run

@@ -4712,6 +4712,37 @@ Remaining limits:
 - `reportDetail` still uses snapshot-derived fallback view-model data when backend detail reads fail
 - `case-history` payload still has no dedicated canonical `runId`, so upstream `cases` history handoff may still fall back to `runName`
 
+## 2026-05-07 Cases sidebar data-source/failure-state wording review follow-up
+
+## Task
+- Re-check the `cases` sidebar wording across the adjacent docs for one remaining limit:
+  - sidebar `Plans` / `Info` / `Recent runs` reuse existing `plans` / `history` state only
+  - no separate request path or second data source is introduced
+  - read failure should surface through explicit unloaded/loading/error/empty-style states
+
+## Completed
+- Re-reviewed:
+  - `docs/phase3/interface/cases/functional-spec.md`
+  - `docs/phase3/interface/cases/interface-spec.md`
+  - `docs/phase3/interface/review-backlog.md`
+- Result:
+  - the current wording is already consistent for this remaining limit
+  - the docs already agree that the sidebar does not issue independent requests
+  - the docs already agree that sidebar summaries reuse existing `plansState` / `historyState`
+  - the docs already agree that failure/unloaded/empty states are surfaced explicitly instead of introducing a second data source
+  - no正文 change was needed in this pass
+- Updated records:
+  - `01_dev_progress.md`
+  - `memory.txt`
+
+## Verification
+- Not run by design:
+  - documentation-only follow-up
+
+## Remaining Limits
+- `reportDetail` still uses snapshot-derived fallback view-model data when backend detail reads fail
+- `case-history` payload still has no dedicated canonical `runId`, so upstream `cases` history handoff may still fall back to `runName`
+
 ## 2026-05-06 CasesScreen handoff and validate review follow-up
 
 ## Task
