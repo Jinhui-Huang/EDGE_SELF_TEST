@@ -209,7 +209,7 @@ The screen consumes:
 
 - current locale
 - shell snapshot
-- `selectedRunName`
+- `selectedRunId`
 - labels for review board and report list
 - callback:
   - `onOpenDetail`
@@ -222,7 +222,7 @@ The screen produces:
   - overview collapsed state
   - selected project change
 - navigation output
-  - report detail entry through `onOpenDetail(runName)`
+  - report detail entry through `onOpenDetail(runId)`
 
 ## 9. User Actions
 
@@ -297,7 +297,7 @@ Current implemented rules:
 
 - selected project falls back to the selected run's project or the first available project
 - if current selected project disappears from the grouped report set, the screen falls back to a valid available project
-- if `selectedRunName` belongs to another project, selected project is updated to follow that run
+- if `selectedRunId` belongs to another project, selected project is updated to follow that run
 
 Implicit business rule:
 

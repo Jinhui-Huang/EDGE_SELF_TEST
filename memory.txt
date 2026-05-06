@@ -1934,3 +1934,22 @@
     - no backend-contract change
     - no test run
     - no build run
+- 2026-05-07: Completed the canonical `runId` phase3-interface sweep follow-up.
+  - Updated `docs/phase3/interface/reports/functional-spec.md`:
+    - screen input wording now uses `selectedRunId`
+    - report-detail handoff wording now describes `onOpenDetail(runId)`
+    - selected-project follow rule now keys off `selectedRunId`
+  - Updated `docs/phase3/interface/dataDiff/functional-spec.md`:
+    - screen dependency wording now uses `selectedRunId`
+    - selected-run context note now uses `selectReportViewModel(snapshot, selectedRunId)`
+    - screen-input wording now says selected run id
+  - Sweep result:
+    - direct residual conflicts were limited to these two functional-spec files in this pass
+  - Keep the explicit boundary:
+    - no code change
+    - no new backend interface
+    - no route change
+    - no App-level handoff change
+    - no backend-contract change
+    - no test run
+    - no build run

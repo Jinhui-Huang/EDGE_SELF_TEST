@@ -4576,6 +4576,36 @@ Remaining limits:
 - `reportDetail` still uses snapshot-derived fallback view-model data when backend detail reads fail
 - `case-history` payload still has no dedicated canonical `runId`, so upstream `cases` history handoff may still fall back to `runName`
 
+## 2026-05-07 Canonical runId phase3-interface sweep follow-up
+
+## Task
+- Run one constrained terminology sweep under `docs/phase3/interface/`:
+  - grep for direct conflicts such as `selectedRunName`, `selectedReportRunName`, and other name-based selected-run wording
+  - fix only the smallest remaining canonical run identifier conflicts
+
+## Completed
+- Updated `docs/phase3/interface/reports/functional-spec.md`:
+  - screen input wording now uses `selectedRunId`
+  - report-detail navigation output now describes `onOpenDetail(runId)`
+  - selected-project follow rule now keys off `selectedRunId`
+- Updated `docs/phase3/interface/dataDiff/functional-spec.md`:
+  - screen dependency wording now uses `selectedRunId`
+  - selected-run context note now uses `selectReportViewModel(snapshot, selectedRunId)`
+  - screen-input wording now says selected run id instead of selected run name
+- Sweep result:
+  - direct residual conflicts were limited to these two functional-spec files in this pass
+- Updated records:
+  - `01_dev_progress.md`
+  - `memory.txt`
+
+## Verification
+- Not run by design:
+  - documentation-only follow-up
+
+## Remaining Limits
+- `reportDetail` still uses snapshot-derived fallback view-model data when backend detail reads fail
+- `case-history` payload still has no dedicated canonical `runId`, so upstream `cases` history handoff may still fall back to `runName`
+
 ## 2026-05-06 CasesScreen handoff and validate review follow-up
 
 ## Task
