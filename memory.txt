@@ -1839,3 +1839,15 @@
     - no backend-contract change
     - no test run
     - no build run
+- 2026-05-07: Completed the `cases` derived-preview path-example alignment follow-up.
+  - Updated `docs/phase3/interface/cases/interface-spec.md`:
+    - replaced the remaining `"/checkout"` DSL example URLs with `<preview-entry-path>`
+    - kept those example blocks aligned with current preview-placeholder wording
+  - Keep the explicit boundary:
+    - no code change
+    - no new backend interface
+    - no route change
+    - no App-level handoff change
+    - no backend-contract change
+    - no test run
+    - no build run

@@ -558,7 +558,7 @@ Response body:
     "id": "checkout-smoke",
     "name": "Checkout smoke",
     "steps": [
-      { "action": "goto", "url": "/checkout" },
+      { "action": "goto", "url": "<preview-entry-path>" },
       { "action": "click", "target": "<preview-entry-locator>" }
     ]
   }
@@ -586,7 +586,7 @@ Request body:
     "id": "checkout-smoke",
     "name": "Checkout smoke",
     "steps": [
-      { "action": "goto", "url": "/checkout" }
+      { "action": "goto", "url": "<preview-entry-path>" }
     ]
   }
 }
@@ -619,7 +619,7 @@ Request body:
     "id": "checkout-smoke",
     "name": "Checkout smoke",
     "steps": [
-      { "action": "goto", "url": "/checkout" },
+      { "action": "goto", "url": "<preview-entry-path>" },
       { "action": "click", "target": "<preview-entry-locator>" }
     ]
   }
