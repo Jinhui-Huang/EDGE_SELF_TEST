@@ -1187,7 +1187,7 @@ export function CasesScreen({
                 </div>
                 <div className="casesMetaRow">
                   <span>{t(copy("Owner"))}</span>
-                  <strong>Lin Chen</strong>
+                  <strong>{t(copy("Not provided in Phase 3 case data."))}</strong>
                 </div>
                 <div className="casesMetaRow">
                   <span>{t(copy("Last run"))}</span>

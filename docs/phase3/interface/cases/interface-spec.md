@@ -470,6 +470,7 @@ These controls change screen state but do not call the backend directly.
 - sidebar `Recent runs` and `History` tab rows both reuse the existing App-level `reportDetail` handoff
 - the current handoff passes `runName`, and `App.tsx` resolves canonical `runId` from `snapshot.reports` when possible because the case-history payload does not yet expose a dedicated canonical `runId`
 - the detail-hero run summary also reuses current-case `historyState` rather than showing a fixed weekly pass placeholder
+- sidebar `Owner` does not have a real Phase 3 data source today, so the screen now renders an explicit not-provided message instead of a fake owner value
 
 ### 8.4 Relationship to DSL and State-Machine Capabilities
 

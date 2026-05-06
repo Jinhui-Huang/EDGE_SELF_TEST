@@ -1717,3 +1717,18 @@
     - no save-flow change
     - no test run
     - no build run
+- 2026-05-07: Completed the `cases` owner-placeholder cleanup.
+  - Updated `ui/admin-console/src/screens/CasesScreen.tsx`:
+    - removed the fixed sidebar owner value `Lin Chen`
+    - `Owner` now shows explicit not-provided text because current Phase 3 case data has no reusable owner field
+  - Synced docs/backlog:
+    - `docs/phase3/interface/cases/functional-spec.md`
+    - `docs/phase3/interface/cases/interface-spec.md`
+    - `docs/phase3/interface/review-backlog.md`
+  - Keep the explicit boundary:
+    - no new backend interface
+    - no route change
+    - no App-level handoff change
+    - no save-flow change
+    - no test run
+    - no build run

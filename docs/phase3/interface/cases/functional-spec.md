@@ -277,6 +277,7 @@ Current behavior:
 - opening a case in detail now preloads `plansState` and `historyState` for that case while keeping `activeTab` unchanged
 - sidebar `Plans` reuses `plansState.data` from that preload or from the `Plans` tab
 - sidebar `Info` / `Recent runs` reuse `historyState.data` from that preload or from the `History` tab
+- sidebar `Owner` no longer shows a fake person name; when no owner field exists in current Phase 3 data, it renders an explicit unavailable/not-provided message
 - `Plans` / `History` tab activation skips only same-case `loading` / `success` duplicates; it still allows retry after failed preload
 - sidebar `Recent runs` click-through reuses the same app-level `reportDetail` handoff as the `History` tab
 
