@@ -4022,6 +4022,39 @@ Remaining limits:
 - case-history payload still has no dedicated canonical `runId`, so downstream App-level handoff still relies on `snapshot.reports` to resolve one when possible
 - sidebar `Plans` / `Info` / `Recent runs` still depend on the existing `plans` / `history` reads succeeding and do not introduce a second data source
 
+## 2026-05-07 Cases step-note preview wording follow-up
+
+## Task
+- Keep this follow-up narrowly inside the current `P2-3 cases` UX cleanup:
+  - reduce the most execution-like note sentences inside `buildDetailSteps()`
+  - keep the local derived structure unchanged
+  - do not add requests, routes, tests, or build
+
+## Completed
+- Updated `ui/admin-console/src/screens/CasesScreen.tsx`:
+  - changed note text such as `Navigate to entry.`, `Submit the happy path.`, `URL assertion.`, `Database assertion.`, and `Snapshot diff.` into preview/derived wording
+  - kept the existing `detailSteps` count, action mix, and row structure unchanged
+- Synced docs/backlog:
+  - `docs/phase3/interface/cases/functional-spec.md`
+  - `docs/phase3/interface/cases/interface-spec.md`
+  - `docs/phase3/interface/review-backlog.md`
+
+## Modified Files
+- `ui/admin-console/src/screens/CasesScreen.tsx`
+- `docs/phase3/interface/cases/functional-spec.md`
+- `docs/phase3/interface/cases/interface-spec.md`
+- `docs/phase3/interface/review-backlog.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Not run by design in this pass:
+  - planner explicitly constrained this follow-up to no test execution and no build
+
+## Remaining Limits
+- case-history payload still has no dedicated canonical `runId`, so downstream App-level handoff still relies on `snapshot.reports` to resolve one when possible
+- sidebar `Plans` / `Info` / `Recent runs` still depend on the existing `plans` / `history` reads succeeding and do not introduce a second data source
+
 ## 2026-05-07 Cases sample-literal placeholder cleanup follow-up
 
 ## Task

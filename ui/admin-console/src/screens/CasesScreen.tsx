@@ -101,14 +101,14 @@ function buildDetailSteps(testCase: CaseItem): DetailStep[] {
   const successPath = `/${normalizedProject.replace(/-web|-center|-console/g, "").replace(/-/g, "/") || "flow"}`;
 
   return [
-    { index: 1, action: "open", selector: successPath, note: "Navigate to entry." },
-    { index: 2, action: "click", selector: "#primary-entry", note: "Locator healed once.", healed: true },
+    { index: 1, action: "open", selector: successPath, note: "Preview navigation step." },
+    { index: 2, action: "click", selector: "#primary-entry", note: "Derived healed-locator preview.", healed: true },
     { index: 3, action: "fill", selector: "[name=account]", value: "<preview-account>" },
     { index: 4, action: "type", selector: "[name=token]", value: "<preview-token>" },
-    { index: 5, action: "click", selector: "button.primary", note: "Submit the happy path." },
-    { index: 6, action: "assert", selector: "url", value: `${successPath}/success/*`, note: "URL assertion." },
-    { index: 7, action: "assert", selector: "db", value: "<preview-db-assertion>", note: "Database assertion." },
-    { index: 8, action: "assert", selector: "delta", value: "<preview-diff-assertion>", note: "Snapshot diff." }
+    { index: 5, action: "click", selector: "button.primary", note: "Preview submit step." },
+    { index: 6, action: "assert", selector: "url", value: `${successPath}/success/*`, note: "Preview URL assertion." },
+    { index: 7, action: "assert", selector: "db", value: "<preview-db-assertion>", note: "Preview DB assertion." },
+    { index: 8, action: "assert", selector: "delta", value: "<preview-diff-assertion>", note: "Preview diff assertion." }
   ];
 }
 
