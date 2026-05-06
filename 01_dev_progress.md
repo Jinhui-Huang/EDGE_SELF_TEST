@@ -4774,6 +4774,35 @@ Remaining limits:
 - `reportDetail` still uses snapshot-derived fallback view-model data when backend detail reads fail
 - `case-history` payload still has no dedicated canonical `runId`, so upstream `cases` history handoff may still fall back to `runName`
 
+## 2026-05-07 ReportDetail fallback remaining-limit wording review follow-up
+
+## Task
+- Re-check `review-backlog.md` and adjacent `reportDetail` docs for one stable remaining limit:
+  - `reportDetail` stays backend-first
+  - backend detail read failure still falls back to the snapshot-derived view model
+
+## Completed
+- Re-reviewed:
+  - `docs/phase3/interface/review-backlog.md`
+  - `docs/phase3/interface/reportDetail/functional-spec.md`
+  - `docs/phase3/interface/reportDetail/interface-spec.md`
+- Result:
+  - the current wording is already consistent for this remaining limit
+  - the `reportDetail` docs already distinguish backend-first primary reads from snapshot-derived fallback on failure
+  - `review-backlog.md` does not introduce a contradictory statement
+  - no正文 change was needed in this pass
+- Updated records:
+  - `01_dev_progress.md`
+  - `memory.txt`
+
+## Verification
+- Not run by design:
+  - documentation-only follow-up
+
+## Remaining Limits
+- `reportDetail` still uses snapshot-derived fallback view-model data when backend detail reads fail
+- `case-history` payload still has no dedicated canonical `runId`, so upstream `cases` history handoff may still fall back to `runName`
+
 ## 2026-05-06 CasesScreen handoff and validate review follow-up
 
 ## Task
