@@ -431,11 +431,11 @@ These controls change screen state but do not call the backend directly.
 
 #### `Recent runs` summary bars
 
-- user action: inspect only today
-- request: none today
+- user action: inspect summary, optionally click a recent run
+- request: no independent request; reuses already loaded `historyState.data` from the `History` tab
 - intended future route:
   - `reports` or `reportDetail`
-- current state: display only
+- current state: implemented as history-derived summary when history for the current case is already loaded; otherwise shows explicit unloaded/loading/error/empty text
 
 #### `Catalog status`
 
@@ -461,9 +461,8 @@ These controls change screen state but do not call the backend directly.
 
 ### 8.3 Relationship to Reports and Report Detail
 
-- current case screen still shows only synthetic sidebar recent-run summary
-- `History` tab run rows now reuse the existing App-level `reportDetail` handoff
-- the current handoff passes `runName` because the case-history payload does not yet expose a dedicated canonical `runId`
+- sidebar `Recent runs` and `History` tab rows both reuse the existing App-level `reportDetail` handoff
+- the current handoff passes `runName`, and `App.tsx` resolves canonical `runId` from `snapshot.reports` when possible because the case-history payload does not yet expose a dedicated canonical `runId`
 
 ### 8.4 Relationship to DSL and State-Machine Capabilities
 
@@ -839,15 +838,17 @@ Current row click behavior:
 
 ### 10.6 `Recent runs` Summary Panel
 
-Current state: display-only sidebar placeholder
+Current state: implemented by reusing loaded history data
 
-Future implementation:
+Current implementation:
 
-- real history data now exists via `GET /api/phase3/cases/{caseId}/history`
-- sidebar summary bars could be connected to this data or made clickable
-- add app-level handler:
-  - `onOpenCaseRunDetail(runName: string)`
-- reuse existing `openReportDetail(runName)` so App-level resolution can prefer canonical `runId`
+- no new request is added for the sidebar
+- before `History` loads, the sidebar shows an explicit hint instead of synthetic run totals
+- after `GET /api/phase3/cases/{caseId}/history` succeeds for the current case, the sidebar derives:
+  - pass / fail / warn counts
+  - recent run status bars
+  - a short clickable recent-run list
+- sidebar recent-run clicks reuse the same `onOpenHistoryRun(runName)` -> `openReportDetail(runName)` App-level path as the main `History` tab
 
 ### 10.7 Future Visible Case-Catalog Editor
 
@@ -921,6 +922,7 @@ Remaining findings:
 
 - `Pre-execution` is correctly a state handoff, not a backend request.
 - App-level case-catalog save already exists, but the visible screen does not expose an editor form.
-- Sidebar info/plans/recent-run panels remain snapshot-derived display, not yet connected to per-tab API data.
+- Sidebar `Plans` remains local/static display.
+- Sidebar `Info` / `Recent runs` depend on already loaded `History` tab data and do not trigger a separate request.
 - History tab handoff now resolves canonical `runId` from `snapshot.reports` when `runName` matches an existing report row, and falls back to `runName` only when no match exists.
 - Plans and history are read-only; write endpoints can be added when editing is required.

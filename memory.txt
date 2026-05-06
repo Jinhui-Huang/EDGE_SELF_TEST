@@ -1601,3 +1601,20 @@
     - no backend contract change
     - no code change
     - no test run
+- 2026-05-07: Completed the small `cases` sidebar recent-runs follow-up.
+  - Updated `ui/admin-console/src/screens/CasesScreen.tsx`:
+    - sidebar `Recent runs` now reuses already loaded `historyState.data` instead of static placeholder bars
+    - pass / fail / warn totals are derived from real run statuses for the current case
+    - recent-run drill-down buttons reuse the existing `onOpenHistoryRun(runName)` App-level handoff
+    - sidebar `Info` panel `Last run` now reflects the latest loaded history run when available
+    - before history loads, sidebar text stays explicit about idle/loading/empty/error state rather than inventing synthetic run data
+  - Synced docs/backlog:
+    - `docs/phase3/interface/cases/functional-spec.md`
+    - `docs/phase3/interface/cases/interface-spec.md`
+    - `docs/phase3/interface/review-backlog.md`
+  - Keep the explicit boundary:
+    - no new backend interface
+    - no route change
+    - no reportDetail backend contract change
+    - no scheduler/report protocol change
+    - no test run

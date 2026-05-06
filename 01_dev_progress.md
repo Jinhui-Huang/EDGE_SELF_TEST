@@ -3874,6 +3874,44 @@ Remaining limits:
 - history run rows still do not hand off into `reportDetail`
 - plans and history remain read-only on the current Phase 3 boundary
 
+## 2026-05-07 Cases sidebar recent-runs history reuse follow-up
+
+## Task
+- Keep this follow-up narrowly inside the current `P2-3 cases` boundary:
+  - upgrade the right-sidebar `Recent runs` panel from static placeholder data to a real summary derived from already loaded case history
+  - reuse the existing App-level `reportDetail` handoff for any sidebar run drill-down
+  - do not add a new backend request, route system, backend contract, or protocol change
+  - do not run tests in this pass
+
+## Completed
+- Updated `ui/admin-console/src/screens/CasesScreen.tsx`:
+  - sidebar `Recent runs` now reuses `historyState.data` after the `History` tab has loaded the current case
+  - sidebar summary bars and pass/fail/warn totals are derived from real run statuses instead of static placeholder values
+  - sidebar recent-run entries are now clickable and reuse `onOpenHistoryRun(runName)`
+  - sidebar `Info` panel `Last run` now also reflects the latest loaded history run when available
+  - when history is still idle/loading/empty/error, the sidebar shows explicit state text instead of inventing synthetic run data
+- Synced docs/backlog:
+  - `docs/phase3/interface/cases/functional-spec.md`
+  - `docs/phase3/interface/cases/interface-spec.md`
+  - `docs/phase3/interface/review-backlog.md`
+
+## Modified Files
+- `ui/admin-console/src/screens/CasesScreen.tsx`
+- `docs/phase3/interface/cases/functional-spec.md`
+- `docs/phase3/interface/cases/interface-spec.md`
+- `docs/phase3/interface/review-backlog.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Not run by design in this pass:
+  - planner explicitly constrained this follow-up to no test execution
+
+## Remaining Limits
+- sidebar `Info` / `Recent runs` still depend on `History` tab data being loaded first and do not issue an independent request
+- sidebar `Plans` remains local/static display
+- case-history payload still has no dedicated canonical `runId`, so downstream App-level handoff still relies on `snapshot.reports` to resolve one when possible
+
 ## 2026-05-06 Cases history canonical runId follow-up
 
 ## Task

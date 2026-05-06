@@ -81,6 +81,16 @@ const detailTabs: Array<{ key: CaseDetailTab; label: LocalizedCopy }> = [
   { key: "history", label: copy("History") }
 ];
 
+function classifyRunStatus(status: string): "pass" | "fail" | "warn" {
+  if (/success|pass|ok|done/i.test(status)) {
+    return "pass";
+  }
+  if (/fail|error|abort|cancel/i.test(status)) {
+    return "fail";
+  }
+  return "warn";
+}
+
 function buildDetailSteps(testCase: CaseItem): DetailStep[] {
   const normalizedProject = testCase.projectKey || "project";
   const normalizedCase = testCase.id || "case";
@@ -575,15 +585,41 @@ export function CasesScreen({
   const archivedCases = visibleCases.filter((item) => item.archived).length;
   const happyCases = visibleCases.filter((item) => /active|happy|pass/i.test(item.status)).length;
   const detailSteps = openedCase ? buildDetailSteps(openedCase) : [];
-  const passBlocks = Array.from({ length: 20 }, (_, index) => {
-    if (index === 7 || index === 13) {
-      return "fail";
-    }
-    if (index === 15) {
-      return "warn";
-    }
-    return "pass";
-  });
+  const historySidebarData =
+    historyState.status === "success" && historyState.data && historyState.caseId === openedCase?.id ? historyState.data : null;
+  const recentHistoryRuns = historySidebarData?.runs.slice(0, 4) ?? [];
+  const recentRunBars = (historySidebarData?.runs ?? []).slice(0, 20).map((run) => classifyRunStatus(run.status));
+  const recentRunSummary = (historySidebarData?.runs ?? []).reduce(
+    (summary, run) => {
+      const bucket = classifyRunStatus(run.status);
+      if (bucket === "pass") {
+        summary.pass += 1;
+      } else if (bucket === "fail") {
+        summary.fail += 1;
+      } else {
+        summary.warn += 1;
+      }
+      return summary;
+    },
+    { total: historySidebarData?.runs.length ?? 0, pass: 0, fail: 0, warn: 0 }
+  );
+  const historySidebarHint =
+    historyState.caseId !== openedCase?.id || historyState.status === "idle"
+      ? t(copy("Open the History tab to load recent-run data for this case."))
+      : historyState.status === "loading"
+        ? t(copy("Loading recent-run data from case history..."))
+        : historyState.status === "error"
+          ? historyState.message || t(copy("Failed to load case history."))
+          : historyState.status === "empty"
+            ? historyState.message || t(copy("No history yet."))
+            : "";
+  const lastHistoryRun = recentHistoryRuns[0] ?? null;
+  const lastRunTone = lastHistoryRun ? classifyRunStatus(lastHistoryRun.status) : null;
+  const lastRunClassName =
+    lastRunTone === "pass" ? "successText" : lastRunTone === "fail" ? "errorText" : lastRunTone === "warn" ? "warningText" : "";
+  const lastRunLabel = lastHistoryRun
+    ? `${lastHistoryRun.status.toLowerCase()} | ${lastHistoryRun.finishedAt}`
+    : historySidebarHint;
 
   return (
     <div className="casesScreen">
@@ -1000,7 +1036,7 @@ export function CasesScreen({
                 </div>
                 <div className="casesMetaRow">
                   <span>{t(copy("Last run"))}</span>
-                  <strong className="successText">pass | 2m ago</strong>
+                  <strong className={lastRunClassName || undefined}>{lastRunLabel}</strong>
                 </div>
                 <div className="casesMetaRow">
                   <span>{t(copy("Updated"))}</span>
@@ -1035,12 +1071,40 @@ export function CasesScreen({
 
               <section className="casesPanelCard">
                 <div className="casesPanelTitle">{t(copy("Recent runs"))}</div>
-                <div className="casesRunBars">
-                  {passBlocks.map((block, index) => (
-                    <span key={index} className={`casesRunBar ${block}`} />
-                  ))}
-                </div>
-                <p className="casesRunsSummary">20 runs | 17 pass | 2 fail | 1 flaky</p>
+                {historySidebarData ? (
+                  <>
+                    <div className="casesRunBars">
+                      {recentRunBars.map((block, index) => (
+                        <span key={`${block}-${index}`} className={`casesRunBar ${block}`} />
+                      ))}
+                    </div>
+                    <p className="casesRunsSummary">
+                      {`${recentRunSummary.total} runs | ${recentRunSummary.pass} pass | ${recentRunSummary.fail} fail | ${recentRunSummary.warn} warn`}
+                    </p>
+                    <div className="casesHistoryRuns">
+                      {recentHistoryRuns.length ? (
+                        recentHistoryRuns.map((run) => (
+                          <button
+                            key={`${run.runName}-${run.finishedAt}-sidebar`}
+                            type="button"
+                            className="casesHistoryRun"
+                            aria-label={`Open recent run ${run.runName} in report detail`}
+                            onClick={() => onOpenHistoryRun(run.runName)}
+                          >
+                            <span className={`casesStatusBadge ${classifyRunStatus(run.status) === "pass" ? "isActive" : ""}`}>{run.status}</span>
+                            <strong>{run.runName}</strong>
+                            <span>{run.finishedAt}</span>
+                            <span>{run.reportEntry}</span>
+                          </button>
+                        ))
+                      ) : (
+                        <p className="casesPanelText">{t(copy("No runs yet."))}</p>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <p className="casesPanelText">{historySidebarHint}</p>
+                )}
               </section>
 
               <section className="casesPanelCard">
