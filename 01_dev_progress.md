@@ -3912,6 +3912,43 @@ Remaining limits:
 - sidebar `Plans` remains local/static display
 - case-history payload still has no dedicated canonical `runId`, so downstream App-level handoff still relies on `snapshot.reports` to resolve one when possible
 
+## 2026-05-07 Cases sidebar plans reuse follow-up
+
+## Task
+- Keep this follow-up narrowly inside the current `P2-3 cases` sidebar cleanup:
+  - upgrade the right-sidebar `Plans` panel from static local content to a real summary derived from already loaded case plans
+  - do not add any new request, handoff, route behavior, or backend/protocol change
+  - do not run tests in this pass
+
+## Completed
+- Updated `ui/admin-console/src/screens/CasesScreen.tsx`:
+  - sidebar `Plans` now reuses `plansState.data` after the `Plans` tab has loaded the current case
+  - sidebar plan rows now render real `plans[]` summary data instead of hard-coded placeholder content
+  - sidebar preconditions now reuse real `preconditions[]` data when available
+  - when plans are still idle/loading/empty/error, the sidebar shows explicit state text instead of inventing synthetic plan rows
+  - sidebar remains read-only and does not introduce a new editor or drill-down path
+- Synced docs/backlog:
+  - `docs/phase3/interface/cases/functional-spec.md`
+  - `docs/phase3/interface/cases/interface-spec.md`
+  - `docs/phase3/interface/review-backlog.md`
+
+## Modified Files
+- `ui/admin-console/src/screens/CasesScreen.tsx`
+- `docs/phase3/interface/cases/functional-spec.md`
+- `docs/phase3/interface/cases/interface-spec.md`
+- `docs/phase3/interface/review-backlog.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Not run by design in this pass:
+  - planner explicitly constrained this follow-up to no test execution
+
+## Remaining Limits
+- sidebar `Plans` still depends on `Plans` tab data being loaded first and does not issue an independent request
+- sidebar `Info` / `Recent runs` still depend on `History` tab data being loaded first and do not issue an independent request
+- case-history payload still has no dedicated canonical `runId`, so downstream App-level handoff still relies on `snapshot.reports` to resolve one when possible
+
 ## 2026-05-06 Cases history canonical runId follow-up
 
 ## Task

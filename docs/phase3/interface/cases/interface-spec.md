@@ -437,6 +437,12 @@ These controls change screen state but do not call the backend directly.
   - `reports` or `reportDetail`
 - current state: implemented as history-derived summary when history for the current case is already loaded; otherwise shows explicit unloaded/loading/error/empty text
 
+#### `Plans` sidebar summary
+
+- user action: inspect only
+- request: no independent request; reuses already loaded `plansState.data` from the `Plans` tab
+- current state: implemented as plans/preconditions summary when plans for the current case are already loaded; otherwise shows explicit unloaded/loading/error/empty text
+
 #### `Catalog status`
 
 - user action: inspect only
@@ -850,7 +856,20 @@ Current implementation:
   - a short clickable recent-run list
 - sidebar recent-run clicks reuse the same `onOpenHistoryRun(runName)` -> `openReportDetail(runName)` App-level path as the main `History` tab
 
-### 10.7 Future Visible Case-Catalog Editor
+### 10.7 `Plans` Sidebar Panel
+
+Current state: implemented by reusing loaded plans data
+
+Current implementation:
+
+- no new request is added for the sidebar
+- before `Plans` loads, the sidebar shows an explicit hint instead of synthetic plan rows
+- after `GET /api/phase3/cases/{caseId}/plans` succeeds for the current case, the sidebar derives:
+  - a short plans summary list
+  - a short preconditions list when available
+- the sidebar remains read-only and does not introduce a separate editor or handoff
+
+### 10.8 Future Visible Case-Catalog Editor
 
 If the `cases` screen later restores the editable catalog form already implied by its props, the recommended implementation type is:
 
@@ -922,7 +941,7 @@ Remaining findings:
 
 - `Pre-execution` is correctly a state handoff, not a backend request.
 - App-level case-catalog save already exists, but the visible screen does not expose an editor form.
-- Sidebar `Plans` remains local/static display.
+- Sidebar `Plans` depends on already loaded `Plans` tab data and does not trigger a separate request.
 - Sidebar `Info` / `Recent runs` depend on already loaded `History` tab data and do not trigger a separate request.
 - History tab handoff now resolves canonical `runId` from `snapshot.reports` when `runName` matches an existing report row, and falls back to `runName` only when no match exists.
 - Plans and history are read-only; write endpoints can be added when editing is required.

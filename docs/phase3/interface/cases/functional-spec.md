@@ -254,8 +254,8 @@ Functional role:
 Current behavior:
 
 - `Info` and `Recent runs` now opportunistically reuse already loaded `History` tab data when available
-- before `History` is loaded, sidebar panels stay explicit about being unloaded instead of inventing synthetic run summaries
-- `Plans` remains local/static display
+- `Plans` now opportunistically reuses already loaded `Plans` tab data when available
+- before `History` / `Plans` are loaded, sidebar panels stay explicit about being unloaded instead of inventing synthetic summaries
 - `Catalog status` is the only area that reflects real mutation state from app-level `caseState`
 - sidebar controls still do not trigger independent requests
 
@@ -272,6 +272,7 @@ Current behavior:
 - detail title/status/project identity come from the currently opened row plus `snapshot.cases`
 - Overview tab step list is front-end generated summary data
 - DSL, state-machine, plans, and history tab content are loaded from dedicated backend APIs via `CaseDetailService`
+- sidebar `Plans` reuses `plansState.data` only after the `Plans` tab has loaded the current case
 - sidebar `Info` / `Recent runs` reuse `historyState.data` only after the `History` tab has loaded the current case
 - sidebar `Recent runs` click-through reuses the same app-level `reportDetail` handoff as the `History` tab
 
@@ -522,7 +523,7 @@ Remaining items:
 
 - App-level case save capability exists, but the current `cases` screen does not expose an actual editable catalog form.
 - History tab run-row handoff now resolves canonical `runId` from `snapshot.reports` by matching `runName`, and only falls back to `runName` when the snapshot has no matching report row.
-- Sidebar `Plans` remains local/static display.
+- Sidebar `Plans` still depends on `Plans` tab data being loaded first; it does not issue an independent request.
 - Sidebar `Info` / `Recent runs` still depend on `History` tab data being loaded first; they do not issue an independent request.
 
 ## 16. Suggested Output Files for This Screen Folder

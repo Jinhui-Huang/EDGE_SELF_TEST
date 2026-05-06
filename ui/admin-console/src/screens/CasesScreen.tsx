@@ -620,6 +620,18 @@ export function CasesScreen({
   const lastRunLabel = lastHistoryRun
     ? `${lastHistoryRun.status.toLowerCase()} | ${lastHistoryRun.finishedAt}`
     : historySidebarHint;
+  const plansSidebarData = plansState.status === "success" && plansState.data && plansState.caseId === openedCase?.id ? plansState.data : null;
+  const planSidebarRows = plansSidebarData?.plans.slice(0, 3) ?? [];
+  const plansSidebarHint =
+    plansState.caseId !== openedCase?.id || plansState.status === "idle"
+      ? t(copy("Open the Plans tab to load plan data for this case."))
+      : plansState.status === "loading"
+        ? t(copy("Loading plan data from case plans..."))
+        : plansState.status === "error"
+          ? plansState.message || t(copy("Failed to load case plans."))
+          : plansState.status === "empty"
+            ? plansState.message || t(copy("No plans yet."))
+            : "";
 
   return (
     <div className="casesScreen">
@@ -1046,27 +1058,36 @@ export function CasesScreen({
 
               <section className="casesPanelCard">
                 <div className="casesPanelTitle">{t(copy("Plans"))}</div>
-                <div className="casesPlanRow">
-                  <span className="casesPlanDot accent2">*</span>
-                  <div>
-                    <strong>{`plan.${openedCase.projectKey}.seed.v2`}</strong>
-                    <p>{t(copy("Data plan seeds account and fixtures."))}</p>
-                  </div>
-                </div>
-                <div className="casesPlanRow">
-                  <span className="casesPlanDot accent3">*</span>
-                  <div>
-                    <strong>plan.restore.snapshot</strong>
-                    <p>{t(copy("Restore from SQL snapshot after run."))}</p>
-                  </div>
-                </div>
-                <div className="casesPlanRow">
-                  <span className="casesPlanDot accent">*</span>
-                  <div>
-                    <strong>plan.diff.expected</strong>
-                    <p>{t(copy("Compare the expected delta before sign-off."))}</p>
-                  </div>
-                </div>
+                {plansSidebarData ? (
+                  <>
+                    {planSidebarRows.length ? (
+                      planSidebarRows.map((plan, index) => (
+                        <div key={plan.id} className="casesPlanRow">
+                          <span className={`casesPlanDot ${accentClasses[index % accentClasses.length]}`}>*</span>
+                          <div>
+                            <strong>{plan.name}</strong>
+                            <p>{plan.summary}</p>
+                            <small>{plan.type}</small>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="casesPanelText">{t(copy("No plans yet."))}</p>
+                    )}
+                    {plansSidebarData.preconditions.length ? (
+                      <div className="casesPlanPreconditions">
+                        <strong>{t(copy("Preconditions"))}</strong>
+                        <ul>
+                          {plansSidebarData.preconditions.slice(0, 3).map((item) => (
+                            <li key={item}>{item}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                  </>
+                ) : (
+                  <p className="casesPanelText">{plansSidebarHint}</p>
+                )}
               </section>
 
               <section className="casesPanelCard">

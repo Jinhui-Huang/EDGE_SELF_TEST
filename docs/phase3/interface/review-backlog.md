@@ -459,12 +459,13 @@ It does not authorize UI or backend changes in the current phase.
   - DSL validate/save and state-machine save now expose explicit mutation feedback
   - changing the opened case resets the active tab to `overview` and clears stale tab-specific detail state
   - History tab run rows now reuse the existing App-level handoff into `reportDetail`
+  - sidebar `Plans` now reuses already loaded case-plan data instead of static local plan rows
   - sidebar `Info` / `Recent runs` now reuse already loaded case-history data instead of static placeholder run summaries
 - Remaining limits:
   - app-level case catalog save already exists, but the visible `cases` screen still does not expose an editable catalog form
   - case-history payload still has no dedicated canonical `runId`, so history run-row handoff still falls back to `runName` when `snapshot.reports` cannot resolve a matching canonical `runId`
+  - sidebar `Plans` still depends on `Plans` tab data being loaded first and does not issue an independent request
   - sidebar `Info` / `Recent runs` still depend on `History` tab data being loaded first and do not issue an independent request
-  - sidebar `Plans` remains local/static display
   - plans and history remain read-only on the current Phase 3 boundary
 - Test coverage:
   - backend case-detail endpoint coverage in `LocalAdminApiServerTest`
