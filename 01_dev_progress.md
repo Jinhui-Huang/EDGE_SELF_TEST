@@ -4680,6 +4680,38 @@ Remaining limits:
 - `reportDetail` still uses snapshot-derived fallback view-model data when backend detail reads fail
 - `case-history` payload still has no dedicated canonical `runId`, so upstream `cases` history handoff may still fall back to `runName`
 
+## 2026-05-07 Cases-history runId fallback wording review follow-up
+
+## Task
+- Re-check the adjacent `cases` / `reports` / `reportDetail` / `dataDiff` docs for consistency around one remaining limit:
+  - `case-history` still lacks a dedicated canonical `runId`
+  - upstream history handoff may therefore still fall back to `runName`
+
+## Completed
+- Re-reviewed:
+  - `docs/phase3/interface/cases/interface-spec.md`
+  - `docs/phase3/interface/cases/functional-spec.md`
+  - `docs/phase3/interface/reports/interface-spec.md`
+  - `docs/phase3/interface/reportDetail/interface-spec.md`
+  - `docs/phase3/interface/dataDiff/interface-spec.md`
+- Result:
+  - the current wording is already consistent for this remaining limit
+  - `cases` explicitly states that the case-history payload has no dedicated canonical `runId`
+  - `reports` / `dataDiff` already describe the corresponding history-adjacent `runName -> runId` resolution path
+  - `reportDetail` does not introduce a contradictory statement
+  - no正文 change was needed in this pass
+- Updated records:
+  - `01_dev_progress.md`
+  - `memory.txt`
+
+## Verification
+- Not run by design:
+  - documentation-only follow-up
+
+## Remaining Limits
+- `reportDetail` still uses snapshot-derived fallback view-model data when backend detail reads fail
+- `case-history` payload still has no dedicated canonical `runId`, so upstream `cases` history handoff may still fall back to `runName`
+
 ## 2026-05-06 CasesScreen handoff and validate review follow-up
 
 ## Task

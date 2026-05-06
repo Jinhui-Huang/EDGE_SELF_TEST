@@ -1994,3 +1994,24 @@
     - no backend-contract change
     - no test run
     - no build run
+- 2026-05-07: Completed the `cases-history` runId fallback wording review follow-up.
+  - Re-reviewed:
+    - `docs/phase3/interface/cases/interface-spec.md`
+    - `docs/phase3/interface/cases/functional-spec.md`
+    - `docs/phase3/interface/reports/interface-spec.md`
+    - `docs/phase3/interface/reportDetail/interface-spec.md`
+    - `docs/phase3/interface/dataDiff/interface-spec.md`
+  - Result:
+    - the current wording is already consistent for this remaining limit
+    - `cases` explicitly states that the case-history payload has no dedicated canonical `runId`
+    - `reports` / `dataDiff` already describe the corresponding history-adjacent `runName -> runId` resolution path
+    - `reportDetail` does not introduce a contradictory statement
+    - no正文 change was needed in this pass
+  - Keep the explicit boundary:
+    - no code change
+    - no new backend interface
+    - no route change
+    - no App-level handoff change
+    - no backend-contract change
+    - no test run
+    - no build run
