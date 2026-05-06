@@ -2239,12 +2239,16 @@ export function App() {
     setCaseDraft((current) => current.filter((_, itemIndex) => itemIndex !== index));
   }
 
-  function addCaseDraftRow() {
+  function addCaseDraftRow(projectKey?: string | null) {
+    const normalizedProjectKey =
+      projectKey && projectKey !== "all" && snapshot.projects.some((project) => project.key === projectKey)
+        ? projectKey
+        : snapshot.projects[0]?.key ?? "";
     setCaseDraft((current) => [
       ...current,
       {
         id: "",
-        projectKey: snapshot.projects[0]?.key ?? "",
+        projectKey: normalizedProjectKey,
         name: "",
         tags: "",
         status: "ACTIVE",

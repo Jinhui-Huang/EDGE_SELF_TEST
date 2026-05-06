@@ -3949,6 +3949,81 @@ Remaining limits:
 - sidebar `Info` / `Recent runs` still depend on `History` tab data being loaded first and do not issue an independent request
 - case-history payload still has no dedicated canonical `runId`, so downstream App-level handoff still relies on `snapshot.reports` to resolve one when possible
 
+## 2026-05-07 Cases overview catalog editor restore follow-up
+
+## Task
+- Keep this follow-up narrowly inside the current `P2-3 cases` boundary:
+  - restore a visible, minimal case catalog editor in the overview region
+  - reuse the existing App-level draft/update/save callbacks and existing `POST /api/phase3/catalog/case` persistence chain
+  - keep the editor separate from the backend-first detail canvas
+  - do not run tests or build in this pass
+
+## Completed
+- Updated `ui/admin-console/src/screens/CasesScreen.tsx`:
+  - restored a visible overview-region catalog editor instead of keeping edit props hidden
+  - editor now reuses existing `onCaseChange`, `onAddCaseRow`, `onRemoveCaseRow`, and `onSubmit`
+  - visible field set is limited to `id`, `projectKey`, `name`, `tags`, `status`, and `archived`
+  - save feedback now surfaces next to the editor through existing `caseState`
+  - detail canvas behavior remains separate and unchanged
+- Synced docs/backlog:
+  - `docs/phase3/interface/cases/functional-spec.md`
+  - `docs/phase3/interface/cases/interface-spec.md`
+  - `docs/phase3/interface/review-backlog.md`
+
+## Modified Files
+- `ui/admin-console/src/screens/CasesScreen.tsx`
+- `docs/phase3/interface/cases/functional-spec.md`
+- `docs/phase3/interface/cases/interface-spec.md`
+- `docs/phase3/interface/review-backlog.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Not run by design in this pass:
+  - planner explicitly constrained this follow-up to no test execution and no build
+
+## Remaining Limits
+- case-history payload still has no dedicated canonical `runId`, so downstream App-level handoff still relies on `snapshot.reports` to resolve one when possible
+- sidebar `Plans` still depends on `Plans` tab data being loaded first and does not issue an independent request
+- sidebar `Info` / `Recent runs` still depend on `History` tab data being loaded first and do not issue an independent request
+
+## 2026-05-07 Cases catalog editor add-row context fix follow-up
+
+## Task
+- Keep this follow-up narrowly inside the current `P2-3 cases` cleanup:
+  - make overview catalog-editor `Add row` respect the current project-filter context
+  - avoid the newly added row disappearing immediately in non-first-project views
+  - do not change save chain, routes, detail flows, tests, or build
+
+## Completed
+- Updated `ui/admin-console/src/screens/CasesScreen.tsx`:
+  - `onAddCaseRow` now forwards the current `selectedProjectKey`
+- Updated `ui/admin-console/src/App.tsx`:
+  - `addCaseDraftRow(projectKey?)` now defaults the new draft row to the forwarded case-project context when it is valid
+  - fallback behavior remains the existing first-project default when no valid case-project context is available
+- Synced docs/backlog:
+  - `docs/phase3/interface/cases/functional-spec.md`
+  - `docs/phase3/interface/cases/interface-spec.md`
+  - `docs/phase3/interface/review-backlog.md`
+
+## Modified Files
+- `ui/admin-console/src/screens/CasesScreen.tsx`
+- `ui/admin-console/src/App.tsx`
+- `docs/phase3/interface/cases/functional-spec.md`
+- `docs/phase3/interface/cases/interface-spec.md`
+- `docs/phase3/interface/review-backlog.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Not run by design in this pass:
+  - planner explicitly constrained this follow-up to no test execution and no build
+
+## Remaining Limits
+- case-history payload still has no dedicated canonical `runId`, so downstream App-level handoff still relies on `snapshot.reports` to resolve one when possible
+- sidebar `Plans` still depends on `Plans` tab data being loaded first and does not issue an independent request
+- sidebar `Info` / `Recent runs` still depend on `History` tab data being loaded first and do not issue an independent request
+
 ## 2026-05-06 Cases history canonical runId follow-up
 
 ## Task

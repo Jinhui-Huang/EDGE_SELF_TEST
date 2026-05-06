@@ -1635,3 +1635,37 @@
     - no report/cases backend contract change
     - no scheduler/report protocol change
     - no test run
+- 2026-05-07: Completed the `cases` overview catalog editor restore follow-up.
+  - Updated `ui/admin-console/src/screens/CasesScreen.tsx`:
+    - restored a visible catalog editor in the overview region
+    - editor now reuses existing `onCaseChange`, `onAddCaseRow`, `onRemoveCaseRow`, and `onSubmit`
+    - visible field set stays limited to `id`, `projectKey`, `name`, `tags`, `status`, and `archived`
+    - save feedback is surfaced beside the editor through the existing `caseState`
+    - detail canvas and backend-first DSL/state-machine/plans/history flows remain separate
+  - Synced docs/backlog:
+    - `docs/phase3/interface/cases/functional-spec.md`
+    - `docs/phase3/interface/cases/interface-spec.md`
+    - `docs/phase3/interface/review-backlog.md`
+  - Keep the explicit boundary:
+    - no new backend interface
+    - no route change
+    - no execution/report/plugin protocol change
+    - no test run
+    - no build run
+- 2026-05-07: Completed the tiny `cases` catalog-editor add-row context fix.
+  - Updated `ui/admin-console/src/screens/CasesScreen.tsx`:
+    - overview editor `Add row` now forwards the current `selectedProjectKey`
+  - Updated `ui/admin-console/src/App.tsx`:
+    - new case draft rows now default to the forwarded project context when it is valid
+    - fallback remains the existing first-project default when no valid cases project context is available
+  - Synced docs/backlog:
+    - `docs/phase3/interface/cases/functional-spec.md`
+    - `docs/phase3/interface/cases/interface-spec.md`
+    - `docs/phase3/interface/review-backlog.md`
+  - Keep the explicit boundary:
+    - no new backend interface
+    - no route change
+    - no save-chain change
+    - no detail-flow change
+    - no test run
+    - no build run

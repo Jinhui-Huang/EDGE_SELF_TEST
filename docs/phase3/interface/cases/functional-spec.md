@@ -304,8 +304,9 @@ The screen consumes:
 
 Important current boundary:
 
-- only `onPrepareCase` is actually used by the rendered screen today
-- the edit/save callbacks are part of app-level capability but are not surfaced in the current `CasesScreen.tsx`
+- `CasesScreen.tsx` now uses the existing app-level edit/save callbacks inside the overview-region catalog editor
+- overview `Add row` now forwards the current project-filter context so the new draft row stays visible in that editor view
+- detail tabs remain separate and continue to use their dedicated backend-first read/write flows
 
 ### 8.2 Screen Outputs
 
@@ -319,7 +320,7 @@ The screen produces:
   - prepared case intent via `onPrepareCase`
   - history run drill-down intent via existing app-level `reportDetail` handoff
 - mutation-state display output
-  - rendering of `caseState` in the detail side panel
+  - rendering of `caseState` in the overview catalog editor and detail side panel
 
 ## 9. User Actions
 
@@ -505,8 +506,6 @@ The `cases` screen is not currently responsible for:
 
 - directly starting execution
 - directly sending scheduler requests/events
-- persisting case catalog rows from visible controls in the current UI build (app-level capability exists but editor form is not exposed)
-
 ## 15. Known Gaps and Review Items
 
 Resolved items (P2-3):
@@ -521,7 +520,6 @@ Resolved items (P2-3):
 
 Remaining items:
 
-- App-level case save capability exists, but the current `cases` screen does not expose an actual editable catalog form.
 - History tab run-row handoff now resolves canonical `runId` from `snapshot.reports` by matching `runName`, and only falls back to `runName` when the snapshot has no matching report row.
 - Sidebar `Plans` still depends on `Plans` tab data being loaded first; it does not issue an independent request.
 - Sidebar `Info` / `Recent runs` still depend on `History` tab data being loaded first; they do not issue an independent request.

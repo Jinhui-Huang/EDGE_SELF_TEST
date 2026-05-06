@@ -39,7 +39,7 @@ type CasesScreenProps = {
   onPrepareCase: (caseId: string) => void;
   onOpenHistoryRun: (runName: string) => void;
   onCaseChange: (index: number, key: keyof CaseItem, value: string | boolean) => void;
-  onAddCaseRow: () => void;
+  onAddCaseRow: (projectKey?: string | null) => void;
   onRemoveCaseRow: (index: number) => void;
   onSubmit: CasesScreenSubmitHandler;
 };
@@ -168,10 +168,22 @@ export function CasesScreen({
   title,
   saveHint,
   caseTagsLabel,
+  fieldCaseIdLabel,
   fieldProjectKeyLabel,
+  fieldNameLabel,
+  fieldStatusLabel,
+  fieldTagsLabel,
+  fieldArchivedLabel,
+  newCatalogRowLabel,
+  addCaseRowLabel,
+  saveCaseCatalogLabel,
   locale,
   onPrepareCase,
-  onOpenHistoryRun
+  onOpenHistoryRun,
+  onCaseChange,
+  onAddCaseRow,
+  onRemoveCaseRow,
+  onSubmit
 }: CasesScreenProps) {
   const t = (value: LocalizedCopy) => translate(locale, value);
   const initialSelection = initialProjectKey?.trim() || snapshot.projects[0]?.key || caseDraft[0]?.projectKey || "all";
@@ -517,6 +529,11 @@ export function CasesScreen({
     }
     return caseDraft.filter((item) => item.projectKey === selectedProjectKey);
   }, [caseDraft, selectedProjectKey]);
+  const visibleDraftRows = useMemo(() => {
+    return caseDraft
+      .map((item, index) => ({ item, index }))
+      .filter(({ item }) => selectedProjectKey === "all" || item.projectKey === selectedProjectKey || !item.projectKey);
+  }, [caseDraft, selectedProjectKey]);
 
   useEffect(() => {
     if (!openedCaseId) {
@@ -767,6 +784,88 @@ export function CasesScreen({
               {!visibleCases.length ? <p className="emptyState">{translate(locale, sharedCopy.noCasesMatch)}</p> : null}
             </div>
           </div>
+
+          <section className="casesListPanel" aria-label="Case catalog editor">
+            <div className="casesListPanelHead">
+              <div>
+                <p className="eyebrow">{t(copy("Catalog editor"))}</p>
+                <h3>{t(copy("Edit visible case rows"))}</h3>
+              </div>
+              <span className="casesListHint">{saveHint}</span>
+            </div>
+
+            <form className="editorForm" onSubmit={onSubmit}>
+              {visibleDraftRows.map(({ item, index }) => (
+                <div key={`case-draft-${index}`} className="editorRow">
+                  <div className="editorMeta editorMetaSplit">
+                    <div>
+                      <strong>{item.name || item.id || `${t(copy("Case"))} ${index + 1}`}</strong>
+                      <small>
+                        {snapshot.cases.find((snapshotCase) => snapshotCase.id === item.id)?.updatedAt ?? newCatalogRowLabel}
+                      </small>
+                    </div>
+                    <button
+                      type="button"
+                      className="dangerButton"
+                      onClick={() => onRemoveCaseRow(index)}
+                      disabled={caseDraft.length === 1}
+                    >
+                      {translate(locale, sharedCopy.removeRow)}
+                    </button>
+                  </div>
+
+                  <label>
+                    {fieldCaseIdLabel}
+                    <input value={item.id} onChange={(event) => onCaseChange(index, "id", event.target.value)} />
+                  </label>
+                  <label>
+                    {fieldProjectKeyLabel}
+                    <select value={item.projectKey} onChange={(event) => onCaseChange(index, "projectKey", event.target.value)}>
+                      <option value="">{t(copy("Select project"))}</option>
+                      {snapshot.projects.map((project) => (
+                        <option key={project.key} value={project.key}>
+                          {project.key}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    {fieldNameLabel}
+                    <input value={item.name} onChange={(event) => onCaseChange(index, "name", event.target.value)} />
+                  </label>
+                  <label>
+                    {fieldStatusLabel}
+                    <input value={item.status} onChange={(event) => onCaseChange(index, "status", event.target.value)} />
+                  </label>
+                  <label className="fullWidth">
+                    {fieldTagsLabel}
+                    <input value={item.tags} onChange={(event) => onCaseChange(index, "tags", event.target.value)} />
+                  </label>
+                  <label>
+                    {fieldArchivedLabel}
+                    <input
+                      type="checkbox"
+                      checked={item.archived}
+                      onChange={(event) => onCaseChange(index, "archived", event.target.checked)}
+                    />
+                  </label>
+                </div>
+              ))}
+              {!visibleDraftRows.length ? (
+                <p className="casesPanelText">{t(copy("No visible catalog rows for this project yet. Add one below."))}</p>
+              ) : null}
+
+              <div className="editorActions">
+                <button type="button" className="dashboardButton secondary" onClick={() => onAddCaseRow(selectedProjectKey)}>
+                  {addCaseRowLabel}
+                </button>
+                <button type="submit" className="dashboardButton primary" disabled={caseState.kind === "pending"}>
+                  {caseState.kind === "pending" ? translate(locale, sharedCopy.saving) : saveCaseCatalogLabel}
+                </button>
+              </div>
+            </form>
+            <MutationStatus state={caseState} />
+          </section>
         </div>
       </section>
 

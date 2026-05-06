@@ -869,29 +869,30 @@ Current implementation:
   - a short preconditions list when available
 - the sidebar remains read-only and does not introduce a separate editor or handoff
 
-### 10.8 Future Visible Case-Catalog Editor
+### 10.8 Visible Case-Catalog Editor
 
-If the `cases` screen later restores the editable catalog form already implied by its props, the recommended implementation type is:
+Current state: implemented in the overview region
 
-- reuse existing shell save flow
-- do not add a second create/update endpoint
+Current implementation:
 
-Concrete implementation design:
-
-- reintroduce field inputs for:
+- the editor is rendered in the overview region, above the detail canvas boundary
+- it reuses the existing shell save flow and does not add a second create/update endpoint
+- visible field set remains:
   - `id`
   - `projectKey`
   - `name`
   - `tags`
   - `status`
   - `archived`
-- reuse existing callbacks:
+- visible controls reuse existing callbacks:
   - `onCaseChange`
   - `onAddCaseRow`
   - `onRemoveCaseRow`
   - `onSubmit`
-- eventual persistence remains:
+- persistence remains:
   - `POST /api/phase3/catalog/case`
+- `Add row` now forwards the current project-filter context so the new draft row defaults to that `projectKey` when possible
+- the editor remains separate from DSL / state-machine / plans / history detail tabs
 
 ## 11. Error Handling Boundary
 
@@ -940,7 +941,6 @@ Resolved findings (P2-3):
 Remaining findings:
 
 - `Pre-execution` is correctly a state handoff, not a backend request.
-- App-level case-catalog save already exists, but the visible screen does not expose an editor form.
 - Sidebar `Plans` depends on already loaded `Plans` tab data and does not trigger a separate request.
 - Sidebar `Info` / `Recent runs` depend on already loaded `History` tab data and do not trigger a separate request.
 - History tab handoff now resolves canonical `runId` from `snapshot.reports` when `runName` matches an existing report row, and falls back to `runName` only when no match exists.
