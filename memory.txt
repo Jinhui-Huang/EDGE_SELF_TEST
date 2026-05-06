@@ -1810,3 +1810,20 @@
     - no save-flow change
     - no test run
     - no build run
+- 2026-05-07: Completed the `cases` locator/path placeholder cleanup.
+  - Updated `ui/admin-console/src/screens/CasesScreen.tsx`:
+    - replaced the entry-path sample with `<preview-entry-path>`
+    - replaced the healed-locator sample with `<preview-entry-locator>`
+    - replaced the field-locator samples with `<preview-account-field>` and `<preview-token-field>`
+    - replaced the submit-control and success-path samples with `<preview-submit-control>` and `<preview-success-path>`
+  - Synced docs/backlog:
+    - `docs/phase3/interface/cases/functional-spec.md`
+    - `docs/phase3/interface/cases/interface-spec.md`
+    - `docs/phase3/interface/review-backlog.md`
+  - Keep the explicit boundary:
+    - no new backend interface
+    - no route change
+    - no App-level handoff change
+    - no save-flow change
+    - no test run
+    - no build run

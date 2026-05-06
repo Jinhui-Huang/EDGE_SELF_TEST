@@ -277,6 +277,7 @@ Current behavior:
 - step-row field labels now explicitly read as preview/sample/derived-note fields so selector/value/note text is not mistaken for runtime-collected execution detail
 - the most concrete sample literals in `buildDetailSteps()` now use obvious preview placeholders (for example account/token/db-assertion text) rather than production-looking values
 - the most concrete step-note sentences in `buildDetailSteps()` now also use preview/derived wording rather than execution-operator narration
+- the most realistic path/locator samples in `buildDetailSteps()` now also use obvious preview placeholders (for example entry-path, field-locator, submit-control, and success-path text) rather than DOM-selector or URL-path shaped values
 - DSL, state-machine, plans, and history tab content are loaded from dedicated backend APIs via `CaseDetailService`
 - opening a case in detail now preloads `plansState` and `historyState` for that case while keeping `activeTab` unchanged
 - sidebar `Plans` reuses `plansState.data` from that preload or from the `Plans` tab

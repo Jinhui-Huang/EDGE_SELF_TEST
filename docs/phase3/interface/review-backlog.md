@@ -470,6 +470,7 @@ It does not authorize UI or backend changes in the current phase.
   - step-row selector/value/note fields now render as preview/sample/derived-note wording rather than looking like runtime-collected execution facts
   - the most concrete `buildDetailSteps()` sample literals now use obvious preview placeholders instead of production-looking account/token/db strings
   - the most execution-like `buildDetailSteps()` note sentences now also use preview/derived wording instead of runtime-style commentary
+  - the most runtime-looking `buildDetailSteps()` path/locator samples now also use preview placeholders instead of DOM-selector or URL-path shaped text
   - sidebar `Plans` now reuses already loaded case-plan data instead of static local plan rows
   - sidebar `Info` / `Recent runs` now reuse already loaded case-history data instead of static placeholder run summaries
 - Remaining limits:

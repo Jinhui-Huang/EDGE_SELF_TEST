@@ -96,17 +96,20 @@ function shouldSkipSameCaseReload(state: RemoteState<unknown>, caseId: string): 
 }
 
 function buildDetailSteps(testCase: CaseItem): DetailStep[] {
-  const normalizedProject = testCase.projectKey || "project";
-  const normalizedCase = testCase.id || "case";
-  const successPath = `/${normalizedProject.replace(/-web|-center|-console/g, "").replace(/-/g, "/") || "flow"}`;
+  const previewEntryPath = "<preview-entry-path>";
+  const previewEntryLocator = "<preview-entry-locator>";
+  const previewAccountField = "<preview-account-field>";
+  const previewTokenField = "<preview-token-field>";
+  const previewSubmitControl = "<preview-submit-control>";
+  const previewSuccessPath = "<preview-success-path>";
 
   return [
-    { index: 1, action: "open", selector: successPath, note: "Preview navigation step." },
-    { index: 2, action: "click", selector: "#primary-entry", note: "Derived healed-locator preview.", healed: true },
-    { index: 3, action: "fill", selector: "[name=account]", value: "<preview-account>" },
-    { index: 4, action: "type", selector: "[name=token]", value: "<preview-token>" },
-    { index: 5, action: "click", selector: "button.primary", note: "Preview submit step." },
-    { index: 6, action: "assert", selector: "url", value: `${successPath}/success/*`, note: "Preview URL assertion." },
+    { index: 1, action: "open", selector: previewEntryPath, note: "Preview navigation step." },
+    { index: 2, action: "click", selector: previewEntryLocator, note: "Derived healed-locator preview.", healed: true },
+    { index: 3, action: "fill", selector: previewAccountField, value: "<preview-account>" },
+    { index: 4, action: "type", selector: previewTokenField, value: "<preview-token>" },
+    { index: 5, action: "click", selector: previewSubmitControl, note: "Preview submit step." },
+    { index: 6, action: "assert", selector: "url", value: previewSuccessPath, note: "Preview URL assertion." },
     { index: 7, action: "assert", selector: "db", value: "<preview-db-assertion>", note: "Preview DB assertion." },
     { index: 8, action: "assert", selector: "delta", value: "<preview-diff-assertion>", note: "Preview diff assertion." }
   ];

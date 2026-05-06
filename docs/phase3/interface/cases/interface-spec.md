@@ -476,6 +476,7 @@ These controls change screen state but do not call the backend directly.
 - step-row fields now render explicit preview/sample/derived-note wording so selector/value/note cells are not presented as runtime-authored facts
 - the most realistic sample literals inside `buildDetailSteps()` are now reduced to obvious preview placeholders instead of account/token/db-style concrete values
 - step-note text inside `buildDetailSteps()` now also uses preview/derived wording instead of execution-style commentary
+- the most realistic selector/path samples inside `buildDetailSteps()` now also use preview placeholders instead of DOM-locator or URL-path shaped values
 
 ### 8.4 Relationship to DSL and State-Machine Capabilities
 
