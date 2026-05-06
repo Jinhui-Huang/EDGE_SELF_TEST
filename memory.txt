@@ -1732,3 +1732,18 @@
     - no save-flow change
     - no test run
     - no build run
+- 2026-05-07: Completed the `cases` assertion-count placeholder cleanup.
+  - Updated `ui/admin-console/src/screens/CasesScreen.tsx`:
+    - replaced the fixed `5 assertions` step-card title value
+    - assertion count now derives from the current `detailSteps` summary via `action === "assert"`
+  - Synced docs/backlog:
+    - `docs/phase3/interface/cases/functional-spec.md`
+    - `docs/phase3/interface/cases/interface-spec.md`
+    - `docs/phase3/interface/review-backlog.md`
+  - Keep the explicit boundary:
+    - no new backend interface
+    - no route change
+    - no App-level handoff change
+    - no save-flow change
+    - no test run
+    - no build run

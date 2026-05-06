@@ -635,6 +635,7 @@ export function CasesScreen({
   const archivedCases = visibleCases.filter((item) => item.archived).length;
   const happyCases = visibleCases.filter((item) => /active|happy|pass/i.test(item.status)).length;
   const detailSteps = openedCase ? buildDetailSteps(openedCase) : [];
+  const assertionStepCount = detailSteps.filter((step) => step.action === "assert").length;
   const historySidebarData =
     historyState.status === "success" && historyState.data && historyState.caseId === openedCase?.id ? historyState.data : null;
   const recentHistoryRuns = historySidebarData?.runs.slice(0, 4) ?? [];
@@ -983,7 +984,7 @@ export function CasesScreen({
                 <section className="casesPanelCard casesStepsCard">
                   <div className="casesPanelHead">
                     <div className="casesPanelTitle">{t(copy("Steps"))}</div>
-                    <span className="casesPanelPill">{detailSteps.length} steps | 5 assertions</span>
+                    <span className="casesPanelPill">{`${detailSteps.length} steps | ${assertionStepCount} assertions`}</span>
                   </div>
                   <div className="casesStepsList">
                     {detailSteps.map((step) => (

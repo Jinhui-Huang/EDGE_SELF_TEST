@@ -4022,6 +4022,39 @@ Remaining limits:
 - case-history payload still has no dedicated canonical `runId`, so downstream App-level handoff still relies on `snapshot.reports` to resolve one when possible
 - sidebar `Plans` / `Info` / `Recent runs` still depend on the existing `plans` / `history` reads succeeding and do not introduce a second data source
 
+## 2026-05-07 Cases assertion-count placeholder cleanup follow-up
+
+## Task
+- Keep this follow-up narrowly inside the current `P2-3 cases` UX cleanup:
+  - remove the fixed `5 assertions` value from the overview/detail step-card title
+  - derive the count from the existing `detailSteps` summary only
+  - do not add requests, routes, tests, or build
+
+## Completed
+- Updated `ui/admin-console/src/screens/CasesScreen.tsx`:
+  - added local `assertionStepCount` derived from `detailSteps.filter((step) => step.action === "assert")`
+  - replaced the fixed `5 assertions` title text with the derived count
+- Synced docs/backlog:
+  - `docs/phase3/interface/cases/functional-spec.md`
+  - `docs/phase3/interface/cases/interface-spec.md`
+  - `docs/phase3/interface/review-backlog.md`
+
+## Modified Files
+- `ui/admin-console/src/screens/CasesScreen.tsx`
+- `docs/phase3/interface/cases/functional-spec.md`
+- `docs/phase3/interface/cases/interface-spec.md`
+- `docs/phase3/interface/review-backlog.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Not run by design in this pass:
+  - planner explicitly constrained this follow-up to no test execution and no build
+
+## Remaining Limits
+- case-history payload still has no dedicated canonical `runId`, so downstream App-level handoff still relies on `snapshot.reports` to resolve one when possible
+- sidebar `Plans` / `Info` / `Recent runs` still depend on the existing `plans` / `history` reads succeeding and do not introduce a second data source
+
 ## 2026-05-07 Cases owner-placeholder cleanup follow-up
 
 ## Task

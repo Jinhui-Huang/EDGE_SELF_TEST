@@ -465,6 +465,7 @@ It does not authorize UI or backend changes in the current phase.
   - same-case preload dedupe no longer blocks manual `Plans` / `History` tab retry after a failed read
   - detail hero no longer shows a fixed `14 runs this week | 100% pass` placeholder; it now reuses current-case history summary state
   - sidebar `Owner` no longer shows a fake `Lin Chen` placeholder; it now renders an explicit not-provided message
+  - overview step-card no longer shows a fixed `5 assertions` placeholder; it now derives the count from the current `detailSteps` summary
   - sidebar `Plans` now reuses already loaded case-plan data instead of static local plan rows
   - sidebar `Info` / `Recent runs` now reuse already loaded case-history data instead of static placeholder run summaries
 - Remaining limits:
