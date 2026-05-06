@@ -463,6 +463,7 @@ It does not authorize UI or backend changes in the current phase.
   - overview editor `Add row` now respects the current project-filter context so new draft rows stay visible
   - opening a case now preloads the existing `plans` / `history` reads so sidebar summaries can hydrate without a manual tab switch
   - same-case preload dedupe no longer blocks manual `Plans` / `History` tab retry after a failed read
+  - detail hero no longer shows a fixed `14 runs this week | 100% pass` placeholder; it now reuses current-case history summary state
   - sidebar `Plans` now reuses already loaded case-plan data instead of static local plan rows
   - sidebar `Info` / `Recent runs` now reuse already loaded case-history data instead of static placeholder run summaries
 - Remaining limits:

@@ -670,6 +670,17 @@ export function CasesScreen({
   const lastRunLabel = lastHistoryRun
     ? `${lastHistoryRun.status.toLowerCase()} | ${lastHistoryRun.finishedAt}`
     : historySidebarHint;
+  const historyHeroSummary = historySidebarData
+    ? recentRunSummary.total
+      ? `${recentRunSummary.total} runs loaded | ${recentRunSummary.pass} pass | ${recentRunSummary.fail} fail | ${recentRunSummary.warn} warn`
+      : t(copy("No history runs loaded yet."))
+    : historyState.caseId !== openedCase?.id || historyState.status === "idle"
+      ? t(copy("History summary is waiting for case preload."))
+      : historyState.status === "loading"
+        ? t(copy("Loading history summary..."))
+        : historyState.status === "error"
+          ? t(copy("History summary unavailable."))
+          : t(copy("No history yet."));
   const plansSidebarData = plansState.status === "success" && plansState.data && plansState.caseId === openedCase?.id ? plansState.data : null;
   const planSidebarRows = plansSidebarData?.plans.slice(0, 3) ?? [];
   const plansSidebarHint =
@@ -917,7 +928,7 @@ export function CasesScreen({
               {openedCase
                 ? t(
                     copy(
-                      `From project ${openedCase.projectKey} | updated ${snapshot.cases.find((item) => item.id === openedCase.id)?.updatedAt ?? "recently"} | 14 runs this week | 100% pass`
+                      `From project ${openedCase.projectKey} | updated ${snapshot.cases.find((item) => item.id === openedCase.id)?.updatedAt ?? "--"} | ${historyHeroSummary}`
                     )
                   )
                 : t(copy("Choose one case from the overview list to load the detail canvas."))}

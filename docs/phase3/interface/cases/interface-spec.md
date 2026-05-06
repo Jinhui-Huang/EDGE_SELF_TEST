@@ -469,6 +469,7 @@ These controls change screen state but do not call the backend directly.
 
 - sidebar `Recent runs` and `History` tab rows both reuse the existing App-level `reportDetail` handoff
 - the current handoff passes `runName`, and `App.tsx` resolves canonical `runId` from `snapshot.reports` when possible because the case-history payload does not yet expose a dedicated canonical `runId`
+- the detail-hero run summary also reuses current-case `historyState` rather than showing a fixed weekly pass placeholder
 
 ### 8.4 Relationship to DSL and State-Machine Capabilities
 

@@ -271,6 +271,7 @@ Current behavior:
 ### 7.2 Detail Canvas Data
 
 - detail title/status/project identity come from the currently opened row plus `snapshot.cases`
+- detail hero subtitle now reuses current-case `historyState` summary when available and otherwise shows explicit preload/loading/unavailable text
 - Overview tab step list is front-end generated summary data
 - DSL, state-machine, plans, and history tab content are loaded from dedicated backend APIs via `CaseDetailService`
 - opening a case in detail now preloads `plansState` and `historyState` for that case while keeping `activeTab` unchanged

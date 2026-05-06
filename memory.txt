@@ -1701,3 +1701,19 @@
     - no save-flow change
     - no test run
     - no build run
+- 2026-05-07: Completed the `cases` hero-summary placeholder cleanup.
+  - Updated `ui/admin-console/src/screens/CasesScreen.tsx`:
+    - removed the fixed `14 runs this week | 100% pass` detail-hero placeholder
+    - detail hero now reuses current-case `historyState` summary when available
+    - when history is still preloading or unavailable, the hero now shows explicit state text instead of fake weekly stats
+  - Synced docs/backlog:
+    - `docs/phase3/interface/cases/functional-spec.md`
+    - `docs/phase3/interface/cases/interface-spec.md`
+    - `docs/phase3/interface/review-backlog.md`
+  - Keep the explicit boundary:
+    - no new backend interface
+    - no route change
+    - no App-level handoff change
+    - no save-flow change
+    - no test run
+    - no build run
