@@ -1762,3 +1762,19 @@
     - no save-flow change
     - no test run
     - no build run
+- 2026-05-07: Completed the `cases` step-row preview-field wording cleanup.
+  - Updated `ui/admin-console/src/screens/CasesScreen.tsx`:
+    - selector cells now read as `Preview selector: ...`
+    - value cells now read as `Sample value: ...` or explicit no-sample text
+    - note/healed cells now read as `Derived note: ...` wording rather than runtime-authored execution detail
+  - Synced docs/backlog:
+    - `docs/phase3/interface/cases/functional-spec.md`
+    - `docs/phase3/interface/cases/interface-spec.md`
+    - `docs/phase3/interface/review-backlog.md`
+  - Keep the explicit boundary:
+    - no new backend interface
+    - no route change
+    - no App-level handoff change
+    - no save-flow change
+    - no test run
+    - no build run

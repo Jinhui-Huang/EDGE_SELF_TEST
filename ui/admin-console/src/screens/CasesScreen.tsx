@@ -992,9 +992,13 @@ export function CasesScreen({
                       <div key={step.index} className="casesStepRow">
                         <div className="casesStepIndex">{String(step.index).padStart(2, "0")}</div>
                         <span className={`casesStepBadge ${step.action === "assert" ? "info" : "neutral"}`}>{step.action}</span>
-                        <div className="casesStepSelector">{step.selector}</div>
-                        <div className="casesStepValue">{step.value ?? ""}</div>
-                        {step.healed ? <span className="casesStepFlag warning">healed</span> : <div className="casesStepNote">{step.note ?? ""}</div>}
+                        <div className="casesStepSelector">{`Preview selector: ${step.selector}`}</div>
+                        <div className="casesStepValue">{step.value ? `Sample value: ${step.value}` : t(copy("No sample value"))}</div>
+                        {step.healed ? (
+                          <div className="casesStepNote">{t(copy("Derived note: healed preview"))}</div>
+                        ) : (
+                          <div className="casesStepNote">{step.note ? `Derived note: ${step.note}` : t(copy("Derived note unavailable"))}</div>
+                        )}
                       </div>
                     ))}
                   </div>

@@ -4022,6 +4022,40 @@ Remaining limits:
 - case-history payload still has no dedicated canonical `runId`, so downstream App-level handoff still relies on `snapshot.reports` to resolve one when possible
 - sidebar `Plans` / `Info` / `Recent runs` still depend on the existing `plans` / `history` reads succeeding and do not introduce a second data source
 
+## 2026-05-07 Cases step-row preview-field wording follow-up
+
+## Task
+- Keep this follow-up narrowly inside the current `P2-3 cases` UX cleanup:
+  - make step-row field wording read as preview/sample/derived-note rather than runtime detail
+  - do not change `buildDetailSteps()` or the step-card structure
+  - do not add requests, routes, tests, or build
+
+## Completed
+- Updated `ui/admin-console/src/screens/CasesScreen.tsx`:
+  - selector cells now render as `Preview selector: ...`
+  - value cells now render as `Sample value: ...` or explicit no-sample text
+  - note/healed cells now render as `Derived note: ...` wording instead of looking like runtime-authored detail
+- Synced docs/backlog:
+  - `docs/phase3/interface/cases/functional-spec.md`
+  - `docs/phase3/interface/cases/interface-spec.md`
+  - `docs/phase3/interface/review-backlog.md`
+
+## Modified Files
+- `ui/admin-console/src/screens/CasesScreen.tsx`
+- `docs/phase3/interface/cases/functional-spec.md`
+- `docs/phase3/interface/cases/interface-spec.md`
+- `docs/phase3/interface/review-backlog.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Not run by design in this pass:
+  - planner explicitly constrained this follow-up to no test execution and no build
+
+## Remaining Limits
+- case-history payload still has no dedicated canonical `runId`, so downstream App-level handoff still relies on `snapshot.reports` to resolve one when possible
+- sidebar `Plans` / `Info` / `Recent runs` still depend on the existing `plans` / `history` reads succeeding and do not introduce a second data source
+
 ## 2026-05-07 Cases step-card derived-preview label follow-up
 
 ## Task
