@@ -4743,6 +4743,37 @@ Remaining limits:
 - `reportDetail` still uses snapshot-derived fallback view-model data when backend detail reads fail
 - `case-history` payload still has no dedicated canonical `runId`, so upstream `cases` history handoff may still fall back to `runName`
 
+## 2026-05-07 Cases plans/history read-only wording review follow-up
+
+## Task
+- Re-check the adjacent `cases` docs for one remaining Phase 3 boundary:
+  - `Plans` and `History` stay read-only
+  - no write endpoints or editing surface are present today
+  - future write/edit capability can be added later
+
+## Completed
+- Re-reviewed:
+  - `docs/phase3/interface/cases/functional-spec.md`
+  - `docs/phase3/interface/cases/interface-spec.md`
+  - `docs/phase3/interface/review-backlog.md`
+- Result:
+  - the current wording is already consistent for this remaining limit
+  - the docs already agree that `Plans` / `History` are read-only on the current Phase 3 boundary
+  - the docs already agree that no write interface or editor is exposed for these two areas today
+  - the docs already agree that future write/edit capability can be added later
+  - no正文 change was needed in this pass
+- Updated records:
+  - `01_dev_progress.md`
+  - `memory.txt`
+
+## Verification
+- Not run by design:
+  - documentation-only follow-up
+
+## Remaining Limits
+- `reportDetail` still uses snapshot-derived fallback view-model data when backend detail reads fail
+- `case-history` payload still has no dedicated canonical `runId`, so upstream `cases` history handoff may still fall back to `runName`
+
 ## 2026-05-06 CasesScreen handoff and validate review follow-up
 
 ## Task

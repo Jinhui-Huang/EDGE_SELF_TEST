@@ -2034,3 +2034,22 @@
     - no backend-contract change
     - no test run
     - no build run
+- 2026-05-07: Completed the `cases` plans/history read-only wording review follow-up.
+  - Re-reviewed:
+    - `docs/phase3/interface/cases/functional-spec.md`
+    - `docs/phase3/interface/cases/interface-spec.md`
+    - `docs/phase3/interface/review-backlog.md`
+  - Result:
+    - the current wording is already consistent for this remaining limit
+    - the docs already agree that `Plans` / `History` are read-only on the current Phase 3 boundary
+    - the docs already agree that no write interface or editor is exposed for these two areas today
+    - the docs already agree that future write/edit capability can be added later
+    - no正文 change was needed in this pass
+  - Keep the explicit boundary:
+    - no code change
+    - no new backend interface
+    - no route change
+    - no App-level handoff change
+    - no backend-contract change
+    - no test run
+    - no build run
