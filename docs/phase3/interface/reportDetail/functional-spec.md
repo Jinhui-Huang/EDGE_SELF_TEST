@@ -67,12 +67,12 @@ Current implementation facts:
 - The page is rendered by `ReportDetailScreen.tsx`.
 - The page depends on:
   - `snapshot`
-  - `selectedRunName`
+  - `selectedRunId`
   - `onBackToReports`
   - `onOpenDataDiff`
   - `onRerun`
   - `apiBaseUrl`
-- run detail content is loaded from `GET /api/phase3/runs/{runId}/report` with fallback to `selectReportViewModel(snapshot, selectedRunName)`.
+- run detail content is loaded from `GET /api/phase3/runs/{runId}/report` with fallback to `selectReportViewModel(snapshot, selectedRunId)`.
 - `Reports` backlink is implemented.
 - `Data diff` tab routes into `dataDiff`.
 - `Download artifacts` is implemented: fetches `GET /api/phase3/runs/{runId}/artifacts` and opens an artifact listing drawer.
@@ -219,11 +219,11 @@ Current behavior:
 
 ### 7.1 Selected Run Context
 
-- the page uses `selectedRunName` from app state as its detail target
+- the page uses `selectedReportRunId` from app state as its detail target
 
 ### 7.2 Front-End Detail View Model
 
-- `selectReportViewModel(snapshot, selectedRunName)` supplies the current detail data
+- `selectReportViewModel(snapshot, selectedRunId)` supplies the current detail data
 - this means the detail page currently inherits the synthetic derivation rules already used in `reportViewModel.ts`
 
 ### 7.3 Data-Diff Handoff
@@ -239,7 +239,7 @@ The screen consumes:
 
 - current locale
 - shell snapshot
-- selected run name
+- selected run id
 - callbacks:
   - `onBackToReports`
   - `onOpenDataDiff`
@@ -342,7 +342,7 @@ Current implementation status:
 Current implemented rules:
 
 - if no report view model can be selected, show no-report state
-- `Data diff` handoff depends on the currently selected run name
+- `Data diff` handoff depends on the currently selected run id
 
 Implicit intended rules:
 

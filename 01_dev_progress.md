@@ -3874,6 +3874,81 @@ Remaining limits:
 - history run rows still do not hand off into `reportDetail`
 - plans and history remain read-only on the current Phase 3 boundary
 
+## 2026-05-06 Cases history canonical runId follow-up
+
+## Task
+- Keep the current `cases` follow-up small and inside the existing Phase 3 boundary:
+  - do not treat history `runName` as canonical `runId`
+  - resolve canonical `runId` from `snapshot.reports` first
+  - fall back to `runName` only when no matching snapshot report exists
+  - do not add any backend endpoint, route-system change, or report-detail contract change
+
+## Completed
+- Updated `ui/admin-console/src/App.tsx`:
+  - added App-level `resolveReportRunId(runNameOrRunId)` helper
+  - `openReportDetail()` now first matches `snapshot.reports` by `runId` or `runName`
+  - when a matching report exists, the handoff stores canonical `runId`
+  - when no matching report exists, the handoff keeps the original value as fallback
+- Extended `ui/admin-console/src/App.test.tsx`:
+  - added regression coverage for `cases` history -> `reportDetail` using snapshot-resolved canonical `runId`
+  - added fallback coverage for history rows whose `runName` cannot be resolved from `snapshot.reports`
+- Synced docs and backlog:
+  - `docs/phase3/interface/cases/functional-spec.md`
+  - `docs/phase3/interface/cases/interface-spec.md`
+  - `docs/phase3/interface/reportDetail/interface-spec.md`
+  - `docs/phase3/interface/reports/interface-spec.md`
+  - `docs/phase3/interface/review-backlog.md`
+
+## Modified Files
+- `ui/admin-console/src/App.tsx`
+- `ui/admin-console/src/App.test.tsx`
+- `docs/phase3/interface/cases/functional-spec.md`
+- `docs/phase3/interface/cases/interface-spec.md`
+- `docs/phase3/interface/reportDetail/interface-spec.md`
+- `docs/phase3/interface/reports/interface-spec.md`
+- `docs/phase3/interface/review-backlog.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Passed: `npm run build` in `ui/admin-console`
+
+## Remaining Limits
+- case-history payload still has no dedicated canonical `runId`
+- history run-row handoff still relies on `snapshot.reports` containing the matching `runName` if canonical `runId` resolution is desired
+- unresolved history rows still fall back to `runName`
+
+## 2026-05-07 ReportDetail canonical runId doc cleanup follow-up
+
+## Task
+- Keep this follow-up documentation-only:
+  - align `reportDetail` functional wording with the current App-level canonical `runId` model
+  - remove leftover `selected run name` / `selectedRunName` wording
+  - do not modify code, route behavior, backend contracts, or tests
+
+## Completed
+- Updated `docs/phase3/interface/reportDetail/functional-spec.md`:
+  - `selectedRunName` wording replaced with `selectedRunId` / `selectedReportRunId` semantics
+  - snapshot fallback wording now references `selectReportViewModel(snapshot, selectedRunId)`
+  - `Data diff` handoff rule now refers to the currently selected run id
+- Updated `docs/phase3/interface/reportDetail/interface-spec.md`:
+  - `reports` -> `reportDetail` relationship now states canonical `runId`
+  - identifier note no longer describes App-level selection as `runName`
+
+## Modified Files
+- `docs/phase3/interface/reportDetail/functional-spec.md`
+- `docs/phase3/interface/reportDetail/interface-spec.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Not run by design:
+  - documentation-only follow-up
+
+## Remaining Limits
+- `reportDetail` still uses snapshot-derived fallback view-model data when backend detail reads fail
+- `case-history` payload still has no dedicated canonical `runId`, so upstream `cases` history handoff may still fall back to `runName`
+
 ## 2026-05-06 CasesScreen handoff and validate review follow-up
 
 ## Task

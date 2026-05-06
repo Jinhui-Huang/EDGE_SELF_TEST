@@ -519,7 +519,7 @@ Remaining items:
 
 - Sidebar info/plans/recent-run panels remain presentational snapshot-derived display (not yet connected to per-tab API data).
 - App-level case save capability exists, but the current `cases` screen does not expose an actual editable catalog form.
-- History tab handoff currently depends on `runName` because the case-history payload does not yet expose a dedicated canonical `runId`.
+- History tab run-row handoff now resolves canonical `runId` from `snapshot.reports` by matching `runName`, and only falls back to `runName` when the snapshot has no matching report row.
 - `Recent runs` summary bars in sidebar are still display-only placeholders.
 
 ## 16. Suggested Output Files for This Screen Folder

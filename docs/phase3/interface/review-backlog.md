@@ -462,7 +462,7 @@ It does not authorize UI or backend changes in the current phase.
 - Remaining limits:
   - sidebar info/plans/recent-run panels are still presentational snapshot-derived display
   - app-level case catalog save already exists, but the visible `cases` screen still does not expose an editable catalog form
-  - history run-row handoff currently depends on `runName` because the case-history payload still has no dedicated canonical `runId`
+  - case-history payload still has no dedicated canonical `runId`, so history run-row handoff still falls back to `runName` when `snapshot.reports` cannot resolve a matching canonical `runId`
   - plans and history remain read-only on the current Phase 3 boundary
 - Test coverage:
   - backend case-detail endpoint coverage in `LocalAdminApiServerTest`

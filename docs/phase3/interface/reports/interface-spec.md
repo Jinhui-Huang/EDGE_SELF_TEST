@@ -38,7 +38,7 @@ Current `reports` screen conclusion:
 - current direct write source:
   - none
 - current direct navigation output:
-  - run-detail App-level selected-run handoff via `onOpenDetail(runName)`
+  - run-detail App-level selected-run handoff via `onOpenDetail(runId)`
 - current report list is not a raw backend list contract; it is a front-end-derived view model built from snapshot data
 
 ## 3. Direct Read Interface: GET /api/phase3/admin-console
@@ -129,7 +129,7 @@ These controls change screen state without calling the backend directly.
 ### 5.3 Selected Run Highlight
 
 - owner:
-  - shell-selected `selectedRunName`
+  - shell-selected `selectedRunId`
   - local selected project synchronization
 - request: none
 
@@ -166,8 +166,8 @@ These controls change screen state without calling the backend directly.
 - user action: click
 - request: none from `reports` itself
 - owner:
-  - `ReportsScreen.tsx` emits `onOpenDetail(runName)`
-  - `App.tsx` stores `selectedReportRunName` and navigates to `reportDetail`
+  - `ReportsScreen.tsx` emits `onOpenDetail(runId)`
+  - `App.tsx` stores `selectedReportRunId` and navigates to `reportDetail`
 - success behavior:
   - selected run becomes the report-detail target
   - route changes to `reportDetail`
@@ -197,7 +197,7 @@ These controls change screen state without calling the backend directly.
 ### 7.2 Relationship to Report Detail
 
 - `reports` is the current upstream list page for `reportDetail`
-- current handoff is App-level selected-run handoff through selected run name
+- current handoff is App-level selected-run handoff through canonical `runId`
 
 ### 7.3 Relationship to Data Diff
 
@@ -327,7 +327,7 @@ Recommended implementation type:
 
 Concrete behavior:
 
-- `Detail` continues to call `onOpenDetail(runName)`
+- `Detail` continues to call `onOpenDetail(runId)`
 - downstream `reportDetail` becomes the first page allowed to fetch a true report contract such as:
   - `GET /api/phase3/runs/{runId}/report`
 

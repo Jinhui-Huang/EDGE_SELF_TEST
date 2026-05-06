@@ -833,7 +833,8 @@ Response body:
 Current row click behavior:
 
 - clicking a run row routes to `reportDetail`
-- the first implementation reuses existing App-level selected-run state via `openReportDetail(runName)`
+- the App-level handoff first resolves a canonical `runId` from `snapshot.reports` by matching `runName`
+- when no matching snapshot report exists, the handoff falls back to the original `runName`
 - no new report-detail endpoint is added for this linkage
 
 ### 10.6 `Recent runs` Summary Panel
@@ -846,7 +847,7 @@ Future implementation:
 - sidebar summary bars could be connected to this data or made clickable
 - add app-level handler:
   - `onOpenCaseRunDetail(runName: string)`
-- reuse existing `openReportDetail(runName)`
+- reuse existing `openReportDetail(runName)` so App-level resolution can prefer canonical `runId`
 
 ### 10.7 Future Visible Case-Catalog Editor
 
@@ -921,5 +922,5 @@ Remaining findings:
 - `Pre-execution` is correctly a state handoff, not a backend request.
 - App-level case-catalog save already exists, but the visible screen does not expose an editor form.
 - Sidebar info/plans/recent-run panels remain snapshot-derived display, not yet connected to per-tab API data.
-- History tab currently hands off by `runName`; the case-history payload still lacks a dedicated canonical `runId`.
+- History tab handoff now resolves canonical `runId` from `snapshot.reports` when `runName` matches an existing report row, and falls back to `runName` only when no match exists.
 - Plans and history are read-only; write endpoints can be added when editing is required.

@@ -1488,8 +1488,23 @@ export function App() {
     setActiveScreen("aiGenerate");
   }
 
-  function openReportDetail(runId: string) {
-    setSelectedReportRunId(runId);
+  function resolveReportRunId(runNameOrRunId: string) {
+    const normalizedValue = runNameOrRunId.trim();
+    if (!normalizedValue) {
+      return null;
+    }
+    const matchedReport = snapshot.reports.find(
+      (item) => item.runId === normalizedValue || item.runName === normalizedValue
+    );
+    return matchedReport?.runId ?? matchedReport?.runName ?? normalizedValue;
+  }
+
+  function openReportDetail(runNameOrRunId: string) {
+    const resolvedRunId = resolveReportRunId(runNameOrRunId);
+    if (!resolvedRunId) {
+      return;
+    }
+    setSelectedReportRunId(resolvedRunId);
     setActiveScreen("reportDetail");
   }
 

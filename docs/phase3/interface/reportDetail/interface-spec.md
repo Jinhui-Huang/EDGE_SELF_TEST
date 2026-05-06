@@ -46,14 +46,14 @@ Current `reportDetail` screen conclusion:
   - back to `reports`
   - open `dataDiff`
   - re-run handoff into `execution` with run context pre-filled
-- fallback to `selectReportViewModel(snapshot, selectedRunName)` when API is unavailable
+- fallback to `selectReportViewModel(snapshot, selectedRunId)` when API is unavailable
 - backend implementation: `ReportArtifactService.java` provides all report-detail read endpoints
 
 ## 3. Current Read Context: GET /api/phase3/admin-console
 
 ### 3.1 Purpose for Report Detail Screen
 
-The `reportDetail` screen currently uses the same shared snapshot as its read model and selects one report through `selectedRunName`.
+The `reportDetail` screen currently uses the same shared snapshot as its read model and selects one report through `selectedRunId`.
 
 Relevant snapshot fields for this screen:
 
@@ -73,7 +73,7 @@ Relevant snapshot fields for this screen:
 ### 3.3 Ownership Boundary
 
 - backend/local-admin-api owns the raw snapshot
-- `App.tsx` owns `selectedReportRunName`
+- `App.tsx` owns `selectedReportRunId`
 - `reportViewModel.ts` owns detail derivation
 - `ReportDetailScreen.tsx` owns only local tab/button rendering
 
@@ -83,7 +83,7 @@ The current detail screen reads real report-detail interfaces first and falls ba
 
 ### 4.1 Current Derivation Entry Point
 
-- `selectReportViewModel(snapshot, selectedRunName)`
+- `selectReportViewModel(snapshot, selectedRunId)`
 
 ### 4.2 Current Derived/Synthetic Fields
 
@@ -115,9 +115,9 @@ This means the current page should be documented as:
 
 Current App-level handoff behavior:
 
-- `ReportsScreen.tsx` calls `onOpenDetail(runName)`
+- `ReportsScreen.tsx` calls `onOpenDetail(runId)`
 - `App.tsx` stores:
-  - `selectedReportRunName = runName`
+  - `selectedReportRunId = runId`
 - `App.tsx` sets:
   - `activeScreen("reportDetail")`
 
@@ -132,8 +132,8 @@ Current behavior:
 
 Current behavior:
 
-- `onOpenDataDiff()` calls `openDataDiff(selectedReportRunName)`
-- `App.tsx` stores run name if present
+- `onOpenDataDiff()` calls `openDataDiff(selectedReportRunId)`
+- `App.tsx` stores run id if present
 - `App.tsx` sets `activeScreen("dataDiff")`
 - no backend request from `reportDetail` itself
 
@@ -225,7 +225,7 @@ Current behavior:
 ### 7.1 Relationship to Reports
 
 - `reportDetail` is the direct downstream page of `reports`
-- current selection handoff uses run name only
+- current selection handoff uses canonical `runId`
 
 ### 7.2 Relationship to Data Diff
 
@@ -255,7 +255,8 @@ Recommended Phase 3 evolution:
 
 Identifier note:
 
-- the UI carries selected run context by `runName` which maps to `{runId}` in backend path parameters
+- the UI carries selected run context by canonical `runId`
+- `runName` remains report content, not the App-level selected-run key
 
 ### 9.1 Full Report Interface (implemented)
 
@@ -467,8 +468,8 @@ Tab behavior:
 
 Current implementation:
 
-- `GET /api/phase3/runs/{runId}/report` loaded on mount; on failure, falls back to `selectReportViewModel(snapshot, selectedRunName)`
-- `selectedRunName == null` → displays explicit "No run selected" empty state
+- `GET /api/phase3/runs/{runId}/report` loaded on mount; on failure, falls back to `selectReportViewModel(snapshot, selectedRunId)`
+- `selectedRunId == null` → displays explicit "No run selected" empty state
 - tab-specific fetches (steps, assertions, recovery, ai-decisions) show loading state then render data or leave panel empty on failure
 - `GET /api/phase3/runs/{runId}/artifacts` on failure surfaces error through action status
 - `Re-run` handoff is local state only, no failure path

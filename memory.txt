@@ -1562,3 +1562,42 @@
     - `npx vitest run src/App.test.tsx -t "opens reportDetail from cases history run rows via the existing App handoff" --pool=forks --poolOptions.forks.singleFork`
     - `npx vitest run src/screens/CasesScreen.test.tsx -t "hands off history run rows through the existing app-level callback" --pool=forks --poolOptions.forks.singleFork`
     - this machine still shows the same Vitest hang / worker-startup instability for some targeted Vitest runs
+- 2026-05-06: Completed the small `cases` history canonical-runId follow-up.
+  - Updated `ui/admin-console/src/App.tsx`:
+    - `openReportDetail()` no longer treats incoming history `runName` as canonical `runId`
+    - added App-level `resolveReportRunId(runNameOrRunId)` helper
+    - handoff now first matches `snapshot.reports` by `runId` or `runName`
+    - resolved match stores canonical `runId`
+    - unresolved match falls back to the original `runName`
+  - Extended `ui/admin-console/src/App.test.tsx`:
+    - `cases` history -> `reportDetail` now verifies snapshot-based `runName` -> `runId` resolution
+    - added fallback coverage when no matching snapshot report exists
+  - Synced docs and backlog:
+    - `docs/phase3/interface/cases/functional-spec.md`
+    - `docs/phase3/interface/cases/interface-spec.md`
+    - `docs/phase3/interface/reportDetail/interface-spec.md`
+    - `docs/phase3/interface/reports/interface-spec.md`
+    - `docs/phase3/interface/review-backlog.md`
+  - Keep the explicit boundary:
+    - no new backend endpoint
+    - no new route system
+    - no reportDetail backend contract change
+    - reuse existing App-level handoff only
+  - Verification:
+    - `npm run build` in `ui/admin-console`: PASS
+  - Not run in this pass:
+    - targeted Vitest cases for the new history handoff branch coverage
+- 2026-05-07: Completed the small `reportDetail` canonical-runId doc cleanup follow-up.
+  - Updated `docs/phase3/interface/reportDetail/functional-spec.md`:
+    - removed leftover `selectedRunName` / `selected run name` wording
+    - aligned selected-run wording to `selectedRunId` / `selectedReportRunId`
+    - `Data diff` handoff rule now refers to the currently selected run id
+  - Updated `docs/phase3/interface/reportDetail/interface-spec.md`:
+    - `reports` -> `reportDetail` relationship now states canonical `runId`
+    - identifier note no longer describes App-level selection as `runName`
+  - Keep the explicit boundary:
+    - no new interface
+    - no route change
+    - no backend contract change
+    - no code change
+    - no test run
