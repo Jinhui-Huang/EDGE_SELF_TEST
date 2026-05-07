@@ -2392,3 +2392,24 @@
     - no test run
     - no build run
     - no commit / push
+- 2026-05-07: Continued `P3-4` on `monitor` by tightening `GET /api/phase3/runs/{runId}/runtime-log`.
+  - Backend:
+    - `RunStatusService` now prefers `runs/<runId>/runtime.log` when the run-local artifact exists
+    - `runtime.log` lines are mapped into backend-owned runtime-log entries with:
+      - `source: "runtime.log"`
+      - `message` as raw line text
+      - `detail.artifactPath = "runtime.log"`
+      - `detail.line`
+    - a small text-to-entry classifier now maps obvious content to `ERROR` / `WARNING` / `HEAL` / `DECISION` / `INFO`
+    - when no `runtime.log` artifact exists, the endpoint keeps the existing scheduler-event-derived path but now marks it explicitly with:
+      - `source: "scheduler-events"`
+  - Tests/docs:
+    - added backend regression for artifact-backed runtime-log priority plus scheduler-event fallback
+    - synced `monitor/interface-spec.md`, `monitor/functional-spec.md`, and `review-backlog.md`
+  - Why this slice:
+    - it was the smallest real step on `P3-4` after `live-page` because it reuses the same run-local artifact-read boundary
+    - the current `MonitorScreen` already understands `source` and runtime-log detail fields, so no broader front-end refactor was needed
+  - Keep the explicit boundary:
+    - no test run
+    - no build run
+    - no commit / push

@@ -188,6 +188,8 @@ Functional role:
 Current behavior:
 
 - log items driven by `runtimeLog` from `GET /api/phase3/runs/{runId}/runtime-log`
+- when run-local `runtime.log` exists, the backend prefers artifact-backed log entries over deterministic shaping
+- when no run-local runtime log artifact exists, the current scheduler-event-derived fallback remains in place and is not presented as artifact-backed data
 - rows are clickable and open a local runtime-log detail panel inside `MonitorScreen`
 
 ### 6.6 Footer Summary
@@ -225,7 +227,7 @@ The screen loads runtime data from dedicated APIs when `selectedRunId` is provid
 
 - `runStatus` from `GET /api/phase3/runs/{runId}/status` — run identity, progress, counters, control state
 - `steps` from `GET /api/phase3/runs/{runId}/steps` — step timeline and state
-- `runtimeLog` from `GET /api/phase3/runs/{runId}/runtime-log` — AI decision and runtime event entries
+- `runtimeLog` from `GET /api/phase3/runs/{runId}/runtime-log` — artifact-backed `runtime.log` entries when available, otherwise scheduler-event-derived AI/runtime notes
 - `livePage` from `GET /api/phase3/runs/{runId}/live-page` — backend-owned availability status, current page URL/state/highlight, and optional run-local screenshot path
 
 ## 8. Screen Inputs and Outputs

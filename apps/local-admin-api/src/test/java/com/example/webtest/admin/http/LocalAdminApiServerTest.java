@@ -705,6 +705,93 @@ class LocalAdminApiServerTest {
     }
 
     @Test
+    void monitorRuntimeLogPrefersRunLocalRuntimeLogAndFallsBackToSchedulerEvents(@TempDir Path tempDir) throws Exception {
+        Path runsDir = tempDir.resolve("runs");
+        Path artifactRunDir = runsDir.resolve("checkout-web-smoke");
+        Files.createDirectories(artifactRunDir);
+        Files.writeString(artifactRunDir.resolve("runtime.log"), String.join("\n",
+                "2026-05-07T09:03:31Z DECISION Confirmed pay button candidate[0]",
+                "WARN locator healed once"), StandardCharsets.UTF_8);
+
+        Path schedulerRequestsFile = tempDir.resolve("scheduler-requests.json");
+        Path schedulerEventsFile = tempDir.resolve("scheduler-events.json");
+        Path schedulerStateFile = tempDir.resolve("scheduler-state.json");
+        Path queueFile = tempDir.resolve("execution-queue.json");
+        Path catalogFile = tempDir.resolve("project-catalog.json");
+        Path executionHistoryFile = tempDir.resolve("execution-history.json");
+        Path modelConfigFile = tempDir.resolve("model-config.json");
+        Path environmentConfigFile = tempDir.resolve("environment-config.json");
+        Files.writeString(queueFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(catalogFile, Jsons.writeValueAsString(Map.of("projects", List.of(), "cases", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(executionHistoryFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(modelConfigFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(environmentConfigFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(schedulerRequestsFile, Jsons.writeValueAsString(Map.of(
+                "requests", List.of(
+                        Map.of("runId", "checkout-web-smoke"),
+                        Map.of("runId", "missing-runtime-log")))), StandardCharsets.UTF_8);
+        Files.writeString(schedulerEventsFile, Jsons.writeValueAsString(Map.of(
+                "events", List.of(
+                        Map.of(
+                                "runId", "checkout-web-smoke",
+                                "type", "DECISION",
+                                "detail", "scheduler fallback should not win",
+                                "at", "2026-05-07T09:03:30Z"),
+                        Map.of(
+                                "runId", "missing-runtime-log",
+                                "type", "DECISION",
+                                "detail", "Scheduler event fallback",
+                                "at", "2026-05-07T09:05:00Z")))), StandardCharsets.UTF_8);
+
+        Clock clock = Clock.fixed(Instant.parse("2026-05-07T09:10:00Z"), ZoneOffset.UTC);
+        SchedulerPersistenceService schedulerPersistence = new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, clock);
+        try (LocalAdminApiServer server = new LocalAdminApiServer(
+                new InetSocketAddress("127.0.0.1", 0),
+                new Phase3MockDataService(
+                        runsDir,
+                        schedulerRequestsFile,
+                        schedulerEventsFile,
+                        schedulerStateFile,
+                        queueFile,
+                        catalogFile,
+                        executionHistoryFile,
+                        modelConfigFile,
+                        environmentConfigFile,
+                        clock),
+                schedulerPersistence,
+                new ConfigPersistenceService(
+                        modelConfigFile,
+                        environmentConfigFile),
+                new CatalogPersistenceService(catalogFile, clock),
+                new RunStatusService(runsDir, schedulerRequestsFile, schedulerEventsFile, schedulerPersistence, clock),
+                new AgentGenerateService(),
+                new ReportArtifactService(runsDir),
+                new DataTemplatePersistenceService(tempDir.resolve("data-templates.json"), clock))) {
+            server.start();
+            HttpClient client = HttpClient.newHttpClient();
+
+            HttpResponse<String> artifactBacked = client.send(
+                    request(server, "/api/phase3/runs/checkout-web-smoke/runtime-log"),
+                    HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> fallbackBacked = client.send(
+                    request(server, "/api/phase3/runs/missing-runtime-log/runtime-log"),
+                    HttpResponse.BodyHandlers.ofString());
+
+            assertEquals(200, artifactBacked.statusCode());
+            assertTrue(artifactBacked.body().contains("\"source\":\"runtime.log\""));
+            assertTrue(artifactBacked.body().contains("Confirmed pay button candidate[0]"));
+            assertTrue(artifactBacked.body().contains("\"type\":\"WARNING\""));
+            assertTrue(artifactBacked.body().contains("\"artifactPath\":\"runtime.log\""));
+            assertTrue(artifactBacked.body().contains("\"line\":2"));
+            assertTrue(!artifactBacked.body().contains("scheduler fallback should not win"));
+
+            assertEquals(200, fallbackBacked.statusCode());
+            assertTrue(fallbackBacked.body().contains("\"source\":\"scheduler-events\""));
+            assertTrue(fallbackBacked.body().contains("Scheduler event fallback"));
+        }
+    }
+
+    @Test
     void persistsEditableCatalogProjectsAndReflectsThemInSnapshots(@TempDir Path tempDir) throws Exception {
         Path runsDir = tempDir.resolve("runs");
         Files.createDirectories(runsDir);

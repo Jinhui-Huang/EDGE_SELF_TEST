@@ -5205,6 +5205,53 @@ Remaining limits:
 - `monitor` live-page now supports image-like screenshot preview, but it still does not render a richer DOM summary
 - Pause/Abort still record intent only; no true execution-control workflow exists in Phase 3
 
+## 2026-05-07 P3-4 monitor runtime-log artifact-backed follow-up
+
+## Task
+- Continue the current `P3-4 monitor` line by tightening `GET /api/phase3/runs/{runId}/runtime-log`:
+  - prefer real run-local `runtime.log` content when it exists
+  - keep the fallback behavior explicit when no run-local runtime-log artifact exists
+  - avoid broad runtime/status/steps refactors
+
+## Completed
+- Updated `RunStatusService.java`:
+  - `GET /api/phase3/runs/{runId}/runtime-log` now checks `runs/<runId>/runtime.log` first
+  - when `runtime.log` exists, the backend maps its lines into backend-owned runtime-log entries
+  - entries now carry:
+    - `source: "runtime.log"`
+    - `message`: raw line text
+    - `detail.artifactPath = "runtime.log"`
+    - `detail.line`
+  - simple line classification now maps obvious log content to `ERROR` / `WARNING` / `HEAL` / `DECISION` / `INFO`
+  - when no `runtime.log` artifact exists, the endpoint keeps the existing scheduler-event-derived fallback path but now marks it with:
+    - `source: "scheduler-events"`
+- Updated `LocalAdminApiServerTest.java`:
+  - added a backend regression that covers both:
+    - run-local `runtime.log` taking precedence over scheduler-event shaping
+    - scheduler-event fallback remaining active when the artifact is absent
+- Synced `monitor/interface-spec.md`, `monitor/functional-spec.md`, and `review-backlog.md`:
+  - runtime-log is now documented as `runtime.log`-first rather than purely deterministic
+  - fallback is documented as scheduler-event-derived, not artifact-backed
+
+## Modified Files
+- `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/RunStatusService.java`
+- `apps/local-admin-api/src/test/java/com/example/webtest/admin/http/LocalAdminApiServerTest.java`
+- `docs/phase3/interface/monitor/interface-spec.md`
+- `docs/phase3/interface/monitor/functional-spec.md`
+- `docs/phase3/interface/review-backlog.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Not run by explicit task boundary:
+  - no test run
+  - no build run
+
+## Remaining Limits
+- `monitor` `runtime-log` now prefers run-local `runtime.log`, but it still uses a very small text-to-entry mapping rather than a richer structured runtime artifact
+- `monitor` `status` / `steps` still remain deterministic when no stronger runtime artifacts exist
+- Pause/Abort still record intent only; no true execution-control workflow exists in Phase 3
+
 ## 2026-05-07 P3-3 dataDiff main payload unavailable-shell follow-up
 
 ## Task

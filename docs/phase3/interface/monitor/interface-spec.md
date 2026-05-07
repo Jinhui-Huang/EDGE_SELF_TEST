@@ -259,6 +259,7 @@ Response body:
 Purpose:
 
 - load AI decisions, heals, state recognition, and runtime notes for the run
+- prefer run-local `runtime.log` entries when the artifact exists; otherwise fall back to scheduler-event-derived runtime notes
 
 Query parameters:
 
@@ -274,18 +275,25 @@ Response body:
     {
       "at": "2026-04-20T05:31:48Z",
       "type": "DECISION",
-      "model": "claude-4.5-sonnet",
-      "summary": "Confirmed Pay button visible at candidate[0] (score 0.94).",
+      "model": "",
+      "summary": "DECISION Confirmed Pay button visible at candidate[0] (score 0.94).",
+      "source": "runtime.log",
+      "message": "2026-04-20T05:31:48Z DECISION Confirmed Pay button visible at candidate[0] (score 0.94).",
       "detail": {
-        "candidateCount": 3,
-        "selectedIndex": 0,
-        "score": 0.94
+        "artifactPath": "runtime.log",
+        "line": 1
       }
     }
   ],
-  "nextCursor": "log_0002"
+  "nextCursor": null
 }
 ```
+
+When no run-local `runtime.log` artifact exists, the endpoint keeps the current scheduler-event-derived fallback path rather than claiming that artifact-backed runtime logs are available:
+
+- `source: "scheduler-events"`
+- `summary` derived from the event `detail` / `title`
+- `model` preserved only when the fallback scheduler event actually carries it
 
 ### 7.4 Live-Page Read Interface
 
@@ -497,7 +505,8 @@ Current implementation:
 ## 11. Remaining Limits
 
 - `live-page` now prefers run-local `live-page.json` / screenshot artifacts and returns an explicit `UNAVAILABLE` shell when they are absent.
-- `status`, `steps`, and `runtime-log` still remain deterministic runtime reads when no stronger run-local runtime artifacts exist.
+- `status` and `steps` still remain deterministic runtime reads when no stronger run-local runtime artifacts exist.
+- `runtime-log` now prefers run-local `runtime.log` artifacts; when they are absent it still falls back to scheduler-event-derived shaping.
 - Pause/Abort record intent only; the backend does not trigger real execution-control workflows in Phase 3.
 - Step rows and runtime log rows now use local detail panels rather than a separate page or route.
 - Live page panel now inlines image-like screenshots when `screenshotPath` is present, but it still does not render a richer DOM summary.

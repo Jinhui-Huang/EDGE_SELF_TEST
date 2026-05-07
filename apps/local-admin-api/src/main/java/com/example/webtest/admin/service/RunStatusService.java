@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -163,6 +164,16 @@ public final class RunStatusService {
 
     public Map<String, Object> getRunRuntimeLog(String runId) throws IOException {
         requireRunId(runId);
+        Path runDir = resolveRunDir(runId);
+        List<Map<String, Object>> artifactItems = readRuntimeLogArtifact(runDir);
+        if (!artifactItems.isEmpty()) {
+            Map<String, Object> artifactResult = new LinkedHashMap<>();
+            artifactResult.put("runId", runId);
+            artifactResult.put("items", artifactItems);
+            artifactResult.put("nextCursor", null);
+            return artifactResult;
+        }
+
         List<Map<String, Object>> events = findEvents(runId);
 
         List<Map<String, Object>> items = new ArrayList<>();
@@ -176,6 +187,7 @@ public final class RunStatusService {
                 entry.put("model", textOr(event, "model", ""));
                 entry.put("summary", textOr(event, "detail",
                         textOr(event, "title", type + " event")));
+                entry.put("source", "scheduler-events");
                 items.add(entry);
             }
         }
@@ -186,6 +198,43 @@ public final class RunStatusService {
         result.put("items", items);
         result.put("nextCursor", null);
         return result;
+    }
+
+    private List<Map<String, Object>> readRuntimeLogArtifact(Path runDir) throws IOException {
+        if (runDir == null || !Files.isDirectory(runDir)) {
+            return List.of();
+        }
+        Path runtimeLog = runDir.resolve("runtime.log").normalize();
+        if (!runtimeLog.startsWith(runDir) || !Files.isRegularFile(runtimeLog)) {
+            return List.of();
+        }
+
+        List<String> lines = Files.readAllLines(runtimeLog, StandardCharsets.UTF_8);
+        if (lines.isEmpty()) {
+            return List.of();
+        }
+
+        Instant fallbackAt = resolveArtifactModifiedAt(runtimeLog);
+        List<Map<String, Object>> items = new ArrayList<>();
+        for (int index = 0; index < lines.size(); index++) {
+            String rawLine = lines.get(index);
+            String trimmed = rawLine == null ? "" : rawLine.trim();
+            if (trimmed.isEmpty()) {
+                continue;
+            }
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("at", resolveRuntimeLogTimestamp(trimmed, fallbackAt));
+            entry.put("type", classifyRuntimeLogType(trimmed));
+            entry.put("model", "");
+            entry.put("summary", summarizeRuntimeLogLine(trimmed));
+            entry.put("source", "runtime.log");
+            entry.put("message", trimmed);
+            entry.put("detail", Map.of(
+                    "artifactPath", "runtime.log",
+                    "line", index + 1));
+            items.add(entry);
+        }
+        return items;
     }
 
     // ---- GET /api/phase3/runs/{runId}/live-page ----
@@ -459,6 +508,62 @@ public final class RunStatusService {
             return null;
         }
         return candidate;
+    }
+
+    private Instant resolveArtifactModifiedAt(Path file) {
+        try {
+            FileTime modifiedAt = Files.getLastModifiedTime(file);
+            return modifiedAt.toInstant();
+        } catch (IOException ignored) {
+            return Instant.now(clock);
+        }
+    }
+
+    private String resolveRuntimeLogTimestamp(String line, Instant fallbackAt) {
+        int separator = line.indexOf(' ');
+        if (separator > 0) {
+            String firstToken = line.substring(0, separator).trim();
+            try {
+                return Instant.parse(firstToken).toString();
+            } catch (RuntimeException ignored) {
+                // fall back to file-modified time
+            }
+        }
+        return fallbackAt.toString();
+    }
+
+    private String summarizeRuntimeLogLine(String line) {
+        int separator = line.indexOf(' ');
+        if (separator > 0) {
+            String firstToken = line.substring(0, separator).trim();
+            try {
+                Instant.parse(firstToken);
+                String remainder = line.substring(separator + 1).trim();
+                if (!remainder.isEmpty()) {
+                    return remainder;
+                }
+            } catch (RuntimeException ignored) {
+                // use raw line
+            }
+        }
+        return line;
+    }
+
+    private String classifyRuntimeLogType(String line) {
+        String normalized = line.toUpperCase(Locale.ROOT);
+        if (normalized.contains("ERROR")) {
+            return "ERROR";
+        }
+        if (normalized.contains("WARN")) {
+            return "WARNING";
+        }
+        if (normalized.contains("HEAL")) {
+            return "HEAL";
+        }
+        if (normalized.contains("DECISION")) {
+            return "DECISION";
+        }
+        return "INFO";
     }
 
     private boolean isImageArtifact(Path file) {
