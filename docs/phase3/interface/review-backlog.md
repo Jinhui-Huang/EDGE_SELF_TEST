@@ -541,12 +541,13 @@ It does not authorize UI or backend changes in the current phase.
 - Resolved in the current pass:
   - `reports` list rows now read tags and other visible summary fields from canonical backend `GET /api/phase3/runs/` rows instead of re-matching `snapshot.cases` on the front end
   - missing `report.json` now returns a backend-owned `UNAVAILABLE` shell for the main report payload, so the overview summary no longer treats no-artifact state like a normal 0/0 report
+  - missing `data-diff.json` now returns a backend-owned `UNAVAILABLE` shell for the main diff payload, so the `dataDiff` table no longer renders synthetic rows for no-artifact runs
 - Why this is next:
   - the interface surface exists, but several pages still retain synthetic list/view-model layers, deterministic mock artifacts, or snapshot fallback behavior
   - the report chain is functionally wired, but not fully backend-native yet
 - Backend work still missing:
   - reduce or eliminate snapshot-derived `reportDetail` fallback dependence when backend detail reads fail
-  - continue tightening missing-artifact semantics so backend-owned empty/unavailable shells replace any remaining misleading mock payloads
+  - continue tightening missing-artifact semantics so backend-owned empty/unavailable shells replace any remaining misleading mock payloads outside the already-cleaned report/data-diff main paths
 - Expected outcome:
   - report list/detail/diff behavior converges on one stable backend run/report contract anchored on canonical `runId`
 

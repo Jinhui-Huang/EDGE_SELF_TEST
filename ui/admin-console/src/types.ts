@@ -526,6 +526,7 @@ export type DataDiffRow = {
 
 export type DataDiffResponse = {
   runId: string;
+  status?: string;
   projectKey: string;
   caseId: string;
   caseName: string;

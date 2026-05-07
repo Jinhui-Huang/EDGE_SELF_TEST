@@ -2096,6 +2096,52 @@ describe("App", () => {
     expect(await screen.findByText("No raw diff artifact available")).toBeInTheDocument();
   });
 
+  it("shows explicit data diff unavailable state when the backend returns an empty-shell", async () => {
+    const dataDiffUnavailableResponse = {
+      runId: "checkout-web-nightly",
+      status: "UNAVAILABLE",
+      projectKey: "",
+      caseId: "",
+      caseName: "",
+      database: {
+        id: "",
+        name: ""
+      },
+      summary: {
+        expectedChanges: 0,
+        unexpectedChanges: 0,
+        restoredCount: 0,
+        totalRows: 0,
+        affectedTables: 0
+      },
+      rows: []
+    };
+    const restoreResultResponse = {
+      runId: "checkout-web-nightly",
+      status: "UNAVAILABLE",
+      items: []
+    };
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/report")) return jsonResponse(reportResponse);
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/data-diff")) return jsonResponse(dataDiffUnavailableResponse);
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/restore-result")) return jsonResponse(restoreResultResponse);
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    await screen.findByText("Recent runs");
+    await userEvent.click(screen.getByRole("button", { name: "Open run checkout-web-nightly" }));
+    await userEvent.click(screen.getByRole("button", { name: "Data diff" }));
+
+    expect(await screen.findByText("UNAVAILABLE")).toBeInTheDocument();
+    expect(await screen.findByText("No diff artifact available")).toBeInTheDocument();
+    expect(screen.queryByText("Expected changes")).not.toBeInTheDocument();
+  });
+
   it("shows explicit AI decisions unavailable state when the backend returns an empty-shell", async () => {
     const aiDecisionsUnavailableResponse = {
       runId: "checkout-web-nightly",

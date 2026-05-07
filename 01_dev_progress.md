@@ -5149,6 +5149,51 @@ Remaining limits:
 - `dataDiff` table rows still retain the existing synthetic fallback path when the diff endpoint itself is unavailable
 - `reportDetail` still keeps snapshot-derived fallback when backend detail reads fail
 
+## 2026-05-07 P3-3 dataDiff main payload unavailable-shell follow-up
+
+## Task
+- Continue the current `P3-3` code path by tightening the main `GET /api/phase3/runs/{runId}/data-diff` contract:
+  - stop fabricating synthetic diff rows when `data-diff.json` is missing
+  - return a backend-owned unavailable/empty shell instead
+  - keep any UI adjustment limited to the main diff panel
+
+## Completed
+- Updated `ReportArtifactService.java`:
+  - `GET /api/phase3/runs/{runId}/data-diff` no longer falls back to deterministic mock diff rows when `data-diff.json` is missing or unreadable
+  - the backend now returns an explicit empty shell instead:
+    - `status: "UNAVAILABLE"`
+    - zeroed `summary`
+    - `rows: []`
+- Updated `DataDiffScreen.tsx`:
+  - when the backend returns the `UNAVAILABLE` main-diff shell, the screen now shows explicit `No diff artifact available` copy
+  - it no longer renders misleading stats/table rows for the no-artifact case
+  - synthetic local rows remain fallback-only when the diff API read itself fails
+- Updated `LocalAdminApiServerTest.java` and `App.test.tsx`:
+  - backend test now asserts `UNAVAILABLE` + `rows: []` for the missing-artifact path
+  - App-level test now covers the explicit main diff unavailable state
+- Synced `dataDiff/interface-spec.md` and `review-backlog.md` to the new backend-owned main diff shell semantics
+
+## Modified Files
+- `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/ReportArtifactService.java`
+- `apps/local-admin-api/src/test/java/com/example/webtest/admin/http/LocalAdminApiServerTest.java`
+- `ui/admin-console/src/types.ts`
+- `ui/admin-console/src/screens/DataDiffScreen.tsx`
+- `ui/admin-console/src/App.test.tsx`
+- `docs/phase3/interface/dataDiff/interface-spec.md`
+- `docs/phase3/interface/review-backlog.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Not run by explicit task boundary:
+  - no test run
+  - no build run
+
+## Remaining Limits
+- synthetic diff rows still remain as a fallback when the main diff API read fails outright
+- `reportDetail` still keeps snapshot-derived fallback when backend detail reads fail
+- artifact/screenshot inline viewing is still not implemented
+
 ## 2026-05-07 P3-3 dataDiff raw backend-owned empty-shell follow-up
 
 ## Task

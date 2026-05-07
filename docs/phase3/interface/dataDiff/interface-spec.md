@@ -3,6 +3,7 @@
 Update note:
 - Current App-level data-diff selection uses canonical `runId`.
 - `dataDiff` reads `GET /api/phase3/runs/{runId}/data-diff`, `.../data-diff/raw`, and `.../restore-result`.
+- missing `data-diff.json` artifacts now return a backend-owned `UNAVAILABLE` shell with empty `summary` / `rows`.
 - missing `data-diff-raw.json` artifacts now return a backend-owned `UNAVAILABLE` shell with empty before/after/afterRestore arrays.
 - `POST /api/phase3/runs/{runId}/restore/retry` refreshes both diff data and restore-result on success.
 - missing `restore-result` artifacts now return a backend-owned `UNAVAILABLE` shell (`items: []`) instead of deterministic mock restore steps.
@@ -26,7 +27,7 @@ Update note:
 This document distinguishes:
 
 - current read context
-- current synthetic diff-row layer
+- legacy synthetic diff-row fallback layer
 - future backend-authored data-diff contracts
 - detailed implementation design for currently unwired controls
 
@@ -36,14 +37,14 @@ Current `dataDiff` screen conclusion:
 
 - current direct read sources:
   - `GET /api/phase3/admin-console` (snapshot context)
-  - `GET /api/phase3/runs/{runId}/data-diff` (diff table data)
+  - `GET /api/phase3/runs/{runId}/data-diff` (diff table data; missing artifacts now return explicit `UNAVAILABLE` / empty shell data)
   - `GET /api/phase3/runs/{runId}/data-diff/raw` (raw JSON drawer; missing artifacts now return explicit `UNAVAILABLE` / empty shell data)
   - `GET /api/phase3/runs/{runId}/restore-result` (restore status; missing artifacts now return explicit `UNAVAILABLE` / empty shell data)
 - current direct write source:
   - `POST /api/phase3/runs/{runId}/restore/retry` (re-restore action)
 - current run context source:
   - `selectedReportRunId` App-level selected-run handoff from `App.tsx`
-- diff table is backed by the backend data-diff endpoint, with fallback to synthetic local data when API is unavailable
+- diff table is backed by the backend data-diff endpoint; synthetic local rows remain fallback-only when the API read itself is unavailable
 
 ## 3. Current Read Context: GET /api/phase3/admin-console
 
@@ -198,7 +199,7 @@ Response body:
 
 ```json
 {
-  "runName": "checkout-web-nightly",
+  "runId": "checkout-web-nightly",
   "database": {
     "id": "oracle-checkout-main",
     "name": "checkout-oracle-main-prodlike"
@@ -224,6 +225,30 @@ Response body:
       "restored": true
     }
   ]
+}
+```
+
+Fallback when `data-diff.json` is missing or unreadable:
+
+```json
+{
+  "runId": "checkout-web-nightly",
+  "status": "UNAVAILABLE",
+  "projectKey": "",
+  "caseId": "",
+  "caseName": "",
+  "database": {
+    "id": "",
+    "name": ""
+  },
+  "summary": {
+    "expectedChanges": 0,
+    "unexpectedChanges": 0,
+    "restoredCount": 0,
+    "totalRows": 0,
+    "affectedTables": 0
+  },
+  "rows": []
 }
 ```
 
@@ -318,13 +343,14 @@ Implementation:
 
 Current implementation:
 
-- no direct backend requests exist
+- direct backend requests exist for diff / raw / restore-result
+- synthetic diff rows remain fallback-only when the main diff read fails
 - fallback title-only state is shown if no selected report can be resolved
 
 Recommended future read-interface errors:
 
 - `GET /api/phase3/runs/{runId}/data-diff`
-  - `404` when diff data does not exist
+  - `200` with explicit `UNAVAILABLE` empty shell when the main diff payload is unavailable
 - `GET /api/phase3/runs/{runId}/data-diff/raw`
   - `200` with explicit `UNAVAILABLE` empty shell when raw payloads are unavailable
 
@@ -338,6 +364,7 @@ Recommended future mutation errors:
 Remaining limits:
 
 - App-level `selectedReportRunId` handoff is enough for page entry; backend run-diff endpoints now exist.
+- Main diff now returns an explicit backend-owned `UNAVAILABLE` empty shell when no real `data-diff.json` exists in the run directory.
 - `View raw JSON` and `Re-restore` are implemented and wired to backend endpoints.
 - Raw diff now returns an explicit backend-owned `UNAVAILABLE` empty shell when no real `data-diff-raw.json` exists in the run directory.
 - Restore result now returns an explicit backend-owned `UNAVAILABLE` empty shell when no real `restore-result.json` exists.

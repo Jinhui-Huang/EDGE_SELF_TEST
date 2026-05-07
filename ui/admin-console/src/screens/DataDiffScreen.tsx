@@ -62,6 +62,7 @@ const C = {
   loadingRawData: copy("Loading raw data...", "正在加载原始数据...", "生データ読み込み中..."),
   failedToLoadRawDiff: copy("Failed to load raw diff", "加载原始差异失败", "生の差分の読み込みに失敗"),
   noRawDiffAvailable: copy("No raw diff artifact available", "无可用原始差异产物", "利用可能な生差分アーティファクトなし"),
+  noDataDiffAvailable: copy("No diff artifact available", "无可用差异产物", "利用可能な差分アーティファクトなし"),
   before: copy("Before", "变更前", "変更前"),
   after: copy("After", "变更后", "変更後"),
   afterRestore: copy("After restore", "恢复后", "リストア後"),
@@ -210,6 +211,7 @@ export function DataDiffScreen({ snapshot, title, locale, selectedRunId, apiBase
   }
 
   const rows: DataDiffRow[] = apiDiff?.rows ?? (fallbackReport ? makeFallbackDiffRows(fallbackReport) : []);
+  const diffUnavailable = apiDiff?.status === "UNAVAILABLE";
   if (rows.length === 0 && !apiDiff && !fallbackReport) {
     return (
       <section className="sectionCard">
@@ -329,70 +331,82 @@ export function DataDiffScreen({ snapshot, title, locale, selectedRunId, apiBase
         </section>
       ) : null}
 
-      <div className="dataDiffStats">
-        <article className="dataDiffStatCard success">
-          <div className="dataDiffStatHead">
-            <span>{l(locale, C.expectedChanges)}</span>
-            <i>+</i>
+      {diffUnavailable ? (
+        <section className="reportPanelCard">
+          <div className="reportPanelHeader">
+            <div className="reportPanelTitle">{l(locale, C.dataDiff)}</div>
+            <span className="statusBadge status-failed">{apiDiff.status}</span>
           </div>
-          <strong>{expectedChanges}</strong>
-        </article>
-        <article className="dataDiffStatCard warning">
-          <div className="dataDiffStatHead">
-            <span>{l(locale, C.unexpected)}</span>
-            <i>!</i>
+          <p>{l(locale, C.noDataDiffAvailable)}</p>
+        </section>
+      ) : (
+        <>
+          <div className="dataDiffStats">
+            <article className="dataDiffStatCard success">
+              <div className="dataDiffStatHead">
+                <span>{l(locale, C.expectedChanges)}</span>
+                <i>+</i>
+              </div>
+              <strong>{expectedChanges}</strong>
+            </article>
+            <article className="dataDiffStatCard warning">
+              <div className="dataDiffStatHead">
+                <span>{l(locale, C.unexpected)}</span>
+                <i>!</i>
+              </div>
+              <strong>{unexpectedChanges}</strong>
+            </article>
+            <article className="dataDiffStatCard accent">
+              <div className="dataDiffStatHead">
+                <span>{l(locale, C.restored)}</span>
+                <i>&gt;</i>
+              </div>
+              <strong>{`${restoredCount}/${rows.length}`}</strong>
+            </article>
+            <article className="dataDiffStatCard accent2">
+              <div className="dataDiffStatHead">
+                <span>{l(locale, C.tablesAffected)}</span>
+                <i>#</i>
+              </div>
+              <strong>{affectedTables}</strong>
+            </article>
           </div>
-          <strong>{unexpectedChanges}</strong>
-        </article>
-        <article className="dataDiffStatCard accent">
-          <div className="dataDiffStatHead">
-            <span>{l(locale, C.restored)}</span>
-            <i>&gt;</i>
-          </div>
-          <strong>{`${restoredCount}/${rows.length}`}</strong>
-        </article>
-        <article className="dataDiffStatCard accent2">
-          <div className="dataDiffStatHead">
-            <span>{l(locale, C.tablesAffected)}</span>
-            <i>#</i>
-          </div>
-          <strong>{affectedTables}</strong>
-        </article>
-      </div>
 
-      <section className="dataDiffTableCard">
-        <div className="dataDiffTableHead">
-          <div>table</div>
-          <div>pk</div>
-          <div>field</div>
-          <div>before</div>
-          <div>after</div>
-          <div>after_restore</div>
-          <div>expected</div>
-          <div>restored</div>
-        </div>
-        <div className="dataDiffTableBody">
-          {rows.map((row) => (
-            <div key={`${row.table}-${row.pk}-${row.field}`} className={`dataDiffRow ${!row.expected || !row.restored ? "isWarning" : ""}`}>
-              <div className="dataDiffCell strong">{row.table}</div>
-              <div className="dataDiffCell muted">{row.pk}</div>
-              <div className="dataDiffCell muted">{row.field}</div>
-              <div className="dataDiffCell soft">{row.before}</div>
-              <div className="dataDiffCell accent">{row.after}</div>
-              <div className={`dataDiffCell ${row.restored ? "success" : "danger"}`}>{row.afterRestore}</div>
-              <div className="dataDiffCell">
-                <span className={`dataDiffBadge ${row.expected ? "success" : "warning"}`}>
-                  <span className="dot" />
-                  {row.expected ? l(locale, C.exp) : l(locale, C.unexp)}
-                </span>
-              </div>
-              <div className="dataDiffCell">
-                <span className={`dataDiffBadge ${row.restored ? "success" : "danger"} iconOnly`}>{row.restored ? "OK" : "NO"}</span>
-              </div>
+          <section className="dataDiffTableCard">
+            <div className="dataDiffTableHead">
+              <div>table</div>
+              <div>pk</div>
+              <div>field</div>
+              <div>before</div>
+              <div>after</div>
+              <div>after_restore</div>
+              <div>expected</div>
+              <div>restored</div>
             </div>
-          ))}
-        </div>
-      </section>
+            <div className="dataDiffTableBody">
+              {rows.map((row) => (
+                <div key={`${row.table}-${row.pk}-${row.field}`} className={`dataDiffRow ${!row.expected || !row.restored ? "isWarning" : ""}`}>
+                  <div className="dataDiffCell strong">{row.table}</div>
+                  <div className="dataDiffCell muted">{row.pk}</div>
+                  <div className="dataDiffCell muted">{row.field}</div>
+                  <div className="dataDiffCell soft">{row.before}</div>
+                  <div className="dataDiffCell accent">{row.after}</div>
+                  <div className={`dataDiffCell ${row.restored ? "success" : "danger"}`}>{row.afterRestore}</div>
+                  <div className="dataDiffCell">
+                    <span className={`dataDiffBadge ${row.expected ? "success" : "warning"}`}>
+                      <span className="dot" />
+                      {row.expected ? l(locale, C.exp) : l(locale, C.unexp)}
+                    </span>
+                  </div>
+                  <div className="dataDiffCell">
+                    <span className={`dataDiffBadge ${row.restored ? "success" : "danger"} iconOnly`}>{row.restored ? "OK" : "NO"}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        </>
+      )}
 
       {rawDrawerOpen ? (
         <div className="dataDiffRawDrawer" data-testid="raw-json-drawer">

@@ -2250,3 +2250,24 @@
     - no test run
     - no build run
     - no commit / push
+- 2026-05-07: Implemented the next small but valuable `P3-3` slice on the main `dataDiff` payload by removing fake diff rows.
+  - Backend:
+    - `GET /api/phase3/runs/{runId}/data-diff` no longer fabricates deterministic diff rows when `data-diff.json` is missing or unreadable
+    - the backend now returns an explicit empty shell instead:
+      - `status: "UNAVAILABLE"`
+      - zeroed `summary`
+      - `rows: []`
+  - Frontend:
+    - `DataDiffScreen` main table panel now shows `No diff artifact available` for the backend-owned `UNAVAILABLE` shell
+    - it no longer renders misleading synthetic stats/rows for the no-artifact case
+    - synthetic local rows remain only as fallback when the main diff API read fails outright
+  - Docs:
+    - synced `dataDiff/interface-spec.md`
+    - refined `review-backlog.md` so the main diff payload is no longer described as retaining the no-artifact synthetic-row path
+  - Remaining limits:
+    - diff-table fallback rows still remain for true diff-endpoint read failures
+    - `reportDetail` snapshot fallback still remains on broader detail-read failures
+  - Keep the explicit boundary:
+    - no test run
+    - no build run
+    - no commit / push

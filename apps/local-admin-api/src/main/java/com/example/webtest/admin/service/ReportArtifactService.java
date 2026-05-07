@@ -97,7 +97,7 @@ public final class ReportArtifactService {
             } catch (IOException ignored) {
             }
         }
-        return buildMockDataDiff(runId);
+        return buildUnavailableDataDiff(runId);
     }
 
     // ---- GET /api/phase3/runs/{runId}/data-diff/raw ----
@@ -390,8 +390,7 @@ public final class ReportArtifactService {
     }
 
     @SuppressWarnings("unchecked")
-    private Map<String, Object> buildMockDataDiff(String runId) {
-        String status = "UNKNOWN";
+    private Map<String, Object> buildUnavailableDataDiff(String runId) {
         String projectKey = "";
         String caseId = "";
         String caseName = "";
@@ -400,9 +399,6 @@ public final class ReportArtifactService {
         if (Files.isRegularFile(reportJson)) {
             try {
                 Map<String, Object> raw = Jsons.readValue(Files.readString(reportJson), Map.class);
-                Map<String, Object> summary = mapValue(raw.get("summary"));
-                int failed = intValue(summary.get("failed"));
-                status = failed > 0 ? "FAILED" : "OK";
                 projectKey = stringValue(raw.get("projectKey"));
                 caseId = stringValue(raw.get("caseId"));
                 caseName = stringValue(raw.get("caseName"));
@@ -412,57 +408,21 @@ public final class ReportArtifactService {
             } catch (IOException ignored) {
             }
         }
-        boolean isFailed = "FAILED".equals(status);
-        String pkSuffix = runId.length() >= 6 ? runId.substring(0, 6) : runId;
-
-        List<Map<String, Object>> rows = List.of(
-                diffRow("orders", "ord_8821", "status", "null",
-                        isFailed ? "\"pending\"" : "\"paid\"", "null", true, true),
-                diffRow("orders", "ord_8821", "total_cents", "null", "8910", "null", true, true),
-                diffRow("order_items", "oi_9104", "(row)", "-", "inserted", "-", true, true),
-                diffRow("order_items", "oi_9105", "(row)", "-", "inserted", "-", true, true),
-                diffRow("products", "sku_A", "stock", "50",
-                        isFailed ? "50" : "49", "50", true, true),
-                diffRow("products", "sku_B", "stock", "28",
-                        isFailed ? "28" : "27", "28", true, true),
-                diffRow("coupons", "SAVE10", "used_count", "142",
-                        isFailed ? "142" : "143", "142", true, true),
-                diffRow("audit_log", "log_" + pkSuffix, "(row)", "-",
-                        "inserted", "kept", false, false));
-
-        long expected = rows.stream().filter(r -> Boolean.TRUE.equals(r.get("expected"))).count();
-        long unexpected = rows.size() - expected;
-        long restored = rows.stream().filter(r -> Boolean.TRUE.equals(r.get("restored"))).count();
-        long tables = rows.stream().map(r -> r.get("table")).distinct().count();
 
         return Map.of(
                 "runId", runId,
+                "status", "UNAVAILABLE",
                 "projectKey", projectKey,
                 "caseId", caseId,
                 "caseName", caseName,
                 "database", database,
                 "summary", Map.of(
-                        "expectedChanges", expected,
-                        "unexpectedChanges", unexpected,
-                        "restoredCount", restored,
-                        "totalRows", (long) rows.size(),
-                        "affectedTables", tables),
-                "rows", rows);
-    }
-
-    private static Map<String, Object> diffRow(String table, String pk, String field,
-            String before, String after, String afterRestore,
-            boolean expected, boolean restored) {
-        Map<String, Object> row = new LinkedHashMap<>();
-        row.put("table", table);
-        row.put("pk", pk);
-        row.put("field", field);
-        row.put("before", before);
-        row.put("after", after);
-        row.put("afterRestore", afterRestore);
-        row.put("expected", expected);
-        row.put("restored", restored);
-        return row;
+                        "expectedChanges", 0,
+                        "unexpectedChanges", 0,
+                        "restoredCount", 0,
+                        "totalRows", 0,
+                        "affectedTables", 0),
+                "rows", List.of());
     }
 
     private static String inferArtifactKind(String filename) {

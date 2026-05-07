@@ -1034,16 +1034,17 @@ class LocalAdminApiServerTest {
             assertTrue(report.body().contains("\"ASSERT_TEXT\""));
             assertTrue(report.body().contains("\"stepsTotal\""));
 
-            // GET /api/phase3/runs/order-smoke-20260425/data-diff — data diff (mock fallback)
+            // GET /api/phase3/runs/order-smoke-20260425/data-diff — data diff empty shell
             HttpResponse<String> dataDiff = client.send(
                     request(server, "/api/phase3/runs/order-smoke-20260425/data-diff"),
                     HttpResponse.BodyHandlers.ofString());
             assertEquals(200, dataDiff.statusCode());
             assertTrue(dataDiff.body().contains("\"order-smoke-20260425\""));
+            assertTrue(dataDiff.body().contains("\"UNAVAILABLE\""));
             assertTrue(dataDiff.body().contains("\"rows\""));
+            assertTrue(dataDiff.body().contains("\"rows\":[]"));
             assertTrue(dataDiff.body().contains("\"summary\""));
             assertTrue(dataDiff.body().contains("\"database\""));
-            assertTrue(dataDiff.body().contains("\"caseName\":\"Checkout smoke\""));
 
             // GET /api/phase3/runs/order-smoke-20260425/assertions — assertions
             HttpResponse<String> assertions = client.send(
