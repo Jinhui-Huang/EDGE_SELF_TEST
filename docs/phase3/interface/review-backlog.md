@@ -538,11 +538,12 @@ It does not authorize UI or backend changes in the current phase.
   - `reports`
   - `reportDetail`
   - `dataDiff`
+- Resolved in the current pass:
+  - `reports` list rows now read tags and other visible summary fields from canonical backend `GET /api/phase3/runs/` rows instead of re-matching `snapshot.cases` on the front end
 - Why this is next:
   - the interface surface exists, but several pages still retain synthetic list/view-model layers, deterministic mock artifacts, or snapshot fallback behavior
   - the report chain is functionally wired, but not fully backend-native yet
 - Backend work still missing:
-  - stronger backend-native `runs` / report-summary contract so list rows are not primarily synthetic front-end derivations
   - reduce or eliminate snapshot-derived `reportDetail` fallback dependence when backend detail reads fail
   - replace deterministic mock data-diff raw / restore-result / recovery / ai-decision payloads with real run-artifact-backed data wherever artifacts should exist
 - Expected outcome:

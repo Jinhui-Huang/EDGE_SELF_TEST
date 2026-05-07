@@ -951,6 +951,7 @@ class LocalAdminApiServerTest {
         reportPayload.put("projectName", "Checkout Web");
         reportPayload.put("caseId", "checkout-smoke");
         reportPayload.put("caseName", "Checkout smoke");
+        reportPayload.put("tags", List.of("smoke", "payment"));
         reportPayload.put("environment", "staging-edge");
         reportPayload.put("model", "claude-4.5-sonnet");
         reportPayload.put("operator", "qa-platform");
@@ -1010,6 +1011,7 @@ class LocalAdminApiServerTest {
             assertTrue(listRuns.body().contains("\"items\""));
             assertTrue(listRuns.body().contains("\"FAILED\""));
             assertTrue(listRuns.body().contains("\"projectKey\":\"checkout-web\""));
+            assertTrue(listRuns.body().contains("\"tags\":[\"smoke\",\"payment\"]"));
 
             // GET /api/phase3/runs/order-smoke-20260425/report-summary — canonical summary
             HttpResponse<String> reportSummary = client.send(

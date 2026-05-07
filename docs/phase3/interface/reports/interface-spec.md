@@ -34,47 +34,49 @@ This document distinguishes:
 Current `reports` screen conclusion:
 
 - current direct read source:
-  - `GET /api/phase3/admin-console`
+  - `GET /api/phase3/runs/`
 - current direct write source:
   - none
 - current direct navigation output:
   - run-detail App-level selected-run handoff via `onOpenDetail(runId)`
-- current report list is not a raw backend list contract; it is a front-end-derived view model built from snapshot data
+- current report list is backend-first from canonical run-summary rows; snapshot/view-model synthesis is fallback-only when the list API is unavailable
 
-## 3. Direct Read Interface: GET /api/phase3/admin-console
+## 3. Direct Read Interface: GET /api/phase3/runs/
 
 ### 3.1 Purpose for Reports Screen
 
-The `reports` screen uses the admin-console snapshot as its current list read model.
+The `reports` screen uses the canonical backend run list as its primary read model.
 
-Relevant snapshot fields for this screen:
+Relevant run-summary fields for this screen:
 
-- `reports[]`
-- `cases[]`
-- `projects[]`
-- `timeline[]`
+- `items[].runId`
+- `items[].runName`
+- `items[].projectKey` / `projectName`
+- `items[].caseId` / `caseName` / `tags[]`
+- `items[].status`
+- `items[].finishedAt`
+- `items[].durationMs`
+- `items[].environment`
+- `items[].stepsPassed` / `stepsTotal`
+- `items[].assertionsPassed` / `assertionsTotal`
 
 ### 3.2 Functional Role by Field
 
-- `reports[]`
-  - provides raw run list seed data
-- `cases[]`
-  - used to infer case identity and tags for each run
-- `projects[]`
-  - used to infer project grouping and labels
-- `timeline[]`
-  - drives the operator timeline side panel
+- backend run-summary rows
+  - provide the canonical report-list catalog shown in the run table
+- `snapshot.timeline[]`
+  - still drives the operator timeline side panel
 
 ### 3.3 Ownership Boundary
 
-- backend/local-admin-api owns the raw snapshot
+- backend/local-admin-api owns the canonical run-summary list contract
 - `App.tsx` owns selected-run state
 - `ReportsScreen.tsx` owns project selection and overview collapse
-- `reportViewModel.ts` owns front-end report-row derivation
+- `reportViewModel.ts` remains fallback-only report-row derivation when the run-list API is unavailable
 
 ## 4. Front-End Derived Report View Model
 
-The biggest interface caveat for this screen is that it does not render a stable backend-native report list DTO.
+The remaining interface caveat for this screen is no longer the primary list path; it is the fallback path used only when the run-list API is unavailable.
 
 ### 4.1 Current Derivation Entry Point
 
@@ -82,7 +84,7 @@ The biggest interface caveat for this screen is that it does not render a stable
 
 ### 4.2 Current Derivation Rules
 
-The view model infers or synthesizes these fields:
+The fallback view model infers or synthesizes these fields:
 
 - best matching case
   - by matching normalized `runName` against case id/name/project key
@@ -107,10 +109,10 @@ The view model infers or synthesizes these fields:
 
 This means the current reports list should be documented as:
 
-- a UI summary model
-- not a stable backend report-list contract
+- backend-native by default
+- snapshot/view-model-derived only when the canonical run-list API is unavailable
 
-Anything derived here should not be treated as already-authoritative interface data.
+Anything derived here should be treated as fallback shell data rather than the authoritative list contract.
 
 ## 5. Local-Only Screen Controls
 
@@ -215,9 +217,9 @@ Those are more appropriate long-term contracts for the report pages than the cur
 
 Recommended Phase 3 evolution:
 
-- keep current list page on aggregated snapshot until a real list endpoint exists
-- move detail rendering toward backend-authored report contracts first
-- later add a list-oriented run/report summary endpoint for `reports`
+- keep the run-list page on `GET /api/phase3/runs/`
+- continue moving `reportDetail` / `dataDiff` away from snapshot fallback and deterministic mock payloads
+- later tighten the remaining backend summary coverage if more list fields need to stop falling back
 
 ## 9. Recommended Future Report Interfaces
 
@@ -227,7 +229,7 @@ Identifier note:
 - future backend path parameters should treat `{runId}` as the canonical run identifier
 - `cases` history handoff now normally arrives with a dedicated canonical `runId`; only older history payloads that still omit `runId` may require temporary `runName` fallback
 
-Because the current list is synthetic, the screen would benefit from dedicated report-list/report-summary interfaces.
+The current list already has dedicated report-list/report-summary interfaces; future work should deepen backend-native coverage rather than reintroduce snapshot derivation.
 
 ### 9.1 Report List Interface
 
@@ -384,8 +386,8 @@ Recommended future read-interface errors:
 
 Review-only findings:
 
-- The current list page is useful as a browsing shell, but its row content is materially front-end-synthesized.
-- `GET /api/phase3/admin-console` is enough for a lightweight overview but not enough for a stable report-list contract.
+- The current list page is backend-native by default, but the snapshot/view-model fallback path still exists when `GET /api/phase3/runs/` is unavailable.
+- `GET /api/phase3/admin-console` remains enough for a lightweight fallback overview but not for the primary stable report-list contract.
 - `Detail` ownership is correctly routed into `reportDetail`.
 - Timeline items still need machine-readable drill-down targets if they are to become actionable.
 

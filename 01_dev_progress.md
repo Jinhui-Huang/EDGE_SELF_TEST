@@ -5064,3 +5064,48 @@ Remaining limits:
 - app-level case catalog save exists, but the visible `cases` screen still does not expose an editable catalog form
 - history run rows still do not hand off into `reportDetail`
 - plans and history remain read-only on the current Phase 3 boundary
+
+## 2026-05-07 P3-3 reports backend-native summary follow-up
+
+## Task
+- Continue the new backlog mainline by pushing one small but high-value part of `P3-3` into code:
+  - reduce `reports` list dependence on front-end synthetic row enrichment
+  - keep scope on the list contract and minimum necessary backend summary fields
+  - do not expand into a full `reportDetail` / `dataDiff` refactor
+
+## Completed
+- Updated backend run-summary assembly in `ReportArtifactService.java`:
+  - `GET /api/phase3/runs/` / `.../report-summary` now include `tags`
+  - tag values are normalized from either array or comma-delimited raw report payloads
+  - fallback summaries now also expose an empty `tags` list
+- Updated frontend list consumption:
+  - `ui/admin-console/src/screens/ReportsScreen.tsx` no longer re-matches `snapshot.cases` to populate API-row tags
+  - canonical run-list rows now supply `caseTags` directly from backend summary data
+  - snapshot/view-model mapping remains only as the existing API-unavailable fallback path
+- Synced minimal regression scaffolding:
+  - `LocalAdminApiServerTest.java` now seeds `tags` into a persisted `report.json` and asserts they round-trip through `GET /api/phase3/runs/`
+- Synced docs:
+  - `docs/phase3/interface/reports/interface-spec.md`
+  - `docs/phase3/interface/reports/functional-spec.md`
+  - `docs/phase3/interface/review-backlog.md`
+
+## Modified Files
+- `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/ReportArtifactService.java`
+- `apps/local-admin-api/src/test/java/com/example/webtest/admin/http/LocalAdminApiServerTest.java`
+- `ui/admin-console/src/types.ts`
+- `ui/admin-console/src/screens/ReportsScreen.tsx`
+- `docs/phase3/interface/reports/interface-spec.md`
+- `docs/phase3/interface/reports/functional-spec.md`
+- `docs/phase3/interface/review-backlog.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Not run by explicit task boundary:
+  - no test run
+  - no build run
+
+## Remaining Limits
+- `reports` list is now backend-first for visible summary rows, but snapshot/view-model fallback still remains when `GET /api/phase3/runs/` is unavailable
+- `reportDetail` still keeps snapshot-derived fallback when backend detail reads fail
+- `dataDiff` still keeps deterministic mock/raw fallback paths that should later be replaced with real run-artifact-backed payloads

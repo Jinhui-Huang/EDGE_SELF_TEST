@@ -301,6 +301,7 @@ public final class ReportArtifactService {
         result.put("projectName", stringValue(raw.get("projectName")));
         result.put("caseId", stringValue(raw.get("caseId")));
         result.put("caseName", stringValue(raw.get("caseName")));
+        result.put("tags", stringListValue(raw.get("tags")));
         result.put("environment", stringValue(raw.get("environment")));
         result.put("model", stringValue(raw.get("model")));
         result.put("operator", stringValue(raw.get("operator")));
@@ -365,6 +366,7 @@ public final class ReportArtifactService {
         result.put("projectName", "");
         result.put("caseId", "");
         result.put("caseName", "");
+        result.put("tags", List.of());
         result.put("environment", "");
         result.put("model", "");
         result.put("operator", "");
@@ -495,6 +497,32 @@ public final class ReportArtifactService {
         } catch (NumberFormatException e) {
             return 0;
         }
+    }
+
+    private static List<String> stringListValue(Object value) {
+        if (value instanceof List<?> l) {
+            List<String> result = new ArrayList<>();
+            for (Object item : l) {
+                String normalized = stringValue(item).trim();
+                if (!normalized.isEmpty()) {
+                    result.add(normalized);
+                }
+            }
+            return result;
+        }
+        String raw = stringValue(value).trim();
+        if (raw.isEmpty()) {
+            return List.of();
+        }
+        String[] parts = raw.split(",");
+        List<String> result = new ArrayList<>();
+        for (String part : parts) {
+            String normalized = part.trim();
+            if (!normalized.isEmpty()) {
+                result.add(normalized);
+            }
+        }
+        return result;
     }
 
     @SuppressWarnings("unchecked")

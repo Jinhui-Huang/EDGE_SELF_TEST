@@ -58,27 +58,24 @@ function formatDuration(ms: number): string {
   return `${minutes}m ${String(remainingSeconds).padStart(2, "0")}s`;
 }
 
-function mapApiToRows(items: RunSummaryItem[], snapshot: AdminConsoleSnapshot): ReportListRow[] {
-  return items.map((item) => {
-    const matchedCase = snapshot.cases.find((testCase) => testCase.id === item.caseId) ?? null;
-    return {
-      runId: item.runId,
-      runName: item.runName || item.runId,
-      status: item.status,
-      finishedAt: item.finishedAt,
-      projectKey: item.projectKey || matchedCase?.projectKey || "unknown-project",
-      projectName: item.projectName || item.projectKey || "Unknown project",
-      caseId: item.caseId || matchedCase?.id || "",
-      caseName: item.caseName || matchedCase?.name || item.runName || item.runId,
-      caseTags: matchedCase?.tags ?? [],
-      duration: formatDuration(item.durationMs),
-      environment: item.environment || "-",
-      stepsPassed: item.stepsPassed,
-      stepsTotal: item.stepsTotal,
-      assertionsPassed: item.assertionsPassed,
-      assertionsTotal: item.assertionsTotal
-    };
-  });
+function mapApiToRows(items: RunSummaryItem[]): ReportListRow[] {
+  return items.map((item) => ({
+    runId: item.runId,
+    runName: item.runName || item.runId,
+    status: item.status,
+    finishedAt: item.finishedAt,
+    projectKey: item.projectKey || "unknown-project",
+    projectName: item.projectName || item.projectKey || "Unknown project",
+    caseId: item.caseId || "",
+    caseName: item.caseName || item.runName || item.runId,
+    caseTags: Array.isArray(item.tags) ? item.tags : [],
+    duration: formatDuration(item.durationMs),
+    environment: item.environment || "-",
+    stepsPassed: item.stepsPassed,
+    stepsTotal: item.stepsTotal,
+    assertionsPassed: item.assertionsPassed,
+    assertionsTotal: item.assertionsTotal
+  }));
 }
 
 function mapFallbackToRows(snapshot: AdminConsoleSnapshot): ReportListRow[] {
@@ -154,7 +151,7 @@ export function ReportsScreen({
   }, [apiBaseUrl]);
 
   const reportProjects = useMemo(() => {
-    const rows = apiLoaded && !apiFailed ? mapApiToRows(apiRuns ?? [], snapshot) : mapFallbackToRows(snapshot);
+    const rows = apiLoaded && !apiFailed ? mapApiToRows(apiRuns ?? []) : mapFallbackToRows(snapshot);
     return groupReportProjects(rows);
   }, [apiFailed, apiLoaded, apiRuns, snapshot]);
 

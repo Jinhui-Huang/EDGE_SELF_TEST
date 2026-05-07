@@ -70,13 +70,13 @@ Current implementation facts:
 - `Detail` on a run row is implemented.
 - project switching is implemented.
 - overview collapse is implemented.
-- the report list is not rendered directly from a backend-native report DTO.
-- instead, the screen first builds front-end report view models from snapshot data.
+- the report list now reads canonical backend run-summary rows from `GET /api/phase3/runs/`.
+- snapshot-derived `buildReportViewModels(snapshot)` rows remain fallback-only when the run-list API is unavailable.
 
 This matters for review:
 
 - the page already provides real navigation into `reportDetail`
-- but many visible row fields are heuristically derived in the front end rather than coming from a stable backend report-list contract
+- but fallback behavior still exists, and `reportDetail` / `dataDiff` continue to carry the bigger synthetic/fallback debt
 
 ## 6. Functional Areas
 
@@ -167,18 +167,27 @@ Current behavior:
 
 ## 7. Data Semantics by Area
 
-### 7.1 Raw Snapshot Report Data
+### 7.1 Primary Backend Run Summary Data
 
-The screen starts from `snapshot.reports[]`, which only provides limited fields such as:
+The screen now starts from `GET /api/phase3/runs/`, which provides stable run-summary fields such as:
 
+- `runId`
 - `runName`
+- `projectKey`
+- `projectName`
+- `caseId`
+- `caseName`
+- `tags`
 - `status`
 - `finishedAt`
-- `entry`
+- `durationMs`
+- `environment`
+- `stepsPassed` / `stepsTotal`
+- `assertionsPassed` / `assertionsTotal`
 
-### 7.2 Front-End Report View Model
+### 7.2 Snapshot Fallback Report View Model
 
-The screen then uses `buildReportViewModels(snapshot)` to derive richer display fields such as:
+When the run-list API is unavailable, the screen falls back to `buildReportViewModels(snapshot)` to derive richer display fields such as:
 
 - project key/name
 - case id/name/tags
@@ -193,8 +202,8 @@ The screen then uses `buildReportViewModels(snapshot)` to derive richer display 
 
 This means:
 
-- the report list is currently an operator-friendly synthetic summary layer
-- it is not yet a fully backend-authored report list contract
+- the normal visible report list is backend-authored
+- the synthetic summary layer still exists only as degraded fallback behavior
 
 ### 7.3 Timeline Data
 
@@ -347,9 +356,9 @@ The `reports` screen is not currently responsible for:
 
 Review items discovered while documenting:
 
-- many visible run-row fields are synthetic front-end derivations rather than backend-native list fields.
-- project/case matching is currently inferred heuristically from `runName`.
-- environment/model/operator/duration/statistics shown in the list are not stable backend list fields yet.
+- the main list rows are backend-native; remaining synthetic dependence in this screen is now confined to fallback rendering when the run-list API is unavailable.
+- project/case matching is currently inferred heuristically from `runName` only in the snapshot fallback path.
+- environment/model/operator/duration/statistics are still less trustworthy in fallback rendering than in backend-native list rows.
 - timeline items are display-only and do not drill into `reportDetail` or `monitor`.
 
 These are documentation review items only. No implementation change is made in this stage.

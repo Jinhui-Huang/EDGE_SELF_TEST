@@ -2123,3 +2123,22 @@
     - no test run
     - no build run
     - no commit / push
+- 2026-05-07: Implemented the first small code slice of `P3-3` for a more backend-native `reports` list.
+  - Backend:
+    - `ReportArtifactService.buildSummary(...)` now includes `tags`
+    - tag values are normalized from either list payloads or comma-delimited strings
+    - fallback summaries now expose `tags: []`
+  - Frontend:
+    - `ReportsScreen` API-row mapping no longer re-matches `snapshot.cases` just to recover tags
+    - canonical `GET /api/phase3/runs/` rows now provide the visible `caseTags` directly
+    - `reportViewModel.ts` remains fallback-only when the run-list API is unavailable
+  - Regression scaffolding:
+    - report-artifact endpoint coverage now seeds `tags` into persisted `report.json`
+    - list-endpoint assertion now checks that backend tags round-trip through `GET /api/phase3/runs/`
+  - Docs:
+    - synced `reports` functional/interface specs to reflect a backend-first list
+    - updated `review-backlog.md` so `P3-3` now records the list-level summary-contract progress while leaving detail/diff fallback debt open
+  - Keep the explicit boundary:
+    - no test run
+    - no build run
+    - no commit / push

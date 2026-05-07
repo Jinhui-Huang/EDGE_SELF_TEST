@@ -423,6 +423,7 @@ export type RunSummaryItem = {
   projectName: string;
   caseId: string;
   caseName: string;
+  tags?: string[];
   environment: string;
   model: string;
   operator: string;
