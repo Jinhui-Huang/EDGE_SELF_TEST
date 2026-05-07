@@ -184,7 +184,7 @@ const reportResponse = {
     {
       kind: "screenshot",
       label: "artifacts/step-1.png",
-      path: "runs/checkout-web-nightly/artifacts/step-1.png"
+      path: "artifacts/step-1.png"
     }
   ]
 };
@@ -1889,8 +1889,8 @@ describe("App", () => {
     const artifactsResponse = {
       runId: "checkout-web-nightly",
       items: [
-        { kind: "report-html", label: "report.html", path: "/runs/checkout-web-nightly/report.html" },
-        { kind: "report-json", label: "report.json", path: "/runs/checkout-web-nightly/report.json" }
+        { kind: "report-html", label: "report.html", path: "report.html" },
+        { kind: "report-json", label: "report.json", path: "report.json" }
       ]
     };
     const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
@@ -1916,6 +1916,64 @@ describe("App", () => {
     expect(await screen.findByText("report.html")).toBeInTheDocument();
     expect(await screen.findByText("report.json")).toBeInTheDocument();
     expect(await screen.findByText(/Artifacts/)).toBeInTheDocument();
+  });
+
+  it("renders inline screenshot preview from report artifact content endpoint", async () => {
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/report")) return jsonResponse(reportResponse);
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    await screen.findByText("Recent runs");
+    await userEvent.click(screen.getByRole("button", { name: "Open run checkout-web-nightly" }));
+
+    const screenshot = await screen.findByRole("img", { name: "artifacts/step-1.png" });
+    expect(screenshot).toHaveAttribute(
+      "src",
+      "http://127.0.0.1:8787/api/phase3/runs/checkout-web-nightly/artifacts/content?path=artifacts%2Fstep-1.png"
+    );
+  });
+
+  it("uses artifact path for screenshot preview when step artifact paths are absent", async () => {
+    const reportWithoutStepScreenshot = {
+      ...reportResponse,
+      steps: [
+        {
+          ...reportResponse.steps[0],
+          artifactPath: null
+        }
+      ],
+      artifacts: [
+        {
+          kind: "screenshot",
+          label: "step-1 preview",
+          path: "rendered/step-1.png"
+        }
+      ]
+    };
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/report")) return jsonResponse(reportWithoutStepScreenshot);
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    await screen.findByText("Recent runs");
+    await userEvent.click(screen.getByRole("button", { name: "Open run checkout-web-nightly" }));
+
+    const screenshot = await screen.findByRole("img", { name: "rendered/step-1.png" });
+    expect(screenshot).toHaveAttribute(
+      "src",
+      "http://127.0.0.1:8787/api/phase3/runs/checkout-web-nightly/artifacts/content?path=rendered%2Fstep-1.png"
+    );
   });
 
   it("keeps reportDetail usable when artifact fetch fails", async () => {

@@ -555,11 +555,29 @@ public final class LocalAdminApiServer implements AutoCloseable {
                     writeJson(exchange, 200, reportService.getAssertions(runId));
                 }
                 case "artifacts" -> {
-                    if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
-                        writeJson(exchange, 405, Map.of("error", "METHOD_NOT_ALLOWED"));
-                        return;
+                    String artifactSub = segments.length > 6 ? segments[6] : "";
+                    if ("content".equals(artifactSub)) {
+                        if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+                            writeJson(exchange, 405, Map.of("error", "METHOD_NOT_ALLOWED"));
+                            return;
+                        }
+                        Map<String, String> query = parseQuery(exchange.getRequestURI().getRawQuery());
+                        String artifactPath = query.getOrDefault("path", "");
+                        if (artifactPath.isBlank()) {
+                            writeJson(exchange, 400, Map.of("error", "BAD_REQUEST", "message", "path query required"));
+                            return;
+                        }
+                        ReportArtifactService.ArtifactContent content = reportService.getArtifactContent(runId, artifactPath);
+                        writeBinary(exchange, 200, content.contentType(), content.bytes());
+                    } else if (artifactSub.isEmpty()) {
+                        if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+                            writeJson(exchange, 405, Map.of("error", "METHOD_NOT_ALLOWED"));
+                            return;
+                        }
+                        writeJson(exchange, 200, reportService.getArtifacts(runId));
+                    } else {
+                        writeJson(exchange, 404, Map.of("error", "NOT_FOUND", "subAction", artifactSub));
                     }
-                    writeJson(exchange, 200, reportService.getArtifacts(runId));
                 }
                 case "recovery" -> {
                     if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
@@ -689,6 +707,15 @@ public final class LocalAdminApiServer implements AutoCloseable {
         byte[] payload = Jsons.writeValueAsString(body).getBytes(StandardCharsets.UTF_8);
         applyCommonHeaders(exchange.getResponseHeaders());
         exchange.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
+        exchange.sendResponseHeaders(status, payload.length);
+        try (OutputStream outputStream = exchange.getResponseBody()) {
+            outputStream.write(payload);
+        }
+    }
+
+    private static void writeBinary(HttpExchange exchange, int status, String contentType, byte[] payload) throws IOException {
+        applyCommonHeaders(exchange.getResponseHeaders());
+        exchange.getResponseHeaders().set("Content-Type", contentType);
         exchange.sendResponseHeaders(status, payload.length);
         try (OutputStream outputStream = exchange.getResponseBody()) {
             outputStream.write(payload);

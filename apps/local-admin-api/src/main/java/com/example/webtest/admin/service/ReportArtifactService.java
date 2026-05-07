@@ -17,6 +17,8 @@ import java.util.stream.Stream;
  * responses for the admin-console report pages.
  */
 public final class ReportArtifactService {
+    public record ArtifactContent(byte[] bytes, String contentType) {}
+
     private final Path reportRoot;
 
     public ReportArtifactService(Path reportRoot) {
@@ -209,15 +211,25 @@ public final class ReportArtifactService {
             try (Stream<Path> files = Files.list(dir)) {
                 files.filter(Files::isRegularFile).forEach(file -> {
                     String name = file.getFileName().toString();
+                    String relativePath = dir.relativize(file).toString().replace('\\', '/');
                     artifactItems.add(Map.of(
                             "kind", inferArtifactKind(name),
                             "label", name,
-                            "path", file.toAbsolutePath().normalize().toString()));
+                            "path", relativePath));
                 });
             } catch (IOException ignored) {
             }
         }
         return Map.of("runId", runId, "items", artifactItems);
+    }
+
+    public ArtifactContent getArtifactContent(String runId, String artifactPath) throws IOException {
+        Path runDir = resolveRunDir(runId);
+        Path resolved = runDir.resolve(artifactPath).normalize();
+        if (!resolved.startsWith(runDir) || !Files.isRegularFile(resolved)) {
+            throw new IllegalArgumentException("Artifact not found: " + artifactPath);
+        }
+        return new ArtifactContent(Files.readAllBytes(resolved), inferContentType(resolved.getFileName().toString()));
     }
 
     // ---- GET /api/phase3/runs/{runId}/recovery ----
@@ -341,10 +353,11 @@ public final class ReportArtifactService {
             try (Stream<Path> files = Files.list(dir)) {
                 files.filter(Files::isRegularFile).forEach(file -> {
                     String name = file.getFileName().toString();
+                    String relativePath = dir.relativize(file).toString().replace('\\', '/');
                     artifacts.add(Map.of(
                             "kind", inferArtifactKind(name),
                             "label", name,
-                            "path", file.toAbsolutePath().normalize().toString()));
+                            "path", relativePath));
                 });
             } catch (IOException ignored) {
             }
@@ -436,6 +449,35 @@ public final class ReportArtifactService {
             return "screenshot";
         }
         return "other";
+    }
+
+    private static String inferContentType(String filename) {
+        String normalized = filename.toLowerCase();
+        if (normalized.endsWith(".png")) {
+            return "image/png";
+        }
+        if (normalized.endsWith(".jpg") || normalized.endsWith(".jpeg")) {
+            return "image/jpeg";
+        }
+        if (normalized.endsWith(".gif")) {
+            return "image/gif";
+        }
+        if (normalized.endsWith(".webp")) {
+            return "image/webp";
+        }
+        if (normalized.endsWith(".svg")) {
+            return "image/svg+xml";
+        }
+        if (normalized.endsWith(".html")) {
+            return "text/html; charset=utf-8";
+        }
+        if (normalized.endsWith(".json")) {
+            return "application/json; charset=utf-8";
+        }
+        if (normalized.endsWith(".txt") || normalized.endsWith(".log")) {
+            return "text/plain; charset=utf-8";
+        }
+        return "application/octet-stream";
     }
 
     private static String stringValue(Object value) {

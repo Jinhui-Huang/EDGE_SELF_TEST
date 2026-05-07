@@ -5194,6 +5194,129 @@ Remaining limits:
 - `reportDetail` still keeps snapshot-derived fallback when backend detail reads fail
 - artifact/screenshot inline viewing is still not implemented
 
+## 2026-05-07 P3-3 reportDetail screenshot inline-preview follow-up
+
+## Task
+- Continue the current `P3-3` code path with one small but real artifact-read slice:
+  - stop leaving `reportDetail` screenshots at path-only listing level
+  - add a minimal backend content-read route for run-local artifacts
+  - use it for inline preview of image-like screenshots on the Overview tab
+
+## Completed
+- Updated `ReportArtifactService.java`:
+  - added `getArtifactContent(runId, artifactPath)` with run-dir path validation
+  - infers basic content types for image/html/json/text files and returns raw bytes
+- Updated `LocalAdminApiServer.java`:
+  - added `GET /api/phase3/runs/{runId}/artifacts/content?path=...`
+  - returns binary content for valid run-local artifact paths
+- Updated `ReportDetailScreen.tsx`:
+  - Overview screenshot cards now derive inline preview URLs from the new backend content endpoint
+  - screenshot previews now prefer `steps[].artifactPath` when available, then fall back to screenshot artifacts
+  - generic artifact drawer remains listing-path-focused
+- Updated `LocalAdminApiServerTest.java` and `App.test.tsx`:
+  - backend test now asserts screenshot content bytes + `image/png`
+  - App-level test now verifies the Overview screenshot `<img>` points at the new content endpoint
+- Synced `reportDetail` specs and `review-backlog.md` to reflect:
+  - image-like Overview screenshots are no longer path-only
+  - generic artifact drawer entries still remain listing-focused
+
+## Modified Files
+- `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/ReportArtifactService.java`
+- `apps/local-admin-api/src/main/java/com/example/webtest/admin/http/LocalAdminApiServer.java`
+- `apps/local-admin-api/src/test/java/com/example/webtest/admin/http/LocalAdminApiServerTest.java`
+- `ui/admin-console/src/screens/ReportDetailScreen.tsx`
+- `ui/admin-console/src/App.test.tsx`
+- `docs/phase3/interface/reportDetail/interface-spec.md`
+- `docs/phase3/interface/reportDetail/functional-spec.md`
+- `docs/phase3/interface/review-backlog.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Not run by explicit task boundary:
+  - no test run
+  - no build run
+
+## Remaining Limits
+- generic artifact drawer entries still remain listing-path-focused; inline read is currently only wired for image-like Overview screenshots
+- synthetic diff rows still remain as a fallback when the main diff API read fails outright
+- `reportDetail` still keeps snapshot-derived fallback when backend detail reads fail
+
+## 2026-05-07 P3-3 reportDetail artifact-path contract fix follow-up
+
+## Task
+- Keep the new `reportDetail` artifact-content capability narrow:
+  - align `artifacts[].path` with `GET /api/phase3/runs/{runId}/artifacts/content?path=...`
+  - remove the remaining mismatch between artifact-list path shape and content-endpoint path expectation
+
+## Completed
+- Updated `ReportArtifactService.java`:
+  - `getArtifacts()` now returns run-local relative `path`
+  - `buildFullReport()` artifact items now use the same run-local relative `path`
+- Left the content endpoint contract unchanged:
+  - `GET /api/phase3/runs/{runId}/artifacts/content?path=...` still reads one run-local artifact path
+  - artifact-list `path` can now be passed back directly without semantic translation
+- Updated regression coverage:
+  - backend test now asserts artifact list `path` uses `screenshot.png`
+  - App-level fallback screenshot preview test now uses a realistic relative `artifacts[].path` and verifies that exact encoded path is used in the preview URL
+- Synced `reportDetail` docs and records to state explicitly that `artifacts[].path` is the run-local path contract shared by both listing and content-read endpoints
+
+## Modified Files
+- `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/ReportArtifactService.java`
+- `apps/local-admin-api/src/test/java/com/example/webtest/admin/http/LocalAdminApiServerTest.java`
+- `ui/admin-console/src/App.test.tsx`
+- `docs/phase3/interface/reportDetail/interface-spec.md`
+- `docs/phase3/interface/reportDetail/functional-spec.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Not run by explicit task boundary:
+  - no test run
+  - no build run
+
+## Remaining Limits
+- generic artifact drawer entries still remain listing-path-focused; inline read is currently only wired for image-like Overview screenshots
+- synthetic diff rows still remain as a fallback when the main diff API read fails outright
+- `reportDetail` still keeps snapshot-derived fallback when backend detail reads fail
+
+## 2026-05-07 P3-3 reportDetail screenshot-path semantic fix follow-up
+
+## Task
+- Keep the just-landed `reportDetail` artifact-content slice narrow:
+  - fix the Overview screenshot fallback path source
+  - ensure `artifacts[]` screenshot preview uses real `path`, not display `label`
+
+## Completed
+- Updated `ReportDetailScreen.tsx`:
+  - `steps[].artifactPath` remains the first-choice screenshot preview source
+  - when that source is absent, the `artifacts[]` screenshot fallback now uses `a.path` for `GET /api/phase3/runs/{runId}/artifacts/content?path=...`
+  - the UI no longer reuses `label` as a fake content path
+- Updated `App.test.tsx`:
+  - added a focused regression case where `steps[].artifactPath` is absent
+  - verified the screenshot `<img>` points at the backend content endpoint with encoded `artifacts[].path`
+- Synced `reportDetail` specs and logs to document the path-source priority:
+  - `steps[].artifactPath` first
+  - `artifacts[].path` fallback
+
+## Modified Files
+- `ui/admin-console/src/screens/ReportDetailScreen.tsx`
+- `ui/admin-console/src/App.test.tsx`
+- `docs/phase3/interface/reportDetail/interface-spec.md`
+- `docs/phase3/interface/reportDetail/functional-spec.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Not run by explicit task boundary:
+  - no test run
+  - no build run
+
+## Remaining Limits
+- generic artifact drawer entries still remain listing-path-focused; inline read is currently only wired for image-like Overview screenshots
+- synthetic diff rows still remain as a fallback when the main diff API read fails outright
+- `reportDetail` still keeps snapshot-derived fallback when backend detail reads fail
+
 ## 2026-05-07 P3-3 dataDiff raw backend-owned empty-shell follow-up
 
 ## Task

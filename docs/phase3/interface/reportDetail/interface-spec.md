@@ -5,6 +5,7 @@ Update note:
 - `ReportsScreen` opens detail through `onOpenDetail(runId)`.
 - `cases` history handoff now also prefers dedicated backend `runId`; only older history rows may still fall back to `runName`.
 - missing `report.json` artifacts now return a backend-owned `UNAVAILABLE` shell for the main report payload instead of forcing the UI straight into snapshot-derived summary fallback.
+- image-like screenshots can now be read through `GET /api/phase3/runs/{runId}/artifacts/content?path=...` and previewed inline on the Overview tab.
 - `reportDetail` reads `GET /api/phase3/runs/{runId}/report` and tab-specific run endpoints, with snapshot fallback only when backend reads fail.
 - missing `recovery.json` artifacts now return a backend-owned `UNAVAILABLE` shell (`items: []`) instead of deterministic mock recovery steps.
 - missing `ai-decisions.json` artifacts now return a backend-owned `UNAVAILABLE` shell (`items: []`) instead of deterministic mock decision logs.
@@ -162,6 +163,7 @@ Current behavior:
 - request: `GET /api/phase3/runs/{runId}/artifacts`
 - owner: `ReportDetailScreen.tsx`
 - success behavior: open artifact listing drawer with kind/label/path for each artifact
+  - `path` is the run-local artifact path reused by `GET /api/phase3/runs/{runId}/artifacts/content?path=...`
 - failure behavior: surface fetch error in action status
 - current state: implemented
 
@@ -409,16 +411,32 @@ Response body:
     {
       "kind": "report-html",
       "label": "report.html",
-      "path": "D:\\...\\runs\\checkout-web-nightly\\report.html"
+      "path": "report.html"
     },
     {
       "kind": "report-json",
       "label": "report.json",
-      "path": "D:\\...\\runs\\checkout-web-nightly\\report.json"
+      "path": "report.json"
     }
   ]
 }
 ```
+
+### 9.7 Artifact Content Interface (implemented)
+
+#### `GET /api/phase3/runs/{runId}/artifacts/content?path=...`
+
+Purpose:
+
+- return artifact bytes for a run-local artifact path
+- the `path` query uses the same run-local relative-path contract returned in `artifacts[].path`
+- currently used by Overview screenshot cards for inline preview
+
+Response behavior:
+
+- `200` with binary content and inferred `Content-Type`
+- `400` when `path` is missing
+- `400` when the requested path escapes the run directory or does not resolve to a regular file
 
 ## 10. Implementation Reference for Wired Controls
 
@@ -429,6 +447,9 @@ Implementation:
 - button calls `GET /api/phase3/runs/{runId}/artifacts`
 - UI opens local artifact listing drawer showing kind/label/path per item
 - drawer has dismiss button to close
+- Overview screenshot cards derive inline preview URLs from `GET /api/phase3/runs/{runId}/artifacts/content?path=...`
+  - prefer `steps[].artifactPath`
+  - fall back to `artifacts[].path` when no step-level screenshot path exists
 
 ### 10.2 `Re-run` (implemented)
 
@@ -470,6 +491,7 @@ Backend error semantics:
 
 - `GET /api/phase3/runs/{runId}/report` returns a backend-owned `UNAVAILABLE` shell when `report.json` does not exist
 - `GET /api/phase3/runs/{runId}/artifacts` returns `200` with empty items when no artifacts are available
+- `GET /api/phase3/runs/{runId}/artifacts/content?path=...` returns binary content for valid run-local artifact paths
 - recovery now returns an explicit backend-owned `UNAVAILABLE` empty shell when no real `recovery.json` exists
 - ai-decisions now returns an explicit backend-owned `UNAVAILABLE` empty shell when no real `ai-decisions.json` exists
 
@@ -479,11 +501,12 @@ Resolved items:
 
 - All tabs are now wired with tab-specific API fetches.
 - `Download artifacts` fetches artifact list from backend and opens listing drawer.
+- Overview screenshots can now preview image-like run artifacts inline through the backend content-read endpoint.
 - `Re-run` hands off run context into `execution` via App-level handoff.
 - Overview tab now distinguishes backend-owned `UNAVAILABLE` report shells from true snapshot-fallback cases.
 - Recovery and AI decisions backend endpoints are implemented in `ReportArtifactService`; both now use file-backed reads with `UNAVAILABLE` empty-shell fallback.
 
 Remaining items:
 
-- Screenshot and artifact content cannot be viewed/downloaded inline — the listing drawer shows file paths only.
+- Generic artifact drawer entries still remain listing-path-focused; inline read is currently only wired for image-like Overview screenshots.
 - Re-run handoff carries `runId` and parses `projectKey` from it, but `environment` and `model` pre-fill depend on report data availability.

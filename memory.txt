@@ -2271,3 +2271,52 @@
     - no test run
     - no build run
     - no commit / push
+- 2026-05-07: Implemented the next small but real `P3-3` artifact-read slice on `reportDetail` by enabling inline screenshot preview.
+  - Backend:
+    - added `GET /api/phase3/runs/{runId}/artifacts/content?path=...`
+    - `ReportArtifactService` now validates run-local artifact paths and returns raw bytes plus inferred content type
+  - Frontend:
+    - `ReportDetailScreen` Overview screenshot cards now render `<img>` previews against the new content endpoint
+    - screenshot previews prefer `steps[].artifactPath` when available, then fall back to screenshot artifacts
+    - generic artifact drawer still remains listing-path-focused
+  - Docs:
+    - synced `reportDetail/interface-spec.md`
+    - synced `reportDetail/functional-spec.md`
+    - refined `review-backlog.md` so screenshot preview is no longer described as path-only
+  - Remaining limits:
+    - generic artifact drawer entries are still not expanded into broad inline/download handling
+    - `reportDetail` snapshot fallback still remains on broader detail-read failures
+  - Keep the explicit boundary:
+    - no test run
+    - no build run
+    - no commit / push
+- 2026-05-07: Applied a tiny follow-up fix on the new `reportDetail` screenshot content-read path semantics.
+  - Frontend:
+    - Overview screenshots still prefer `steps[].artifactPath`
+    - when falling back to `apiReport.artifacts[]`, the content endpoint now uses the real `a.path`
+    - it no longer misuses display `label` as the artifact-content query path
+  - Tests:
+    - added a focused App-level regression where `steps[].artifactPath` is absent and screenshot preview must come from `artifacts[].path`
+  - Docs:
+    - synced `reportDetail/interface-spec.md`
+    - synced `reportDetail/functional-spec.md`
+    - recorded the path-source priority in `01_dev_progress.md` / `memory.txt`
+  - Keep the explicit boundary:
+    - no test run
+    - no build run
+    - no commit / push
+- 2026-05-07: Applied a small contract fix so artifact listing and artifact content-read now share one path semantic.
+  - Backend:
+    - `artifacts[].path` is now emitted as a run-local relative path instead of an absolute filesystem path
+    - `GET /api/phase3/runs/{runId}/artifacts/content?path=...` keeps consuming that same run-local path contract
+  - Frontend/tests:
+    - Overview screenshot fallback already uses `a.path`; the fallback regression test now uses a realistic relative artifact path
+    - backend test now asserts artifact list output also uses the relative path form
+  - Docs:
+    - synced `reportDetail/interface-spec.md`
+    - synced `reportDetail/functional-spec.md`
+    - recorded that `artifacts[].path` and `artifacts/content?path=...` now intentionally share one contract
+  - Keep the explicit boundary:
+    - no test run
+    - no build run
+    - no commit / push

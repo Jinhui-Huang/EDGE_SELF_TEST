@@ -197,9 +197,13 @@ Functional role:
 
 Current behavior:
 
-- screenshot cards are rendered from API report artifacts when available, and otherwise fall back to the current report view model
+- screenshot cards are rendered from API report step/artifact paths when available, and otherwise fall back to the current report view model
 - artifact access is implemented as backend-backed listing via `GET /api/phase3/runs/{runId}/artifacts`
-- the current screen does not support inline artifact open/download content; it shows a listing drawer with file paths only
+- image-like screenshots now use `GET /api/phase3/runs/{runId}/artifacts/content?path=...` for inline preview on the Overview tab
+  - prefer `steps[].artifactPath`
+  - fall back to `artifacts[].path` rather than display `label`
+  - `artifacts[].path` is a run-local relative path, so the same value can be passed back to the content endpoint
+- generic artifact access still remains listing-path-focused in the drawer
 
 ### 6.6 Assertions Panel
 
@@ -295,7 +299,7 @@ Current implementation summary:
 ### 10.2 Hero Controls
 
 - `Download artifacts`
-  - function: retrieve or open run artifacts
+  - function: retrieve or review run artifacts
   - output type: `GET /api/phase3/runs/{runId}/artifacts` then local artifact listing drawer
   - current implementation: implemented
 - `Re-run`
@@ -400,15 +404,15 @@ The `reportDetail` screen is not currently responsible for:
 Resolved items:
 
 - `Download artifacts` is now wired: fetches `GET /api/phase3/runs/{runId}/artifacts` and opens a listing drawer.
+- Overview screenshots can now preview image-like run artifacts inline through `GET /api/phase3/runs/{runId}/artifacts/content?path=...`.
 - `Re-run` is now wired: hands off run context into `execution` via App-level handoff.
 - All tabs are now actionable with tab-specific API fetches.
-- `Recovery` and `AI decisions` backend endpoints are implemented in `ReportArtifactService` with mock fallback data.
+- `Recovery` and `AI decisions` backend endpoints are implemented in `ReportArtifactService` with backend-owned `UNAVAILABLE` empty-shell fallback.
 - Overview tab shows real report data from `GET /api/phase3/runs/{runId}/report` or falls back to synthetic view model.
 
 Remaining items:
 
-- Recovery and AI decisions data are deterministic mock when no real run artifacts exist on disk.
-- Screenshot and artifact content cannot be viewed/downloaded inline — the listing drawer shows file paths only.
+- Generic artifact drawer entries still remain listing-path-focused; inline read is currently only wired for image-like Overview screenshots.
 - Re-run handoff carries `runId` but limited additional context (projectKey parsed from runId, no environment or model pre-fill from report).
 
 ## 16. Suggested Output Files for This Screen Folder

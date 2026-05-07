@@ -1065,6 +1065,15 @@ class LocalAdminApiServerTest {
             assertTrue(artifacts.body().contains("\"report-json\""));
             assertTrue(artifacts.body().contains("\"report-html\""));
             assertTrue(artifacts.body().contains("\"screenshot\""));
+            assertTrue(artifacts.body().contains("\"path\":\"screenshot.png\""));
+
+            // GET /api/phase3/runs/order-smoke-20260425/artifacts/content?path=screenshot.png — inline screenshot content
+            HttpResponse<byte[]> artifactContent = client.send(
+                    request(server, "/api/phase3/runs/order-smoke-20260425/artifacts/content?path=screenshot.png"),
+                    HttpResponse.BodyHandlers.ofByteArray());
+            assertEquals(200, artifactContent.statusCode());
+            assertEquals("image/png", artifactContent.headers().firstValue("Content-Type").orElse(""));
+            assertEquals("fake-png", new String(artifactContent.body(), StandardCharsets.UTF_8));
 
             // GET /api/phase3/runs/order-smoke-20260425/recovery — recovery (mock fallback)
             HttpResponse<String> recovery = client.send(

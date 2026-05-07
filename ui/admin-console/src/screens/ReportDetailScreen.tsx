@@ -278,14 +278,27 @@ export function ReportDetailScreen({
     ? apiReport.assertions.map((a) => ({ name: a.name, actual: a.message || a.status, pass: a.pass }))
     : fallbackReport?.assertions ?? [];
 
-  const displayScreenshots =
-    apiReport?.artifacts
-      ?.filter((a) => a.kind === "screenshot")
-      .map((a, index) => ({
+  const stepScreenshots =
+    apiReport?.steps
+      ?.filter((step) => step.artifactPath)
+      .map((step, index) => ({
         label: String(index + 1).padStart(2, "0"),
-        path: a.label,
-        tone: "accent" as const
-      })) ?? fallbackReport?.screenshots ?? [];
+        path: step.artifactPath ?? "",
+        tone: "accent" as const,
+        previewUrl: `${apiBaseUrl}/api/phase3/runs/${encodeURIComponent(selectedRunId)}/artifacts/content?path=${encodeURIComponent(step.artifactPath ?? "")}`
+      })) ?? [];
+
+  const displayScreenshots =
+    stepScreenshots.length > 0
+      ? stepScreenshots
+      : apiReport?.artifacts
+          ?.filter((a) => a.kind === "screenshot")
+          .map((a, index) => ({
+            label: String(index + 1).padStart(2, "0"),
+            path: a.path,
+            tone: "accent" as const,
+            previewUrl: `${apiBaseUrl}/api/phase3/runs/${encodeURIComponent(selectedRunId)}/artifacts/content?path=${encodeURIComponent(a.path)}`
+          })) ?? fallbackReport?.screenshots ?? [];
 
   const tabDefs: Array<{ key: ReportDetailTab; label: LocalizedCopy }> = [
     { key: "overview", label: C.overview },
@@ -412,10 +425,20 @@ export function ReportDetailScreen({
                 <div key={`${runName}-${item.label}`} className={`reportShotCard ${item.tone}`}>
                   <div className="reportShotIndex">{item.label}</div>
                   <div className="reportShotBody">
-                    <span />
-                    <span />
-                    <span />
-                    <div />
+                    {"previewUrl" in item && item.previewUrl ? (
+                      <img
+                        src={item.previewUrl}
+                        alt={item.path}
+                        style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 12 }}
+                      />
+                    ) : (
+                      <>
+                        <span />
+                        <span />
+                        <span />
+                        <div />
+                      </>
+                    )}
                   </div>
                   <div className="reportShotPath">{item.path}</div>
                 </div>
