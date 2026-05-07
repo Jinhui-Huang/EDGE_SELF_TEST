@@ -5149,6 +5149,62 @@ Remaining limits:
 - `dataDiff` table rows still retain the existing synthetic fallback path when the diff endpoint itself is unavailable
 - `reportDetail` still keeps snapshot-derived fallback when backend detail reads fail
 
+## 2026-05-07 P3-4 monitor live-page backend-artifact follow-up
+
+## Task
+- Start the next higher-value mainline slice under `P3-4`:
+  - tighten `GET /api/phase3/runs/{runId}/live-page`
+  - prefer real run-local live-page/screenshot artifacts over deterministic monitor payload shaping
+  - return an explicit unavailable shell when no live artifact exists
+
+## Completed
+- Updated backend `RunStatusService.java`:
+  - added optional `runsRoot` support for runtime artifact reads
+  - `GET /api/phase3/runs/{runId}/live-page` now prefers:
+    - `runs/<runId>/live-page.json`
+    - referenced or inferred run-local screenshot files
+  - live-page payload now returns:
+    - `status: "AVAILABLE"` when a live artifact is present
+    - `status: "UNAVAILABLE"` shell when no live artifact exists
+  - `screenshotPath` now uses run-local relative-path semantics so it can be consumed by the existing artifact-content read route
+- Updated frontend `MonitorScreen.tsx`:
+  - live-page panel now shows explicit unavailable copy instead of rendering a fake structured page shell when backend status is `UNAVAILABLE`
+  - when `screenshotPath` is present, the panel now renders an inline `<img>` preview via:
+    - `GET /api/phase3/runs/{runId}/artifacts/content?path=...`
+- Synced scaffolding/docs:
+  - `LocalAdminApiApp.java`
+  - `LocalAdminApiServerTest.java`
+  - `MonitorScreen.test.tsx`
+  - `App.test.tsx`
+  - `monitor/interface-spec.md`
+  - `monitor/functional-spec.md`
+  - `review-backlog.md`
+
+## Modified Files
+- `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/RunStatusService.java`
+- `apps/local-admin-api/src/main/java/com/example/webtest/admin/LocalAdminApiApp.java`
+- `apps/local-admin-api/src/test/java/com/example/webtest/admin/http/LocalAdminApiServerTest.java`
+- `ui/admin-console/src/types.ts`
+- `ui/admin-console/src/screens/MonitorScreen.tsx`
+- `ui/admin-console/src/screens/MonitorScreen.test.tsx`
+- `ui/admin-console/src/App.test.tsx`
+- `ui/admin-console/src/styles.css`
+- `docs/phase3/interface/monitor/interface-spec.md`
+- `docs/phase3/interface/monitor/functional-spec.md`
+- `docs/phase3/interface/review-backlog.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Not run by explicit task boundary:
+  - no test run
+  - no build run
+
+## Remaining Limits
+- `monitor` `status` / `steps` / `runtime-log` still remain deterministic when no stronger run-local runtime artifacts exist
+- `monitor` live-page now supports image-like screenshot preview, but it still does not render a richer DOM summary
+- Pause/Abort still record intent only; no true execution-control workflow exists in Phase 3
+
 ## 2026-05-07 P3-3 dataDiff main payload unavailable-shell follow-up
 
 ## Task

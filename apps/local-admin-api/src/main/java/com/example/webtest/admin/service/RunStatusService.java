@@ -24,6 +24,9 @@ import java.util.Map;
  */
 public final class RunStatusService {
 
+    private static final String[] LIVE_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif"};
+
+    private final Path runsRoot;
     private final Path schedulerRequestsPath;
     private final Path schedulerEventsPath;
     private final SchedulerPersistenceService schedulerPersistence;
@@ -34,6 +37,16 @@ public final class RunStatusService {
             Path schedulerEventsPath,
             SchedulerPersistenceService schedulerPersistence,
             Clock clock) {
+        this(null, schedulerRequestsPath, schedulerEventsPath, schedulerPersistence, clock);
+    }
+
+    public RunStatusService(
+            Path runsRoot,
+            Path schedulerRequestsPath,
+            Path schedulerEventsPath,
+            SchedulerPersistenceService schedulerPersistence,
+            Clock clock) {
+        this.runsRoot = runsRoot != null ? runsRoot.toAbsolutePath().normalize() : null;
         this.schedulerRequestsPath = schedulerRequestsPath;
         this.schedulerEventsPath = schedulerEventsPath;
         this.schedulerPersistence = schedulerPersistence;
@@ -182,6 +195,10 @@ public final class RunStatusService {
         Map<String, Object> request = findRequest(runId);
         List<Map<String, Object>> events = findEvents(runId);
         String status = deriveStatus(request, events);
+        Path runDir = resolveRunDir(runId);
+        Path livePageJson = runDir != null ? runDir.resolve("live-page.json") : null;
+        Map<String, Object> liveArtifact = readLivePageArtifact(livePageJson);
+        Path screenshot = resolveLiveScreenshot(runDir, liveArtifact);
 
         // Find latest step event for highlight
         Map<String, Object> latestStep = null;
@@ -196,19 +213,63 @@ public final class RunStatusService {
             }
         }
 
+        if (!liveArtifact.isEmpty() || screenshot != null) {
+            return buildAvailableLivePage(runId, request, status, latestStep, latestStepIndex, liveArtifact, screenshot);
+        }
+
+        return buildUnavailableLivePage(runId);
+    }
+
+    private Map<String, Object> buildAvailableLivePage(
+            String runId,
+            Map<String, Object> request,
+            String status,
+            Map<String, Object> latestStep,
+            int latestStepIndex,
+            Map<String, Object> liveArtifact,
+            Path screenshot) throws IOException {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("runId", runId);
-        result.put("capturedAt", Instant.now(clock).toString());
-        result.put("url", textOr(request, "targetUrl", ""));
-        result.put("title", textOr(request, "title", runId));
-        result.put("pageState", status.equals("RUNNING") ? "active" : "idle");
+        result.put("status", "AVAILABLE");
+        result.put("capturedAt", resolveCapturedAt(liveArtifact, screenshot));
+        result.put("url", firstNonBlank(
+                textOr(liveArtifact, "url", ""),
+                textOr(request, "targetUrl", "")));
+        result.put("title", firstNonBlank(
+                textOr(liveArtifact, "title", ""),
+                textOr(request, "title", ""),
+                runId));
+        result.put("pageState", firstNonBlank(
+                textOr(liveArtifact, "pageState", ""),
+                screenshot != null ? "artifact-captured" : "",
+                status.equals("RUNNING") ? "active" : "idle"));
 
         Map<String, Object> highlight = new LinkedHashMap<>();
-        highlight.put("stepIndex", latestStepIndex);
-        highlight.put("action", latestStep != null ? textOr(latestStep, "detail", "") : "");
-        highlight.put("target", "");
+        Map<String, Object> artifactHighlight = mapValue(liveArtifact.get("highlight"));
+        highlight.put("stepIndex", intValue(artifactHighlight.getOrDefault("stepIndex", latestStepIndex)));
+        highlight.put("action", firstNonBlank(
+                textOr(artifactHighlight, "action", ""),
+                latestStep != null ? textOr(latestStep, "detail", "") : ""));
+        highlight.put("target", textOr(artifactHighlight, "target", ""));
         result.put("highlight", highlight);
+        result.put("screenshotPath", screenshot != null
+                ? runDirRelativePath(resolveRunDir(runId), screenshot)
+                : null);
+        return result;
+    }
 
+    private Map<String, Object> buildUnavailableLivePage(String runId) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("runId", runId);
+        result.put("status", "UNAVAILABLE");
+        result.put("capturedAt", Instant.now(clock).toString());
+        result.put("url", "");
+        result.put("title", "");
+        result.put("pageState", "unavailable");
+        result.put("highlight", Map.of(
+                "stepIndex", 0,
+                "action", "",
+                "target", ""));
         result.put("screenshotPath", null);
         return result;
     }
@@ -336,6 +397,132 @@ public final class RunStatusService {
             }
         }
         return result;
+    }
+
+    private Path resolveRunDir(String runId) {
+        if (runsRoot == null) {
+            return null;
+        }
+        Path resolved = runsRoot.resolve(runId).normalize();
+        if (!resolved.startsWith(runsRoot)) {
+            throw new IllegalArgumentException("Invalid runId: path traversal detected");
+        }
+        return resolved;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> readLivePageArtifact(Path livePageJson) {
+        if (livePageJson == null || !Files.isRegularFile(livePageJson)) {
+            return Map.of();
+        }
+        try {
+            Map<String, Object> value = Jsons.readValue(Files.readString(livePageJson, StandardCharsets.UTF_8), Map.class);
+            return value != null ? value : Map.of();
+        } catch (IOException ignored) {
+            return Map.of();
+        }
+    }
+
+    private Path resolveLiveScreenshot(Path runDir, Map<String, Object> liveArtifact) throws IOException {
+        if (runDir == null || !Files.isDirectory(runDir)) {
+            return null;
+        }
+        String rawPath = textOr(liveArtifact, "screenshotPath", "");
+        Path normalized = normalizeArtifactPath(runDir, rawPath);
+        if (normalized != null) {
+            return normalized;
+        }
+        try (var walk = Files.walk(runDir, 2)) {
+            return walk
+                    .filter(Files::isRegularFile)
+                    .filter(this::isImageArtifact)
+                    .sorted((left, right) -> Long.compare(scoreLiveScreenshot(right), scoreLiveScreenshot(left)))
+                    .findFirst()
+                    .orElse(null);
+        }
+    }
+
+    private Path normalizeArtifactPath(Path runDir, String rawPath) {
+        if (rawPath == null || rawPath.isBlank()) {
+            return null;
+        }
+        Path candidate;
+        try {
+            candidate = Path.of(rawPath).normalize();
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+        if (!candidate.isAbsolute()) {
+            candidate = runDir.resolve(candidate).normalize();
+        }
+        if (!candidate.startsWith(runDir) || !Files.isRegularFile(candidate)) {
+            return null;
+        }
+        return candidate;
+    }
+
+    private boolean isImageArtifact(Path file) {
+        String filename = file.getFileName().toString().toLowerCase(Locale.ROOT);
+        for (String extension : LIVE_IMAGE_EXTENSIONS) {
+            if (filename.endsWith(extension)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private long scoreLiveScreenshot(Path file) {
+        String normalized = file.toString().replace('\\', '/').toLowerCase(Locale.ROOT);
+        long score = 0;
+        if (normalized.contains("/live/")) {
+            score += 4;
+        }
+        if (normalized.contains("live-page")) {
+            score += 3;
+        }
+        if (normalized.contains("screenshot")) {
+            score += 2;
+        }
+        try {
+            score += Files.getLastModifiedTime(file).toMillis();
+        } catch (IOException ignored) {
+        }
+        return score;
+    }
+
+    private String resolveCapturedAt(Map<String, Object> liveArtifact, Path screenshot) throws IOException {
+        String capturedAt = textOr(liveArtifact, "capturedAt", "");
+        if (!capturedAt.isBlank()) {
+            return capturedAt;
+        }
+        if (screenshot != null && Files.isRegularFile(screenshot)) {
+            return Files.getLastModifiedTime(screenshot).toInstant().toString();
+        }
+        return Instant.now(clock).toString();
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return "";
+    }
+
+    private String runDirRelativePath(Path runDir, Path artifactPath) {
+        if (runDir == null || artifactPath == null) {
+            return "";
+        }
+        return runDir.relativize(artifactPath).toString().replace('\\', '/');
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> mapValue(Object value) {
+        if (value instanceof Map<?, ?> m) {
+            return (Map<String, Object>) m;
+        }
+        return Map.of();
     }
 
     private String deriveStatus(Map<String, Object> request, List<Map<String, Object>> events) {

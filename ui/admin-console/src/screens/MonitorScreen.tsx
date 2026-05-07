@@ -209,6 +209,10 @@ export function MonitorScreen({
   const queueLead = snapshot.workQueue[0];
   const runningStep = steps.find((step) => step.state === "RUNNING");
   const activeDetailKind = selectedStep ? "step" : selectedLog ? "log" : null;
+  const livePageStatus = livePage?.status ?? "UNAVAILABLE";
+  const liveScreenshotUrl = runId && livePage?.screenshotPath
+    ? `${apiBaseUrl}/api/phase3/runs/${encodeURIComponent(runId)}/artifacts/content?path=${encodeURIComponent(livePage.screenshotPath)}`
+    : null;
 
   return (
     <div className="monitorScreen">
@@ -354,11 +358,28 @@ export function MonitorScreen({
             <h3>{t(copy("Live page", "实时页面", "ライブページ"))}</h3>
             <span className="monitorPill mono">
               <span className="monitorPillIcon info">▣</span>
-              {livePage?.url ? safeHostname(livePage.url) : safeHostname(runStatus?.currentPage?.url) || "--"}
+              {livePageStatus === "AVAILABLE" ? safeHostname(livePage?.url) || "--" : "--"}
             </span>
           </div>
           <div className="monitorViewport">
-            <div className="monitorCheckoutMock">
+            {livePageStatus === "UNAVAILABLE" ? (
+              <p className="monitorEmptyHint">
+                {t(copy(
+                  "No live page artifact available.",
+                  "当前没有可读的 live page 产物。",
+                  "利用可能な live page artifact はまだありません。"
+                ))}
+              </p>
+            ) : (
+              <>
+                {liveScreenshotUrl ? (
+                  <img
+                    className="monitorScreenshotPreview"
+                    src={liveScreenshotUrl}
+                    alt={livePage?.title || runId}
+                  />
+                ) : null}
+                <div className="monitorCheckoutMock">
               <div className="monitorCheckoutTitle">{livePage?.title ?? runId}</div>
               <div className="monitorCheckoutGrid">
                 <div className="monitorField">
@@ -380,6 +401,8 @@ export function MonitorScreen({
                 <span>step {livePage.highlight.stepIndex} · {livePage.highlight.action || "active"}</span>
               </div>
             ) : null}
+              </>
+            )}
           </div>
         </section>
 

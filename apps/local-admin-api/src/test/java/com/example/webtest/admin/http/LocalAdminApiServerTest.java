@@ -609,6 +609,102 @@ class LocalAdminApiServerTest {
     }
 
     @Test
+    void monitorLivePagePrefersRunLocalArtifactsAndReturnsUnavailableShellWhenAbsent(@TempDir Path tempDir) throws Exception {
+        Path runsDir = tempDir.resolve("runs");
+        Path checkoutRunDir = runsDir.resolve("checkout-web-smoke");
+        Files.createDirectories(checkoutRunDir.resolve("live"));
+        Files.writeString(checkoutRunDir.resolve("live-page.json"), Jsons.writeValueAsString(Map.of(
+                "capturedAt", "2026-05-07T09:03:31Z",
+                "url", "https://example.test/checkout",
+                "title", "Checkout",
+                "pageState", "checkout.form",
+                "highlight", Map.of(
+                        "stepIndex", 2,
+                        "action", "Inspect payment button",
+                        "target", "#pay-now"),
+                "screenshotPath", "live/step-5.png")), StandardCharsets.UTF_8);
+        Files.writeString(checkoutRunDir.resolve("live").resolve("step-5.png"), "fake-live-png", StandardCharsets.UTF_8);
+
+        Path schedulerRequestsFile = tempDir.resolve("scheduler-requests.json");
+        Path schedulerEventsFile = tempDir.resolve("scheduler-events.json");
+        Path schedulerStateFile = tempDir.resolve("scheduler-state.json");
+        Path queueFile = tempDir.resolve("execution-queue.json");
+        Path catalogFile = tempDir.resolve("project-catalog.json");
+        Path executionHistoryFile = tempDir.resolve("execution-history.json");
+        Path modelConfigFile = tempDir.resolve("model-config.json");
+        Path environmentConfigFile = tempDir.resolve("environment-config.json");
+        Files.writeString(queueFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(catalogFile, Jsons.writeValueAsString(Map.of("projects", List.of(), "cases", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(executionHistoryFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(modelConfigFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(environmentConfigFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(schedulerRequestsFile, Jsons.writeValueAsString(Map.of(
+                "requests", List.of(
+                        Map.of(
+                                "runId", "checkout-web-smoke",
+                                "projectKey", "checkout-web",
+                                "owner", "qa-platform",
+                                "environment", "prod-like",
+                                "targetUrl", "https://example.test/checkout",
+                                "title", "Checkout smoke"),
+                        Map.of(
+                                "runId", "missing-live-artifact",
+                                "projectKey", "checkout-web",
+                                "owner", "qa-platform",
+                                "environment", "prod-like",
+                                "targetUrl", "https://example.test/checkout",
+                                "title", "Missing live page")))), StandardCharsets.UTF_8);
+        Files.writeString(schedulerEventsFile, Jsons.writeValueAsString(Map.of(
+                "events", List.of(
+                        Map.of("runId", "checkout-web-smoke", "type", "STEP_RUNNING", "detail", "Inspect payment button", "at", "2026-05-07T09:03:30Z"),
+                        Map.of("runId", "missing-live-artifact", "type", "STEP_RUNNING", "detail", "Open checkout", "at", "2026-05-07T09:00:00Z")))), StandardCharsets.UTF_8);
+
+        Clock clock = Clock.fixed(Instant.parse("2026-05-07T09:10:00Z"), ZoneOffset.UTC);
+        SchedulerPersistenceService schedulerPersistence = new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, clock);
+        try (LocalAdminApiServer server = new LocalAdminApiServer(
+                new InetSocketAddress("127.0.0.1", 0),
+                new Phase3MockDataService(
+                        runsDir,
+                        schedulerRequestsFile,
+                        schedulerEventsFile,
+                        schedulerStateFile,
+                        queueFile,
+                        catalogFile,
+                        executionHistoryFile,
+                        modelConfigFile,
+                        environmentConfigFile,
+                        clock),
+                schedulerPersistence,
+                new ConfigPersistenceService(
+                        modelConfigFile,
+                        environmentConfigFile),
+                new CatalogPersistenceService(catalogFile, clock),
+                new RunStatusService(runsDir, schedulerRequestsFile, schedulerEventsFile, schedulerPersistence, clock),
+                new AgentGenerateService(),
+                new ReportArtifactService(runsDir),
+                new DataTemplatePersistenceService(tempDir.resolve("data-templates.json"), clock))) {
+            server.start();
+            HttpClient client = HttpClient.newHttpClient();
+
+            HttpResponse<String> available = client.send(
+                    request(server, "/api/phase3/runs/checkout-web-smoke/live-page"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, available.statusCode());
+            assertTrue(available.body().contains("\"status\":\"AVAILABLE\""));
+            assertTrue(available.body().contains("\"screenshotPath\":\"live/step-5.png\""));
+            assertTrue(available.body().contains("\"pageState\":\"checkout.form\""));
+
+            HttpResponse<String> unavailable = client.send(
+                    request(server, "/api/phase3/runs/missing-live-artifact/live-page"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, unavailable.statusCode());
+            assertTrue(unavailable.body().contains("\"status\":\"UNAVAILABLE\""));
+            assertTrue(unavailable.body().contains("\"screenshotPath\":null"));
+            assertTrue(unavailable.body().contains("\"pageState\":\"unavailable\""));
+        }
+    }
+
+    @Test
     void persistsEditableCatalogProjectsAndReflectsThemInSnapshots(@TempDir Path tempDir) throws Exception {
         Path runsDir = tempDir.resolve("runs");
         Files.createDirectories(runsDir);

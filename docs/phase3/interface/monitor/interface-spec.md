@@ -300,6 +300,7 @@ Response body:
 ```json
 {
   "runId": "checkout-web-smoke",
+  "status": "AVAILABLE",
   "capturedAt": "2026-04-20T05:31:49Z",
   "url": "https://app.acme.example/checkout",
   "title": "Checkout",
@@ -309,9 +310,33 @@ Response body:
     "action": "click",
     "target": "button.pay"
   },
-  "screenshotPath": "D:\\...\\runs\\checkout-web-smoke\\live\\step-5.png"
+  "screenshotPath": "live/step-5.png"
 }
 ```
+
+When no run-local live-page artifact is available, the backend returns an explicit unavailable shell instead of fabricating a live page:
+
+```json
+{
+  "runId": "checkout-web-smoke",
+  "status": "UNAVAILABLE",
+  "capturedAt": "2026-04-20T05:31:49Z",
+  "url": "",
+  "title": "",
+  "pageState": "unavailable",
+  "highlight": {
+    "stepIndex": 0,
+    "action": "",
+    "target": ""
+  },
+  "screenshotPath": null
+}
+```
+
+Current screen behavior:
+
+- when `status === "AVAILABLE"` and `screenshotPath` is present, `MonitorScreen` resolves the image through the existing run artifact-content read path:
+  - `GET /api/phase3/runs/{runId}/artifacts/content?path=...`
 
 ### 7.5 Pause Control Interface
 
@@ -471,8 +496,9 @@ Current implementation:
 
 ## 11. Remaining Limits
 
-- Runtime data is deterministic mock from the backend when no real run artifacts or live execution exist.
+- `live-page` now prefers run-local `live-page.json` / screenshot artifacts and returns an explicit `UNAVAILABLE` shell when they are absent.
+- `status`, `steps`, and `runtime-log` still remain deterministic runtime reads when no stronger run-local runtime artifacts exist.
 - Pause/Abort record intent only; the backend does not trigger real execution-control workflows in Phase 3.
 - Step rows and runtime log rows now use local detail panels rather than a separate page or route.
-- Live page panel shows structured data only; no real screenshot or DOM summary is rendered.
+- Live page panel now inlines image-like screenshots when `screenshotPath` is present, but it still does not render a richer DOM summary.
 - `GET /api/phase3/admin-console` is still used for queue pressure in the footer; deeper runtime context comes from run-specific APIs.

@@ -41,9 +41,9 @@ It does not authorize UI or backend changes in the current phase.
   - Pause/Abort show pending/success/error feedback, refresh runtime data on success
   - idle/loading/error/loaded states fully implemented
 - Remaining limits:
-  - runtime data is deterministic mock from backend when no real run artifacts exist
+  - `live-page` now prefers run-local live artifacts and returns an explicit `UNAVAILABLE` shell when they are absent, but `status` / `steps` / `runtime-log` still remain deterministic when no stronger runtime artifacts exist
   - Pause/Abort record intent only, no real execution-control workflow in Phase 3
-  - live page shows structured data only, no real screenshot
+  - live page still does not render a richer DOM summary beyond the current screenshot + compact structured payload
 
 ### P0-7. Monitor Drill-Down Panels — DONE
 
@@ -65,8 +65,8 @@ It does not authorize UI or backend changes in the current phase.
   - no new route or sub-page was added
   - `monitor` remains a runtime observation page, not an editing or orchestration page
 - Remaining limits:
-  - runtime data is still deterministic mock when no real run artifacts exist
-  - live page remains structured-data only; no real screenshot or DOM summary is rendered
+  - `status` / `steps` / `runtime-log` still remain deterministic when no stronger runtime artifacts exist
+  - live page now uses run-local artifact reads when available, but still does not render a richer DOM summary
 - Test coverage:
   - click step row opens detail
   - click runtime log row opens detail
@@ -564,7 +564,7 @@ It does not authorize UI or backend changes in the current phase.
 - Why this is next:
   - both chains are wired, but important runtime/browser-facing data is still deterministic mock or intent-only
 - Backend work still missing:
-  - `monitor`: real runtime status/step/log/live-page sourcing instead of deterministic mock when real run artifacts exist
+  - `monitor`: continue moving `status` / `steps` / `runtime-log` from deterministic runtime shaping toward stronger run-local artifact or execution-backed reads
   - `monitor`: real execution-control workflow behind Pause/Abort instead of record-intent-only behavior
   - `plugin`: richer page-summary/platform context from real extension/native-host data instead of deterministic local rules where applicable
 - Expected outcome:

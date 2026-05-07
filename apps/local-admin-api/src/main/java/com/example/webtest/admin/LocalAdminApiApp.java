@@ -110,6 +110,7 @@ public final class LocalAdminApiApp {
                         environmentConfigFile),
                 new CatalogPersistenceService(catalogFile, clock),
                 new RunStatusService(
+                        reportRoot,
                         schedulerRequestsFile,
                         schedulerEventsFile,
                         schedulerPersistence,

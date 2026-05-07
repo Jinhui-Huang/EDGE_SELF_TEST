@@ -167,8 +167,9 @@ Functional role:
 Current behavior:
 
 - panel driven by `livePage` from `GET /api/phase3/runs/{runId}/live-page`
-- shows URL, page state, and active step highlight from API response
-- no true screenshot is rendered (uses structured data instead)
+- shows explicit unavailable state when no run-local live artifact exists
+- when a run-local screenshot is present, the panel can render it inline from the existing run artifact-content read path
+- keeps URL, page state, and active step highlight from the same backend-owned payload
 
 ### 6.5 AI Runtime Log Panel
 
@@ -225,7 +226,7 @@ The screen loads runtime data from dedicated APIs when `selectedRunId` is provid
 - `runStatus` from `GET /api/phase3/runs/{runId}/status` — run identity, progress, counters, control state
 - `steps` from `GET /api/phase3/runs/{runId}/steps` — step timeline and state
 - `runtimeLog` from `GET /api/phase3/runs/{runId}/runtime-log` — AI decision and runtime event entries
-- `livePage` from `GET /api/phase3/runs/{runId}/live-page` — current page URL, state, and highlight
+- `livePage` from `GET /api/phase3/runs/{runId}/live-page` — backend-owned availability status, current page URL/state/highlight, and optional run-local screenshot path
 
 ## 8. Screen Inputs and Outputs
 
@@ -376,9 +377,10 @@ The `monitor` screen is not currently responsible for:
 
 ## 15. Remaining Limits
 
-- Runtime data is deterministic mock from the backend when no real run artifacts exist.
+- `livePage` now prefers run-local live-page artifacts and returns an explicit unavailable shell when none exist.
+- `status`, `steps`, and `runtimeLog` still remain deterministic runtime reads when no stronger run-local runtime artifacts exist.
 - Step rows and runtime log rows now open local drill-down detail panels using existing runtime payload only; no new backend interface is required.
-- Live page panel shows structured data only; no real screenshot is rendered.
+- Live page panel can now inline image-like screenshots, but it still does not render a richer DOM summary.
 - Pause/Abort record intent only; the backend does not trigger real execution-control workflows in Phase 3.
 
 ## 16. Suggested Output Files for This Screen Folder

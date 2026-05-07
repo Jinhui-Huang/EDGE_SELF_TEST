@@ -100,6 +100,7 @@ const runtimeLogResponse: RuntimeLogResponse = {
 
 const livePageResponse: LivePage = {
   runId: "checkout-web-smoke",
+  status: "AVAILABLE",
   capturedAt: "2026-05-05T10:03:46Z",
   url: "https://example.test/checkout",
   title: "Checkout",
@@ -306,5 +307,57 @@ describe("MonitorScreen", () => {
     expect(await screen.findByText("Status API: HTTP 500")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Step detail" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Runtime log detail" })).not.toBeInTheDocument();
+  });
+
+  it("shows an explicit unavailable shell when no live-page artifact exists", async () => {
+    vi.stubGlobal("fetch", createFetchMock({
+      livePage: {
+        ...livePageResponse,
+        status: "UNAVAILABLE",
+        title: "",
+        url: "",
+        pageState: "unavailable",
+        highlight: { stepIndex: 0, action: "", target: "" },
+        screenshotPath: null
+      }
+    }));
+
+    render(
+      <MonitorScreen
+        snapshot={snapshot}
+        title="Execution monitor"
+        locale="en"
+        selectedRunId="checkout-web-smoke"
+        apiBaseUrl="http://127.0.0.1:8787"
+      />
+    );
+
+    expect(await screen.findByText("No live page artifact available.")).toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: "Checkout" })).not.toBeInTheDocument();
+  });
+
+  it("renders an inline screenshot preview when the live-page payload provides one", async () => {
+    vi.stubGlobal("fetch", createFetchMock({
+      livePage: {
+        ...livePageResponse,
+        screenshotPath: "live/step-5.png"
+      }
+    }));
+
+    render(
+      <MonitorScreen
+        snapshot={snapshot}
+        title="Execution monitor"
+        locale="en"
+        selectedRunId="checkout-web-smoke"
+        apiBaseUrl="http://127.0.0.1:8787"
+      />
+    );
+
+    const image = await screen.findByRole("img", { name: "Checkout" });
+    expect(image).toHaveAttribute(
+      "src",
+      "http://127.0.0.1:8787/api/phase3/runs/checkout-web-smoke/artifacts/content?path=live%2Fstep-5.png"
+    );
   });
 });

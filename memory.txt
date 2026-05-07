@@ -2369,3 +2369,26 @@
     - no test run
     - no build run
     - no commit / push
+- 2026-05-07: Started `P3-4` on `monitor` by tightening `GET /api/phase3/runs/{runId}/live-page`.
+  - Backend:
+    - `RunStatusService` now accepts optional `runsRoot` context for runtime artifact reads
+    - `live-page` now prefers `runs/<runId>/live-page.json` plus referenced or inferred run-local screenshot files
+    - missing live-page artifacts no longer fall back to deterministic page shaping; the backend now returns:
+      - `status: "UNAVAILABLE"`
+      - empty title/url
+      - `pageState: "unavailable"`
+      - `screenshotPath: null`
+    - available live-page artifacts now return:
+      - `status: "AVAILABLE"`
+      - run-local relative `screenshotPath`
+  - Frontend:
+    - `MonitorScreen` live-page panel now renders explicit unavailable copy for the backend-owned unavailable shell
+    - when `screenshotPath` is present, the panel now renders inline `<img>` preview through the existing artifact-content endpoint
+  - Tests/docs:
+    - added backend regression for `AVAILABLE` live-page artifact vs `UNAVAILABLE` shell
+    - added frontend regressions for unavailable live-page shell and inline screenshot preview
+    - synced `monitor/interface-spec.md`, `monitor/functional-spec.md`, and `review-backlog.md`
+  - Keep the explicit boundary:
+    - no test run
+    - no build run
+    - no commit / push

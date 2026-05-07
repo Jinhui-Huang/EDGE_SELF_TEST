@@ -330,6 +330,7 @@ export type RuntimeLogResponse = {
 
 export type LivePage = {
   runId: string;
+  status: string;
   capturedAt: string;
   url: string;
   title: string;

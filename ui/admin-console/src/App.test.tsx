@@ -273,6 +273,7 @@ const monitorRuntimeLogResponse = {
 
 const monitorLivePageResponse = {
   runId: "checkout-web-smoke",
+  status: "AVAILABLE",
   capturedAt: "2026-04-18T09:03:31Z",
   url: "https://example.test/checkout",
   title: "Checkout",
