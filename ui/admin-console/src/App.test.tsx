@@ -1430,8 +1430,8 @@ describe("App", () => {
       uploaded: [{ id: "checkout-web-test-doc-md", name: "test-doc.md" }]
     };
     const rawResponse = {
-      documentId: "checkout-web-primary",
-      name: "checkout-regression-v3.md",
+      documentId: "checkout-web-test-doc-md",
+      name: "test-doc.md",
       projectKey: "checkout-web",
       content: "# Checkout regression\n\nUploaded raw source",
       uploadedAt: "2026-04-25T10:00:00Z"
@@ -1441,17 +1441,37 @@ describe("App", () => {
       if (url.endsWith("/api/phase3/admin-console")) {
         return jsonResponse(snapshot);
       }
+      if (url.endsWith("/api/phase3/documents")) {
+        return jsonResponse({
+          items: [
+            {
+              id: "checkout-web-primary",
+              name: "checkout-regression-v3.md",
+              projectKey: "checkout-web",
+              projectName: "checkout-web",
+              status: "PARSED",
+              updatedAt: "2026-04-25T10:00:00Z",
+              model: "claude-4.5",
+              detectedCases: 0,
+              subtitle: "Parsed recently / claude-4.5 / 0 cases detected"
+            }
+          ]
+        });
+      }
       if (url.endsWith("/api/phase3/documents/upload")) {
         return jsonResponse(uploadResponse, 202);
       }
-       if (url.endsWith("/api/phase3/documents/checkout-web-primary/parse-result")) {
-        return jsonResponse({ status: "NOT_FOUND", documentId: "checkout-web-primary" });
+      if (url.endsWith("/api/phase3/documents/checkout-web-test-doc-md/parse-result")
+        || url.endsWith("/api/phase3/documents/checkout-web-primary/parse-result")) {
+        return jsonResponse({ status: "NOT_FOUND", documentId: "checkout-web-test-doc-md" });
       }
-      if (url.endsWith("/api/phase3/documents/checkout-web-primary/raw")) {
+      if (url.endsWith("/api/phase3/documents/checkout-web-test-doc-md/raw")
+        || url.endsWith("/api/phase3/documents/checkout-web-primary/raw")) {
         return jsonResponse(rawResponse);
       }
-      if (url.endsWith("/api/phase3/documents/checkout-web-primary/versions")) {
-        return jsonResponse({ documentId: "checkout-web-primary", items: [] });
+      if (url.endsWith("/api/phase3/documents/checkout-web-test-doc-md/versions")
+        || url.endsWith("/api/phase3/documents/checkout-web-primary/versions")) {
+        return jsonResponse({ documentId: "checkout-web-test-doc-md", items: [] });
       }
       throw new Error(`Unexpected fetch: ${url} ${init?.method ?? "GET"}`);
     });
@@ -1532,6 +1552,23 @@ describe("App", () => {
       if (url.endsWith("/api/phase3/admin-console")) {
         return jsonResponse(snapshot);
       }
+      if (url.endsWith("/api/phase3/documents")) {
+        return jsonResponse({
+          items: [
+            {
+              id: "checkout-web-primary",
+              name: "checkout-regression-v3.md",
+              projectKey: "checkout-web",
+              projectName: "checkout-web",
+              status: "PARSED",
+              updatedAt: "2026-04-25T10:00:00Z",
+              model: "claude-4.5",
+              detectedCases: 1,
+              subtitle: "Parsed recently / claude-4.5 / 1 cases detected"
+            }
+          ]
+        });
+      }
       if (url.endsWith("/api/phase3/documents/checkout-web-primary/parse-result")) {
         return jsonResponse(parseResultResponse);
       }
@@ -1582,6 +1619,23 @@ describe("App", () => {
       const url = String(input);
       if (url.endsWith("/api/phase3/admin-console")) {
         return jsonResponse(snapshot);
+      }
+      if (url.endsWith("/api/phase3/documents")) {
+        return jsonResponse({
+          items: [
+            {
+              id: "checkout-web-primary",
+              name: "checkout-regression-v3.md",
+              projectKey: "checkout-web",
+              projectName: "checkout-web",
+              status: "PARSED",
+              updatedAt: "2026-04-25T10:00:00Z",
+              model: "claude-4.5",
+              detectedCases: 1,
+              subtitle: "Parsed recently / claude-4.5 / 1 cases detected"
+            }
+          ]
+        });
       }
       if (url.endsWith("/api/phase3/documents/checkout-web-primary/reparse")) {
         return jsonResponse(reparseResponse, 202);
@@ -1654,6 +1708,23 @@ describe("App", () => {
       const url = String(input);
       if (url.endsWith("/api/phase3/admin-console")) {
         return jsonResponse(snapshot);
+      }
+      if (url.endsWith("/api/phase3/documents")) {
+        return jsonResponse({
+          items: [
+            {
+              id: "checkout-web-primary",
+              name: "checkout-regression-v3.md",
+              projectKey: "checkout-web",
+              projectName: "checkout-web",
+              status: "PARSED",
+              updatedAt: "2026-04-25T10:00:00Z",
+              model: "claude-4.5",
+              detectedCases: 1,
+              subtitle: "Parsed recently / claude-4.5 / 1 cases detected"
+            }
+          ]
+        });
       }
       if (url.endsWith("/api/phase3/documents/checkout-web-primary/parse-result") && !init?.method) {
         return jsonResponse(currentParseResult);

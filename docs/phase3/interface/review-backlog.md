@@ -498,14 +498,106 @@ It does not authorize UI or backend changes in the current phase.
   - `Raw document` and `Version history` tabs now surface explicit loading / empty / error states
   - backend file-backed document persistence now records simple version-history entries for upload, re-parse, and manual-edit events
 - Remaining limits:
-  - document catalog is still front-end synthesized from `GET /api/phase3/admin-console`; there is still no canonical `GET /api/phase3/documents` list interface
-  - uploaded documents are merged into the current front-end session only; they survive snapshot rebuilds in that session but still disappear after remount / fresh app load because the catalog remains synthetic
+  - document catalog now prefers canonical `GET /api/phase3/documents`, but snapshot-derived shell rows still remain as fallback for non-persisted preview entries
   - parse-result detail still keeps synthetic fallback content when no persisted backend document exists, so placeholder shell documents remain reviewable before real upload
   - version history is lightweight audit metadata only; it does not yet store per-version raw-content snapshots or diff payloads
 
 ---
 
-## 5. Dependency Notes
+## 5. Priority P3
+
+### P3-1. Add canonical document-list backend for `docParse` DONE
+
+- Screens:
+  - `docParse`
+- Resolved:
+  - implemented canonical `GET /api/phase3/documents`
+  - `DocumentPersistenceService` now assembles stable persisted document-list metadata from file-backed document state
+  - `DocParseScreen` now prefers the backend document list for catalog rows and survives remount / fresh app load without relying on current session-only uploads
+- Remaining limits:
+  - snapshot-derived shell rows still remain as fallback when no persisted backend document exists yet
+  - project rail counts still partly reflect snapshot-derived fallback rows, not purely persisted document metadata
+
+### P3-2. Add canonical `runId` to `cases` history payload
+
+- Screens:
+  - `cases`
+  - `reports`
+  - `reportDetail`
+  - `dataDiff`
+- Why this is next:
+  - current history run-row handoff still needs history-adjacent `runName -> runId` resolution when the upstream payload lacks a dedicated canonical `runId`
+  - this is now one of the clearest remaining contract gaps in the run/report chain
+- Backend work still missing:
+  - add dedicated canonical `runId` to `GET /api/phase3/cases/{caseId}/history`
+  - stop relying on `snapshot.reports` matching or fallback to `runName` for downstream handoff
+- Expected outcome:
+  - `cases -> reportDetail/dataDiff` run drill-down becomes contract-stable and no longer depends on front-end resolution heuristics
+
+### P3-3. Finish backend-native report chain and reduce synthetic/fallback dependency
+
+- Screens:
+  - `reports`
+  - `reportDetail`
+  - `dataDiff`
+- Why this is next:
+  - the interface surface exists, but several pages still retain synthetic list/view-model layers, deterministic mock artifacts, or snapshot fallback behavior
+  - the report chain is functionally wired, but not fully backend-native yet
+- Backend work still missing:
+  - stronger backend-native `runs` / report-summary contract so list rows are not primarily synthetic front-end derivations
+  - reduce or eliminate snapshot-derived `reportDetail` fallback dependence when backend detail reads fail
+  - replace deterministic mock data-diff raw / restore-result / recovery / ai-decision payloads with real run-artifact-backed data wherever artifacts should exist
+- Expected outcome:
+  - report list/detail/diff behavior converges on one stable backend run/report contract anchored on canonical `runId`
+
+### P3-4. Replace remaining deterministic runtime/plugin mocks with real artifact/context reads
+
+- Screens:
+  - `monitor`
+  - `plugin`
+- Why this is next:
+  - both chains are wired, but important runtime/browser-facing data is still deterministic mock or intent-only
+- Backend work still missing:
+  - `monitor`: real runtime status/step/log/live-page sourcing instead of deterministic mock when real run artifacts exist
+  - `monitor`: real execution-control workflow behind Pause/Abort instead of record-intent-only behavior
+  - `plugin`: richer page-summary/platform context from real extension/native-host data instead of deterministic local rules where applicable
+- Expected outcome:
+  - runtime observation and extension flows become materially closer to production behavior, not just protocol-complete
+
+### P3-5. Upgrade file-backed or deterministic backend domains to stronger real services
+
+- Screens:
+  - `dataTemplates`
+  - `models`
+  - `environments`
+- Why this is next:
+  - these domains are interface-complete for Phase 3, but backend realism is still intentionally limited
+- Backend work still missing:
+  - `dataTemplates`: database-backed storage and versioning rather than file-backed registry only
+  - `models`: typed models API and stronger routing-rule persistence than generic config-item storage
+  - `models` / `environments`: real outbound provider/JDBC connectivity validation instead of deterministic-only validation
+- Expected outcome:
+  - config/data domains stop being “mock-realistic” and start behaving like true backend-owned services
+
+## 6. Priority P4
+
+### P4-1. Add typed summary/read models for overview screens
+
+- Screens:
+  - `dashboard`
+  - `projects`
+  - `execution`
+- Lower priority because:
+  - these screens are already functionally wired in Phase 3
+  - the remaining gaps are mostly typed backend summary/read models rather than blocked control paths
+- Backend work still missing:
+  - dedicated dashboard attention/metric model
+  - typed project-summary/detail interfaces
+  - execution queue/prepared-case metadata with stable backend-owned drill-down identifiers
+
+---
+
+## 6. Dependency Notes
 
 - `dashboard`, `reports`, `reportDetail`, `dataDiff`, and `monitor` should converge on one canonical run identifier model.
 - `docParse` -> `aiGenerate` -> `cases` must share a stable generated-case draft contract.
@@ -514,32 +606,18 @@ It does not authorize UI or backend changes in the current phase.
 
 ---
 
-## 6. Suggested Implementation Order
+## 7. Suggested Implementation Order
 
-1. Runtime chain:
-   - `execution` handoff
-   - `monitor` runtime APIs
-   - run/report canonical identifier cleanup
-2. Report chain:
-   - `reports`
-   - `reportDetail`
-   - `dataDiff`
-3. AI generation chain:
-   - `docParse`
-   - `aiGenerate`
-   - `cases`
-4. Data/config chain:
-   - `dataTemplates`
-   - `models`
-   - `environments`
-5. Navigation and shell hardening:
-   - `dashboard`
-   - `projects`
-   - `plugin`
+1. P3-1 `docParse` document-list backend
+2. P3-2 `cases` history canonical `runId`
+3. P3-3 backend-native report chain (`reports` / `reportDetail` / `dataDiff`)
+4. P3-4 runtime/plugin realism upgrade (`monitor` / `plugin`)
+5. P3-5 stronger backend services for data/config domains
+6. P4 typed overview/read models (`dashboard` / `projects` / `execution`)
 
 ---
 
-## 7. Review Reminder
+## 8. Review Reminder
 
 - The current phase remains documentation-only.
 - Any approved next implementation phase should use this backlog together with:

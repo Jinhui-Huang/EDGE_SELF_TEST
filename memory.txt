@@ -2071,3 +2071,37 @@
     - no backend-contract change
     - no test run
     - no build run
+- 2026-05-07: Planned the next Phase 3 backend manufacturing priorities in `review-backlog.md`.
+  - Added new backlog tiers for the still-missing backend work:
+    - `P3-1` canonical `docParse` document-list backend
+    - `P3-2` canonical `runId` in `cases` history payload
+    - `P3-3` backend-native report chain completion for `reports` / `reportDetail` / `dataDiff`
+    - `P3-4` runtime/plugin realism upgrade for `monitor` / `plugin`
+    - `P3-5` stronger backend services for `dataTemplates` / `models` / `environments`
+    - `P4-1` typed summary/read models for `dashboard` / `projects` / `execution`
+  - Updated suggested implementation order to follow those new priorities.
+  - Keep the explicit boundary:
+    - no code change
+    - no new backend interface was implemented in this pass
+    - no route change
+    - no App-level handoff change
+    - no backend-contract change
+    - no test run
+    - no build run
+- 2026-05-07: Implemented `P3-1` canonical `docParse` document-list backend.
+  - Backend:
+    - added canonical `GET /api/phase3/documents`
+    - `DocumentPersistenceService` now assembles persisted list metadata from existing `meta.json` + `parse-result.json`
+    - optional `projectKey` query filtering is supported
+  - Frontend:
+    - `DocParseScreen` now prefers `GET /api/phase3/documents` for catalog rows
+    - upload / re-parse / manual-save now refresh list metadata as well as detail reads
+    - synthetic `buildDocuments(snapshot)` rows remain only as fallback shell entries
+  - Docs:
+    - synced `docParse` functional/interface specs
+    - synced `ui-control-interface-overview.md`
+    - marked `P3-1` done in `review-backlog.md`
+  - Remaining limits:
+    - fallback shell rows still exist for non-persisted preview entries
+    - project-rail counts still partly reflect snapshot-derived fallback rows
+    - no test run / no build run in this pass by explicit task boundary

@@ -80,11 +80,11 @@ Conventions used here:
 |---|---|---|---|
 | Collapse / expand | button | Local only | Keep local |
 | Project button | button | Local project switch only | Keep local |
-| `Detail` | button | Implemented: opens the local document canvas and immediately attempts backend hydration through `GET /api/phase3/documents/{documentId}/parse-result`, `GET /raw`, and `GET /versions` | Keep current lightweight open + hydrate flow until a document-list API exists |
+| `Detail` | button | Implemented: opens the local document canvas, with catalog rows now preferring `GET /api/phase3/documents` and detail hydration through `GET /api/phase3/documents/{documentId}/parse-result`, `GET /raw`, and `GET /versions` | Keep current lightweight open + hydrate flow |
 | `Re-parse` | button | Implemented: `POST /api/phase3/documents/{documentId}/reparse`, then refreshes parse result/raw/version detail through the existing document reads | Keep current |
 | `Manual edit` | button | Implemented: opens JSON editor for detected cases, saves via `PUT /api/phase3/documents/{documentId}/parse-result`, then refreshes parse result/raw/version detail through the existing document reads | Keep current |
 | `Generate tests` | button | Implemented as App-level focus handoff into `aiGenerate` | Keep current handoff until typed routing is introduced |
-| `Parse result` / `Raw document` / `Version history` | tabs | Implemented: local tab state only for switching, but document content is now backend-first on document open via `GET /api/phase3/documents/{documentId}/parse-result`, `GET /raw`, and `GET /versions`; raw/history also expose loading / empty / error states | Keep current backend-first detail hydration; a future `GET /api/phase3/documents` list can remove the remaining synthetic catalog seed |
+| `Parse result` / `Raw document` / `Version history` | tabs | Implemented: local tab state only for switching, while the catalog now prefers `GET /api/phase3/documents` and document content is backend-first on document open via `GET /api/phase3/documents/{documentId}/parse-result`, `GET /raw`, and `GET /versions`; raw/history also expose loading / empty / error states | Keep current backend-first catalog + detail flow |
 | `Upload file` | file input | Implemented: reads file content and uploads via `POST /api/phase3/documents/upload` with projectKey, fileName, and content | Keep current |
 | Case row | clickable row | Local case selection only | Keep local |
 | Case-name generate button | button | Implemented as App-level focus handoff into `aiGenerate` | Keep current handoff |

@@ -27,6 +27,7 @@ This document distinguishes:
 Current `docParse` screen conclusion:
 
 - current direct read source:
+  - `GET /api/phase3/documents` (canonical backend document list)
   - `GET /api/phase3/admin-console`
 - current direct write/mutation interfaces:
   - `POST /api/phase3/documents/upload` (upload document)
@@ -37,14 +38,14 @@ Current `docParse` screen conclusion:
   - `GET /api/phase3/documents/{documentId}/versions` (read version history on first open / history tab)
 - current real cross-screen output:
   - App-level focus handoff into `aiGenerate`
-- document list is still front-end-generated from snapshot and then merged with session-local uploaded entries; detail payload now attempts backend hydration on first open
+- document list now prefers canonical backend metadata from `GET /api/phase3/documents`; synthetic snapshot-derived shell rows remain only as fallback when no persisted backend entry exists yet
 - backend implementation: `DocumentPersistenceService.java` provides file-backed persistence under `config/phase3/documents/<documentId>/` and maintains lightweight version-history entries
 
-## 3. Current Read Context: GET /api/phase3/admin-console
+## 3. Supporting Snapshot Context: GET /api/phase3/admin-console
 
 ### 3.1 Purpose for DocParse Screen
 
-The page currently uses the shared admin-console snapshot as a seed for its synthetic document catalog.
+The page now uses the shared admin-console snapshot only as supporting context for project rail labels, fallback counts, and synthetic preview fallback rows.
 
 Relevant snapshot fields:
 
@@ -72,15 +73,16 @@ This snapshot is not sufficient for true doc-parse behavior because it does not 
 - version history
 - manual-edit state
 
-## 4. Current Synthetic Document Model
+## 4. Current Catalog and Fallback Model
 
 ### 4.1 Current Derivation Entry Point
 
-- `buildDocuments(snapshot)` in `DocParseScreen.tsx`
+- canonical list read: `GET /api/phase3/documents`
+- synthetic fallback seed: `buildDocuments(snapshot)` in `DocParseScreen.tsx`
 
 ### 4.2 Current Derived Fields
 
-The page currently synthesizes:
+The page currently synthesizes fallback-only shell content for:
 
 - document ids/names
 - statuses
@@ -94,8 +96,8 @@ The page currently synthesizes:
 This means the current page should be documented as:
 
 - a document-parse UI shell
-- not yet a backend-authored document catalog contract
-- a backend-first detail reader layered on top of a synthetic/session-local catalog
+- a backend-authored document catalog contract with synthetic fallback rows for non-persisted shell entries
+- a backend-first detail reader layered on top of a canonical list plus fallback preview rows
 
 ## 5. Current Real App-Level Focus Handoff: DocParse -> AiGenerate
 
@@ -276,19 +278,19 @@ These controls currently mutate UI state only.
 
 This section documents implemented and future document-specific interfaces.
 
-### 9.1 Document List Interface (future)
+### 9.1 Document List Interface
 
 #### `GET /api/phase3/documents`
 
-Status: not yet implemented
+Status: implemented (P3-1)
 
 Purpose:
 
-- list uploaded/parsing-ready documents for one project
+- list canonical persisted documents for one project or for the whole current catalog
 
 Query parameters:
 
-- `projectKey`
+- optional `projectKey`
 
 Response body:
 
@@ -630,8 +632,8 @@ Current implementation:
 
 Remaining gaps:
 
-- document detail still depends on synthetic shell catalog IDs until a canonical document-list API exists
-- uploaded entries survive snapshot rebuilds only inside the current front-end session; remount / fresh app load still loses them because there is no canonical `GET /api/phase3/documents`
+- parse-result detail still falls back to synthetic shell content when no persisted backend document exists
+- project rail counts still depend partly on snapshot-derived fallback rows until every shell document is persisted through the document service
 
 ## 12. Review Items
 
@@ -645,10 +647,10 @@ Resolved items (P2-4):
 - `Version history` is now backed by `GET /api/phase3/documents/{documentId}/versions`.
 - first-open detail hydration now attempts backend `parse-result` read instead of waiting for a later mutation refresh.
 - The page now has a real App-level focus handoff into `aiGenerate` and real document-service write capabilities.
+- Document catalog now prefers canonical backend list metadata from `GET /api/phase3/documents`, so uploaded entries survive remount / fresh app load without relying on session-local merge only.
 
 Remaining items:
 
-- Document catalog is still synthetic front-end data from `buildDocuments(snapshot)`, not a backend document list via `GET /api/phase3/documents`.
-- Uploaded documents are merged into the current front-end session only; they survive snapshot rebuilds in that session but still disappear after remount / fresh app load.
 - parse-result detail still falls back to synthetic shell content when no persisted backend document exists.
+- project rail counts and non-persisted shell rows still rely partly on snapshot-derived fallback data.
 - version history is event-level metadata only; it does not yet expose per-version raw snapshots or diffs.

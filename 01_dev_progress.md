@@ -3874,6 +3874,60 @@ Remaining limits:
 - history run rows still do not hand off into `reportDetail`
 - plans and history remain read-only on the current Phase 3 boundary
 
+## 2026-05-07 P3-1 canonical docParse document-list backend
+
+## Task
+- Start the new backlog mainline at `P3-1` and move `docParse` from a synthetic catalog seed toward a canonical backend document list:
+  - implement `GET /api/phase3/documents`
+  - assemble stable persisted list metadata from existing file-backed document storage
+  - make `DocParseScreen` prefer the new list API while keeping the current detail-read/write chain
+  - sync the relevant Phase 3 docs and progress records
+
+## Completed
+- Updated `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/DocumentPersistenceService.java`:
+  - added `listDocuments(projectKey)` backed by existing `config/phase3/documents/<documentId>/meta.json` plus `parse-result.json`
+  - list rows now expose stable persisted metadata: `id`, `name`, `projectKey`, `projectName`, `status`, `updatedAt`, `model`, `detectedCases`, `subtitle`
+- Updated `apps/local-admin-api/src/main/java/com/example/webtest/admin/http/LocalAdminApiServer.java`:
+  - added canonical `GET /api/phase3/documents`
+  - supports optional `projectKey` query filtering
+- Updated `ui/admin-console/src/screens/DocParseScreen.tsx`:
+  - document catalog now prefers `GET /api/phase3/documents`
+  - synthetic `buildDocuments(snapshot)` rows remain only as fallback shell entries when no persisted backend document exists yet
+  - upload / re-parse / manual-save now refresh backend list metadata in addition to refreshing detail reads
+- Updated frontend/backend type/test scaffolding to match the new list contract:
+  - `ui/admin-console/src/types.ts`
+  - existing `DocParseScreen` / `App` test mocks now include the document-list fetch path
+- Synced docs:
+  - `docs/phase3/interface/docParse/functional-spec.md`
+  - `docs/phase3/interface/docParse/interface-spec.md`
+  - `docs/phase3/interface/ui-control-interface-overview.md`
+  - `docs/phase3/interface/review-backlog.md`
+
+## Modified Files
+- `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/DocumentPersistenceService.java`
+- `apps/local-admin-api/src/main/java/com/example/webtest/admin/http/LocalAdminApiServer.java`
+- `apps/local-admin-api/src/test/java/com/example/webtest/admin/http/LocalAdminApiServerTest.java`
+- `ui/admin-console/src/types.ts`
+- `ui/admin-console/src/screens/DocParseScreen.tsx`
+- `ui/admin-console/src/screens/DocParseScreen.test.tsx`
+- `ui/admin-console/src/App.test.tsx`
+- `docs/phase3/interface/docParse/functional-spec.md`
+- `docs/phase3/interface/docParse/interface-spec.md`
+- `docs/phase3/interface/ui-control-interface-overview.md`
+- `docs/phase3/interface/review-backlog.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Not run by design in this pass:
+  - no test run
+  - no build run
+
+## Remaining Limits
+- `DocParseScreen` still keeps snapshot-derived fallback shell rows so unpersisted preview entries remain reviewable before real upload
+- project-rail counts still partly reflect snapshot-derived fallback rows rather than a purely persisted document registry
+- document detail remains backend-first, but parse-result fallback content is still shown when no persisted backend document exists
+
 ## 2026-05-07 Cases sidebar recent-runs history reuse follow-up
 
 ## Task
@@ -4798,6 +4852,35 @@ Remaining limits:
 ## Verification
 - Not run by design:
   - documentation-only follow-up
+
+## Remaining Limits
+- `reportDetail` still uses snapshot-derived fallback view-model data when backend detail reads fail
+- `case-history` payload still has no dedicated canonical `runId`, so upstream `cases` history handoff may still fall back to `runName`
+
+## 2026-05-07 Phase 3 remaining-backend backlog planning
+
+## Task
+- Convert the current backlog state into a concrete next-phase backend plan:
+  - separate already-built Phase 3 backend work from remaining backend gaps
+  - record new priority levels for the still-missing backend work
+  - keep this as planning/documentation only
+
+## Completed
+- Updated `docs/phase3/interface/review-backlog.md` with new post-P2 planning priorities:
+  - `P3-1` canonical `docParse` document-list backend
+  - `P3-2` canonical `runId` in `cases` history payload
+  - `P3-3` backend-native report chain completion for `reports` / `reportDetail` / `dataDiff`
+  - `P3-4` runtime/plugin realism upgrade for `monitor` / `plugin`
+  - `P3-5` stronger backend services for `dataTemplates` / `models` / `environments`
+  - `P4-1` typed summary/read models for `dashboard` / `projects` / `execution`
+- Updated the suggested implementation order to follow those new backend priorities.
+- Updated records:
+  - `01_dev_progress.md`
+  - `memory.txt`
+
+## Verification
+- Not run by design:
+  - documentation-only planning follow-up
 
 ## Remaining Limits
 - `reportDetail` still uses snapshot-derived fallback view-model data when backend detail reads fail

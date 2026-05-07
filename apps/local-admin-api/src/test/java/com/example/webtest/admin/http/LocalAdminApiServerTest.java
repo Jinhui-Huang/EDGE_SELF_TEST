@@ -1716,6 +1716,14 @@ class LocalAdminApiServerTest {
             assertTrue(upload.body().contains("\"ACCEPTED\""));
             assertTrue(upload.body().contains("checkout-regression-v3"));
 
+            HttpResponse<String> list = client.send(
+                    request(server, "/api/phase3/documents?projectKey=checkout-web"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, list.statusCode());
+            assertTrue(list.body().contains("\"items\""));
+            assertTrue(list.body().contains("\"checkout-web-checkout-regression-v3\""));
+            assertTrue(list.body().contains("\"detectedCases\":2"));
+
             // 2. Get parse result for uploaded document
             String documentId = "checkout-web-checkout-regression-v3";
             HttpResponse<String> parseResult = client.send(

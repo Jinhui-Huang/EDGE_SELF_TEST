@@ -690,6 +690,22 @@ export type DocumentUploadResponse = {
   uploaded: { id: string; name: string }[];
 };
 
+export type DocumentListItem = {
+  id: string;
+  name: string;
+  projectKey: string;
+  projectName: string;
+  status: string;
+  updatedAt: string;
+  model: string;
+  detectedCases: number;
+  subtitle: string;
+};
+
+export type DocumentListResponse = {
+  items: DocumentListItem[];
+};
+
 export type DocumentReparseResponse = {
   status: string;
   kind: string;

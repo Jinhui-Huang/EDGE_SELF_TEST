@@ -65,7 +65,7 @@ Current implementation facts:
 
 - The page is rendered by `DocParseScreen.tsx`.
 - The page performs direct `fetch` calls to the backend for document upload, re-parse, manual parse-result editing, raw-document read, version-history read, and first-open parse-result hydration.
-- The page builds its document catalog through local helper `buildDocuments(snapshot)` and now attempts backend detail hydration when a document is opened.
+- The page now prefers canonical backend catalog metadata from `GET /api/phase3/documents`, while keeping `buildDocuments(snapshot)` only as a fallback shell source for non-persisted preview rows.
 - project switching is implemented.
 - document detail opening is implemented.
 - `Generate tests` is implemented as App-level focus handoff into `aiGenerate`.
@@ -78,9 +78,8 @@ Current implementation facts:
 This matters for review:
 
 - the page owns real upstream handoff into `aiGenerate` and real document-service write capabilities
-- document list still starts from synthetic front-end data from snapshot because there is no canonical `GET /api/phase3/documents` yet
-- uploaded documents are merged into the current front-end session so snapshot rebuilds in the same session do not immediately drop them
-- uploaded documents are still lost after remount / fresh app load because the catalog remains synthetic and session-local
+- document list now survives remount / fresh app load through canonical backend metadata from `GET /api/phase3/documents`
+- snapshot-derived document rows remain only as fallback shell previews when no persisted backend entry exists yet
 - parse result, raw document, and version history can now be persisted and refreshed from the backend after upload, re-parse, or manual edit
 
 ## 6. Functional Areas
@@ -242,7 +241,9 @@ Current behavior:
 ### 7.1 Document Catalog Data
 
 - documents are currently built by `buildDocuments(snapshot)` and then merged with session-local uploaded documents
+- documents now prefer `GET /api/phase3/documents`; `buildDocuments(snapshot)` remains the fallback seed for non-persisted shell rows
 - source domains:
+  - `GET /api/phase3/documents`
   - `snapshot.projects`
   - `snapshot.cases`
   - `snapshot.generatedAt`
@@ -468,9 +469,8 @@ Resolved items (P2-4):
 
 Remaining items:
 
-- Document catalog is still synthetic front-end data from `buildDocuments(snapshot)`, not a backend document list.
-- Uploaded documents now survive snapshot rebuilds inside the same front-end session only; they still disappear after remount / fresh app load because there is no canonical backend document-list API.
 - parse-result detail still keeps synthetic fallback content when the selected shell document has no persisted backend artifact.
+- project rail counts and non-persisted shell rows still rely partly on snapshot-derived fallback data.
 - version history is still lightweight event metadata only; it does not yet expose per-version raw snapshots or diffs.
 
 ## 16. Suggested Output Files for This Screen Folder

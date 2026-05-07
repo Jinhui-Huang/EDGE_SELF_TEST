@@ -20,7 +20,9 @@ import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.Executors;
 
@@ -188,6 +190,8 @@ public final class LocalAdminApiServer implements AutoCloseable {
         server.createContext("/api/phase3/data-templates",
                 exchange -> handleDataTemplateEndpoint(exchange, dataTemplatePersistenceService));
         server.createContext("/api/phase3/runs/", exchange -> handleRunEndpoint(exchange, runStatusService, reportArtifactService));
+        server.createContext("/api/phase3/documents",
+                exchange -> handleDocumentEndpoint(exchange, documentPersistenceService));
         server.createContext("/api/phase3/documents/upload",
                 exchange -> handleMutation(exchange, documentPersistenceService::upload));
         server.createContext("/api/phase3/documents/",
@@ -294,6 +298,16 @@ public final class LocalAdminApiServer implements AutoCloseable {
             return;
         }
         String path = exchange.getRequestURI().getPath();
+        String method = exchange.getRequestMethod().toUpperCase();
+        if ("/api/phase3/documents".equals(path)) {
+            if (!"GET".equals(method)) {
+                writeJson(exchange, 405, Map.of("error", "METHOD_NOT_ALLOWED"));
+                return;
+            }
+            Map<String, String> query = parseQuery(exchange.getRequestURI().getRawQuery());
+            writeJson(exchange, 200, service.listDocuments(query.getOrDefault("projectKey", "")));
+            return;
+        }
         // /api/phase3/documents/{documentId}/reparse       -> POST reparse
         // /api/phase3/documents/{documentId}/parse-result  -> GET or PUT
         // /api/phase3/documents/{documentId}/raw           -> GET
@@ -308,7 +322,6 @@ public final class LocalAdminApiServer implements AutoCloseable {
 
         String documentId = segments[4];
         String action = segments.length > 5 ? segments[5] : "";
-        String method = exchange.getRequestMethod().toUpperCase();
 
         try {
             switch (action) {
@@ -349,6 +362,25 @@ public final class LocalAdminApiServer implements AutoCloseable {
         } catch (IllegalArgumentException e) {
             writeJson(exchange, 400, Map.of("error", "BAD_REQUEST", "message", e.getMessage()));
         }
+    }
+
+    private static Map<String, String> parseQuery(String rawQuery) {
+        Map<String, String> query = new LinkedHashMap<>();
+        if (rawQuery == null || rawQuery.isBlank()) {
+            return query;
+        }
+        for (String part : rawQuery.split("&")) {
+            if (part.isBlank()) {
+                continue;
+            }
+            int index = part.indexOf('=');
+            String key = index >= 0 ? part.substring(0, index) : part;
+            String value = index >= 0 ? part.substring(index + 1) : "";
+            query.put(
+                    URLDecoder.decode(key, StandardCharsets.UTF_8),
+                    URLDecoder.decode(value, StandardCharsets.UTF_8));
+        }
+        return query;
     }
 
     private static void handleDataTemplateEndpoint(HttpExchange exchange,

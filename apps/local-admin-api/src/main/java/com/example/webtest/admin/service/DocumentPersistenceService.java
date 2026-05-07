@@ -9,6 +9,7 @@ import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +29,63 @@ public final class DocumentPersistenceService {
     public DocumentPersistenceService(Path documentRoot, Clock clock) {
         this.documentRoot = documentRoot;
         this.clock = clock == null ? Clock.systemUTC() : clock;
+    }
+
+    // ---- GET /api/phase3/documents ----
+
+    @SuppressWarnings("unchecked")
+    public Object listDocuments(String projectKey) throws IOException {
+        Path root = documentRoot.toAbsolutePath().normalize();
+        if (!Files.isDirectory(root)) {
+            return Map.of("items", List.of());
+        }
+
+        List<Map<String, Object>> items = new ArrayList<>();
+        try (var stream = Files.list(root)) {
+            List<Path> docDirs = stream
+                    .filter(Files::isDirectory)
+                    .sorted(Comparator.comparing(path -> path.getFileName().toString()))
+                    .toList();
+            for (Path docDir : docDirs) {
+                Path metaFile = docDir.resolve("meta.json");
+                if (!Files.isRegularFile(metaFile)) {
+                    continue;
+                }
+                Map<String, Object> meta = Jsons.readValue(Files.readString(metaFile, StandardCharsets.UTF_8), Map.class);
+                String itemProjectKey = stringValue(meta.get("projectKey"));
+                if (!projectKey.isEmpty() && !projectKey.equals(itemProjectKey)) {
+                    continue;
+                }
+
+                Path parseResultFile = docDir.resolve("parse-result.json");
+                int detectedCases = countDetectedCases(parseResultFile);
+                String model = stringValue(meta.get("model"));
+                if (model.isEmpty()) {
+                    model = "claude-4.5";
+                }
+                String status = stringValue(meta.get("status"));
+                if (status.isEmpty()) {
+                    status = "PARSED";
+                }
+
+                Map<String, Object> item = new LinkedHashMap<>();
+                item.put("id", stringValue(meta.get("documentId")));
+                item.put("name", stringValue(meta.get("name")));
+                item.put("projectKey", itemProjectKey);
+                item.put("projectName", itemProjectKey);
+                item.put("status", status);
+                item.put("updatedAt", stringValue(meta.get("updatedAt")));
+                item.put("model", model);
+                item.put("detectedCases", detectedCases);
+                item.put("subtitle", "Parsed recently / " + model + " / " + detectedCases + " cases detected");
+                items.add(item);
+            }
+        }
+
+        items.sort(Comparator.comparing(
+                item -> stringValue(item.get("updatedAt")),
+                Comparator.reverseOrder()));
+        return Map.of("items", items);
     }
 
     // ---- POST /api/phase3/documents/upload ----
@@ -310,6 +368,19 @@ public final class DocumentPersistenceService {
                 .replaceAll("[^a-z0-9-]", "-")
                 .replaceAll("-+", "-")
                 .replaceAll("^-|-$", "");
+    }
+
+    @SuppressWarnings("unchecked")
+    private static int countDetectedCases(Path parseResultFile) throws IOException {
+        if (!Files.isRegularFile(parseResultFile)) {
+            return 0;
+        }
+        Map<String, Object> parseResult = Jsons.readValue(Files.readString(parseResultFile, StandardCharsets.UTF_8), Map.class);
+        Object detectedCases = parseResult.get("detectedCases");
+        if (detectedCases instanceof List<?> items) {
+            return items.size();
+        }
+        return 0;
     }
 
     private static String stringValue(Object value) {

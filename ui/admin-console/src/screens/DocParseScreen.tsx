@@ -2,6 +2,7 @@ import { ChangeEvent, Dispatch, SetStateAction, useCallback, useEffect, useMemo,
 import { translate } from "../i18n";
 import {
   AdminConsoleSnapshot,
+  DocumentListResponse,
   DocumentParseResult,
   DocumentParseResultSaveResponse,
   DocumentRawResponse,
@@ -203,6 +204,34 @@ function buildDocuments(snapshot: AdminConsoleSnapshot): ParsedDocument[] {
   });
 }
 
+function buildDocumentFromListItem(
+  snapshot: AdminConsoleSnapshot,
+  item: DocumentListResponse["items"][number]
+): ParsedDocument {
+  const project = snapshot.projects.find((entry) => entry.key === item.projectKey);
+  return {
+    id: item.id,
+    name: item.name,
+    projectKey: item.projectKey,
+    projectName: project?.name ?? item.projectName ?? item.projectKey,
+    status: item.status === "Changed" ? "Changed" : "Parsed",
+    updatedAt: item.updatedAt,
+    model: item.model,
+    detectedCases: item.detectedCases,
+    subtitle: item.subtitle,
+    cases: [],
+    rawDocument: "",
+    versions: [],
+    reasoning: [
+      {
+        label: copy("Catalog"),
+        body: copy("Loaded from canonical document-list metadata; detail hydrates on open.")
+      }
+    ],
+    missing: []
+  };
+}
+
 function mergeDocuments(baseDocuments: ParsedDocument[], sessionDocuments: ParsedDocument[]): ParsedDocument[] {
   const merged = new Map<string, ParsedDocument>();
   for (const document of baseDocuments) {
@@ -247,6 +276,7 @@ export function DocParseScreen({ snapshot, apiBaseUrl, title, locale, onOpenAiGe
   const t = (value: LocalizedCopy) => translate(locale, value);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [sessionDocuments, setSessionDocuments] = useState<ParsedDocument[]>([]);
+  const [backendDocuments, setBackendDocuments] = useState<ParsedDocument[]>([]);
   const [documents, setDocuments] = useState<ParsedDocument[]>(() => buildDocuments(snapshot));
   const [selectedProjectKey, setSelectedProjectKey] = useState(snapshot.projects[0]?.key ?? "");
   const [openedDocumentId, setOpenedDocumentId] = useState<string | null>(null);
@@ -440,6 +470,19 @@ export function DocParseScreen({ snapshot, apiBaseUrl, title, locale, onOpenAiGe
     [apiBaseUrl, applyParseResultToDocument, applyRawToDocument, applyVersionsToDocument, fetchDocumentSection]
   );
 
+  const refreshDocumentCatalog = useCallback(async () => {
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/phase3/documents`);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const payload: DocumentListResponse = await response.json();
+      setBackendDocuments(payload.items.map((item) => buildDocumentFromListItem(snapshot, item)));
+    } catch {
+      setBackendDocuments([]);
+    }
+  }, [apiBaseUrl, snapshot]);
+
   const handleUploadToBackend = useCallback(
     async (fileName: string, content: string, projectKey: string) => {
       setActionStatus(t(copy("Uploading...")));
@@ -456,6 +499,7 @@ export function DocParseScreen({ snapshot, apiBaseUrl, title, locale, onOpenAiGe
         const uploaded = payload.uploaded[0];
         if (uploaded) {
           upsertSessionDocument(projectKey, fileName, uploaded.id);
+          await refreshDocumentCatalog();
           await refreshDocumentDetails(uploaded.id);
         }
         setActionStatus(t(copy("Upload complete")));
@@ -465,7 +509,7 @@ export function DocParseScreen({ snapshot, apiBaseUrl, title, locale, onOpenAiGe
         return null;
       }
     },
-    [apiBaseUrl, refreshDocumentDetails, t, upsertSessionDocument]
+    [apiBaseUrl, refreshDocumentCatalog, refreshDocumentDetails, t, upsertSessionDocument]
   );
 
   const handleReparse = useCallback(
@@ -483,13 +527,14 @@ export function DocParseScreen({ snapshot, apiBaseUrl, title, locale, onOpenAiGe
         const payload: DocumentReparseResponse = await response.json();
         setActionStatus(payload.status === "ACCEPTED" ? t(copy("Re-parse complete")) : t(copy("Document not found")));
         if (payload.status === "ACCEPTED") {
+          await refreshDocumentCatalog();
           await refreshDocumentDetails(documentId);
         }
       } catch {
         setActionStatus(t(copy("Re-parse failed")));
       }
     },
-    [apiBaseUrl, refreshDocumentDetails, t]
+    [apiBaseUrl, refreshDocumentCatalog, refreshDocumentDetails, t]
   );
 
   const handleSaveParseResult = useCallback(
@@ -509,18 +554,23 @@ export function DocParseScreen({ snapshot, apiBaseUrl, title, locale, onOpenAiGe
         setActionStatus(payload.status === "ACCEPTED" ? t(copy("Saved")) : t(copy("Document not found")));
         setManualEditMode(false);
         if (payload.status === "ACCEPTED") {
+          await refreshDocumentCatalog();
           await refreshDocumentDetails(documentId);
         }
       } catch {
         setActionStatus(t(copy("Invalid JSON or save failed")));
       }
     },
-    [apiBaseUrl, manualEditDraft, refreshDocumentDetails, t]
+    [apiBaseUrl, manualEditDraft, refreshDocumentCatalog, refreshDocumentDetails, t]
   );
 
   useEffect(() => {
-    setDocuments(mergeDocuments(buildDocuments(snapshot), sessionDocuments));
-  }, [sessionDocuments, snapshot]);
+    setDocuments(mergeDocuments(mergeDocuments(buildDocuments(snapshot), sessionDocuments), backendDocuments));
+  }, [backendDocuments, sessionDocuments, snapshot]);
+
+  useEffect(() => {
+    void refreshDocumentCatalog();
+  }, [refreshDocumentCatalog]);
 
   useEffect(() => {
     if (!snapshot.projects.some((item) => item.key === selectedProjectKey)) {

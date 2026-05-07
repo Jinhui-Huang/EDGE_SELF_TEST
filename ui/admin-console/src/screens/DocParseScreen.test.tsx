@@ -64,6 +64,23 @@ describe("DocParseScreen", () => {
   it("loads parse result, raw document, and version history from backend on document open", async () => {
     const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
       const url = String(input);
+      if (url.endsWith("/api/phase3/documents")) {
+        return jsonResponse({
+          items: [
+            {
+              id: "checkout-web-checkout-regression-v3",
+              name: "checkout-regression-v3.md",
+              projectKey: "checkout-web",
+              projectName: "checkout-web",
+              status: "PARSED",
+              updatedAt: "2026-05-06T08:00:00Z",
+              model: "claude-4.5",
+              detectedCases: 1,
+              subtitle: "Parsed recently / claude-4.5 / 1 cases detected"
+            }
+          ]
+        });
+      }
       if (url.endsWith("/api/phase3/documents/checkout-web-checkout-regression-v3/parse-result")) {
         return jsonResponse({
           documentId: "checkout-web-checkout-regression-v3",
@@ -130,6 +147,23 @@ describe("DocParseScreen", () => {
     };
     const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
+      if (url.endsWith("/api/phase3/documents")) {
+        return jsonResponse({
+          items: [
+            {
+              id: "checkout-web-checkout-regression-v3",
+              name: "checkout-regression-v3.md",
+              projectKey: "checkout-web",
+              projectName: "checkout-web",
+              status: "PARSED",
+              updatedAt: "2026-05-06T08:00:00Z",
+              model: "claude-4.5",
+              detectedCases: 1,
+              subtitle: "Parsed recently / claude-4.5 / 1 cases detected"
+            }
+          ]
+        });
+      }
       if (url.endsWith("/api/phase3/documents/checkout-web-checkout-regression-v3/reparse")) {
         return jsonResponse({ status: "ACCEPTED", kind: "document-reparse", documentId: "checkout-web-checkout-regression-v3" }, 202);
       }
@@ -190,6 +224,23 @@ describe("DocParseScreen", () => {
     };
     const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
+      if (url.endsWith("/api/phase3/documents")) {
+        return jsonResponse({
+          items: [
+            {
+              id: "checkout-web-checkout-regression-v3",
+              name: "checkout-regression-v3.md",
+              projectKey: "checkout-web",
+              projectName: "checkout-web",
+              status: "PARSED",
+              updatedAt: "2026-05-06T08:00:00Z",
+              model: "claude-4.5",
+              detectedCases: 1,
+              subtitle: "Parsed recently / claude-4.5 / 1 cases detected"
+            }
+          ]
+        });
+      }
       if (url.endsWith("/api/phase3/documents/checkout-web-checkout-regression-v3/parse-result") && !init?.method) {
         return jsonResponse(currentParseResult);
       }
@@ -259,6 +310,23 @@ describe("DocParseScreen", () => {
   it("adds an uploaded document into the current catalog with the backend id and opens backend detail", async () => {
     const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
+      if (url.endsWith("/api/phase3/documents")) {
+        return jsonResponse({
+          items: [
+            {
+              id: "checkout-web-test-doc",
+              name: "test-doc.md",
+              projectKey: "checkout-web",
+              projectName: "checkout-web",
+              status: "PARSED",
+              updatedAt: "2026-05-06T08:00:00Z",
+              model: "claude-4.5",
+              detectedCases: 1,
+              subtitle: "Parsed recently / claude-4.5 / 1 cases detected"
+            }
+          ]
+        });
+      }
       if (url.endsWith("/api/phase3/documents/upload")) {
         return jsonResponse({
           status: "ACCEPTED",
