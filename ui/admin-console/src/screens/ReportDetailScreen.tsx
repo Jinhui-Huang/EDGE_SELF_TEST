@@ -510,7 +510,10 @@ export function ReportDetailScreen({
       {activeTab === "aiDecisions" ? (
         <div className="reportTabPanel">
           <section className="reportPanelCard">
-            <div className="reportPanelTitle">{t(C.aiDecisionLog)}</div>
+            <div className="reportPanelHeader">
+              <div className="reportPanelTitle">{t(C.aiDecisionLog)}</div>
+              {aiDecisionsData?.status ? <span className={`statusBadge ${statusClass(aiDecisionsData.status)}`}>{aiDecisionsData.status}</span> : null}
+            </div>
             {aiDecisionsData?.items.length ? (
               <div className="reportAiDecisionList">
                 {aiDecisionsData.items.map((item) => (

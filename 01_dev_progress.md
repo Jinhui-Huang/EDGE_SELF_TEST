@@ -5194,6 +5194,49 @@ Remaining limits:
 - `recovery` / `ai-decisions` still keep deterministic mock payloads when real artifacts are absent
 - `reportDetail` still keeps snapshot-derived fallback when backend detail reads fail
 
+## 2026-05-07 P3-3 reportDetail ai-decisions backend-owned empty-shell follow-up
+
+## Task
+- Continue `P3-3` with one small `reportDetail`-adjacent code slice:
+  - remove deterministic fake content from `GET /api/phase3/runs/{runId}/ai-decisions`
+  - keep any UI adjustment confined to the AI decisions panel
+
+## Completed
+- Updated backend AI-decisions fallback:
+  - `ReportArtifactService.java` no longer fabricates deterministic AI decision rows when `ai-decisions.json` is missing
+  - missing or unreadable AI-decision artifacts now return:
+    - `status: "UNAVAILABLE"`
+    - `items: []`
+- Updated `ReportDetailScreen.tsx`:
+  - the AI decisions panel now shows a status badge when the backend returns `UNAVAILABLE`
+  - existing no-data copy remains the empty-state body, so the panel consumes the new shell without expanding the page contract
+- Synced scaffolding/docs:
+  - `LocalAdminApiServerTest.java`
+  - `App.test.tsx`
+  - `docs/phase3/interface/reportDetail/interface-spec.md`
+  - `docs/phase3/interface/review-backlog.md`
+
+## Modified Files
+- `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/ReportArtifactService.java`
+- `apps/local-admin-api/src/test/java/com/example/webtest/admin/http/LocalAdminApiServerTest.java`
+- `ui/admin-console/src/types.ts`
+- `ui/admin-console/src/screens/ReportDetailScreen.tsx`
+- `ui/admin-console/src/App.test.tsx`
+- `docs/phase3/interface/reportDetail/interface-spec.md`
+- `docs/phase3/interface/review-backlog.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Not run by explicit task boundary:
+  - no test run
+  - no build run
+
+## Remaining Limits
+- `recovery` still keeps deterministic mock payloads when real artifacts are absent
+- `reportDetail` main summary still keeps snapshot-derived fallback when backend detail reads fail
+- screenshot/artifact content still remains listing-path-only rather than inline view/download
+
 ## 2026-05-07 P3-3 dataDiff restore-result doc example alignment follow-up
 
 ## Task

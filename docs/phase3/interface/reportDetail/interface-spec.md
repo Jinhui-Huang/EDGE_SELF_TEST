@@ -5,6 +5,7 @@ Update note:
 - `ReportsScreen` opens detail through `onOpenDetail(runId)`.
 - `cases` history handoff now also prefers dedicated backend `runId`; only older history rows may still fall back to `runName`.
 - `reportDetail` reads `GET /api/phase3/runs/{runId}/report` and tab-specific run endpoints, with snapshot fallback only when backend reads fail.
+- missing `ai-decisions.json` artifacts now return a backend-owned `UNAVAILABLE` shell (`items: []`) instead of deterministic mock decision logs.
 
 ## 1. Scope and Design Basis
 
@@ -218,7 +219,7 @@ Current behavior:
 - user action: click
 - request: `GET /api/phase3/runs/{runId}/ai-decisions` (on first activation)
 - owner: `ReportDetailScreen.tsx` local tab state
-- success behavior: show AI decision log with timestamp, type, model, summary
+- success behavior: show AI decision log with timestamp, type, model, summary, or explicit unavailable state when the backend returns an empty shell
 - current state: implemented
 
 ## 7. Relationship to Other Interfaces
@@ -382,21 +383,15 @@ Purpose:
 
 - return runtime AI decision and heal history for the run
 - fetched on AI decisions tab activation
-- backend: `ReportArtifactService.getAiDecisions()` reads `ai-decisions.json` from run dir, falls back to deterministic mock
+- backend: `ReportArtifactService.getAiDecisions()` reads `ai-decisions.json` from run dir; missing artifacts now return `UNAVAILABLE` + `items: []`
 
 Response body:
 
 ```json
 {
-  "runName": "checkout-web-nightly",
-  "items": [
-    {
-      "at": "2026-04-20T05:37:12Z",
-      "type": "LOCATOR_HEAL",
-      "model": "claude-4.5-sonnet",
-      "summary": "Candidate[1] selected after primary locator failed"
-    }
-  ]
+  "runId": "checkout-web-nightly",
+  "status": "UNAVAILABLE",
+  "items": []
 }
 ```
 
@@ -479,7 +474,8 @@ Backend error semantics:
 
 - `GET /api/phase3/runs/{runId}/report` returns `404` when report artifact does not exist
 - `GET /api/phase3/runs/{runId}/artifacts` returns `200` with empty items when no artifacts are available
-- recovery and ai-decisions endpoints return deterministic mock data when no real run artifacts exist on disk
+- recovery still returns deterministic mock data when no real run artifacts exist on disk
+- ai-decisions now returns an explicit backend-owned `UNAVAILABLE` empty shell when no real `ai-decisions.json` exists
 
 ## 12. Review Items
 
@@ -489,10 +485,10 @@ Resolved items:
 - `Download artifacts` fetches artifact list from backend and opens listing drawer.
 - `Re-run` hands off run context into `execution` via App-level handoff.
 - Overview tab shows real report data from `GET /api/phase3/runs/{runId}/report` with fallback to synthetic view model.
-- Recovery and AI decisions backend endpoints are implemented in `ReportArtifactService` with file-backed reads and mock fallbacks.
+- Recovery and AI decisions backend endpoints are implemented in `ReportArtifactService`; AI decisions now use a file-backed read with `UNAVAILABLE` empty-shell fallback.
 
 Remaining items:
 
-- Recovery and AI decisions data are deterministic mock when no real run artifacts exist on disk.
+- Recovery data is still deterministic mock when no real run artifacts exist on disk.
 - Screenshot and artifact content cannot be viewed/downloaded inline — the listing drawer shows file paths only.
 - Re-run handoff carries `runId` and parses `projectKey` from it, but `environment` and `model` pre-fill depend on report data availability.

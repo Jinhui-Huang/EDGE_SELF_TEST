@@ -2096,6 +2096,32 @@ describe("App", () => {
     expect(await screen.findByText("No raw diff artifact available")).toBeInTheDocument();
   });
 
+  it("shows explicit AI decisions unavailable state when the backend returns an empty-shell", async () => {
+    const aiDecisionsUnavailableResponse = {
+      runId: "checkout-web-nightly",
+      status: "UNAVAILABLE",
+      items: []
+    };
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/report")) return jsonResponse(reportResponse);
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/ai-decisions")) return jsonResponse(aiDecisionsUnavailableResponse);
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    await screen.findByText("Recent runs");
+    await userEvent.click(screen.getByRole("button", { name: "Open run checkout-web-nightly" }));
+    await screen.findByText("Download artifacts");
+    await userEvent.click(screen.getByRole("button", { name: "AI decisions" }));
+
+    expect(await screen.findByText("UNAVAILABLE")).toBeInTheDocument();
+    expect(await screen.findByText("No AI decision data available")).toBeInTheDocument();
+  });
+
   it("calls re-restore endpoint and shows status feedback in dataDiff", async () => {
     const restoreResultResponse = {
       runId: "checkout-web-nightly",

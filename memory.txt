@@ -2195,3 +2195,22 @@
     - no test run
     - no build run
     - no commit / push
+- 2026-05-07: Implemented the next small `P3-3` slice on `reportDetail` by removing fake AI decision logs.
+  - Backend:
+    - `GET /api/phase3/runs/{runId}/ai-decisions` no longer fabricates deterministic decision rows when `ai-decisions.json` is missing
+    - the backend now returns an explicit empty shell instead:
+      - `status: "UNAVAILABLE"`
+      - `items: []`
+  - Frontend:
+    - `ReportDetailScreen` AI decisions panel now surfaces the backend `UNAVAILABLE` badge
+    - existing `No AI decision data available` copy remains the empty-state body
+  - Docs:
+    - synced `reportDetail/interface-spec.md`
+    - refined `review-backlog.md` so `ai-decisions` is no longer described as deterministic mock fallback
+  - Remaining limits:
+    - `recovery` deterministic mock fallback still remains
+    - `reportDetail` snapshot fallback still remains on main detail read failures
+  - Keep the explicit boundary:
+    - no test run
+    - no build run
+    - no commit / push

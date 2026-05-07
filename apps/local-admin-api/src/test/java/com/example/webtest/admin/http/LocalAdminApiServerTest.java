@@ -1081,9 +1081,9 @@ class LocalAdminApiServerTest {
                     HttpResponse.BodyHandlers.ofString());
             assertEquals(200, aiDecisions.statusCode());
             assertTrue(aiDecisions.body().contains("\"order-smoke-20260425\""));
-            assertTrue(aiDecisions.body().contains("\"LOCATOR_HEAL\""));
+            assertTrue(aiDecisions.body().contains("\"UNAVAILABLE\""));
             assertTrue(aiDecisions.body().contains("\"items\""));
-            assertTrue(aiDecisions.body().contains("\"claude-4.5-sonnet\""));
+            assertTrue(aiDecisions.body().contains("\"items\":[]"));
 
             // GET /api/phase3/runs/order-smoke-20260425/data-diff/raw — raw diff
             HttpResponse<String> rawDiff = client.send(

@@ -499,6 +499,7 @@ export type AiDecisionItem = {
 
 export type AiDecisionsResponse = {
   runId: string;
+  status?: string;
   items: AiDecisionItem[];
 };
 

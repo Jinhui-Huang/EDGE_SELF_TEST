@@ -247,7 +247,7 @@ public final class ReportArtifactService {
             } catch (IOException ignored) {
             }
         }
-        return buildMockAiDecisions(runId);
+        return buildUnavailableAiDecisions(runId);
     }
 
     // ---- internal ----
@@ -573,19 +573,11 @@ public final class ReportArtifactService {
         return result;
     }
 
-    private Map<String, Object> buildMockAiDecisions(String runId) {
+    private Map<String, Object> buildUnavailableAiDecisions(String runId) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("runId", runId);
-        result.put("items", List.of(
-                Map.of("at", "2026-04-20T05:37:12Z", "type", "LOCATOR_HEAL",
-                        "model", "claude-4.5-sonnet",
-                        "summary", "Candidate[1] selected after primary locator #pay-now failed"),
-                Map.of("at", "2026-04-20T05:38:01Z", "type", "WAIT_STRATEGY",
-                        "model", "claude-4.5-sonnet",
-                        "summary", "Extended wait to 8s for payment iframe to settle"),
-                Map.of("at", "2026-04-20T05:39:45Z", "type", "ASSERTION_SUGGESTION",
-                        "model", "claude-4.5-sonnet",
-                        "summary", "Suggested adding URL pattern assertion for /order/confirm/*")));
+        result.put("status", "UNAVAILABLE");
+        result.put("items", List.of());
         return result;
     }
 }
