@@ -21,6 +21,7 @@ const formDefaults = {
 };
 
 let latestTab = null;
+let latestSnapshot = null;
 let currentPickResult = null;
 
 export function createFallbackPopupSnapshot(error) {
@@ -133,9 +134,21 @@ export function setButtonPending(buttonId, pending, pendingLabel, defaultLabel) 
 
 export function renderPageSummaryResult(summary) {
   const summaryNode = document.getElementById("pageSummaryResult");
+  const domainNode = document.getElementById("pageSummaryDomain");
+  const pathNode = document.getElementById("pageSummaryPath");
+  const runtimeSummaryNode = document.getElementById("pageSummaryRuntime");
   const recommendationNode = document.getElementById("pageSummaryRecommendation");
   if (summaryNode) {
     summaryNode.textContent = summary?.summary || "No page summary available.";
+  }
+  if (domainNode) {
+    domainNode.textContent = summary?.domain || summary?.host || "--";
+  }
+  if (pathNode) {
+    pathNode.textContent = summary?.path || "--";
+  }
+  if (runtimeSummaryNode) {
+    runtimeSummaryNode.textContent = summary?.runtimeSummary || "--";
   }
   if (recommendationNode) {
     recommendationNode.textContent = summary?.recommendedAction || "Refresh current page context or open the platform.";
@@ -204,10 +217,46 @@ export function getSelectedLocator() {
   return currentPickResult?.recommendedLocator || "";
 }
 
-export async function requestPageSummary(tab = latestTab) {
+export function domainFromUrl(rawUrl) {
+  if (!rawUrl) {
+    return "";
+  }
+  try {
+    return new URL(rawUrl).host;
+  } catch {
+    return "";
+  }
+}
+
+export function pathFromUrl(rawUrl) {
+  if (!rawUrl) {
+    return "";
+  }
+  try {
+    return new URL(rawUrl).pathname || "/";
+  } catch {
+    return "";
+  }
+}
+
+export async function requestPageSummary(tab = latestTab, snapshot = latestSnapshot) {
+  const tabUrl = tab?.url || "";
+  const snapshotUrl = snapshot?.page?.url || "";
+  const pageUrl = tabUrl || snapshotUrl;
+  const useTabUrl = Boolean(tabUrl);
   return await requestNativeBridge("PAGE_SUMMARY_GET", {
-    pageTitle: tab?.title || "",
-    pageUrl: tab?.url || "",
+    pageTitle: tab?.title || snapshot?.page?.title || "",
+    pageUrl,
+    pageDomain: useTabUrl
+      ? domainFromUrl(tabUrl)
+      : snapshot?.page?.domain || domainFromUrl(pageUrl),
+    pagePath: useTabUrl
+      ? pathFromUrl(tabUrl)
+      : pathFromUrl(pageUrl),
+    runtimeMode: snapshot?.runtime?.mode || "",
+    queueState: snapshot?.runtime?.queueState || "",
+    auditState: snapshot?.runtime?.auditState || "",
+    nextAction: snapshot?.runtime?.nextAction || "",
     locator: getSelectedLocator()
   });
 }
@@ -497,7 +546,7 @@ export async function runPageSummaryAction() {
   setMutationState("quickActionStatus", "pending", "Requesting page summary through native host...");
   try {
     const tab = latestTab || await getCurrentTab();
-    const summary = await requestPageSummary(tab);
+    const summary = await requestPageSummary(tab, latestSnapshot);
     renderPageSummaryResult(summary);
     setMutationState("quickActionStatus", "success", summary.recommendedAction || "Page summary loaded.");
     return summary;
@@ -605,6 +654,7 @@ export async function refreshCurrentPage() {
   try {
     const [tab, snapshot] = await Promise.all([getCurrentTab(), loadPopupSnapshot()]);
     latestTab = tab ?? null;
+    latestSnapshot = snapshot ?? null;
     titleNode.textContent = tab?.title ?? "Untitled tab";
     urlNode.textContent = tab?.url ?? "No URL";
     connectionBadgeNode.textContent = snapshot.status;
@@ -631,6 +681,7 @@ export async function refreshCurrentPage() {
     return snapshot;
   } catch (error) {
     latestTab = null;
+    latestSnapshot = null;
     titleNode.textContent = "Read failed";
     urlNode.textContent = error instanceof Error ? error.message : String(error);
     connectionBadgeNode.textContent = "ERROR";

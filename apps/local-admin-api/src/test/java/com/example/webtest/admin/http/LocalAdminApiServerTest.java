@@ -2350,6 +2350,12 @@ class LocalAdminApiServerTest {
                     request(server, "/api/phase3/extension/page-summary", "POST", Jsons.writeValueAsString(Map.of(
                             "pageTitle", "Checkout - Payment",
                             "pageUrl", "https://checkout.example.test/pay",
+                            "pageDomain", "checkout.example.test",
+                            "pagePath", "/pay",
+                            "runtimeMode", "Audit-first",
+                            "queueState", "2 queued / 1 active / 1 waiting",
+                            "auditState", "Latest run active",
+                            "nextAction", "Keep the platform execution monitor open.",
                             "locator", "#pay-submit"))),
                     HttpResponse.BodyHandlers.ofString());
             HttpResponse<String> executionHandoff = client.send(
@@ -2372,7 +2378,12 @@ class LocalAdminApiServerTest {
                     HttpResponse.BodyHandlers.ofString());
 
             assertEquals(200, pageSummary.statusCode());
+            assertTrue(pageSummary.body().contains("\"domain\":\"checkout.example.test\""));
+            assertTrue(pageSummary.body().contains("\"path\":\"/pay\""));
+            assertTrue(pageSummary.body().contains("\"runtimeSummary\":\"Audit-first | 2 queued / 1 active / 1 waiting | Latest run active\""));
+            assertTrue(pageSummary.body().contains("Viewing Checkout - Payment on checkout.example.test/pay."));
             assertTrue(pageSummary.body().contains("\"recommendedAction\""));
+            assertTrue(pageSummary.body().contains("Keep the platform execution monitor open."));
             assertTrue(pageSummary.body().contains("pay-submit"));
 
             assertEquals(200, executionHandoff.statusCode());

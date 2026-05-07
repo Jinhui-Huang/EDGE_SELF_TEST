@@ -110,7 +110,7 @@ It does not authorize UI or backend changes in the current phase.
 - Remaining limits:
   - `Pick element` was still visual-only at the end of P0-4 and was completed later in P0-5
   - `Quick smoke test` was still visual-only at the end of P0-5 and is completed later in P0-6 by reusing the scheduler request chain
-  - `Page summary` remains deterministic from popup tab context plus local rules; no real DOM/content-script extraction exists yet
+  - `Page summary` now prefers real popup/native-host/tab payload for title/url/domain/path/runtime context, but no DOM/content-script extraction exists yet
   - `Use in DSL` currently hands off into `aiGenerate`, not directly into the `cases` DSL editor
 - Test coverage:
   - popup quick-action tests for page summary, platform handoff, clipboard copy, and DSL handoff
@@ -566,7 +566,7 @@ It does not authorize UI or backend changes in the current phase.
 - Backend work still missing:
   - `monitor`: continue deepening `status` beyond the current `report.json` / `live-page.json` / artifact-timestamp-first path so scheduler-only fallback can shrink further, and deepen `steps` / `runtime-log` beyond the current `report.json`-first / `runtime.log`-first paths now that failed/skipped report-step terminal semantics are preserved
   - `monitor`: real execution-control workflow behind Pause/Abort instead of record-intent-only behavior
-  - `plugin`: richer page-summary/platform context from real extension/native-host data instead of deterministic local rules where applicable
+  - `plugin`: continue deepening page-summary/platform context from real extension/native-host/tab data and only fall back to backend-local rules where stronger context is absent
 - Expected outcome:
   - runtime observation and extension flows become materially closer to production behavior, not just protocol-complete
 

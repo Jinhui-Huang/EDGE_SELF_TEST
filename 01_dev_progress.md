@@ -5149,6 +5149,79 @@ Remaining limits:
 - `dataDiff` table rows still retain the existing synthetic fallback path when the diff endpoint itself is unavailable
 - `reportDetail` still keeps snapshot-derived fallback when backend detail reads fail
 
+## 2026-05-08 P3-4 plugin page-summary context-first follow-up
+
+## Task
+- Continue `P3-4 plugin` on one narrow code slice:
+  - tighten `POST /api/phase3/extension/page-summary`
+  - prefer real popup/background/native-host/tab payload over backend-local deterministic rules
+  - keep scope inside page-summary only; do not expand into pick mode or quick smoke
+
+## Completed
+- Updated extension popup request shaping:
+  - `extension/edge-extension/popup.js` now sends `PAGE_SUMMARY_GET` with:
+    - active-tab `pageTitle`
+    - active-tab `pageUrl`
+    - derived `pageDomain`
+    - derived `pagePath`
+    - cached popup runtime context:
+      - `runtimeMode`
+      - `queueState`
+      - `auditState`
+      - `nextAction`
+    - optional `locator`
+  - page identity fields now stay same-source:
+    - when current `tab.url` exists, `pageUrl` / `pageDomain` / `pagePath` are all derived from that current tab URL
+    - only when `tab.url` is missing does the popup fall back to cached snapshot page fields
+  - popup now caches the latest popup snapshot after refresh and reuses that runtime context when page summary is requested
+  - popup page-summary result panel now renders:
+    - `domain`
+    - `path`
+    - `runtimeSummary`
+- Updated local-admin-api page-summary assembly:
+  - `ExtensionActionService.java` now prefers caller-provided page/runtime fields over backend-local host/path derivation when those fields are present
+  - response now includes:
+    - `domain`
+    - `path`
+    - `runtimeSummary`
+    - summary text explicitly bound to current title/url/runtime context
+  - `recommendedAction` now prefers the caller-provided `nextAction` when available instead of always falling back to generic local wording
+- Updated regression coverage:
+  - popup test now asserts the richer `PAGE_SUMMARY_GET` payload and rendered result fields
+  - popup test now also asserts that a stale `snapshot.page.domain` cannot override the current active-tab URL/domain/path
+  - native-host test now asserts the richer page-summary payload is forwarded unchanged to local-admin-api
+  - local-admin-api test now asserts page-summary response priority for domain/path/runtime summary/recommended action
+- Synced plugin docs/backlog:
+  - `docs/phase3/interface/plugin/interface-spec.md`
+  - `docs/phase3/interface/plugin/functional-spec.md`
+  - `docs/phase3/interface/review-backlog.md`
+
+## Modified Files
+- `extension/edge-extension/popup.js`
+- `extension/edge-extension/popup.html`
+- `ui/admin-console/src/popup.test.js`
+- `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/ExtensionActionService.java`
+- `apps/local-admin-api/src/test/java/com/example/webtest/admin/http/LocalAdminApiServerTest.java`
+- `apps/native-host/src/test/java/com/example/webtest/nativehost/NativeHostMessageProcessorTest.java`
+- `docs/phase3/interface/plugin/interface-spec.md`
+- `docs/phase3/interface/plugin/functional-spec.md`
+- `docs/phase3/interface/review-backlog.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Ran targeted frontend test:
+  - `npm test -- --run popup.test.js`
+- Ran targeted native-host test:
+  - `mvn -pl apps/native-host -Dtest=NativeHostMessageProcessorTest test`
+- Ran targeted local-admin-api test:
+  - `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+
+## Remaining Limits
+- `page-summary` now prefers popup/native-host/tab context, but it still does not use DOM/content-script extraction for richer page understanding
+- admin-console `plugin` screen still remains a mirror/demo shell; the real quick action continues to live in the extension popup runtime
+- quick smoke, pick mode, and platform handoff chains were intentionally left unchanged in this slice
+
 ## 2026-05-07 P3-4 monitor status artifact/context follow-up
 
 ## Task

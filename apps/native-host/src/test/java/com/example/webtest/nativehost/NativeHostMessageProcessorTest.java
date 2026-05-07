@@ -103,7 +103,13 @@ class NativeHostMessageProcessorTest {
                     "req-page-summary",
                     Map.of(
                             "pageTitle", "Checkout",
-                            "pageUrl", "https://checkout.example.test/pay")));
+                            "pageUrl", "https://checkout.example.test/pay",
+                            "pageDomain", "checkout.example.test",
+                            "pagePath", "/pay",
+                            "runtimeMode", "Audit-first",
+                            "queueState", "2 queued / 1 active / 1 waiting",
+                            "auditState", "Latest run active",
+                            "nextAction", "Keep the platform execution monitor open.")));
             NativeHostResponse handoffResponse = processor.process(new NativeHostRequest(
                     "1.0",
                     "PLATFORM_HANDOFF_PREPARE",
@@ -115,6 +121,8 @@ class NativeHostMessageProcessorTest {
             assertTrue(pageSummaryResponse.ok());
             assertTrue(handoffResponse.ok());
             assertTrue(pageSummaryBody.get().contains("\"pageTitle\":\"Checkout\""));
+            assertTrue(pageSummaryBody.get().contains("\"pageDomain\":\"checkout.example.test\""));
+            assertTrue(pageSummaryBody.get().contains("\"runtimeMode\":\"Audit-first\""));
             assertTrue(handoffBody.get().contains("\"target\":\"execution\""));
             assertTrue(String.valueOf(handoffResponse.data()).contains("screen=execution"));
         }

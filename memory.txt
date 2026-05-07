@@ -2479,3 +2479,25 @@
   - Remaining limits:
     - `status` still falls back to a scheduler-derived shell when stronger run-local artifacts are absent
     - `steps` / `runtime-log` still keep their existing scheduler/placeholder fallback paths when those stronger artifacts are absent
+- 2026-05-08: Continued `P3-4 plugin` by tightening `POST /api/phase3/extension/page-summary`.
+  - Extension popup:
+    - `popup.js` now sends `PAGE_SUMMARY_GET` with active-tab `pageTitle` / `pageUrl`, derived `pageDomain` / `pagePath`, cached popup runtime context (`runtimeMode`, `queueState`, `auditState`, `nextAction`), and optional locator
+    - page identity fields now stay same-source: when `tab.url` exists, `pageUrl` / `pageDomain` / `pagePath` are all derived from that current tab URL; snapshot page fields only remain fallback
+    - the popup caches the latest popup snapshot after refresh and reuses that runtime context when the operator requests page summary
+    - the page-summary result panel now renders `domain`, `path`, and `runtimeSummary`
+  - Backend:
+    - `ExtensionActionService` now prefers caller-provided page/runtime fields over backend-local deterministic rules when they are present
+    - page-summary responses now include `domain`, `path`, `runtimeSummary`, context-bound summary copy, and caller-preferred `recommendedAction`
+  - Tests/docs:
+    - popup test now asserts the richer `PAGE_SUMMARY_GET` payload plus rendered result fields
+    - popup test also asserts that a stale `snapshot.page.domain` cannot override the current active-tab URL/domain/path
+    - native-host test now asserts the richer page-summary payload is forwarded unchanged to local-admin-api
+    - local-admin-api test now asserts page-summary response priority for domain/path/runtime summary/recommended action
+    - synced `plugin/interface-spec.md`, `plugin/functional-spec.md`, and `review-backlog.md`
+  - Verification:
+    - ran `npm test -- --run popup.test.js`
+    - ran `mvn -pl apps/native-host -Dtest=NativeHostMessageProcessorTest test`
+    - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+  - Remaining limits:
+    - `page-summary` still does not use DOM/content-script extraction for richer page understanding
+    - quick smoke, pick mode, and platform handoff chains were intentionally left unchanged in this slice

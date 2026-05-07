@@ -30,6 +30,9 @@ function createFormDom() {
     <dd id="locatorReason">Pick mode returns a recommended locator after the page element is selected.</dd>
     <ul id="locatorCandidatesList"><li class="locatorCandidate empty">No picked element yet.</li></ul>
     <dd id="pageSummaryResult">Not requested yet.</dd>
+    <dd id="pageSummaryDomain">--</dd>
+    <dd id="pageSummaryPath">--</dd>
+    <dd id="pageSummaryRuntime">--</dd>
     <dd id="pageSummaryRecommendation">Not requested yet.</dd>
     <dd id="pageTitle">Not loaded</dd>
     <dd id="pageUrl">Not loaded</dd>
@@ -158,30 +161,119 @@ describe("popup helpers", () => {
 
   it("requests page summary through native host and renders the result", async () => {
     createFormDom();
-    globalThis.chrome.runtime.sendMessage = vi.fn().mockResolvedValueOnce({
-      ok: true,
-      data: {
-        status: "READY",
-        summary: "Checkout page is active.",
-        recommendedAction: "Open the platform."
-      }
-    });
+    globalThis.chrome.runtime.sendMessage = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        data: {
+          status: "READY",
+          summary: "Bridge online",
+          page: {
+            title: "Checkout",
+            url: "https://checkout.example.test/pay",
+            domain: "checkout.example.test",
+            lastUpdatedAt: "2026-05-08T00:00:00Z"
+          },
+          runtime: {
+            mode: "Audit-first",
+            queueState: "2 queued / 1 active / 1 waiting",
+            auditState: "Latest run active",
+            nextAction: "Keep the platform execution monitor open."
+          }
+        }
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        data: {
+          status: "idle",
+          result: null
+        }
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        data: {
+          status: "READY",
+          summary: "Viewing Checkout on checkout.example.test/pay. Runtime: Audit-first | 2 queued / 1 active / 1 waiting | Latest run active.",
+          domain: "checkout.example.test",
+          path: "/pay",
+          runtimeSummary: "Audit-first | 2 queued / 1 active / 1 waiting | Latest run active.",
+          recommendedAction: "Keep the platform execution monitor open."
+        }
+      });
     const popup = await import("../../../extension/edge-extension/popup.js");
 
+    await popup.refreshCurrentPage();
     await expect(popup.runPageSummaryAction()).resolves.toMatchObject({
       status: "READY"
     });
-    expect(globalThis.chrome.runtime.sendMessage).toHaveBeenCalledWith({
+    expect(globalThis.chrome.runtime.sendMessage).toHaveBeenLastCalledWith({
       channel: "native-host",
       type: "PAGE_SUMMARY_GET",
       payload: {
         pageTitle: "Checkout",
         pageUrl: "https://checkout.example.test/pay",
+        pageDomain: "checkout.example.test",
+        pagePath: "/pay",
+        runtimeMode: "Audit-first",
+        queueState: "2 queued / 1 active / 1 waiting",
+        auditState: "Latest run active",
+        nextAction: "Keep the platform execution monitor open.",
         locator: ""
       }
     });
-    expect(document.getElementById("pageSummaryResult").textContent).toContain("Checkout page is active.");
-    expect(document.getElementById("pageSummaryRecommendation").textContent).toContain("Open the platform.");
+    expect(document.getElementById("pageSummaryResult").textContent).toContain("Viewing Checkout on checkout.example.test/pay.");
+    expect(document.getElementById("pageSummaryDomain").textContent).toBe("checkout.example.test");
+    expect(document.getElementById("pageSummaryPath").textContent).toBe("/pay");
+    expect(document.getElementById("pageSummaryRuntime").textContent).toContain("Audit-first");
+    expect(document.getElementById("pageSummaryRecommendation").textContent).toContain("execution monitor");
+  });
+
+  it("derives page domain and path from the current tab url even when snapshot page context is stale", async () => {
+    globalThis.chrome.runtime.sendMessage = vi.fn().mockResolvedValue({
+      ok: true,
+      data: {
+        status: "READY",
+        summary: "Current tab summary",
+        recommendedAction: "Keep the platform execution monitor open."
+      }
+    });
+    const popup = await import("../../../extension/edge-extension/popup.js");
+
+    await popup.requestPageSummary(
+      {
+        title: "New Checkout",
+        url: "https://new.example.test/pay"
+      },
+      {
+        page: {
+          title: "Old Checkout",
+          url: "https://old.example.test/cart",
+          domain: "old.example.test"
+        },
+        runtime: {
+          mode: "Audit-first",
+          queueState: "1 active",
+          auditState: "Latest run active",
+          nextAction: "Keep the platform execution monitor open."
+        }
+      }
+    );
+
+    expect(globalThis.chrome.runtime.sendMessage).toHaveBeenCalledWith({
+      channel: "native-host",
+      type: "PAGE_SUMMARY_GET",
+      payload: {
+        pageTitle: "New Checkout",
+        pageUrl: "https://new.example.test/pay",
+        pageDomain: "new.example.test",
+        pagePath: "/pay",
+        runtimeMode: "Audit-first",
+        queueState: "1 active",
+        auditState: "Latest run active",
+        nextAction: "Keep the platform execution monitor open.",
+        locator: ""
+      }
+    });
   });
 
   it("submits quick smoke through the scheduler request bridge and renders the accepted result", async () => {

@@ -26,16 +26,28 @@ public final class ExtensionActionService {
         Map<String, Object> payload = parseBody(requestBody);
         String pageTitle = textOr(payload, "pageTitle", "Untitled page");
         String pageUrl = textOr(payload, "pageUrl", "");
-        String pageHost = hostFromUrl(pageUrl);
-        String pagePath = pathFromUrl(pageUrl);
+        String pageDomain = firstNonBlank(
+                textOr(payload, "pageDomain", ""),
+                hostFromUrl(pageUrl));
+        String pagePath = firstNonBlank(
+                textOr(payload, "pagePath", ""),
+                pathFromUrl(pageUrl));
+        String runtimeMode = textOr(payload, "runtimeMode", "");
+        String queueState = textOr(payload, "queueState", "");
+        String auditState = textOr(payload, "auditState", "");
+        String nextAction = textOr(payload, "nextAction", "");
         String locator = textOr(payload, "locator", "");
+        String runtimeSummary = buildRuntimeSummary(runtimeMode, queueState, auditState);
 
         List<String> signals = new ArrayList<>();
-        if (!pageHost.isBlank()) {
-            signals.add("Host " + pageHost + " is available from the active tab context.");
+        if (!pageDomain.isBlank()) {
+            signals.add("Domain " + pageDomain + " came from the current extension/tab context.");
         }
         if (!pagePath.isBlank() && !"/".equals(pagePath)) {
-            signals.add("Current route " + pagePath + " should remain aligned with popup runtime status.");
+            signals.add("Path " + pagePath + " came from the active tab URL.");
+        }
+        if (!runtimeSummary.isBlank()) {
+            signals.add("Runtime summary " + runtimeSummary + " came from popup/native-host context.");
         }
         if (!locator.isBlank()) {
             signals.add("Recommended locator " + locator + " is ready for clipboard or DSL handoff.");
@@ -45,14 +57,17 @@ public final class ExtensionActionService {
         response.put("status", "READY");
         response.put("title", pageTitle);
         response.put("url", pageUrl);
-        response.put("host", pageHost);
+        response.put("domain", pageDomain);
+        response.put("host", pageDomain);
         response.put("path", pagePath);
-        response.put("summary",
-                pageTitle + " is the active page. Keep popup actions lightweight and move configuration or deep review into the platform.");
+        response.put("runtimeSummary", runtimeSummary);
+        response.put("summary", buildSummary(pageTitle, pageDomain, pagePath, runtimeSummary, locator));
         response.put("signals", signals);
-        response.put("recommendedAction", !locator.isBlank()
-                ? "Open the platform or send the recommended locator into DSL review."
-                : "Refresh popup context or open the platform for deeper inspection.");
+        response.put("recommendedAction", !nextAction.isBlank()
+                ? nextAction
+                : !locator.isBlank()
+                    ? "Open the platform or send the recommended locator into DSL review."
+                    : "Refresh popup context or open the platform for deeper inspection.");
         return response;
     }
 
@@ -114,6 +129,43 @@ public final class ExtensionActionService {
         }
     }
 
+    private String buildRuntimeSummary(String runtimeMode, String queueState, String auditState) {
+        List<String> parts = new ArrayList<>();
+        if (!runtimeMode.isBlank()) {
+            parts.add(runtimeMode);
+        }
+        if (!queueState.isBlank()) {
+            parts.add(queueState);
+        }
+        if (!auditState.isBlank()) {
+            parts.add(auditState);
+        }
+        return String.join(" | ", parts);
+    }
+
+    private String buildSummary(
+            String pageTitle,
+            String pageDomain,
+            String pagePath,
+            String runtimeSummary,
+            String locator) {
+        String route = !pageDomain.isBlank()
+                ? pageDomain + (pagePath.isBlank() ? "" : pagePath)
+                : (!pagePath.isBlank() ? pagePath : pageTitle);
+        StringBuilder builder = new StringBuilder("Viewing ")
+                .append(pageTitle.isBlank() ? "the current tab" : pageTitle)
+                .append(" on ")
+                .append(route.isBlank() ? "the current page" : route)
+                .append(".");
+        if (!runtimeSummary.isBlank()) {
+            builder.append(" Runtime: ").append(runtimeSummary).append(".");
+        }
+        if (!locator.isBlank()) {
+            builder.append(" Locator ").append(locator).append(" is ready.");
+        }
+        return builder.toString();
+    }
+
     private String hostFromUrl(String rawUrl) {
         if (rawUrl.isBlank()) {
             return "";
@@ -162,6 +214,15 @@ public final class ExtensionActionService {
         }
         String text = String.valueOf(value).trim();
         return text.isEmpty() ? fallback : text;
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return "";
     }
 
     private String encode(String value) {
