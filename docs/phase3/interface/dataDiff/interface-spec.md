@@ -3,6 +3,7 @@
 Update note:
 - Current App-level data-diff selection uses canonical `runId`.
 - `dataDiff` reads `GET /api/phase3/runs/{runId}/data-diff`, `.../data-diff/raw`, and `.../restore-result`.
+- missing `data-diff-raw.json` artifacts now return a backend-owned `UNAVAILABLE` shell with empty before/after/afterRestore arrays.
 - `POST /api/phase3/runs/{runId}/restore/retry` refreshes both diff data and restore-result on success.
 - missing `restore-result` artifacts now return a backend-owned `UNAVAILABLE` shell (`items: []`) instead of deterministic mock restore steps.
 - Synthetic diff rows are fallback-only when backend reads are unavailable.
@@ -36,7 +37,7 @@ Current `dataDiff` screen conclusion:
 - current direct read sources:
   - `GET /api/phase3/admin-console` (snapshot context)
   - `GET /api/phase3/runs/{runId}/data-diff` (diff table data)
-  - `GET /api/phase3/runs/{runId}/data-diff/raw` (raw JSON drawer)
+  - `GET /api/phase3/runs/{runId}/data-diff/raw` (raw JSON drawer; missing artifacts now return explicit `UNAVAILABLE` / empty shell data)
   - `GET /api/phase3/runs/{runId}/restore-result` (restore status; missing artifacts now return explicit `UNAVAILABLE` / empty shell data)
 - current direct write source:
   - `POST /api/phase3/runs/{runId}/restore/retry` (re-restore action)
@@ -124,7 +125,7 @@ No backend request is sent by this route change.
 - user action: click
 - request: `GET /api/phase3/runs/{runId}/data-diff/raw`
 - owner: `DataDiffScreen.tsx`
-- current state: implemented — fetches raw diff data and opens in-page drawer with before/after/afterRestore tabs
+- current state: implemented — fetches raw diff data and opens in-page drawer with before/after/afterRestore tabs, or shows explicit raw-artifact-unavailable copy for backend empty shells
 
 #### `Re-restore`
 
@@ -133,7 +134,16 @@ No backend request is sent by this route change.
 - owner: `DataDiffScreen.tsx`
 - current state: implemented — posts restore-retry request, shows success/rejected/error status bar, refreshes diff data on success
 
-### 6.2 Restore Result Fallback Semantics
+### 6.2 Raw Diff Fallback Semantics
+
+- when `data-diff-raw.json` exists, the backend returns the persisted raw diff payload
+- when the artifact is missing or unreadable, the backend now returns:
+  - `{"runId":"...","status":"UNAVAILABLE","before":[],"after":[],"afterRestore":[]}`
+- current UI behavior:
+  - still opens the raw drawer
+  - shows explicit unavailable copy instead of fake before/after content
+
+### 6.3 Restore Result Fallback Semantics
 
 - when `restore-result.json` exists, the backend returns the persisted restore-status payload
 - when the artifact is missing or unreadable, the backend now returns:
@@ -142,7 +152,7 @@ No backend request is sent by this route change.
   - still renders the restore-result panel
   - shows the explicit empty-state message instead of fake restore steps
 
-### 6.3 Diff Table
+### 6.4 Diff Table
 
 #### Diff row
 
@@ -229,10 +239,11 @@ Response body:
 
 ```json
 {
-  "runName": "checkout-web-nightly",
-  "beforePath": "D:\\...\\runs\\checkout-web-nightly\\diff\\before.json",
-  "afterPath": "D:\\...\\runs\\checkout-web-nightly\\diff\\after.json",
-  "afterRestorePath": "D:\\...\\runs\\checkout-web-nightly\\diff\\after_restore.json"
+  "runId": "checkout-web-nightly",
+  "status": "UNAVAILABLE",
+  "before": [],
+  "after": [],
+  "afterRestore": []
 }
 ```
 
@@ -315,7 +326,7 @@ Recommended future read-interface errors:
 - `GET /api/phase3/runs/{runId}/data-diff`
   - `404` when diff data does not exist
 - `GET /api/phase3/runs/{runId}/data-diff/raw`
-  - `200` with empty paths when raw payloads are unavailable
+  - `200` with explicit `UNAVAILABLE` empty shell when raw payloads are unavailable
 
 Recommended future mutation errors:
 
@@ -328,7 +339,7 @@ Remaining limits:
 
 - App-level `selectedReportRunId` handoff is enough for page entry; backend run-diff endpoints now exist.
 - `View raw JSON` and `Re-restore` are implemented and wired to backend endpoints.
-- Raw diff data is deterministic mock when no real `data-diff-raw.json` exists in the run directory.
+- Raw diff now returns an explicit backend-owned `UNAVAILABLE` empty shell when no real `data-diff-raw.json` exists in the run directory.
 - Restore result now returns an explicit backend-owned `UNAVAILABLE` empty shell when no real `restore-result.json` exists.
 - Re-restore does not trigger a real restore workflow — it records intent and returns ACCEPTED.
 - Raw JSON drawer does not support copy-to-clipboard or download.

@@ -2060,6 +2060,42 @@ describe("App", () => {
     expect(await screen.findByText(/Failed to load raw diff/)).toBeInTheDocument();
   });
 
+  it("shows explicit raw artifact unavailable state when raw diff payload is empty-shell", async () => {
+    const restoreResultResponse = {
+      runId: "checkout-web-nightly",
+      status: "UNAVAILABLE",
+      items: []
+    };
+    const rawDiffUnavailableResponse = {
+      runId: "checkout-web-nightly",
+      status: "UNAVAILABLE",
+      before: [],
+      after: [],
+      afterRestore: []
+    };
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/report")) return jsonResponse(reportResponse);
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/data-diff")) return jsonResponse(dataDiffResponse);
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/restore-result")) return jsonResponse(restoreResultResponse);
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/data-diff/raw")) return jsonResponse(rawDiffUnavailableResponse);
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    await screen.findByText("Recent runs");
+    await userEvent.click(screen.getByRole("button", { name: "Open run checkout-web-nightly" }));
+    await userEvent.click(screen.getByRole("button", { name: "Data diff" }));
+    await screen.findByText("Data diff - orders & inventory");
+    await userEvent.click(screen.getByRole("button", { name: "View raw JSON" }));
+
+    expect(await screen.findByTestId("raw-json-drawer")).toBeInTheDocument();
+    expect(await screen.findByText("No raw diff artifact available")).toBeInTheDocument();
+  });
+
   it("calls re-restore endpoint and shows status feedback in dataDiff", async () => {
     const restoreResultResponse = {
       runId: "checkout-web-nightly",

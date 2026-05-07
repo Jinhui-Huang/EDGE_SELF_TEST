@@ -112,7 +112,7 @@ public final class ReportArtifactService {
             } catch (IOException ignored) {
             }
         }
-        return buildMockRawDataDiff(runId, dir);
+        return buildUnavailableRawDataDiff(runId);
     }
 
     // ---- GET /api/phase3/runs/{runId}/restore-result ----
@@ -555,32 +555,13 @@ public final class ReportArtifactService {
         return result;
     }
 
-    private Map<String, Object> buildMockRawDataDiff(String runId, Path dir) {
-        // Build inline raw snapshots shaped by the mock data-diff rows
-        Object diffResult = getDataDiff(runId);
-        List<Map<String, Object>> rows = List.of();
-        if (diffResult instanceof Map<?, ?> m && m.get("rows") instanceof List<?> l) {
-            @SuppressWarnings("unchecked")
-            List<Map<String, Object>> typed = (List<Map<String, Object>>) l;
-            rows = typed;
-        }
-
-        List<Map<String, Object>> beforeEntries = new ArrayList<>();
-        List<Map<String, Object>> afterEntries = new ArrayList<>();
-        List<Map<String, Object>> afterRestoreEntries = new ArrayList<>();
-        for (Map<String, Object> row : rows) {
-            Map<String, Object> key = Map.of("table", row.getOrDefault("table", ""),
-                    "pk", row.getOrDefault("pk", ""), "field", row.getOrDefault("field", ""));
-            beforeEntries.add(Map.of("key", key, "value", row.getOrDefault("before", "")));
-            afterEntries.add(Map.of("key", key, "value", row.getOrDefault("after", "")));
-            afterRestoreEntries.add(Map.of("key", key, "value", row.getOrDefault("afterRestore", "")));
-        }
-
+    private Map<String, Object> buildUnavailableRawDataDiff(String runId) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("runId", runId);
-        result.put("before", beforeEntries);
-        result.put("after", afterEntries);
-        result.put("afterRestore", afterRestoreEntries);
+        result.put("status", "UNAVAILABLE");
+        result.put("before", List.of());
+        result.put("after", List.of());
+        result.put("afterRestore", List.of());
         return result;
     }
 

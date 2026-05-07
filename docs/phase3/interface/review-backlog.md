@@ -545,7 +545,7 @@ It does not authorize UI or backend changes in the current phase.
   - the report chain is functionally wired, but not fully backend-native yet
 - Backend work still missing:
   - reduce or eliminate snapshot-derived `reportDetail` fallback dependence when backend detail reads fail
-  - replace deterministic mock data-diff raw / recovery / ai-decision payloads with real run-artifact-backed data wherever artifacts should exist
+  - replace deterministic mock recovery / ai-decision payloads with real run-artifact-backed data wherever artifacts should exist
   - continue tightening missing-artifact semantics so backend-owned empty/unavailable shells replace any remaining misleading mock payloads
 - Expected outcome:
   - report list/detail/diff behavior converges on one stable backend run/report contract anchored on canonical `runId`

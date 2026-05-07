@@ -5149,6 +5149,51 @@ Remaining limits:
 - `dataDiff` table rows still retain the existing synthetic fallback path when the diff endpoint itself is unavailable
 - `reportDetail` still keeps snapshot-derived fallback when backend detail reads fail
 
+## 2026-05-07 P3-3 dataDiff raw backend-owned empty-shell follow-up
+
+## Task
+- Continue `P3-3` on the same `dataDiff` chain:
+  - remove deterministic fake content from `GET /api/phase3/runs/{runId}/data-diff/raw`
+  - keep any UI adjustment confined to the raw drawer
+
+## Completed
+- Updated backend raw-diff fallback:
+  - `ReportArtifactService.java` no longer fabricates before/after/afterRestore entries from mock diff rows when `data-diff-raw.json` is missing
+  - missing or unreadable raw artifacts now return:
+    - `status: "UNAVAILABLE"`
+    - `before: []`
+    - `after: []`
+    - `afterRestore: []`
+- Updated raw drawer consumption in `DataDiffScreen.tsx`:
+  - the drawer still opens for the same endpoint
+  - backend `UNAVAILABLE` empty shells now render explicit unavailable copy instead of empty fake JSON content
+- Synced scaffolding/docs:
+  - `LocalAdminApiServerTest.java`
+  - `App.test.tsx`
+  - `docs/phase3/interface/dataDiff/interface-spec.md`
+  - `docs/phase3/interface/review-backlog.md`
+
+## Modified Files
+- `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/ReportArtifactService.java`
+- `apps/local-admin-api/src/test/java/com/example/webtest/admin/http/LocalAdminApiServerTest.java`
+- `ui/admin-console/src/types.ts`
+- `ui/admin-console/src/screens/DataDiffScreen.tsx`
+- `ui/admin-console/src/App.test.tsx`
+- `docs/phase3/interface/dataDiff/interface-spec.md`
+- `docs/phase3/interface/review-backlog.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Not run by explicit task boundary:
+  - no test run
+  - no build run
+
+## Remaining Limits
+- `dataDiff` table rows still retain the existing synthetic fallback path when the diff endpoint itself is unavailable
+- `recovery` / `ai-decisions` still keep deterministic mock payloads when real artifacts are absent
+- `reportDetail` still keeps snapshot-derived fallback when backend detail reads fail
+
 ## 2026-05-07 P3-3 dataDiff restore-result doc example alignment follow-up
 
 ## Task

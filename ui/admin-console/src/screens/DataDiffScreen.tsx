@@ -61,6 +61,7 @@ const C = {
   close: copy("Close", "关闭", "閉じる"),
   loadingRawData: copy("Loading raw data...", "正在加载原始数据...", "生データ読み込み中..."),
   failedToLoadRawDiff: copy("Failed to load raw diff", "加载原始差异失败", "生の差分の読み込みに失敗"),
+  noRawDiffAvailable: copy("No raw diff artifact available", "无可用原始差异产物", "利用可能な生差分アーティファクトなし"),
   before: copy("Before", "变更前", "変更前"),
   after: copy("After", "变更后", "変更後"),
   afterRestore: copy("After restore", "恢复后", "リストア後"),
@@ -251,6 +252,7 @@ export function DataDiffScreen({ snapshot, title, locale, selectedRunId, apiBase
   })();
 
   const rawTabs: RawJsonDrawerTab[] = ["before", "after", "afterRestore"];
+  const rawUnavailable = rawData?.status === "UNAVAILABLE";
 
   return (
     <div className="dataDiffScreen">
@@ -413,7 +415,13 @@ export function DataDiffScreen({ snapshot, title, locale, selectedRunId, apiBase
             </div>
           ) : null}
 
-          {rawData && !rawLoading && !rawError ? (
+          {rawData && rawUnavailable && !rawLoading && !rawError ? (
+            <div className="dataDiffRawDrawerBody">
+              <p>{l(locale, C.noRawDiffAvailable)}</p>
+            </div>
+          ) : null}
+
+          {rawData && !rawUnavailable && !rawLoading && !rawError ? (
             <>
               <div className="dataDiffRawTabs">
                 {rawTabs.map((tab) => (

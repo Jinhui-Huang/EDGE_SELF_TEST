@@ -1091,6 +1091,7 @@ class LocalAdminApiServerTest {
                     HttpResponse.BodyHandlers.ofString());
             assertEquals(200, rawDiff.statusCode());
             assertTrue(rawDiff.body().contains("\"order-smoke-20260425\""));
+            assertTrue(rawDiff.body().contains("\"UNAVAILABLE\""));
             assertTrue(rawDiff.body().contains("\"before\""));
             assertTrue(rawDiff.body().contains("\"after\""));
             assertTrue(rawDiff.body().contains("\"afterRestore\""));

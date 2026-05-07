@@ -2173,3 +2173,25 @@
     - no test run
     - no build run
     - no commit / push
+- 2026-05-07: Implemented the next small `P3-3` slice on `dataDiff` by removing fake raw-diff content.
+  - Backend:
+    - `GET /api/phase3/runs/{runId}/data-diff/raw` no longer fabricates before/after/afterRestore entries from mock diff rows when `data-diff-raw.json` is missing
+    - the backend now returns an explicit empty shell instead:
+      - `status: "UNAVAILABLE"`
+      - `before: []`
+      - `after: []`
+      - `afterRestore: []`
+  - Frontend:
+    - `DataDiffScreen` raw drawer still opens on the same endpoint
+    - backend `UNAVAILABLE` shells now show explicit unavailable copy instead of empty fake JSON content
+  - Docs:
+    - synced `dataDiff/interface-spec.md`
+    - refined `review-backlog.md` so `data-diff/raw` is no longer described as deterministic mock fallback
+  - Remaining limits:
+    - diff-table fallback rows still remain
+    - `recovery` / `ai-decisions` still keep deterministic mock payloads
+    - `reportDetail` snapshot fallback remains open
+  - Keep the explicit boundary:
+    - no test run
+    - no build run
+    - no commit / push

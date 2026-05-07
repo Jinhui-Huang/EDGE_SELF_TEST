@@ -551,6 +551,7 @@ export type RawDataDiffEntry = {
 
 export type RawDataDiffResponse = {
   runId: string;
+  status?: string;
   before: RawDataDiffEntry[];
   after: RawDataDiffEntry[];
   afterRestore: RawDataDiffEntry[];
