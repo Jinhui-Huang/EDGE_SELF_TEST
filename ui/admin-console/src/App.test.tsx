@@ -2853,7 +2853,7 @@ describe("App", () => {
   });
 
   it("consumes plugin execution handoff from URL query params", async () => {
-    window.history.replaceState({}, "", "/?source=plugin&screen=execution&runId=popup-run&projectKey=checkout-web&owner=edge-popup&environment=staging-edge&targetUrl=https%3A%2F%2Fcheckout.example.test%2Fpay&detail=Queued%20from%20popup");
+    window.history.replaceState({}, "", "/?source=plugin&screen=execution&runId=popup-run&projectKey=checkout-web&owner=edge-popup&environment=staging-edge&targetUrl=https%3A%2F%2Fcheckout.example.test%2Fpay&detail=Queued%20from%20popup&pageTitle=Checkout%20Payment&pageDomain=checkout.example.test&pagePath=%2Fpay&pageHeadings=Checkout%20-%3E%20Payment%20details&pageActionHints=Pay%20now&pageFormHints=Card%20number%2C%20Expiry%20date&bodySummary=Review%20your%20order%20total%20before%20confirming%20payment.&runtimeMode=Audit-first&queueState=1%20active&auditState=Latest%20run%20active&locator=%23pay-submit");
     const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
       const url = String(input);
       if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
@@ -2870,10 +2870,12 @@ describe("App", () => {
     expect((await screen.findAllByLabelText("Owner")).some((element) => (element as HTMLInputElement).value === "edge-popup")).toBe(true);
     expect((await screen.findAllByLabelText("Environment")).some((element) => (element as HTMLInputElement).value === "staging-edge")).toBe(true);
     expect(await screen.findByDisplayValue("https://checkout.example.test/pay")).toBeInTheDocument();
+    expect(await screen.findByDisplayValue(/Visible headings: Checkout -> Payment details/)).toBeInTheDocument();
+    expect(await screen.findByDisplayValue(/Runtime: Audit-first \| 1 active \| Latest run active/)).toBeInTheDocument();
   });
 
   it("consumes plugin DSL handoff from URL query params", async () => {
-    window.history.replaceState({}, "", "/?source=plugin&screen=aiGenerate&projectKey=checkout-web&projectName=checkout-web&pageTitle=Checkout%20Payment&pageUrl=https%3A%2F%2Fcheckout.example.test%2Fpay&locator=%23pay-submit");
+    window.history.replaceState({}, "", "/?source=plugin&screen=aiGenerate&projectKey=checkout-web&projectName=checkout-web&pageTitle=Checkout%20Payment&pageUrl=https%3A%2F%2Fcheckout.example.test%2Fpay&pageDomain=checkout.example.test&pagePath=%2Fpay&pageHeadings=Checkout%20-%3E%20Payment%20details&pageActionHints=Pay%20now&pageFormHints=Card%20number%2C%20Expiry%20date&bodySummary=Review%20your%20order%20total%20before%20confirming%20payment.&runtimeMode=Audit-first&queueState=1%20active&auditState=Latest%20run%20active&locator=%23pay-submit");
     const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
       const url = String(input);
       if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
@@ -2886,6 +2888,10 @@ describe("App", () => {
     expect(await screen.findByText("AI Generate")).toBeInTheDocument();
     expect((await screen.findAllByText("Checkout Payment locator review")).length).toBeGreaterThan(0);
     expect(await screen.findByText(/#pay-submit/)).toBeInTheDocument();
+    expect(await screen.findByText("Visible headings")).toBeInTheDocument();
+    expect(await screen.findByText("Checkout -> Payment details")).toBeInTheDocument();
+    expect(await screen.findByText("Runtime context")).toBeInTheDocument();
+    expect(await screen.findByText("Audit-first | 1 active | Latest run active")).toBeInTheDocument();
   });
 
   it("generates cases from docParse handoff via real generate endpoint", async () => {

@@ -581,7 +581,16 @@ describe("popup helpers", () => {
         owner: "edge-popup",
         environment: "staging-edge",
         targetUrl: "https://checkout.example.test/pay",
-        detail: "review current page | Page: Checkout | URL: https://checkout.example.test/pay"
+        detail: "review current page | Page: Checkout | URL: https://checkout.example.test/pay",
+        pageTitle: "Checkout",
+        pageUrl: "https://checkout.example.test/pay",
+        pageDomain: "checkout.example.test",
+        pagePath: "/pay",
+        runtimeMode: "",
+        queueState: "",
+        auditState: "",
+        nextAction: "",
+        locator: ""
       }
     });
     expect(globalThis.chrome.runtime.sendMessage).toHaveBeenNthCalledWith(2, {
@@ -637,6 +646,12 @@ describe("popup helpers", () => {
         projectName: "checkout-web",
         pageTitle: "Checkout",
         pageUrl: "https://checkout.example.test/pay",
+        pageDomain: "checkout.example.test",
+        pagePath: "/pay",
+        runtimeMode: "",
+        queueState: "",
+        auditState: "",
+        nextAction: "",
         locator: "#pay-submit"
       }
     });

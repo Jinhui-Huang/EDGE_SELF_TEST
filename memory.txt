@@ -2521,3 +2521,30 @@
   - Remaining limits:
     - `page-summary` still uses only a lightweight DOM snapshot; it does not yet perform richer structured page understanding
     - quick smoke, pick mode, and platform handoff chains were intentionally left unchanged in this slice
+- 2026-05-08: Continued `P3-4 plugin` by deepening `PLATFORM_HANDOFF_PREPARE`.
+  - Extension popup/background:
+    - `popup.js` now reuses a shared current-page context builder for `PAGE_SUMMARY_GET` and `PLATFORM_HANDOFF_PREPARE`
+    - `Open in platform` now sends current page title/url/domain/path, runtime context, and locator together with the existing execution handoff fields
+    - `Use in DSL` now sends the same richer page/runtime identity fields together with the current real locator
+    - `background.js` now applies the same lightweight content-script DOM snapshot enrichment to `PLATFORM_HANDOFF_PREPARE` that it already applies to `PAGE_SUMMARY_GET`
+    - when content-script messaging is unavailable, platform handoff still safely falls back to the original caller payload
+  - Backend/platform:
+    - `ExtensionActionService.preparePlatformHandoff(...)` remains URL-assembly-only, but now includes richer caller-provided page/runtime/DOM context in the generated query params
+    - `App.tsx` now consumes that richer query context into:
+      - a more informative `execution` `launchForm.detail`
+      - richer `aiGenerate` page-identity/runtime reasoning context
+  - Tests/docs:
+    - popup test now asserts richer `PLATFORM_HANDOFF_PREPARE` payloads for `Open in platform` and `Use in DSL`
+    - background bridge test now asserts platform-handoff DOM-context enrichment
+    - native-host test now asserts richer platform-handoff payload forwarding
+    - local-admin-api test now asserts richer query-param handoff URLs
+    - App test now asserts plugin execution / AI-generate query handoff consumption still works with those richer params
+    - synced `plugin/interface-spec.md`, `plugin/functional-spec.md`, and `review-backlog.md`
+  - Verification:
+    - ran `npm test -- --run popup.test.js background.test.js`
+    - ran `npx vitest run src/App.test.tsx -t "consumes plugin"`
+    - ran `mvn -pl apps/native-host -Dtest=NativeHostMessageProcessorTest test`
+    - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+  - Remaining limits:
+    - platform handoff still uses lightweight query params plus App-local state mapping; it does not introduce typed route models or persisted cross-app context
+    - `Use in DSL` still targets `aiGenerate`, not direct `cases` DSL insertion

@@ -1316,6 +1316,32 @@ type PluginUrlHandoff =
     }
   | null;
 
+function buildPluginRuntimeSummary(params: URLSearchParams): string {
+  return [
+    params.get("runtimeMode") || "",
+    params.get("queueState") || "",
+    params.get("auditState") || ""
+  ].filter(Boolean).join(" | ");
+}
+
+function buildPluginExecutionDetail(params: URLSearchParams): string | undefined {
+  const parts = [
+    params.get("detail") || "",
+    params.get("pageTitle") ? `Page title: ${params.get("pageTitle")}` : "",
+    params.get("pageDomain") || params.get("pagePath")
+      ? `Page context: ${(params.get("pageDomain") || "") + (params.get("pagePath") || "")}`
+      : "",
+    params.get("pageHeadings") ? `Visible headings: ${params.get("pageHeadings")}` : "",
+    params.get("pageActionHints") ? `Primary actions: ${params.get("pageActionHints")}` : "",
+    params.get("pageFormHints") ? `Form landmarks: ${params.get("pageFormHints")}` : "",
+    params.get("bodySummary") ? `Body summary: ${params.get("bodySummary")}` : "",
+    buildPluginRuntimeSummary(params) ? `Runtime: ${buildPluginRuntimeSummary(params)}` : "",
+    params.get("locator") ? `Locator: ${params.get("locator")}` : "",
+    params.get("nextAction") ? `Suggested next action: ${params.get("nextAction")}` : ""
+  ].filter(Boolean);
+  return parts.length ? parts.join(" | ") : undefined;
+}
+
 function parsePluginUrlHandoff(search: string): PluginUrlHandoff {
   const params = new URLSearchParams(search);
   if (params.get("source") !== "plugin") {
@@ -1330,8 +1356,8 @@ function parsePluginUrlHandoff(search: string): PluginUrlHandoff {
         projectKey: params.get("projectKey") || undefined,
         owner: params.get("owner") || undefined,
         environment: params.get("environment") || undefined,
-        targetUrl: params.get("targetUrl") || undefined,
-        detail: params.get("detail") || undefined
+        targetUrl: params.get("targetUrl") || params.get("pageUrl") || undefined,
+        detail: buildPluginExecutionDetail(params)
       }
     };
   }
@@ -1340,16 +1366,73 @@ function parsePluginUrlHandoff(search: string): PluginUrlHandoff {
     const projectName = params.get("projectName") || projectKey;
     const pageTitle = params.get("pageTitle") || "Plugin page context";
     const pageUrl = params.get("pageUrl") || "";
+    const pageDomain = params.get("pageDomain") || "";
+    const pagePath = params.get("pagePath") || "";
+    const pageHeadings = params.get("pageHeadings") || "";
+    const pageFormHints = params.get("pageFormHints") || "";
+    const pageActionHints = params.get("pageActionHints") || "";
+    const bodySummary = params.get("bodySummary") || "";
+    const runtimeSummary = buildPluginRuntimeSummary(params);
     const locator = params.get("locator") || "";
     const caseId = `plugin-${projectKey}-locator-review`;
     const caseName = pageTitle.includes("locator") ? pageTitle : `${pageTitle} locator review`;
+    const reasoning = [
+      {
+        label: "Plugin handoff",
+        body: pageUrl
+          ? `Received from popup page context: ${pageUrl}`
+          : "Received from popup page context."
+      },
+      pageDomain || pagePath
+        ? {
+            label: "Page identity",
+            body: `${pageDomain}${pagePath}` || pageTitle
+          }
+        : null,
+      pageHeadings
+        ? {
+            label: "Visible headings",
+            body: pageHeadings
+          }
+        : null,
+      pageActionHints
+        ? {
+            label: "Primary actions",
+            body: pageActionHints
+          }
+        : null,
+      pageFormHints
+        ? {
+            label: "Form landmarks",
+            body: pageFormHints
+          }
+        : null,
+      bodySummary
+        ? {
+            label: "Body summary",
+            body: bodySummary
+          }
+        : null,
+      runtimeSummary
+        ? {
+            label: "Runtime context",
+            body: runtimeSummary
+          }
+        : null,
+      {
+        label: "Locator",
+        body: locator || "Popup did not provide a locator candidate."
+      }
+    ].filter(Boolean) as AiGenerateFocus["reasoning"];
     return {
       screen: "aiGenerate",
       focus: {
         projectKey,
         projectName,
         documentId: `plugin-${projectKey}-page-summary`,
-        documentName: pageUrl ? `${pageTitle} (${pageUrl})` : pageTitle,
+        documentName: pageDomain || pagePath
+          ? `${pageTitle} (${pageDomain}${pagePath})`
+          : pageUrl ? `${pageTitle} (${pageUrl})` : pageTitle,
         caseId,
         caseName,
         generatedCases: [
@@ -1360,18 +1443,7 @@ function parsePluginUrlHandoff(search: string): PluginUrlHandoff {
             confidence: locator ? "0.88" : "0.72"
           }
         ],
-        reasoning: [
-          {
-            label: "Plugin handoff",
-            body: pageUrl
-              ? `Received from popup page context: ${pageUrl}`
-              : "Received from popup page context."
-          },
-          {
-            label: "Locator",
-            body: locator || "Popup did not provide a locator candidate."
-          }
-        ]
+        reasoning
       }
     };
   }

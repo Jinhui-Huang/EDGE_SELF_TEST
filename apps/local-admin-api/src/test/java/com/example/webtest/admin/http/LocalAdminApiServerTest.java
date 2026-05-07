@@ -2363,22 +2363,40 @@ class LocalAdminApiServerTest {
                             Map.entry("bodySummary", "Review your order total and enter the card details to complete payment")))),
                     HttpResponse.BodyHandlers.ofString());
             HttpResponse<String> executionHandoff = client.send(
-                    request(server, "/api/phase3/extension/platform-handoff", "POST", Jsons.writeValueAsString(Map.of(
-                            "target", "execution",
-                            "runId", "popup-checkout-smoke",
-                            "projectKey", "checkout-web",
-                            "owner", "edge-popup",
-                            "environment", "staging-edge",
-                            "targetUrl", "https://checkout.example.test/pay"))),
+                    request(server, "/api/phase3/extension/platform-handoff", "POST", Jsons.writeValueAsString(Map.ofEntries(
+                            Map.entry("target", "execution"),
+                            Map.entry("runId", "popup-checkout-smoke"),
+                            Map.entry("projectKey", "checkout-web"),
+                            Map.entry("owner", "edge-popup"),
+                            Map.entry("environment", "staging-edge"),
+                            Map.entry("targetUrl", "https://checkout.example.test/pay"),
+                            Map.entry("pageTitle", "Checkout - Payment"),
+                            Map.entry("pageUrl", "https://checkout.example.test/pay"),
+                            Map.entry("pageDomain", "checkout.example.test"),
+                            Map.entry("pagePath", "/pay"),
+                            Map.entry("runtimeMode", "Audit-first"),
+                            Map.entry("queueState", "2 queued / 1 active / 1 waiting"),
+                            Map.entry("auditState", "Latest run active"),
+                            Map.entry("locator", "#pay-submit"),
+                            Map.entry("bodySummary", "Review your order total before confirming payment."),
+                            Map.entry("headings", List.of("Checkout", "Payment details"))))),
                     HttpResponse.BodyHandlers.ofString());
             HttpResponse<String> dslHandoff = client.send(
-                    request(server, "/api/phase3/extension/platform-handoff", "POST", Jsons.writeValueAsString(Map.of(
-                            "target", "aiGenerate",
-                            "projectKey", "checkout-web",
-                            "projectName", "checkout-web",
-                            "pageTitle", "Checkout - Payment",
-                            "pageUrl", "https://checkout.example.test/pay",
-                            "locator", "#pay-submit"))),
+                    request(server, "/api/phase3/extension/platform-handoff", "POST", Jsons.writeValueAsString(Map.ofEntries(
+                            Map.entry("target", "aiGenerate"),
+                            Map.entry("projectKey", "checkout-web"),
+                            Map.entry("projectName", "checkout-web"),
+                            Map.entry("pageTitle", "Checkout - Payment"),
+                            Map.entry("pageUrl", "https://checkout.example.test/pay"),
+                            Map.entry("pageDomain", "checkout.example.test"),
+                            Map.entry("pagePath", "/pay"),
+                            Map.entry("runtimeMode", "Audit-first"),
+                            Map.entry("queueState", "2 queued / 1 active / 1 waiting"),
+                            Map.entry("auditState", "Latest run active"),
+                            Map.entry("locator", "#pay-submit"),
+                            Map.entry("bodySummary", "Review your order total before confirming payment."),
+                            Map.entry("headings", List.of("Checkout", "Payment details")),
+                            Map.entry("actionHints", List.of("Pay now"))))),
                     HttpResponse.BodyHandlers.ofString());
 
             assertEquals(200, pageSummary.statusCode());
@@ -2398,11 +2416,17 @@ class LocalAdminApiServerTest {
             assertTrue(executionHandoff.body().contains("\"screen\":\"execution\""));
             assertTrue(executionHandoff.body().contains("screen=execution"));
             assertTrue(executionHandoff.body().contains("runId=popup-checkout-smoke"));
+            assertTrue(executionHandoff.body().contains("pageDomain=checkout.example.test"));
+            assertTrue(executionHandoff.body().contains("pagePath=%2Fpay"));
+            assertTrue(executionHandoff.body().contains("pageHeadings=Checkout+-%3E+Payment+details"));
+            assertTrue(executionHandoff.body().contains("bodySummary=Review+your+order+total+before+confirming+payment."));
 
             assertEquals(200, dslHandoff.statusCode());
             assertTrue(dslHandoff.body().contains("\"screen\":\"aiGenerate\""));
             assertTrue(dslHandoff.body().contains("screen=aiGenerate"));
             assertTrue(dslHandoff.body().contains("locator=%23pay-submit"));
+            assertTrue(dslHandoff.body().contains("pageDomain=checkout.example.test"));
+            assertTrue(dslHandoff.body().contains("pageActionHints=Pay+now"));
         }
     }
 

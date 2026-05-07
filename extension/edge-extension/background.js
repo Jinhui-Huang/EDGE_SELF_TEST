@@ -84,7 +84,7 @@ export async function sendToContentScript(message) {
   return response.data;
 }
 
-function mergePageSummaryContext(payload, domContext) {
+function mergeDomContextPayload(payload, domContext) {
   const safePayload = payload && typeof payload === "object" ? payload : {};
   const safeContext = domContext && typeof domContext === "object" ? domContext : {};
   return {
@@ -96,14 +96,14 @@ function mergePageSummaryContext(payload, domContext) {
   };
 }
 
-async function enrichPageSummaryPayload(payload) {
+async function enrichPayloadWithDomContext(payload) {
   try {
     const domContext = await sendToContentScript({
       channel: "content-script",
       type: "CS_PAGE_SUMMARY_CONTEXT_GET",
       payload: {}
     });
-    return mergePageSummaryContext(payload, domContext);
+    return mergeDomContextPayload(payload, domContext);
   } catch {
     return payload && typeof payload === "object" ? payload : {};
   }
@@ -175,7 +175,16 @@ export async function handleBridgeMessage(message, sender = null) {
         ok: true,
         data: await sendToNativeHost({
           ...message,
-          payload: await enrichPageSummaryPayload(message.payload)
+          payload: await enrichPayloadWithDomContext(message.payload)
+        })
+      };
+    }
+    if (message?.type === "PLATFORM_HANDOFF_PREPARE") {
+      return {
+        ok: true,
+        data: await sendToNativeHost({
+          ...message,
+          payload: await enrichPayloadWithDomContext(message.payload)
         })
       };
     }

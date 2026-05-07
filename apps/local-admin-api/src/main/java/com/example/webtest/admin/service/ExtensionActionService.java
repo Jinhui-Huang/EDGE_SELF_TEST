@@ -99,14 +99,48 @@ public final class ExtensionActionService {
         switch (target) {
             case "execution" -> {
                 params.put("screen", "execution");
-                copyIfPresent(payload, params, "runId", "projectKey", "owner", "environment", "targetUrl", "detail");
+                copyIfPresent(payload, params,
+                        "runId",
+                        "projectKey",
+                        "owner",
+                        "environment",
+                        "targetUrl",
+                        "detail",
+                        "pageTitle",
+                        "pageUrl",
+                        "pageDomain",
+                        "pagePath",
+                        "runtimeMode",
+                        "queueState",
+                        "auditState",
+                        "nextAction",
+                        "locator",
+                        "bodySummary");
+                copyJoinedListIfPresent(payload, params, "headings", "pageHeadings", " -> ");
+                copyJoinedListIfPresent(payload, params, "formHints", "pageFormHints", ", ");
+                copyJoinedListIfPresent(payload, params, "actionHints", "pageActionHints", ", ");
                 response.put("screen", "execution");
                 response.put("handoffKind", "platform-execution");
                 response.put("summary", "Open the platform execution workspace with popup page context prefilled.");
             }
             case "aigenerate" -> {
                 params.put("screen", "aiGenerate");
-                copyIfPresent(payload, params, "projectKey", "projectName", "pageTitle", "pageUrl", "locator");
+                copyIfPresent(payload, params,
+                        "projectKey",
+                        "projectName",
+                        "pageTitle",
+                        "pageUrl",
+                        "pageDomain",
+                        "pagePath",
+                        "runtimeMode",
+                        "queueState",
+                        "auditState",
+                        "nextAction",
+                        "locator",
+                        "bodySummary");
+                copyJoinedListIfPresent(payload, params, "headings", "pageHeadings", " -> ");
+                copyJoinedListIfPresent(payload, params, "formHints", "pageFormHints", ", ");
+                copyJoinedListIfPresent(payload, params, "actionHints", "pageActionHints", ", ");
                 response.put("screen", "aiGenerate");
                 response.put("handoffKind", "platform-ai-generate");
                 response.put("summary", "Open the platform AI generate workspace with locator review context.");
@@ -142,6 +176,18 @@ public final class ExtensionActionService {
             if (!value.isBlank()) {
                 target.put(key, value);
             }
+        }
+    }
+
+    private void copyJoinedListIfPresent(
+            Map<String, Object> source,
+            Map<String, String> target,
+            String sourceKey,
+            String targetKey,
+            String delimiter) {
+        List<String> values = stringList(source.get(sourceKey));
+        if (!values.isEmpty()) {
+            target.put(targetKey, String.join(delimiter, values));
         }
     }
 

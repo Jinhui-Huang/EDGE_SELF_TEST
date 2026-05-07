@@ -239,12 +239,12 @@ export function pathFromUrl(rawUrl) {
   }
 }
 
-export async function requestPageSummary(tab = latestTab, snapshot = latestSnapshot) {
+export function buildCurrentPageContextPayload(tab = latestTab, snapshot = latestSnapshot, locator = getSelectedLocator()) {
   const tabUrl = tab?.url || "";
   const snapshotUrl = snapshot?.page?.url || "";
   const pageUrl = tabUrl || snapshotUrl;
   const useTabUrl = Boolean(tabUrl);
-  return await requestNativeBridge("PAGE_SUMMARY_GET", {
+  return {
     pageTitle: tab?.title || snapshot?.page?.title || "",
     pageUrl,
     pageDomain: useTabUrl
@@ -257,8 +257,12 @@ export async function requestPageSummary(tab = latestTab, snapshot = latestSnaps
     queueState: snapshot?.runtime?.queueState || "",
     auditState: snapshot?.runtime?.auditState || "",
     nextAction: snapshot?.runtime?.nextAction || "",
-    locator: getSelectedLocator()
-  });
+    locator
+  };
+}
+
+export async function requestPageSummary(tab = latestTab, snapshot = latestSnapshot) {
+  return await requestNativeBridge("PAGE_SUMMARY_GET", buildCurrentPageContextPayload(tab, snapshot));
 }
 
 export async function requestContentScriptPick(type, payload = {}) {
@@ -576,6 +580,7 @@ export async function runPickElementAction() {
 export async function runOpenInPlatformAction() {
   const form = readForm("launch");
   const tab = latestTab || await getCurrentTab();
+  const pageContext = buildCurrentPageContextPayload(tab, latestSnapshot);
   setButtonPending("openPlatformButton", true, "Opening...", "Open in platform");
   setMutationState("quickActionStatus", "pending", "Preparing platform execution handoff through native host...");
   try {
@@ -584,8 +589,9 @@ export async function runOpenInPlatformAction() {
       projectKey: form.projectKey,
       owner: form.owner,
       environment: form.environment,
-      targetUrl: tab?.url || "",
-      detail: buildContextDetail(form.detail, tab)
+      targetUrl: pageContext.pageUrl || "",
+      detail: buildContextDetail(form.detail, tab),
+      ...pageContext
     });
     await requestPlatformOpen(handoff.url);
     setMutationState("quickActionStatus", "success", "Opened platform execution workspace.");
@@ -621,12 +627,11 @@ export async function runUseInDslAction() {
   setButtonPending("useDslButton", true, "Opening...", "Use in DSL");
   setMutationState("quickActionStatus", "pending", "Preparing DSL handoff through native host...");
   try {
+    const pageContext = buildCurrentPageContextPayload(tab, latestSnapshot, locator);
     const handoff = await preparePlatformHandoff("aiGenerate", {
       projectKey: form.projectKey || "checkout-web",
       projectName: form.projectKey || "checkout-web",
-      pageTitle: tab?.title || "Current page",
-      pageUrl: tab?.url || "",
-      locator
+      ...pageContext
     });
     await requestPlatformOpen(handoff.url);
     setMutationState("quickActionStatus", "success", "Opened platform DSL review workspace.");

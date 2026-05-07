@@ -5277,6 +5277,74 @@ Remaining limits:
 - admin-console `plugin` screen still remains a mirror/demo shell; the real quick action continues to live in the extension popup runtime
 - quick smoke, pick mode, and platform handoff chains were intentionally left unchanged in this slice
 
+## 2026-05-08 P3-4 plugin platform handoff richer-context follow-up
+
+## Task
+- Continue the current `P3-4 plugin` mainline by deepening `PLATFORM_HANDOFF_PREPARE`:
+  - carry richer popup/tab/content-script context into `Open in platform` and `Use in DSL`
+  - keep the existing lightweight query-param/App-state handoff model
+  - avoid expanding into quick smoke or pick mode main flows
+
+## Completed
+- Updated popup/native-host handoff payloads:
+  - `popup.js` now reuses a shared current-page context builder for:
+    - `PAGE_SUMMARY_GET`
+    - `PLATFORM_HANDOFF_PREPARE`
+  - `Open in platform` now sends:
+    - page title/url/domain/path
+    - runtime context
+    - locator
+    - existing execution handoff fields
+  - `Use in DSL` now sends the same page/runtime identity fields together with the current real locator
+- Updated background enrichment:
+  - `background.js` now applies the same lightweight content-script DOM snapshot enrichment to `PLATFORM_HANDOFF_PREPARE` that it already applies to `PAGE_SUMMARY_GET`
+  - if the content script is unavailable, handoff still safely falls back to the original caller payload
+- Updated local-admin-api/App handoff consumption:
+  - `ExtensionActionService.preparePlatformHandoff(...)` now keeps the backend URL-assembly-only role, but includes richer caller-provided page/runtime/DOM context in the generated query params
+  - `App.tsx` now consumes that richer query context:
+    - `execution` handoff assembles a more informative `launchForm.detail`
+    - `aiGenerate` handoff builds richer reasoning/page-identity context from query params
+- Updated regression coverage:
+  - popup test now asserts richer `PLATFORM_HANDOFF_PREPARE` payloads for `Open in platform` and `Use in DSL`
+  - background bridge test now asserts platform-handoff DOM-context enrichment
+  - native-host test now asserts richer platform-handoff payload forwarding
+  - local-admin-api test now asserts the generated handoff URL carries richer page/runtime/DOM context
+  - App test now asserts plugin execution and AI-generate query handoff consumption still works with those richer params
+- Synced plugin docs/backlog:
+  - `docs/phase3/interface/plugin/interface-spec.md`
+  - `docs/phase3/interface/plugin/functional-spec.md`
+  - `docs/phase3/interface/review-backlog.md`
+
+## Modified Files
+- `extension/edge-extension/popup.js`
+- `extension/edge-extension/background.js`
+- `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/ExtensionActionService.java`
+- `apps/native-host/src/test/java/com/example/webtest/nativehost/NativeHostMessageProcessorTest.java`
+- `apps/local-admin-api/src/test/java/com/example/webtest/admin/http/LocalAdminApiServerTest.java`
+- `ui/admin-console/src/background.test.js`
+- `ui/admin-console/src/popup.test.js`
+- `ui/admin-console/src/App.tsx`
+- `ui/admin-console/src/App.test.tsx`
+- `docs/phase3/interface/plugin/interface-spec.md`
+- `docs/phase3/interface/plugin/functional-spec.md`
+- `docs/phase3/interface/review-backlog.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Ran targeted frontend tests:
+  - `npm test -- --run popup.test.js background.test.js`
+  - `npx vitest run src/App.test.tsx -t "consumes plugin"`
+- Ran targeted native-host test:
+  - `mvn -pl apps/native-host -Dtest=NativeHostMessageProcessorTest test`
+- Ran targeted local-admin-api test:
+  - `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+
+## Remaining Limits
+- platform handoff still uses lightweight query params plus App-local state mapping; it does not introduce typed route models or persisted cross-app context
+- `Use in DSL` still targets `aiGenerate`, not direct `cases` DSL insertion
+- quick smoke and pick mode main flows were intentionally left unchanged in this slice
+
 ## 2026-05-07 P3-4 monitor status artifact/context follow-up
 
 ## Task

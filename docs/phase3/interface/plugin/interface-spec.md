@@ -369,9 +369,10 @@ Recommended implementation type:
 Concrete implementation design:
 
 - popup -> background -> native-host -> `POST /api/phase3/extension/platform-handoff`
-- local-admin-api returns a deterministic platform URL with query-param context
+- background first enriches the caller payload with the same lightweight content-script DOM snapshot used by `Page summary` when it is available
+- local-admin-api returns a platform URL assembled from caller-provided query-param context
 - background opens the tab
-- `ui/admin-console/src/App.tsx` consumes query params and maps them into existing App state
+- `ui/admin-console/src/App.tsx` consumes those richer query params and maps them into existing App state
 - no complex route system is introduced
 
 ## 7. Detailed Implementation Design for Remaining and Recently Wired Controls
@@ -446,8 +447,9 @@ Concrete implementation design:
 
 - popup requests:
   - `PLATFORM_HANDOFF_PREPARE` with target `execution`
+  - caller payload includes current page title/url/domain/path, runtime context, locator, and available lightweight DOM snapshot context
 - background opens returned URL
-- platform App consumes query params and pre-fills `launchForm`
+- platform App consumes query params and pre-fills `launchForm`, especially `targetUrl` and a richer `detail` field assembled from the popup context
 
 ### 7.5 `Copy`
 
@@ -471,11 +473,12 @@ Concrete implementation design:
 - popup packages:
   - selected locator
   - page context
+  - available lightweight DOM snapshot context
   - selected project context
 - popup requests:
   - `PLATFORM_HANDOFF_PREPARE` with target `aiGenerate`
 - background opens returned URL
-- platform App maps query params into `aiGenerateFocus`
+- platform App maps richer query params into `aiGenerateFocus`, including page identity/runtime/reasoning context
 
 ## 8. Error Handling Boundary
 
@@ -518,6 +521,7 @@ These align with the extension/native-message design docs.
 - Popup snapshot data is deterministic mock from the backend when no real extension context exists.
 - `Page summary`, `Quick smoke test`, `Open in platform`, `Copy`, and `Use in DSL` are now implemented in the real extension popup runtime.
 - `Page summary` now prefers the real popup/native-host/tab payload and, when available, a lightweight content-script DOM snapshot for headings/form landmarks/action hints/body summary before falling back to backend-local rules.
+- `Open in platform` and `Use in DSL` now reuse that same caller-context-first pattern so platform handoff URLs carry richer page/runtime/DOM context instead of only the thinnest query shell.
 - `Pick element` is now implemented through popup/background/content-script only; it does not involve native-host or local-admin-api DOM collection.
 - `Quick smoke test` intentionally reuses the scheduler request interface instead of adding a dedicated popup execution protocol.
 - Quick actions should primarily map to extension/background/native interfaces plus extension-specific local-admin-api endpoints, or existing scheduler interfaces when the responsibility already matches, not to normal admin-console REST mutations.

@@ -114,9 +114,15 @@ class NativeHostMessageProcessorTest {
                     "1.0",
                     "PLATFORM_HANDOFF_PREPARE",
                     "req-handoff",
-                    Map.of(
-                            "target", "execution",
-                            "runId", "popup-checkout-smoke")));
+                    Map.ofEntries(
+                            Map.entry("target", "execution"),
+                            Map.entry("runId", "popup-checkout-smoke"),
+                            Map.entry("pageTitle", "Checkout"),
+                            Map.entry("pageUrl", "https://checkout.example.test/pay"),
+                            Map.entry("pageDomain", "checkout.example.test"),
+                            Map.entry("pagePath", "/pay"),
+                            Map.entry("pageHeadings", "Checkout -> Payment details"),
+                            Map.entry("bodySummary", "Review your order total before confirming payment."))));
 
             assertTrue(pageSummaryResponse.ok());
             assertTrue(handoffResponse.ok());
@@ -124,6 +130,8 @@ class NativeHostMessageProcessorTest {
             assertTrue(pageSummaryBody.get().contains("\"pageDomain\":\"checkout.example.test\""));
             assertTrue(pageSummaryBody.get().contains("\"runtimeMode\":\"Audit-first\""));
             assertTrue(handoffBody.get().contains("\"target\":\"execution\""));
+            assertTrue(handoffBody.get().contains("\"pageDomain\":\"checkout.example.test\""));
+            assertTrue(handoffBody.get().contains("\"bodySummary\":\"Review your order total before confirming payment.\""));
             assertTrue(String.valueOf(handoffResponse.data()).contains("screen=execution"));
         }
     }

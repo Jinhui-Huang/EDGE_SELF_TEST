@@ -232,4 +232,60 @@ describe("background bridge", () => {
       })
     );
   });
+
+  it("enriches platform handoff requests with content-script DOM context before forwarding to native host", async () => {
+    globalThis.chrome.tabs.query = vi.fn().mockResolvedValue([{ id: 42, title: "Checkout", url: "https://checkout.example.test/pay" }]);
+    globalThis.chrome.tabs.sendMessage = vi.fn().mockResolvedValue({
+      ok: true,
+      data: {
+        headings: ["Checkout", "Payment details"],
+        formHints: ["Card number"],
+        actionHints: ["Pay now"],
+        bodySummary: "Review your order total before confirming payment."
+      }
+    });
+    globalThis.chrome.runtime.sendNativeMessage = vi.fn().mockResolvedValue({
+      ok: true,
+      data: {
+        status: "READY",
+        screen: "execution",
+        url: "http://127.0.0.1:5173/?source=plugin&screen=execution"
+      }
+    });
+    const background = await import("./../../../extension/edge-extension/background.js");
+
+    await expect(background.handleBridgeMessage({
+      channel: "native-host",
+      type: "PLATFORM_HANDOFF_PREPARE",
+      payload: {
+        target: "execution",
+        runId: "popup-run",
+        pageTitle: "Checkout",
+        pageUrl: "https://checkout.example.test/pay",
+        pageDomain: "checkout.example.test",
+        pagePath: "/pay"
+      }
+    })).resolves.toMatchObject({
+      ok: true,
+      data: {
+        screen: "execution"
+      }
+    });
+
+    expect(globalThis.chrome.runtime.sendNativeMessage).toHaveBeenCalledWith(
+      "com.example.webtest.phase3.nativehost",
+      expect.objectContaining({
+        type: "PLATFORM_HANDOFF_PREPARE",
+        payload: expect.objectContaining({
+          target: "execution",
+          pageTitle: "Checkout",
+          pageDomain: "checkout.example.test",
+          headings: ["Checkout", "Payment details"],
+          formHints: ["Card number"],
+          actionHints: ["Pay now"],
+          bodySummary: "Review your order total before confirming payment."
+        })
+      })
+    );
+  });
 });
