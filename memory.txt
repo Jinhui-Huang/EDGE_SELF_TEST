@@ -2142,3 +2142,34 @@
     - no test run
     - no build run
     - no commit / push
+- 2026-05-07: Implemented the next small `P3-3` slice on the `dataDiff` chain by removing fake restore-result content.
+  - Backend:
+    - `GET /api/phase3/runs/{runId}/restore-result` no longer falls back to deterministic `PARTIAL` restore steps when `restore-result.json` is missing
+    - the backend now returns an explicit empty shell instead:
+      - `status: "UNAVAILABLE"`
+      - `items: []`
+  - Why `restore-result` first:
+    - it was smaller and safer than `data-diff/raw`
+    - `DataDiffScreen` already had an explicit empty-state branch for empty restore items, so no UI contract expansion was needed
+  - Docs:
+    - synced `dataDiff/interface-spec.md`
+    - refined `review-backlog.md` so `restore-result` is no longer described as still using deterministic mock payloads
+  - Remaining limits:
+    - `data-diff/raw` still keeps deterministic mock fallback content
+    - diff-table fallback rows and `reportDetail` snapshot fallback remain open
+  - Keep the explicit boundary:
+    - no test run
+    - no build run
+    - no commit / push
+- 2026-05-07: Completed a tiny doc-only follow-up for the same `P3-3 dataDiff` restore-result cleanup.
+  - Updated `docs/phase3/interface/dataDiff/interface-spec.md`:
+    - the `GET /api/phase3/runs/{runId}/restore-result` example block no longer shows stale `PARTIAL` + fake steps
+    - it now matches the current backend-missing-artifact semantics:
+      - `runId`
+      - `status: "UNAVAILABLE"`
+      - `items: []`
+  - Keep the explicit boundary:
+    - no code change
+    - no test run
+    - no build run
+    - no commit / push

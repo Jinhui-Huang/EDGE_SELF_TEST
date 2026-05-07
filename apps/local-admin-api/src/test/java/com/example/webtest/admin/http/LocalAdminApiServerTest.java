@@ -1101,8 +1101,8 @@ class LocalAdminApiServerTest {
                     HttpResponse.BodyHandlers.ofString());
             assertEquals(200, restoreResult.statusCode());
             assertTrue(restoreResult.body().contains("\"order-smoke-20260425\""));
-            assertTrue(restoreResult.body().contains("\"PARTIAL\""));
-            assertTrue(restoreResult.body().contains("\"restore snapshot\""));
+            assertTrue(restoreResult.body().contains("\"UNAVAILABLE\""));
+            assertTrue(restoreResult.body().contains("\"items\":[]"));
 
             // POST /api/phase3/runs/order-smoke-20260425/restore/retry — restore retry accepted
             HttpResponse<String> restoreRetry = client.send(

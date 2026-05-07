@@ -127,7 +127,7 @@ public final class ReportArtifactService {
             } catch (IOException ignored) {
             }
         }
-        return buildMockRestoreResult(runId);
+        return buildUnavailableRestoreResult(runId);
     }
 
     // ---- POST /api/phase3/runs/{runId}/restore/retry ----
@@ -584,17 +584,11 @@ public final class ReportArtifactService {
         return result;
     }
 
-    private Map<String, Object> buildMockRestoreResult(String runId) {
+    private Map<String, Object> buildUnavailableRestoreResult(String runId) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("runId", runId);
-        result.put("status", "PARTIAL");
-        result.put("items", List.of(
-                Map.of("step", "restore snapshot", "status", "SUCCESS",
-                        "detail", "Primary checkout schema restored from pre-run backup"),
-                Map.of("step", "verify row counts", "status", "SUCCESS",
-                        "detail", "Row counts match pre-run baseline"),
-                Map.of("step", "restore audit_log", "status", "SKIPPED",
-                        "detail", "Audit log rows are kept by policy")));
+        result.put("status", "UNAVAILABLE");
+        result.put("items", List.of());
         return result;
     }
 

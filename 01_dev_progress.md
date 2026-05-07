@@ -5109,3 +5109,72 @@ Remaining limits:
 - `reports` list is now backend-first for visible summary rows, but snapshot/view-model fallback still remains when `GET /api/phase3/runs/` is unavailable
 - `reportDetail` still keeps snapshot-derived fallback when backend detail reads fail
 - `dataDiff` still keeps deterministic mock/raw fallback paths that should later be replaced with real run-artifact-backed payloads
+
+## 2026-05-07 P3-3 dataDiff restore-result backend-owned empty-shell follow-up
+
+## Task
+- Continue `P3-3` with one small `dataDiff`-chain code slice:
+  - remove the most misleading deterministic fallback on the backend side
+  - prefer explicit backend-owned missing-artifact semantics over fake restore content
+  - keep scope tighter than a full `dataDiff` / `reportDetail` chain refactor
+
+## Completed
+- Updated `ReportArtifactService.java`:
+  - `GET /api/phase3/runs/{runId}/restore-result` no longer fabricates a `PARTIAL` restore payload with fake steps when `restore-result.json` is missing
+  - missing or unreadable restore artifacts now return a backend-owned empty shell:
+    - `status: "UNAVAILABLE"`
+    - `items: []`
+- Left `data-diff/raw` unchanged in this pass:
+  - `restore-result` was the smaller and safer first target because `DataDiffScreen` already had an explicit empty-state branch for `items.length === 0`
+  - this lets the UI stop showing fake restore steps without changing the page contract shape
+- Synced docs:
+  - `docs/phase3/interface/dataDiff/interface-spec.md`
+  - `docs/phase3/interface/review-backlog.md`
+
+## Modified Files
+- `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/ReportArtifactService.java`
+- `apps/local-admin-api/src/test/java/com/example/webtest/admin/http/LocalAdminApiServerTest.java`
+- `docs/phase3/interface/dataDiff/interface-spec.md`
+- `docs/phase3/interface/review-backlog.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Not run by explicit task boundary:
+  - no test run
+  - no build run
+
+## Remaining Limits
+- `data-diff/raw` still falls back to deterministic mock content when no persisted raw artifact exists
+- `dataDiff` table rows still retain the existing synthetic fallback path when the diff endpoint itself is unavailable
+- `reportDetail` still keeps snapshot-derived fallback when backend detail reads fail
+
+## 2026-05-07 P3-3 dataDiff restore-result doc example alignment follow-up
+
+## Task
+- Keep the current `P3-3 dataDiff` thread narrow:
+  - align the `restore-result` example block in `dataDiff/interface-spec.md`
+  - avoid any code change or broader doc sweep
+
+## Completed
+- Updated `docs/phase3/interface/dataDiff/interface-spec.md`:
+  - the `GET /api/phase3/runs/{runId}/restore-result` example JSON no longer shows stale `PARTIAL` + fake restore steps
+  - the example now matches the current backend-missing-artifact behavior:
+    - `runId`
+    - `status: "UNAVAILABLE"`
+    - `items: []`
+
+## Modified Files
+- `docs/phase3/interface/dataDiff/interface-spec.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Not run by explicit task boundary:
+  - no test run
+  - no build run
+
+## Remaining Limits
+- `data-diff/raw` still falls back to deterministic mock content when no persisted raw artifact exists
+- `dataDiff` table rows still retain the existing synthetic fallback path when the diff endpoint itself is unavailable
+- `reportDetail` still keeps snapshot-derived fallback when backend detail reads fail
