@@ -6,6 +6,7 @@ import {
   Locale,
   RecoveryResponse,
   RunArtifactsResponse,
+  RunReportArtifact,
   RunAssertionsResponse,
   RunReport,
   RunStepsResponse
@@ -38,6 +39,7 @@ const C = {
   loadingReport: copy("Loading report...", "正在加载报告...", "レポートを読み込み中..."),
   reports: copy("Reports", "报告", "レポート"),
   downloadArtifacts: copy("Download artifacts", "下载产物", "アーティファクト取得"),
+  preview: copy("Preview", "预览", "プレビュー"),
   reRun: copy("Re-run", "重新执行", "再実行"),
   artifacts: copy("Artifacts", "产物", "アーティファクト"),
   noArtifactsAvailable: copy("No artifacts available", "无可用产物", "アーティファクトなし"),
@@ -102,6 +104,7 @@ export function ReportDetailScreen({
   const [aiDecisionsData, setAiDecisionsData] = useState<AiDecisionsResponse | null>(null);
   const [artifactsData, setArtifactsData] = useState<RunArtifactsResponse | null>(null);
   const [artifactsOpen, setArtifactsOpen] = useState(false);
+  const [previewArtifact, setPreviewArtifact] = useState<RunReportArtifact | null>(null);
 
   useEffect(() => {
     if (!selectedRunId) return;
@@ -114,6 +117,7 @@ export function ReportDetailScreen({
     setAiDecisionsData(null);
     setArtifactsData(null);
     setArtifactsOpen(false);
+    setPreviewArtifact(null);
     fetch(`${apiBaseUrl}/api/phase3/runs/${encodeURIComponent(selectedRunId)}/report`)
       .then((r) => (r.ok ? (r.json() as Promise<RunReport>) : Promise.reject(r.status)))
       .then((data) => {
@@ -197,6 +201,7 @@ export function ReportDetailScreen({
         if (data.runId && Array.isArray(data.items)) {
           setArtifactsData(data);
           setArtifactsOpen(true);
+          setPreviewArtifact(data.items.find((item) => item.kind === "report-html") ?? null);
         }
       })
       .catch(() => {});
@@ -354,10 +359,27 @@ export function ReportDetailScreen({
                   <span className={`docParseDocumentBadge ${item.kind === "screenshot" ? "accent" : "neutral"}`}>{item.kind}</span>
                   <span>{item.label}</span>
                   <small>{item.path}</small>
+                  {item.kind === "report-html" ? (
+                    <button type="button" className="reportsActionButton ghost" onClick={() => setPreviewArtifact(item)}>
+                      {t(C.preview)}
+                    </button>
+                  ) : null}
                 </div>
               ))
             )}
           </div>
+          {previewArtifact?.kind === "report-html" ? (
+            <div className="reportPanelCard" style={{ marginTop: 16 }}>
+              <div className="reportPanelHeader">
+                <div className="reportPanelTitle">{`${previewArtifact.label} - ${t(C.preview)}`}</div>
+              </div>
+              <iframe
+                title={previewArtifact.label}
+                src={`${apiBaseUrl}/api/phase3/runs/${encodeURIComponent(selectedRunId)}/artifacts/content?path=${encodeURIComponent(previewArtifact.path)}`}
+                style={{ width: "100%", minHeight: 420, border: "1px solid rgba(148, 163, 184, 0.35)", borderRadius: 12, background: "#fff" }}
+              />
+            </div>
+          ) : null}
         </div>
       ) : null}
 

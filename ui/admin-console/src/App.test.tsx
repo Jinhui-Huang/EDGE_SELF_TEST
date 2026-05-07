@@ -1916,6 +1916,11 @@ describe("App", () => {
     expect(await screen.findByText("report.html")).toBeInTheDocument();
     expect(await screen.findByText("report.json")).toBeInTheDocument();
     expect(await screen.findByText(/Artifacts/)).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Preview" })).toBeInTheDocument();
+    expect(screen.getByTitle("report.html")).toHaveAttribute(
+      "src",
+      "http://127.0.0.1:8787/api/phase3/runs/checkout-web-nightly/artifacts/content?path=report.html"
+    );
   });
 
   it("renders inline screenshot preview from report artifact content endpoint", async () => {

@@ -2320,3 +2320,19 @@
     - no test run
     - no build run
     - no commit / push
+- 2026-05-07: Pushed the same artifact-content endpoint one step further by making `report-html` previewable inside the artifact drawer.
+  - Frontend:
+    - the artifact drawer now exposes a `Preview` action for `report-html`
+    - clicking it mounts an inline iframe backed by `GET /api/phase3/runs/{runId}/artifacts/content?path=...`
+    - other artifact kinds still remain listing-path-focused for now
+  - Why this slice:
+    - `report-html` was the smallest stable text-like artifact to preview because the browser can render it directly from the existing content endpoint
+    - this avoided expanding into a full multi-type artifact viewer
+  - Docs:
+    - synced `reportDetail/interface-spec.md`
+    - synced `reportDetail/functional-spec.md`
+    - refined `review-backlog.md` to record `report-html` as the first drawer-level inline preview type
+  - Keep the explicit boundary:
+    - no test run
+    - no build run
+    - no commit / push

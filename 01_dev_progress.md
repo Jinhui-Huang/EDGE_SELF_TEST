@@ -5242,6 +5242,45 @@ Remaining limits:
 - synthetic diff rows still remain as a fallback when the main diff API read fails outright
 - `reportDetail` still keeps snapshot-derived fallback when backend detail reads fail
 
+## 2026-05-07 P3-3 reportDetail report-html drawer preview follow-up
+
+## Task
+- Continue the just-landed artifact-content path with one more small but real reader:
+  - keep scope inside the artifact drawer
+  - let one common text-like artifact type preview inline instead of staying path-only
+
+## Completed
+- Updated `ReportDetailScreen.tsx`:
+  - artifact drawer now keeps a small `previewArtifact` state
+  - `report-html` items render a `Preview` action
+  - the drawer now mounts an inline `<iframe>` preview backed by `GET /api/phase3/runs/{runId}/artifacts/content?path=...`
+  - scope remains intentionally narrow: no generic multi-type viewer
+- Updated `App.test.tsx`:
+  - artifact drawer test now verifies the `Preview` action exists for `report-html`
+  - it also verifies the drawer mounts an iframe pointed at the shared content endpoint
+- Synced `reportDetail` specs and `review-backlog.md`:
+  - `Download artifacts` is no longer just path listing
+  - `report-html` is now the first drawer-level inline preview type
+
+## Modified Files
+- `ui/admin-console/src/screens/ReportDetailScreen.tsx`
+- `ui/admin-console/src/App.test.tsx`
+- `docs/phase3/interface/reportDetail/interface-spec.md`
+- `docs/phase3/interface/reportDetail/functional-spec.md`
+- `docs/phase3/interface/review-backlog.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Not run by explicit task boundary:
+  - no test run
+  - no build run
+
+## Remaining Limits
+- generic artifact drawer entries still remain mostly listing-path-focused; inline read is currently wired for image-like Overview screenshots and `report-html`
+- synthetic diff rows still remain as a fallback when the main diff API read fails outright
+- `reportDetail` still keeps snapshot-derived fallback when backend detail reads fail
+
 ## 2026-05-07 P3-3 reportDetail artifact-path contract fix follow-up
 
 ## Task
