@@ -40,6 +40,8 @@ const C = {
   reports: copy("Reports", "报告", "レポート"),
   downloadArtifacts: copy("Download artifacts", "下载产物", "アーティファクト取得"),
   preview: copy("Preview", "预览", "プレビュー"),
+  loadingPreview: copy("Loading preview...", "加载预览中...", "プレビューを読み込み中..."),
+  previewFailed: copy("Preview failed", "预览失败", "プレビューに失敗"),
   reRun: copy("Re-run", "重新执行", "再実行"),
   artifacts: copy("Artifacts", "产物", "アーティファクト"),
   noArtifactsAvailable: copy("No artifacts available", "无可用产物", "アーティファクトなし"),
@@ -105,6 +107,9 @@ export function ReportDetailScreen({
   const [artifactsData, setArtifactsData] = useState<RunArtifactsResponse | null>(null);
   const [artifactsOpen, setArtifactsOpen] = useState(false);
   const [previewArtifact, setPreviewArtifact] = useState<RunReportArtifact | null>(null);
+  const [previewText, setPreviewText] = useState("");
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!selectedRunId) return;
@@ -118,6 +123,9 @@ export function ReportDetailScreen({
     setArtifactsData(null);
     setArtifactsOpen(false);
     setPreviewArtifact(null);
+    setPreviewText("");
+    setPreviewLoading(false);
+    setPreviewError(null);
     fetch(`${apiBaseUrl}/api/phase3/runs/${encodeURIComponent(selectedRunId)}/report`)
       .then((r) => (r.ok ? (r.json() as Promise<RunReport>) : Promise.reject(r.status)))
       .then((data) => {
@@ -216,6 +224,22 @@ export function ReportDetailScreen({
       model: apiReport?.model ?? ""
     });
   }, [selectedRunId, apiReport, onRerun]);
+
+  useEffect(() => {
+    if (!selectedRunId || !previewArtifact || previewArtifact.kind !== "report-json") {
+      setPreviewText("");
+      setPreviewLoading(false);
+      setPreviewError(null);
+      return;
+    }
+    setPreviewLoading(true);
+    setPreviewError(null);
+    fetch(`${apiBaseUrl}/api/phase3/runs/${encodeURIComponent(selectedRunId)}/artifacts/content?path=${encodeURIComponent(previewArtifact.path)}`)
+      .then((r) => (r.ok ? r.text() : Promise.reject(r.status)))
+      .then((text) => setPreviewText(text))
+      .catch((err) => setPreviewError(String(err)))
+      .finally(() => setPreviewLoading(false));
+  }, [apiBaseUrl, previewArtifact, selectedRunId]);
 
   const fallbackReport = fetchFailed ? selectReportViewModel(snapshot, selectedRunId) : null;
   const runName = apiReport?.runName ?? fallbackReport?.runName ?? selectedRunId ?? "";
@@ -359,8 +383,13 @@ export function ReportDetailScreen({
                   <span className={`docParseDocumentBadge ${item.kind === "screenshot" ? "accent" : "neutral"}`}>{item.kind}</span>
                   <span>{item.label}</span>
                   <small>{item.path}</small>
-                  {item.kind === "report-html" ? (
-                    <button type="button" className="reportsActionButton ghost" onClick={() => setPreviewArtifact(item)}>
+                  {item.kind === "report-html" || item.kind === "report-json" ? (
+                    <button
+                      type="button"
+                      className="reportsActionButton ghost"
+                      aria-label={`${t(C.preview)} ${item.label}`}
+                      onClick={() => setPreviewArtifact(item)}
+                    >
                       {t(C.preview)}
                     </button>
                   ) : null}
@@ -378,6 +407,18 @@ export function ReportDetailScreen({
                 src={`${apiBaseUrl}/api/phase3/runs/${encodeURIComponent(selectedRunId)}/artifacts/content?path=${encodeURIComponent(previewArtifact.path)}`}
                 style={{ width: "100%", minHeight: 420, border: "1px solid rgba(148, 163, 184, 0.35)", borderRadius: 12, background: "#fff" }}
               />
+            </div>
+          ) : null}
+          {previewArtifact?.kind === "report-json" ? (
+            <div className="reportPanelCard" style={{ marginTop: 16 }}>
+              <div className="reportPanelHeader">
+                <div className="reportPanelTitle">{`${previewArtifact.label} - ${t(C.preview)}`}</div>
+              </div>
+              {previewLoading ? <p>{t(C.loadingPreview)}</p> : null}
+              {previewError ? <p>{`${t(C.previewFailed)}: ${previewError}`}</p> : null}
+              {!previewLoading && !previewError ? (
+                <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{previewText}</pre>
+              ) : null}
             </div>
           ) : null}
         </div>

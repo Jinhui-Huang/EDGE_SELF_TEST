@@ -163,6 +163,7 @@ Current behavior:
 - request: `GET /api/phase3/runs/{runId}/artifacts`
 - owner: `ReportDetailScreen.tsx`
 - success behavior: open artifact drawer with kind/label/path for each artifact; `report-html` entries can preview inline in the same drawer
+  - `report-json` entries can also preview inline as text in the same drawer
   - `path` is the run-local artifact path reused by `GET /api/phase3/runs/{runId}/artifacts/content?path=...`
 - failure behavior: surface fetch error in action status
 - current state: implemented
@@ -447,6 +448,7 @@ Implementation:
 - button calls `GET /api/phase3/runs/{runId}/artifacts`
 - UI opens local artifact listing drawer showing kind/label/path per item
 - `report-html` entries now render a minimal inline preview via `GET /api/phase3/runs/{runId}/artifacts/content?path=report.html`
+- `report-json` entries now render a minimal inline `<pre>` preview via `GET /api/phase3/runs/{runId}/artifacts/content?path=report.json`
 - drawer has dismiss button to close
 - Overview screenshot cards derive inline preview URLs from `GET /api/phase3/runs/{runId}/artifacts/content?path=...`
   - prefer `steps[].artifactPath`
@@ -503,6 +505,7 @@ Resolved items:
 - All tabs are now wired with tab-specific API fetches.
 - `Download artifacts` fetches artifact list from backend and opens listing drawer.
 - `report-html` artifacts can now preview inline inside the artifact drawer through the shared content endpoint.
+- `report-json` artifacts can now preview inline inside the artifact drawer through the same content endpoint.
 - Overview screenshots can now preview image-like run artifacts inline through the backend content-read endpoint.
 - `Re-run` hands off run context into `execution` via App-level handoff.
 - Overview tab now distinguishes backend-owned `UNAVAILABLE` report shells from true snapshot-fallback cases.
@@ -510,5 +513,5 @@ Resolved items:
 
 Remaining items:
 
-- Generic artifact drawer entries still remain mostly listing-path-focused; inline read is currently wired for image-like Overview screenshots and `report-html` preview.
+- Generic artifact drawer entries still remain mostly listing-path-focused; inline read is currently wired for image-like Overview screenshots, `report-html`, and `report-json` preview.
 - Re-run handoff carries `runId` and parses `projectKey` from it, but `environment` and `model` pre-fill depend on report data availability.

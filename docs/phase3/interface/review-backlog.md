@@ -544,13 +544,14 @@ It does not authorize UI or backend changes in the current phase.
   - missing `data-diff.json` now returns a backend-owned `UNAVAILABLE` shell for the main diff payload, so the `dataDiff` table no longer renders synthetic rows for no-artifact runs
   - `reportDetail` Overview screenshots can now read image-like artifact content inline through a backend content endpoint instead of staying path-only
   - `reportDetail` artifact drawer can now inline-preview `report-html` through the same backend content endpoint instead of staying pure path listing
+  - `reportDetail` artifact drawer can now also inline-preview `report-json` as text through that same endpoint
 - Why this is next:
   - the interface surface exists, but several pages still retain synthetic list/view-model layers, deterministic mock artifacts, or snapshot fallback behavior
   - the report chain is functionally wired, but not fully backend-native yet
 - Backend work still missing:
   - reduce or eliminate snapshot-derived `reportDetail` fallback dependence when backend detail reads fail
   - continue tightening missing-artifact semantics so backend-owned empty/unavailable shells replace any remaining misleading mock payloads outside the already-cleaned report/data-diff main paths
-  - expand artifact-content reads beyond image-like Overview screenshots and `report-html` if richer inline/download coverage is needed
+  - expand artifact-content reads beyond image-like Overview screenshots, `report-html`, and `report-json` if richer inline/download coverage is needed
 - Expected outcome:
   - report list/detail/diff behavior converges on one stable backend run/report contract anchored on canonical `runId`
 

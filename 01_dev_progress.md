@@ -5281,6 +5281,47 @@ Remaining limits:
 - synthetic diff rows still remain as a fallback when the main diff API read fails outright
 - `reportDetail` still keeps snapshot-derived fallback when backend detail reads fail
 
+## 2026-05-07 P3-3 reportDetail report-json drawer preview follow-up
+
+## Task
+- Continue the same artifact-content line with one more tiny reader:
+  - keep scope inside the current artifact drawer
+  - add minimal inline preview for one text-like artifact type
+
+## Completed
+- Updated `ReportDetailScreen.tsx`:
+  - kept the existing `previewArtifact` flow inside the drawer
+  - added a tiny `report-json` text-preview branch using the existing content endpoint
+  - the drawer now fetches `report.json` text on demand and renders it in a `<pre>`
+  - scope remains intentionally narrow: no generic multi-type viewer and no Overview screenshot refactor
+- Chose `report-json` over `log`:
+  - it is already present in the current artifact drawer fixtures
+  - the existing content endpoint already returns `application/json; charset=utf-8`
+  - it was the smallest stable text-like artifact to preview without new endpoint work
+- Updated `App.test.tsx`:
+  - artifact drawer coverage now checks both preview buttons
+  - added a focused `report-json` preview test that verifies the drawer fetches the content endpoint and renders the JSON text
+- Synced `reportDetail` specs and `review-backlog.md` to record `report-json` as the next small drawer-level inline preview type
+
+## Modified Files
+- `ui/admin-console/src/screens/ReportDetailScreen.tsx`
+- `ui/admin-console/src/App.test.tsx`
+- `docs/phase3/interface/reportDetail/interface-spec.md`
+- `docs/phase3/interface/reportDetail/functional-spec.md`
+- `docs/phase3/interface/review-backlog.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Not run by explicit task boundary:
+  - no test run
+  - no build run
+
+## Remaining Limits
+- generic artifact drawer entries still remain mostly listing-path-focused; inline read is currently wired for image-like Overview screenshots, `report-html`, and `report-json`
+- synthetic diff rows still remain as a fallback when the main diff API read fails outright
+- `reportDetail` still keeps snapshot-derived fallback when backend detail reads fail
+
 ## 2026-05-07 P3-3 reportDetail artifact-path contract fix follow-up
 
 ## Task

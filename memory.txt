@@ -2336,3 +2336,19 @@
     - no test run
     - no build run
     - no commit / push
+- 2026-05-07: Extended the same tiny drawer-level reader path to `report-json`.
+  - Frontend:
+    - artifact drawer preview buttons now cover both `report-html` and `report-json`
+    - `report-json` uses the existing content endpoint and renders inline as text in a `<pre>`
+    - no generic multi-type viewer was introduced
+  - Why this slice:
+    - `report-json` was smaller and steadier than `log` because it is already present in current artifact fixtures
+    - the endpoint already serves it as `application/json; charset=utf-8`, so no backend contract change was needed
+  - Docs:
+    - synced `reportDetail/interface-spec.md`
+    - synced `reportDetail/functional-spec.md`
+    - refined `review-backlog.md` so drawer-level inline preview now covers `report-html` and `report-json`
+  - Keep the explicit boundary:
+    - no test run
+    - no build run
+    - no commit / push
