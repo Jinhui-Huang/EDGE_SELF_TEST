@@ -1071,8 +1071,8 @@ class LocalAdminApiServerTest {
                     HttpResponse.BodyHandlers.ofString());
             assertEquals(200, recovery.statusCode());
             assertTrue(recovery.body().contains("\"order-smoke-20260425\""));
-            assertTrue(recovery.body().contains("\"PARTIAL\""));
-            assertTrue(recovery.body().contains("\"restore snapshot\""));
+            assertTrue(recovery.body().contains("\"UNAVAILABLE\""));
+            assertTrue(recovery.body().contains("\"items\":[]"));
             assertTrue(recovery.body().contains("\"items\""));
 
             // GET /api/phase3/runs/order-smoke-20260425/ai-decisions — ai decisions (mock fallback)

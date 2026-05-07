@@ -2122,6 +2122,32 @@ describe("App", () => {
     expect(await screen.findByText("No AI decision data available")).toBeInTheDocument();
   });
 
+  it("shows explicit recovery unavailable state when the backend returns an empty-shell", async () => {
+    const recoveryUnavailableResponse = {
+      runId: "checkout-web-nightly",
+      status: "UNAVAILABLE",
+      items: []
+    };
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/report")) return jsonResponse(reportResponse);
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/recovery")) return jsonResponse(recoveryUnavailableResponse);
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    await screen.findByText("Recent runs");
+    await userEvent.click(screen.getByRole("button", { name: "Open run checkout-web-nightly" }));
+    await screen.findByText("Download artifacts");
+    await userEvent.click(screen.getByRole("button", { name: "Recovery" }));
+
+    expect(await screen.findByText("UNAVAILABLE")).toBeInTheDocument();
+    expect(await screen.findByText("No recovery data available")).toBeInTheDocument();
+  });
+
   it("calls re-restore endpoint and shows status feedback in dataDiff", async () => {
     const restoreResultResponse = {
       runId: "checkout-web-nightly",

@@ -2214,3 +2214,22 @@
     - no test run
     - no build run
     - no commit / push
+- 2026-05-07: Implemented the next small `P3-3` slice on `reportDetail` by removing fake recovery steps.
+  - Backend:
+    - `GET /api/phase3/runs/{runId}/recovery` no longer fabricates deterministic recovery rows when `recovery.json` is missing
+    - the backend now returns an explicit empty shell instead:
+      - `status: "UNAVAILABLE"`
+      - `items: []`
+  - Frontend:
+    - `ReportDetailScreen` recovery panel already had a status badge plus empty-state branch
+    - the new shell is therefore consumed without extra panel refactor
+  - Docs:
+    - synced `reportDetail/interface-spec.md`
+    - refined `review-backlog.md` so `recovery` is no longer described as deterministic mock fallback
+  - Remaining limits:
+    - `reportDetail` snapshot fallback still remains on main detail read failures
+    - artifact/screenshot inline viewing is still not implemented
+  - Keep the explicit boundary:
+    - no test run
+    - no build run
+    - no commit / push

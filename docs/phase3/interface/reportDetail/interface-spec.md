@@ -5,6 +5,7 @@ Update note:
 - `ReportsScreen` opens detail through `onOpenDetail(runId)`.
 - `cases` history handoff now also prefers dedicated backend `runId`; only older history rows may still fall back to `runName`.
 - `reportDetail` reads `GET /api/phase3/runs/{runId}/report` and tab-specific run endpoints, with snapshot fallback only when backend reads fail.
+- missing `recovery.json` artifacts now return a backend-owned `UNAVAILABLE` shell (`items: []`) instead of deterministic mock recovery steps.
 - missing `ai-decisions.json` artifacts now return a backend-owned `UNAVAILABLE` shell (`items: []`) instead of deterministic mock decision logs.
 
 ## 1. Scope and Design Basis
@@ -357,21 +358,15 @@ Purpose:
 
 - return restore/recovery actions and results for the run
 - fetched on Recovery tab activation
-- backend: `ReportArtifactService.getRecovery()` reads `recovery.json` from run dir, falls back to deterministic mock
+- backend: `ReportArtifactService.getRecovery()` reads `recovery.json` from run dir; missing artifacts now return `UNAVAILABLE` + `items: []`
 
 Response body:
 
 ```json
 {
-  "runName": "checkout-web-nightly",
-  "status": "PARTIAL",
-  "items": [
-    {
-      "step": "restore snapshot",
-      "status": "SUCCESS",
-      "detail": "Primary checkout schema restored"
-    }
-  ]
+  "runId": "checkout-web-nightly",
+  "status": "UNAVAILABLE",
+  "items": []
 }
 ```
 
@@ -474,7 +469,7 @@ Backend error semantics:
 
 - `GET /api/phase3/runs/{runId}/report` returns `404` when report artifact does not exist
 - `GET /api/phase3/runs/{runId}/artifacts` returns `200` with empty items when no artifacts are available
-- recovery still returns deterministic mock data when no real run artifacts exist on disk
+- recovery now returns an explicit backend-owned `UNAVAILABLE` empty shell when no real `recovery.json` exists
 - ai-decisions now returns an explicit backend-owned `UNAVAILABLE` empty shell when no real `ai-decisions.json` exists
 
 ## 12. Review Items
@@ -485,10 +480,9 @@ Resolved items:
 - `Download artifacts` fetches artifact list from backend and opens listing drawer.
 - `Re-run` hands off run context into `execution` via App-level handoff.
 - Overview tab shows real report data from `GET /api/phase3/runs/{runId}/report` with fallback to synthetic view model.
-- Recovery and AI decisions backend endpoints are implemented in `ReportArtifactService`; AI decisions now use a file-backed read with `UNAVAILABLE` empty-shell fallback.
+- Recovery and AI decisions backend endpoints are implemented in `ReportArtifactService`; both now use file-backed reads with `UNAVAILABLE` empty-shell fallback.
 
 Remaining items:
 
-- Recovery data is still deterministic mock when no real run artifacts exist on disk.
 - Screenshot and artifact content cannot be viewed/downloaded inline — the listing drawer shows file paths only.
 - Re-run handoff carries `runId` and parses `projectKey` from it, but `environment` and `model` pre-fill depend on report data availability.
