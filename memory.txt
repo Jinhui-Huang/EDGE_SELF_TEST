@@ -2352,3 +2352,20 @@
     - no test run
     - no build run
     - no commit / push
+- 2026-05-07: Extended the same tiny drawer-level reader path one more step to `log`.
+  - Backend:
+    - `.log` artifacts are now classified as `kind: "log"` in artifact listings
+  - Frontend:
+    - reused the existing `report-json` text-preview path instead of creating a second viewer mechanism
+    - `Preview runtime.log` now fetches the existing content endpoint and renders inline text in a `<pre>`
+  - Why this slice:
+    - it was the smallest follow-up after `report-json` because the drawer already had the text-preview state machine
+    - no content-endpoint contract change was needed; `text/plain; charset=utf-8` already works
+  - Docs:
+    - synced `reportDetail/interface-spec.md`
+    - synced `reportDetail/functional-spec.md`
+    - refined `review-backlog.md` so drawer-level inline preview now covers `report-html`, `report-json`, and `log`
+  - Keep the explicit boundary:
+    - no test run
+    - no build run
+    - no commit / push

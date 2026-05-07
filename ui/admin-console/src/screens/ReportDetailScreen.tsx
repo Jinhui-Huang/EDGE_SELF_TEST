@@ -226,7 +226,7 @@ export function ReportDetailScreen({
   }, [selectedRunId, apiReport, onRerun]);
 
   useEffect(() => {
-    if (!selectedRunId || !previewArtifact || previewArtifact.kind !== "report-json") {
+    if (!selectedRunId || !previewArtifact || (previewArtifact.kind !== "report-json" && previewArtifact.kind !== "log")) {
       setPreviewText("");
       setPreviewLoading(false);
       setPreviewError(null);
@@ -383,7 +383,7 @@ export function ReportDetailScreen({
                   <span className={`docParseDocumentBadge ${item.kind === "screenshot" ? "accent" : "neutral"}`}>{item.kind}</span>
                   <span>{item.label}</span>
                   <small>{item.path}</small>
-                  {item.kind === "report-html" || item.kind === "report-json" ? (
+                  {item.kind === "report-html" || item.kind === "report-json" || item.kind === "log" ? (
                     <button
                       type="button"
                       className="reportsActionButton ghost"
@@ -409,7 +409,7 @@ export function ReportDetailScreen({
               />
             </div>
           ) : null}
-          {previewArtifact?.kind === "report-json" ? (
+          {previewArtifact?.kind === "report-json" || previewArtifact?.kind === "log" ? (
             <div className="reportPanelCard" style={{ marginTop: 16 }}>
               <div className="reportPanelHeader">
                 <div className="reportPanelTitle">{`${previewArtifact.label} - ${t(C.preview)}`}</div>

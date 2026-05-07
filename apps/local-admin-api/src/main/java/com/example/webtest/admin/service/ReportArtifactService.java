@@ -445,6 +445,9 @@ public final class ReportArtifactService {
         if (filename.endsWith(".json")) {
             return "report-json";
         }
+        if (filename.endsWith(".log")) {
+            return "log";
+        }
         if (filename.endsWith(".png") || filename.endsWith(".jpg") || filename.endsWith(".jpeg")) {
             return "screenshot";
         }

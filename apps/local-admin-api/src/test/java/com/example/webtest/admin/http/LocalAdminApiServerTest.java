@@ -969,6 +969,7 @@ class LocalAdminApiServerTest {
                 Map.of("stepName", "Click checkout", "action", "CLICK", "status", "SUCCESS", "artifactPath", "checkout.png")));
         Files.writeString(runDir.resolve("report.json"), Jsons.writeValueAsString(reportPayload), StandardCharsets.UTF_8);
         Files.writeString(runDir.resolve("report.html"), "<html>report</html>", StandardCharsets.UTF_8);
+        Files.writeString(runDir.resolve("runtime.log"), "step-1 ok\nstep-2 failed", StandardCharsets.UTF_8);
         Files.writeString(runDir.resolve("screenshot.png"), "fake-png", StandardCharsets.UTF_8);
 
         // minimal scaffolding for server construction
@@ -1064,6 +1065,7 @@ class LocalAdminApiServerTest {
             assertTrue(artifacts.body().contains("\"order-smoke-20260425\""));
             assertTrue(artifacts.body().contains("\"report-json\""));
             assertTrue(artifacts.body().contains("\"report-html\""));
+            assertTrue(artifacts.body().contains("\"log\""));
             assertTrue(artifacts.body().contains("\"screenshot\""));
             assertTrue(artifacts.body().contains("\"path\":\"screenshot.png\""));
 

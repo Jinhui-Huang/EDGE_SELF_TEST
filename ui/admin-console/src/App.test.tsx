@@ -1890,7 +1890,8 @@ describe("App", () => {
       runId: "checkout-web-nightly",
       items: [
         { kind: "report-html", label: "report.html", path: "report.html" },
-        { kind: "report-json", label: "report.json", path: "report.json" }
+        { kind: "report-json", label: "report.json", path: "report.json" },
+        { kind: "log", label: "runtime.log", path: "runtime.log" }
       ]
     };
     const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
@@ -1915,9 +1916,11 @@ describe("App", () => {
     });
     expect(await screen.findByText("report.html")).toBeInTheDocument();
     expect(await screen.findByText("report.json")).toBeInTheDocument();
+    expect(await screen.findByText("runtime.log")).toBeInTheDocument();
     expect(await screen.findByText(/Artifacts/)).toBeInTheDocument();
     expect(await screen.findByRole("button", { name: "Preview report.html" })).toBeInTheDocument();
     expect(await screen.findByRole("button", { name: "Preview report.json" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Preview runtime.log" })).toBeInTheDocument();
     expect(screen.getByTitle("report.html")).toHaveAttribute(
       "src",
       "http://127.0.0.1:8787/api/phase3/runs/checkout-web-nightly/artifacts/content?path=report.html"
@@ -1961,6 +1964,42 @@ describe("App", () => {
     });
     expect(await screen.findByText(/"status": "FAILED"/)).toBeInTheDocument();
     expect(await screen.findByText(/"summary": \{ "total": 8 \}/)).toBeInTheDocument();
+  });
+
+  it("renders inline log preview inside the artifact drawer", async () => {
+    const artifactsResponse = {
+      runId: "checkout-web-nightly",
+      items: [{ kind: "log", label: "runtime.log", path: "runtime.log" }]
+    };
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/report")) return jsonResponse(reportResponse);
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/artifacts")) return jsonResponse(artifactsResponse);
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/artifacts/content?path=runtime.log")) {
+        return Promise.resolve(
+          new Response("step-1 ok\nstep-2 failed", {
+            status: 200,
+            headers: { "Content-Type": "text/plain; charset=utf-8" }
+          })
+        );
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    await screen.findByText("Recent runs");
+    await userEvent.click(screen.getByRole("button", { name: "Open run checkout-web-nightly" }));
+    await userEvent.click(screen.getByRole("button", { name: "Download artifacts" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Preview runtime.log" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith("http://127.0.0.1:8787/api/phase3/runs/checkout-web-nightly/artifacts/content?path=runtime.log");
+    });
+    expect(await screen.findByText(/step-1 ok/)).toBeInTheDocument();
+    expect(await screen.findByText(/step-2 failed/)).toBeInTheDocument();
   });
 
   it("renders inline screenshot preview from report artifact content endpoint", async () => {

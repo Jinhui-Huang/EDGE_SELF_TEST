@@ -5322,6 +5322,50 @@ Remaining limits:
 - synthetic diff rows still remain as a fallback when the main diff API read fails outright
 - `reportDetail` still keeps snapshot-derived fallback when backend detail reads fail
 
+## 2026-05-07 P3-3 reportDetail log drawer preview follow-up
+
+## Task
+- Continue the same tiny artifact-content reader path:
+  - keep scope inside the current artifact drawer
+  - add one more text-like inline preview without turning the drawer into a general viewer
+
+## Completed
+- Updated `ReportArtifactService.java`:
+  - `.log` artifacts are now classified as `kind: "log"`
+- Updated `ReportDetailScreen.tsx`:
+  - reused the existing text-preview state machine added for `report-json`
+  - expanded that branch to accept `log` with the same `<pre>` preview path
+  - no new endpoint and no second preview mechanism were introduced
+- Chose `log` as the next step:
+  - it follows naturally from the existing `report-json` text-preview branch
+  - `text/plain; charset=utf-8` is already served by the current content endpoint
+  - this keeps the scope small and inside the current drawer
+- Updated tests:
+  - backend artifact-list coverage now checks `kind: "log"`
+  - App-level artifact drawer coverage now verifies `Preview runtime.log` fetches the content endpoint and renders log text
+- Synced `reportDetail` specs and `review-backlog.md` to record `log` as the next small drawer-level inline preview type
+
+## Modified Files
+- `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/ReportArtifactService.java`
+- `apps/local-admin-api/src/test/java/com/example/webtest/admin/http/LocalAdminApiServerTest.java`
+- `ui/admin-console/src/screens/ReportDetailScreen.tsx`
+- `ui/admin-console/src/App.test.tsx`
+- `docs/phase3/interface/reportDetail/interface-spec.md`
+- `docs/phase3/interface/reportDetail/functional-spec.md`
+- `docs/phase3/interface/review-backlog.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Not run by explicit task boundary:
+  - no test run
+  - no build run
+
+## Remaining Limits
+- generic artifact drawer entries still remain mostly listing-path-focused; inline read is currently wired for image-like Overview screenshots, `report-html`, `report-json`, and `log`
+- synthetic diff rows still remain as a fallback when the main diff API read fails outright
+- `reportDetail` still keeps snapshot-derived fallback when backend detail reads fail
+
 ## 2026-05-07 P3-3 reportDetail artifact-path contract fix follow-up
 
 ## Task
