@@ -23,6 +23,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -788,6 +789,286 @@ class LocalAdminApiServerTest {
             assertEquals(200, fallbackBacked.statusCode());
             assertTrue(fallbackBacked.body().contains("\"source\":\"scheduler-events\""));
             assertTrue(fallbackBacked.body().contains("Scheduler event fallback"));
+        }
+    }
+
+    @Test
+    void monitorStepsPrefersRunLocalReportStepsAndFallsBackToSchedulerEvents(@TempDir Path tempDir) throws Exception {
+        Path runsDir = tempDir.resolve("runs");
+        Path artifactRunDir = runsDir.resolve("checkout-web-smoke");
+        Files.createDirectories(artifactRunDir);
+        Files.writeString(artifactRunDir.resolve("report.json"), Jsons.writeValueAsString(Map.of(
+                "runId", "checkout-web-smoke",
+                "steps", List.of(
+                        Map.of(
+                                "stepName", "Open checkout page",
+                                "action", "open",
+                                "status", "PASSED",
+                                "message", "report-backed step",
+                                "durationMs", 1200,
+                                "artifactPath", "artifacts/step-1.png"),
+                        Map.of(
+                                "stepName", "Click pay button",
+                                "action", "click",
+                                "status", "RUNNING",
+                                "durationMs", 0),
+                        Map.of(
+                                "stepName", "Submit payment",
+                                "action", "click",
+                                "status", "ERROR",
+                                "message", "payment button not found",
+                                "durationMs", 950),
+                        Map.of(
+                                "stepName", "Archive receipt",
+                                "action", "archive",
+                                "status", "SKIPPED",
+                                "durationMs", 0)))), StandardCharsets.UTF_8);
+
+        Path schedulerRequestsFile = tempDir.resolve("scheduler-requests.json");
+        Path schedulerEventsFile = tempDir.resolve("scheduler-events.json");
+        Path schedulerStateFile = tempDir.resolve("scheduler-state.json");
+        Path queueFile = tempDir.resolve("execution-queue.json");
+        Path catalogFile = tempDir.resolve("project-catalog.json");
+        Path executionHistoryFile = tempDir.resolve("execution-history.json");
+        Path modelConfigFile = tempDir.resolve("model-config.json");
+        Path environmentConfigFile = tempDir.resolve("environment-config.json");
+        Files.writeString(queueFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(catalogFile, Jsons.writeValueAsString(Map.of("projects", List.of(), "cases", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(executionHistoryFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(modelConfigFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(environmentConfigFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(schedulerRequestsFile, Jsons.writeValueAsString(Map.of(
+                "requests", List.of(
+                        Map.of("runId", "checkout-web-smoke"),
+                        Map.of("runId", "missing-report-steps")))), StandardCharsets.UTF_8);
+        Files.writeString(schedulerEventsFile, Jsons.writeValueAsString(Map.of(
+                "events", List.of(
+                        Map.of(
+                                "runId", "checkout-web-smoke",
+                                "type", "STEP_RUNNING",
+                                "detail", "scheduler step should not win",
+                                "at", "2026-05-07T09:03:30Z"),
+                        Map.of(
+                                "runId", "missing-report-steps",
+                                "type", "STEP_DONE",
+                                "detail", "Open checkout fallback",
+                                "durationMs", 800,
+                                "at", "2026-05-07T09:05:00Z")))), StandardCharsets.UTF_8);
+
+        Clock clock = Clock.fixed(Instant.parse("2026-05-07T09:10:00Z"), ZoneOffset.UTC);
+        SchedulerPersistenceService schedulerPersistence = new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, clock);
+        try (LocalAdminApiServer server = new LocalAdminApiServer(
+                new InetSocketAddress("127.0.0.1", 0),
+                new Phase3MockDataService(
+                        runsDir,
+                        schedulerRequestsFile,
+                        schedulerEventsFile,
+                        schedulerStateFile,
+                        queueFile,
+                        catalogFile,
+                        executionHistoryFile,
+                        modelConfigFile,
+                        environmentConfigFile,
+                        clock),
+                schedulerPersistence,
+                new ConfigPersistenceService(
+                        modelConfigFile,
+                        environmentConfigFile),
+                new CatalogPersistenceService(catalogFile, clock),
+                new RunStatusService(runsDir, schedulerRequestsFile, schedulerEventsFile, schedulerPersistence, clock),
+                new AgentGenerateService(),
+                new ReportArtifactService(runsDir),
+                new DataTemplatePersistenceService(tempDir.resolve("data-templates.json"), clock))) {
+            server.start();
+            HttpClient client = HttpClient.newHttpClient();
+
+            HttpResponse<String> artifactBacked = client.send(
+                    request(server, "/api/phase3/runs/checkout-web-smoke/steps"),
+                    HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> fallbackBacked = client.send(
+                    request(server, "/api/phase3/runs/missing-report-steps/steps"),
+                    HttpResponse.BodyHandlers.ofString());
+
+            assertEquals(200, artifactBacked.statusCode());
+            assertTrue(artifactBacked.body().contains("\"label\":\"Open checkout page\""));
+            assertTrue(artifactBacked.body().contains("\"state\":\"DONE\""));
+            assertTrue(artifactBacked.body().contains("\"note\":\"report-backed step\""));
+            assertTrue(artifactBacked.body().contains("\"state\":\"RUNNING\""));
+            assertTrue(artifactBacked.body().contains("\"label\":\"Submit payment\""));
+            assertTrue(artifactBacked.body().contains("\"state\":\"FAILED\""));
+            assertTrue(artifactBacked.body().contains("\"note\":\"payment button not found\""));
+            assertTrue(artifactBacked.body().contains("\"label\":\"Archive receipt\""));
+            assertTrue(artifactBacked.body().contains("\"state\":\"SKIPPED\""));
+            assertTrue(!artifactBacked.body().contains("scheduler step should not win"));
+
+            assertEquals(200, fallbackBacked.statusCode());
+            assertTrue(fallbackBacked.body().contains("\"label\":\"Open checkout fallback\""));
+            assertTrue(fallbackBacked.body().contains("\"durationMs\":800"));
+        }
+    }
+
+    @Test
+    void monitorStatusPrefersRunLocalArtifactsAndKeepsFallbackProgressConservative(@TempDir Path tempDir) throws Exception {
+        Path runsDir = tempDir.resolve("runs");
+        Path artifactRunDir = runsDir.resolve("artifact-backed-status");
+        Files.createDirectories(artifactRunDir);
+        Path reportJson = artifactRunDir.resolve("report.json");
+        Path livePageJson = artifactRunDir.resolve("live-page.json");
+        Path runtimeLog = artifactRunDir.resolve("runtime.log");
+        Files.writeString(reportJson, Jsons.writeValueAsString(Map.of(
+                "runId", "artifact-backed-status",
+                "projectKey", "checkout-web",
+                "environment", "prod-like",
+                "model", "claude-4.5-sonnet",
+                "operator", "artifact-runner",
+                "startedAt", "2026-05-07T09:00:00Z",
+                "finishedAt", "2026-05-07T09:04:12Z",
+                "summary", Map.of(
+                        "total", 4,
+                        "passed", 3,
+                        "failed", 1,
+                        "durationMs", 252000),
+                "steps", List.of(
+                        Map.of("stepName", "Open checkout", "action", "OPEN", "status", "SUCCESS"),
+                        Map.of("stepName", "Assert total", "action", "ASSERT_TOTAL", "status", "SUCCESS"),
+                        Map.of("stepName", "Assert receipt", "action", "ASSERT_RECEIPT", "status", "FAILED"),
+                        Map.of("stepName", "Archive receipt", "action", "ARCHIVE", "status", "SKIPPED")))), StandardCharsets.UTF_8);
+        Files.writeString(livePageJson, Jsons.writeValueAsString(Map.of(
+                "url", "https://example.test/checkout/review",
+                "pageState", "artifact-captured",
+                "capturedAt", "2026-05-07T09:04:10Z")), StandardCharsets.UTF_8);
+        Files.writeString(runtimeLog, "2026-05-07T09:04:11Z Final artifact flush", StandardCharsets.UTF_8);
+        Files.setLastModifiedTime(reportJson, FileTime.from(Instant.parse("2026-05-07T09:04:12Z")));
+        Files.setLastModifiedTime(livePageJson, FileTime.from(Instant.parse("2026-05-07T09:04:10Z")));
+        Files.setLastModifiedTime(runtimeLog, FileTime.from(Instant.parse("2026-05-07T09:04:11Z")));
+
+        Path schedulerRequestsFile = tempDir.resolve("scheduler-requests.json");
+        Path schedulerEventsFile = tempDir.resolve("scheduler-events.json");
+        Path schedulerStateFile = tempDir.resolve("scheduler-state.json");
+        Path queueFile = tempDir.resolve("execution-queue.json");
+        Path catalogFile = tempDir.resolve("project-catalog.json");
+        Path executionHistoryFile = tempDir.resolve("execution-history.json");
+        Path modelConfigFile = tempDir.resolve("model-config.json");
+        Path environmentConfigFile = tempDir.resolve("environment-config.json");
+        Files.writeString(queueFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(catalogFile, Jsons.writeValueAsString(Map.of("projects", List.of(), "cases", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(executionHistoryFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(modelConfigFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(environmentConfigFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Files.writeString(schedulerRequestsFile, Jsons.writeValueAsString(Map.of(
+                "requests", List.of(
+                        Map.of(
+                                "runId", "artifact-backed-status",
+                                "projectKey", "scheduler-project",
+                                "environment", "staging",
+                                "executionModel", "gpt-4.1-mini",
+                                "owner", "scheduler-owner",
+                                "targetUrl", "https://fallback.example/checkout",
+                                "status", "RUNNING"),
+                        Map.of(
+                                "runId", "fallback-status",
+                                "projectKey", "fallback-web",
+                                "environment", "staging",
+                                "executionModel", "gpt-4.1-mini",
+                                "owner", "scheduler-owner",
+                                "targetUrl", "https://fallback.example/checkout",
+                                "status", "RUNNING")))), StandardCharsets.UTF_8);
+        Files.writeString(schedulerEventsFile, Jsons.writeValueAsString(Map.of(
+                "events", List.of(
+                        Map.of(
+                                "runId", "artifact-backed-status",
+                                "type", "RUNNING",
+                                "status", "RUNNING",
+                                "detail", "scheduler status should not win",
+                                "at", "2026-05-07T09:03:30Z"),
+                        Map.of(
+                                "runId", "artifact-backed-status",
+                                "type", "ASSERTION_PASSED",
+                                "detail", "scheduler assertion count should not win",
+                                "at", "2026-05-07T09:03:31Z"),
+                        Map.of(
+                                "runId", "artifact-backed-status",
+                                "type", "AI_CALL",
+                                "detail", "ai assist invoked",
+                                "at", "2026-05-07T09:03:32Z"),
+                        Map.of(
+                                "runId", "artifact-backed-status",
+                                "type", "HEAL",
+                                "detail", "self-heal applied",
+                                "at", "2026-05-07T09:03:33Z"),
+                        Map.of(
+                                "runId", "fallback-status",
+                                "type", "DECISION",
+                                "detail", "fallback still uses scheduler context",
+                                "at", "2026-05-07T09:06:00Z")))), StandardCharsets.UTF_8);
+
+        Clock clock = Clock.fixed(Instant.parse("2026-05-07T09:10:00Z"), ZoneOffset.UTC);
+        SchedulerPersistenceService schedulerPersistence = new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, clock);
+        try (LocalAdminApiServer server = new LocalAdminApiServer(
+                new InetSocketAddress("127.0.0.1", 0),
+                new Phase3MockDataService(
+                        runsDir,
+                        schedulerRequestsFile,
+                        schedulerEventsFile,
+                        schedulerStateFile,
+                        queueFile,
+                        catalogFile,
+                        executionHistoryFile,
+                        modelConfigFile,
+                        environmentConfigFile,
+                        clock),
+                schedulerPersistence,
+                new ConfigPersistenceService(
+                        modelConfigFile,
+                        environmentConfigFile),
+                new CatalogPersistenceService(catalogFile, clock),
+                new RunStatusService(runsDir, schedulerRequestsFile, schedulerEventsFile, schedulerPersistence, clock),
+                new AgentGenerateService(),
+                new ReportArtifactService(runsDir),
+                new DataTemplatePersistenceService(tempDir.resolve("data-templates.json"), clock))) {
+            server.start();
+            HttpClient client = HttpClient.newHttpClient();
+
+            HttpResponse<String> artifactBacked = client.send(
+                    request(server, "/api/phase3/runs/artifact-backed-status/status"),
+                    HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> fallbackBacked = client.send(
+                    request(server, "/api/phase3/runs/fallback-status/status"),
+                    HttpResponse.BodyHandlers.ofString());
+
+            assertEquals(200, artifactBacked.statusCode());
+            assertTrue(artifactBacked.body().contains("\"projectKey\":\"checkout-web\""));
+            assertTrue(artifactBacked.body().contains("\"status\":\"FAILED\""));
+            assertTrue(artifactBacked.body().contains("\"environment\":\"prod-like\""));
+            assertTrue(artifactBacked.body().contains("\"model\":\"claude-4.5-sonnet\""));
+            assertTrue(artifactBacked.body().contains("\"owner\":\"artifact-runner\""));
+            assertTrue(artifactBacked.body().contains("\"currentStep\":4"));
+            assertTrue(artifactBacked.body().contains("\"totalSteps\":4"));
+            assertTrue(artifactBacked.body().contains("\"percent\":100"));
+            assertTrue(artifactBacked.body().contains("\"elapsedMs\":252000"));
+            assertTrue(artifactBacked.body().contains("\"estimatedTotalMs\":252000"));
+            assertTrue(artifactBacked.body().contains("\"url\":\"https://example.test/checkout/review\""));
+            assertTrue(artifactBacked.body().contains("\"state\":\"artifact-captured\""));
+            assertTrue(artifactBacked.body().contains("\"assertionsPassed\":1"));
+            assertTrue(artifactBacked.body().contains("\"assertionsTotal\":2"));
+            assertTrue(artifactBacked.body().contains("\"aiCalls\":1"));
+            assertTrue(artifactBacked.body().contains("\"heals\":1"));
+            assertTrue(artifactBacked.body().contains("\"canPause\":false"));
+            assertTrue(artifactBacked.body().contains("\"canAbort\":false"));
+            assertTrue(artifactBacked.body().contains("\"lastUpdatedAt\":\"2026-05-07T09:04:12Z\""));
+            assertTrue(!artifactBacked.body().contains("scheduler status should not win"));
+
+            assertEquals(200, fallbackBacked.statusCode());
+            assertTrue(fallbackBacked.body().contains("\"status\":\"RUNNING\""));
+            assertTrue(fallbackBacked.body().contains("\"currentStep\":0"));
+            assertTrue(fallbackBacked.body().contains("\"totalSteps\":0"));
+            assertTrue(fallbackBacked.body().contains("\"percent\":0"));
+            assertTrue(fallbackBacked.body().contains("\"estimatedTotalMs\":0"));
+            assertTrue(fallbackBacked.body().contains("\"url\":\"https://fallback.example/checkout\""));
+            assertTrue(fallbackBacked.body().contains("\"state\":\"active\""));
+            assertTrue(fallbackBacked.body().contains("\"lastUpdatedAt\":\"2026-05-07T09:10:00Z\"")
+                    || fallbackBacked.body().contains("\"lastUpdatedAt\":\"2026-05-07T09:06:00Z\""));
+            assertTrue(!fallbackBacked.body().contains("\"totalSteps\":8"));
         }
     }
 

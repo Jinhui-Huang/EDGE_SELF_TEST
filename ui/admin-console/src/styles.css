@@ -4153,6 +4153,14 @@ button:disabled {
   animation: pulse 1.5s ease-in-out infinite;
 }
 
+.monitorStepBarItem.fail {
+  background: var(--danger);
+}
+
+.monitorStepBarItem.skip {
+  background: var(--warning);
+}
+
 .monitorMiniStats {
   display: flex;
   gap: 16px;
@@ -4245,6 +4253,14 @@ button:disabled {
   background: color-mix(in srgb, var(--accent) 10%, var(--surface));
 }
 
+.monitorStepItem.fail {
+  background: color-mix(in srgb, var(--danger) 9%, var(--surface));
+}
+
+.monitorStepItem.skip {
+  background: color-mix(in srgb, var(--warning) 10%, var(--surface));
+}
+
 .monitorStepDot {
   width: 20px;
   height: 20px;
@@ -4270,6 +4286,16 @@ button:disabled {
 .monitorStepDot.todo {
   color: var(--text-soft);
   background: color-mix(in srgb, var(--text-soft) 14%, transparent);
+}
+
+.monitorStepDot.fail {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+}
+
+.monitorStepDot.skip {
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 14%, transparent);
 }
 
 .monitorStepCopy {

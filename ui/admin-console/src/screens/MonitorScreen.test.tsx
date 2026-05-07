@@ -265,6 +265,40 @@ describe("MonitorScreen", () => {
     expect(await screen.findByText("member-center")).toBeInTheDocument();
   });
 
+  it("preserves failed and skipped step semantics instead of showing todo", async () => {
+    vi.stubGlobal("fetch", createFetchMock({
+      steps: {
+        runId: "checkout-web-smoke",
+        items: [
+          { index: 1, label: "Submit payment", state: "FAILED", durationMs: 950, note: "payment button not found" },
+          { index: 2, label: "Archive receipt", state: "SKIPPED", durationMs: 0 }
+        ]
+      }
+    }));
+
+    render(
+      <MonitorScreen
+        snapshot={snapshot}
+        title="Execution monitor"
+        locale="en"
+        selectedRunId="checkout-web-smoke"
+        apiBaseUrl="http://127.0.0.1:8787"
+      />
+    );
+
+    const failedStep = await screen.findByRole("button", { name: /Open step detail: Submit payment/i });
+    const skippedStep = await screen.findByRole("button", { name: /Open step detail: Archive receipt/i });
+    expect(failedStep.className).toContain("fail");
+    expect(failedStep.className).not.toContain("todo");
+    expect(skippedStep.className).toContain("skip");
+    expect(skippedStep.className).not.toContain("todo");
+
+    await userEvent.click(failedStep);
+    const detailPanel = await screen.findByLabelText("Step detail panel");
+    expect(within(detailPanel).getByText("failed")).toBeInTheDocument();
+    expect(within(detailPanel).getAllByText("payment button not found").length).toBeGreaterThan(0);
+  });
+
   it("does not expose drill-down when steps and runtime logs are empty", async () => {
     vi.stubGlobal("fetch", createFetchMock({
       steps: { runId: "checkout-web-smoke", items: [] },

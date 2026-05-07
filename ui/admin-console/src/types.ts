@@ -300,7 +300,7 @@ export type RunStatus = {
 export type RunStep = {
   index: number;
   label: string;
-  state: "DONE" | "RUNNING" | "TODO";
+  state: "DONE" | "RUNNING" | "TODO" | "FAILED" | "SKIPPED";
   durationMs: number;
   startedAt?: string;
   note?: string;

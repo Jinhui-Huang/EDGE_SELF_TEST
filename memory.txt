@@ -2413,3 +2413,69 @@
     - no test run
     - no build run
     - no commit / push
+- 2026-05-07: Continued `P3-4` on `monitor` by tightening `GET /api/phase3/runs/{runId}/steps`.
+  - Backend:
+    - `RunStatusService` now prefers run-local `report.json.steps[]` when that artifact already exists
+    - monitor step payloads are now mapped from report steps via:
+      - `label` from `stepName` / `action`
+      - normalized `state`
+      - `durationMs`
+      - optional `startedAt`
+      - optional `note` from `message` or `artifactPath`
+    - when no run-local report-step artifact exists, the endpoint keeps the existing scheduler-event-derived and placeholder fallback path
+  - Tests/docs:
+    - added backend regression for report-backed step priority plus scheduler-event fallback
+    - synced `monitor/interface-spec.md`, `monitor/functional-spec.md`, and `review-backlog.md`
+  - Why this slice:
+    - there was no obvious dedicated `steps.json`, but `report.json.steps[]` was already a real run-local artifact and was the smallest stronger source available
+    - this reduces deterministic shaping without inventing a new runtime parser or contract
+  - Keep the explicit boundary:
+    - no test run
+    - no build run
+    - no commit / push
+- 2026-05-07: Applied a small semantic follow-up on the same `P3-4 monitor /steps` path so report-backed failed steps no longer look pending.
+  - Backend:
+    - `normalizeReportStepState()` now preserves non-success terminal report states instead of collapsing them into `TODO`
+    - `FAILED` / `ERROR`-like states map to `FAILED`
+    - `SKIPPED` / `CANCELLED` / `ABORTED`-like states map to `SKIPPED`
+  - Frontend:
+    - `RunStep.state` now includes `FAILED` and `SKIPPED`
+    - `MonitorScreen` step bar, step list, and detail badge now render distinct failed/skipped tones instead of todo styling
+  - Tests/docs:
+    - added backend assertion coverage for report-backed `FAILED` and `SKIPPED` step mapping
+    - added `MonitorScreen` coverage so failed/skipped rows do not regress into todo semantics
+    - synced `monitor/interface-spec.md`, `monitor/functional-spec.md`, and `review-backlog.md`
+  - Why this slice:
+    - it fixes the most misleading remaining report-backed `steps` semantic without expanding into the larger `status` chain
+    - it keeps backend-owned truth on step terminal state instead of letting the front end fake pending work
+  - Keep the explicit boundary:
+    - no test run
+    - no build run
+    - no commit / push
+- 2026-05-07: Applied a tiny doc-only alignment on `P3-4 monitor` for the live-page interface spec.
+  - Docs:
+    - `monitor/interface-spec.md` section `5.4 Live page viewport` no longer says `current state: placeholder only`
+    - the section now matches the current real implementation and the later live-page contract details in the same file:
+      - backend-owned `AVAILABLE` / `UNAVAILABLE` shell from `GET /api/phase3/runs/{runId}/live-page`
+      - explicit unavailable copy in `MonitorScreen`
+      - inline screenshot rendering through artifact-content when `screenshotPath` exists
+  - Keep the explicit boundary:
+    - no code change
+    - no test run
+    - no build run
+    - no commit / push
+- 2026-05-07: Continued `P3-4 monitor` by tightening `GET /api/phase3/runs/{runId}/status`.
+  - Backend:
+    - `RunStatusService` now prefers run-local `report.json` for stronger status/progress/assertion counts and run metadata
+    - `currentPage.url` / `currentPage.state` now prefer run-local `live-page.json` when it exists
+    - `lastUpdatedAt` now prefers the latest artifact-backed timestamp from `report.json`, `live-page.json`, or `runtime.log`, then falls back to scheduler events
+    - when no stronger progress artifact exists, `/status` no longer fabricates the old default `8`-step shape and instead returns conservative `0 / 0 / 0` progress
+    - scheduler persistence still remains the fallback shell for lifecycle status, `aiCalls`, `heals`, and control gating when stronger artifacts are absent
+  - Tests/docs:
+    - added backend coverage for artifact-backed `/status` priority plus conservative no-artifact fallback
+    - synced `monitor/interface-spec.md`, `monitor/functional-spec.md`, and `review-backlog.md`
+  - Verification:
+    - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+  - Remaining limits:
+    - `status` still falls back to a scheduler-derived shell when stronger run-local artifacts are absent
+    - `steps` / `runtime-log` still keep their existing scheduler/placeholder fallback paths when those stronger artifacts are absent

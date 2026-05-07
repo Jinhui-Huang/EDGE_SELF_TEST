@@ -567,7 +567,7 @@ function DetailField({ label, value, mono = false }: { label: string; value: str
   );
 }
 
-function normalizeStepState(state: string): "done" | "run" | "todo" {
+function normalizeStepState(state: string): "done" | "run" | "todo" | "fail" | "skip" {
   switch (state.toUpperCase()) {
     case "DONE":
     case "PASSED":
@@ -577,6 +577,13 @@ function normalizeStepState(state: string): "done" | "run" | "todo" {
     case "STARTED":
     case "IN_PROGRESS":
       return "run";
+    case "FAILED":
+    case "ERROR":
+      return "fail";
+    case "SKIPPED":
+    case "CANCELLED":
+    case "ABORTED":
+      return "skip";
     default:
       return "todo";
   }
@@ -634,6 +641,9 @@ function statusToTone(status: string): string {
       return "success";
     case "FAILED":
     case "ERROR":
+      return "coral";
+    case "SKIPPED":
+    case "CANCELLED":
       return "warning";
     case "PAUSED":
     case "PAUSING":

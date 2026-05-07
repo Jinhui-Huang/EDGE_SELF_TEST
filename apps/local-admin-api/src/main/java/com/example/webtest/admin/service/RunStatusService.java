@@ -60,44 +60,51 @@ public final class RunStatusService {
         requireRunId(runId);
         Map<String, Object> request = findRequest(runId);
         List<Map<String, Object>> events = findEvents(runId);
-
-        String status = deriveStatus(request, events);
-        Map<String, Object> latestEvent = events.isEmpty() ? null : events.get(events.size() - 1);
-        Instant startedAt = findStartedAt(events);
+        Path runDir = resolveRunDir(runId);
+        ReportStatusContext reportContext = readReportStatusContext(runDir);
+        LivePageStatusContext livePageContext = readLivePageStatusContext(runDir);
+        String fallbackStatus = deriveStatus(request, events);
+        String status = firstNonBlank(reportContext.status(), fallbackStatus, "UNKNOWN");
         Instant now = Instant.now(clock);
-        long elapsedMs = startedAt != null ? Duration.between(startedAt, now).toMillis() : 0;
+        Map<String, Object> latestEvent = events.isEmpty() ? null : events.get(events.size() - 1);
+        Instant startedAt = reportContext.startedAt() != null ? reportContext.startedAt() : findStartedAt(events);
+        Instant finishedAt = reportContext.finishedAt();
+        long elapsedMs = resolveElapsedMs(reportContext.durationMs(), startedAt, finishedAt, now);
 
-        int totalSteps = countEventType(events, "STEP_DONE") + countEventType(events, "STEP_RUNNING") + countEventType(events, "STEP_TODO");
-        if (totalSteps == 0) totalSteps = 8;
-        int doneSteps = countEventType(events, "STEP_DONE");
-        int currentStep = doneSteps + 1;
-        int percent = totalSteps > 0 ? Math.min(100, (doneSteps * 100) / totalSteps) : 0;
+        ProgressInfo progressInfo = deriveProgressInfo(reportContext, events, status, elapsedMs);
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("runId", runId);
-        result.put("projectKey", textOr(request, "projectKey", ""));
+        result.put("projectKey", firstNonBlank(reportContext.projectKey(), textOr(request, "projectKey", "")));
         result.put("status", status);
-        result.put("environment", textOr(request, "environment", ""));
-        result.put("model", textOr(request, "executionModel", ""));
-        result.put("owner", textOr(request, "owner", ""));
+        result.put("environment", firstNonBlank(reportContext.environment(), textOr(request, "environment", "")));
+        result.put("model", firstNonBlank(reportContext.model(), textOr(request, "executionModel", "")));
+        result.put("owner", firstNonBlank(reportContext.owner(), textOr(request, "owner", "")));
 
         Map<String, Object> progress = new LinkedHashMap<>();
-        progress.put("currentStep", currentStep);
-        progress.put("totalSteps", totalSteps);
-        progress.put("percent", percent);
+        progress.put("currentStep", progressInfo.currentStep());
+        progress.put("totalSteps", progressInfo.totalSteps());
+        progress.put("percent", progressInfo.percent());
         progress.put("elapsedMs", elapsedMs);
-        progress.put("estimatedTotalMs", totalSteps > 0 && doneSteps > 0
-                ? (elapsedMs * totalSteps) / doneSteps : 0);
+        progress.put("estimatedTotalMs", progressInfo.estimatedTotalMs());
         result.put("progress", progress);
 
         Map<String, Object> currentPage = new LinkedHashMap<>();
-        currentPage.put("url", textOr(request, "targetUrl", ""));
-        currentPage.put("state", status.equals("RUNNING") ? "active" : "idle");
+        currentPage.put("url", firstNonBlank(livePageContext.url(), textOr(request, "targetUrl", "")));
+        currentPage.put("state", firstNonBlank(
+                livePageContext.pageState(),
+                "RUNNING".equals(status) ? "active" : "idle"));
         result.put("currentPage", currentPage);
 
+        int eventAssertionsPassed = countEventType(events, "ASSERTION_PASSED");
+        int eventAssertionsTotal = eventAssertionsPassed + countEventType(events, "ASSERTION_FAILED");
         Map<String, Object> counters = new LinkedHashMap<>();
-        counters.put("assertionsPassed", countEventType(events, "ASSERTION_PASSED"));
-        counters.put("assertionsTotal", countEventType(events, "ASSERTION_PASSED") + countEventType(events, "ASSERTION_FAILED"));
+        counters.put("assertionsPassed", reportContext.assertionsTotal() > 0
+                ? reportContext.assertionsPassed()
+                : eventAssertionsPassed);
+        counters.put("assertionsTotal", reportContext.assertionsTotal() > 0
+                ? reportContext.assertionsTotal()
+                : eventAssertionsTotal);
         counters.put("aiCalls", countEventType(events, "AI_CALL"));
         counters.put("heals", countEventType(events, "HEAL"));
         result.put("counters", counters);
@@ -108,8 +115,7 @@ public final class RunStatusService {
         control.put("canAbort", !isTerminal);
         result.put("control", control);
 
-        result.put("lastUpdatedAt", latestEvent != null
-                ? textOr(latestEvent, "at", now.toString()) : now.toString());
+        result.put("lastUpdatedAt", resolveLastUpdatedAt(now, latestEvent, reportContext, livePageContext, runDir));
         return result;
     }
 
@@ -117,6 +123,15 @@ public final class RunStatusService {
 
     public Map<String, Object> getRunSteps(String runId) throws IOException {
         requireRunId(runId);
+        Path runDir = resolveRunDir(runId);
+        List<Map<String, Object>> artifactSteps = readReportBackedSteps(runDir);
+        if (!artifactSteps.isEmpty()) {
+            Map<String, Object> artifactResult = new LinkedHashMap<>();
+            artifactResult.put("runId", runId);
+            artifactResult.put("items", artifactSteps);
+            return artifactResult;
+        }
+
         List<Map<String, Object>> events = findEvents(runId);
         String currentStatus = deriveStatus(findRequest(runId), events);
         boolean isRunning = "RUNNING".equals(currentStatus);
@@ -158,6 +173,59 @@ public final class RunStatusService {
         result.put("runId", runId);
         result.put("items", items);
         return result;
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> readReportBackedSteps(Path runDir) throws IOException {
+        if (runDir == null || !Files.isDirectory(runDir)) {
+            return List.of();
+        }
+        Path reportJson = runDir.resolve("report.json").normalize();
+        if (!reportJson.startsWith(runDir) || !Files.isRegularFile(reportJson)) {
+            return List.of();
+        }
+
+        Map<String, Object> report;
+        try {
+            report = Jsons.readValue(Files.readString(reportJson, StandardCharsets.UTF_8), Map.class);
+        } catch (IOException ignored) {
+            return List.of();
+        }
+        Object rawSteps = report.get("steps");
+        if (!(rawSteps instanceof List<?> stepList) || stepList.isEmpty()) {
+            return List.of();
+        }
+
+        List<Map<String, Object>> items = new ArrayList<>();
+        int stepIndex = 0;
+        for (Object rawStep : stepList) {
+            if (!(rawStep instanceof Map<?, ?> map)) {
+                continue;
+            }
+            stepIndex++;
+            Map<String, Object> step = new LinkedHashMap<>();
+            step.put("index", stepIndex);
+            step.put("label", firstNonBlank(
+                    stringValue(map.get("stepName")),
+                    stringValue(map.get("action")),
+                    "step " + stepIndex));
+            step.put("state", normalizeReportStepState(stringValue(map.get("status"))));
+            step.put("durationMs", longValue(map.get("durationMs")));
+
+            String startedAt = stringValue(map.get("startedAt"));
+            if (!startedAt.isBlank()) {
+                step.put("startedAt", startedAt);
+            }
+
+            String note = firstNonBlank(
+                    stringValue(map.get("message")),
+                    stringValue(map.get("artifactPath")));
+            if (!note.isBlank()) {
+                step.put("note", note);
+            }
+            items.add(step);
+        }
+        return items;
     }
 
     // ---- GET /api/phase3/runs/{runId}/runtime-log ----
@@ -235,6 +303,122 @@ public final class RunStatusService {
             items.add(entry);
         }
         return items;
+    }
+
+    @SuppressWarnings("unchecked")
+    private ReportStatusContext readReportStatusContext(Path runDir) throws IOException {
+        if (runDir == null || !Files.isDirectory(runDir)) {
+            return ReportStatusContext.empty();
+        }
+        Path reportJson = runDir.resolve("report.json").normalize();
+        if (!reportJson.startsWith(runDir) || !Files.isRegularFile(reportJson)) {
+            return ReportStatusContext.empty();
+        }
+
+        Map<String, Object> report;
+        try {
+            report = Jsons.readValue(Files.readString(reportJson, StandardCharsets.UTF_8), Map.class);
+        } catch (IOException ignored) {
+            return ReportStatusContext.empty();
+        }
+        if (report == null || report.isEmpty()) {
+            return ReportStatusContext.empty();
+        }
+
+        Map<String, Object> summary = mapValue(report.get("summary"));
+        List<Map<String, Object>> steps = listValue(report.get("steps"));
+        int totalSteps = steps.isEmpty() ? intValue(summary.get("total")) : steps.size();
+        int completedSteps = 0;
+        int runningSteps = 0;
+        int todoSteps = 0;
+        int failedSteps = 0;
+        int assertionsTotal = 0;
+        int assertionsPassed = 0;
+        for (Map<String, Object> step : steps) {
+            String state = normalizeReportStepState(stringValue(step.get("status")));
+            switch (state) {
+                case "DONE", "SKIPPED" -> completedSteps++;
+                case "FAILED" -> {
+                    completedSteps++;
+                    failedSteps++;
+                }
+                case "RUNNING" -> runningSteps++;
+                default -> todoSteps++;
+            }
+
+            String action = stringValue(step.get("action")).toUpperCase(Locale.ROOT);
+            if (action.startsWith("ASSERT")) {
+                assertionsTotal++;
+                if ("DONE".equals(state)) {
+                    assertionsPassed++;
+                }
+            }
+        }
+
+        int summaryFailed = intValue(summary.get("failed"));
+        int summaryPassed = intValue(summary.get("passed"));
+        if (totalSteps <= 0 && intValue(summary.get("total")) > 0) {
+            totalSteps = intValue(summary.get("total"));
+            completedSteps = Math.min(totalSteps, summaryPassed + summaryFailed);
+            failedSteps = Math.max(failedSteps, summaryFailed);
+        }
+
+        Instant startedAt = instantValue(report.get("startedAt"));
+        Instant finishedAt = instantValue(report.get("finishedAt"));
+        long durationMs = longValue(summary.get("durationMs"));
+        if (durationMs <= 0 && startedAt != null && finishedAt != null) {
+            durationMs = Math.max(0, Duration.between(startedAt, finishedAt).toMillis());
+        }
+
+        String status = deriveReportStatus(
+                normalizeLifecycleStatus(stringValue(report.get("status"))),
+                totalSteps,
+                completedSteps,
+                runningSteps,
+                todoSteps,
+                Math.max(failedSteps, summaryFailed),
+                finishedAt != null);
+
+        Instant updatedAt = latestInstant(
+                finishedAt,
+                startedAt,
+                resolveArtifactModifiedAt(reportJson));
+
+        return new ReportStatusContext(
+                status,
+                startedAt,
+                finishedAt,
+                durationMs,
+                totalSteps,
+                completedSteps,
+                assertionsPassed,
+                assertionsTotal,
+                stringValue(report.get("projectKey")),
+                stringValue(report.get("environment")),
+                firstNonBlank(stringValue(report.get("model")), stringValue(report.get("executionModel"))),
+                firstNonBlank(stringValue(report.get("operator")), stringValue(report.get("owner"))),
+                updatedAt);
+    }
+
+    private LivePageStatusContext readLivePageStatusContext(Path runDir) throws IOException {
+        if (runDir == null) {
+            return LivePageStatusContext.empty();
+        }
+        Path livePageJson = runDir.resolve("live-page.json").normalize();
+        Map<String, Object> liveArtifact = readLivePageArtifact(livePageJson);
+        Path screenshot = resolveLiveScreenshot(runDir, liveArtifact);
+        if (liveArtifact.isEmpty() && screenshot == null) {
+            return LivePageStatusContext.empty();
+        }
+
+        Instant updatedAt = latestInstant(
+                instantValue(liveArtifact.get("capturedAt")),
+                screenshot != null ? resolveArtifactModifiedAt(screenshot) : null,
+                Files.isRegularFile(livePageJson) ? resolveArtifactModifiedAt(livePageJson) : null);
+        return new LivePageStatusContext(
+                firstNonBlank(textOr(liveArtifact, "url", ""), ""),
+                textOr(liveArtifact, "pageState", ""),
+                updatedAt);
     }
 
     // ---- GET /api/phase3/runs/{runId}/live-page ----
@@ -566,6 +750,52 @@ public final class RunStatusService {
         return "INFO";
     }
 
+    private String normalizeReportStepState(String status) {
+        return switch (status.toUpperCase(Locale.ROOT)) {
+            case "SUCCESS", "SUCCEEDED", "PASSED", "DONE" -> "DONE";
+            case "RUNNING", "STARTED", "IN_PROGRESS" -> "RUNNING";
+            case "FAILED", "FAIL", "ERROR", "BROKEN", "TIMEOUT" -> "FAILED";
+            case "SKIPPED", "SKIP", "CANCELLED", "ABORTED" -> "SKIPPED";
+            default -> "TODO";
+        };
+    }
+
+    private String normalizeLifecycleStatus(String status) {
+        return switch (status.toUpperCase(Locale.ROOT)) {
+            case "SUCCESS", "SUCCEEDED", "PASSED", "DONE", "OK" -> "OK";
+            case "RUNNING", "STARTED", "IN_PROGRESS" -> "RUNNING";
+            case "FAILED", "FAIL", "ERROR", "BROKEN", "TIMEOUT", "NEEDS_REVIEW" -> "FAILED";
+            case "PAUSED", "PAUSING", "ABORTED", "ABORTING", "PRE_EXECUTION", "QUEUED", "WAITING" -> status.toUpperCase(Locale.ROOT);
+            default -> "";
+        };
+    }
+
+    private String deriveReportStatus(
+            String rawStatus,
+            int totalSteps,
+            int completedSteps,
+            int runningSteps,
+            int todoSteps,
+            int failedSteps,
+            boolean finished) {
+        if (finished && !rawStatus.isBlank() && isTerminalStatus(rawStatus)) {
+            return rawStatus;
+        }
+        if (runningSteps > 0) {
+            return "RUNNING";
+        }
+        if (failedSteps > 0 && (finished || (totalSteps > 0 && completedSteps >= totalSteps && todoSteps == 0))) {
+            return "FAILED";
+        }
+        if (totalSteps > 0 && completedSteps < totalSteps) {
+            return "RUNNING";
+        }
+        if (totalSteps > 0 && completedSteps >= totalSteps) {
+            return failedSteps > 0 ? "FAILED" : "OK";
+        }
+        return rawStatus;
+    }
+
     private boolean isImageArtifact(Path file) {
         String filename = file.getFileName().toString().toLowerCase(Locale.ROOT);
         for (String extension : LIVE_IMAGE_EXTENSIONS) {
@@ -667,6 +897,45 @@ public final class RunStatusService {
         };
     }
 
+    private ProgressInfo deriveProgressInfo(
+            ReportStatusContext reportContext,
+            List<Map<String, Object>> events,
+            String status,
+            long elapsedMs) {
+        int totalSteps = reportContext.totalSteps();
+        int completedSteps = reportContext.completedSteps();
+        int runningSteps = 0;
+        if (totalSteps <= 0) {
+            int doneSteps = countEventType(events, "STEP_DONE");
+            int eventRunning = countEventType(events, "STEP_RUNNING");
+            int todoSteps = countEventType(events, "STEP_TODO");
+            totalSteps = doneSteps + eventRunning + todoSteps;
+            completedSteps = doneSteps;
+            runningSteps = eventRunning;
+        }
+
+        if (totalSteps <= 0) {
+            return new ProgressInfo(0, 0, 0, 0);
+        }
+
+        int currentStep;
+        int percent;
+        if (isTerminalStatus(status)) {
+            currentStep = totalSteps;
+            percent = 100;
+        } else {
+            currentStep = runningSteps > 0 || completedSteps < totalSteps
+                    ? Math.min(totalSteps, completedSteps + 1)
+                    : Math.min(totalSteps, completedSteps);
+            percent = Math.min(100, (completedSteps * 100) / totalSteps);
+        }
+
+        long estimatedTotalMs = completedSteps > 0 && totalSteps > 0
+                ? Math.max(elapsedMs, (elapsedMs * totalSteps) / completedSteps)
+                : 0;
+        return new ProgressInfo(currentStep, totalSteps, percent, estimatedTotalMs);
+    }
+
     private Instant findStartedAt(List<Map<String, Object>> events) {
         for (Map<String, Object> event : events) {
             String type = textOr(event, "type", "");
@@ -701,6 +970,102 @@ public final class RunStatusService {
             }
         }
         return count;
+    }
+
+    private long resolveElapsedMs(long artifactDurationMs, Instant startedAt, Instant finishedAt, Instant now) {
+        if (artifactDurationMs > 0) {
+            return artifactDurationMs;
+        }
+        if (startedAt == null) {
+            return 0;
+        }
+        Instant end = finishedAt != null ? finishedAt : now;
+        return Math.max(0, Duration.between(startedAt, end).toMillis());
+    }
+
+    private String resolveLastUpdatedAt(
+            Instant now,
+            Map<String, Object> latestEvent,
+            ReportStatusContext reportContext,
+            LivePageStatusContext livePageContext,
+            Path runDir) {
+        Instant runtimeLogAt = null;
+        if (runDir != null) {
+            Path runtimeLog = runDir.resolve("runtime.log").normalize();
+            if (runtimeLog.startsWith(runDir) && Files.isRegularFile(runtimeLog)) {
+                runtimeLogAt = resolveArtifactModifiedAt(runtimeLog);
+            }
+        }
+        Instant eventAt = latestEvent != null ? instantValue(latestEvent.get("at")) : null;
+        Instant resolved = latestInstant(
+                eventAt,
+                reportContext.updatedAt(),
+                livePageContext.updatedAt(),
+                runtimeLogAt);
+        return (resolved != null ? resolved : now).toString();
+    }
+
+    private Instant latestInstant(Instant... candidates) {
+        Instant latest = null;
+        for (Instant candidate : candidates) {
+            if (candidate != null && (latest == null || candidate.isAfter(latest))) {
+                latest = candidate;
+            }
+        }
+        return latest;
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> listValue(Object value) {
+        if (!(value instanceof List<?> list)) {
+            return List.of();
+        }
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Object item : list) {
+            if (item instanceof Map<?, ?> map) {
+                Map<String, Object> typed = new LinkedHashMap<>();
+                for (Map.Entry<?, ?> entry : map.entrySet()) {
+                    if (entry.getKey() != null) {
+                        typed.put(String.valueOf(entry.getKey()), entry.getValue());
+                    }
+                }
+                result.add(typed);
+            }
+        }
+        return result;
+    }
+
+    private int intValue(Object value) {
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        if (value instanceof String text && !text.isBlank()) {
+            try {
+                return Integer.parseInt(text.trim());
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        return 0;
+    }
+
+    private String stringValue(Object value) {
+        if (value == null) {
+            return "";
+        }
+        String text = String.valueOf(value).trim();
+        return text.isEmpty() ? "" : text;
+    }
+
+    private Instant instantValue(Object value) {
+        String text = stringValue(value);
+        if (text.isBlank()) {
+            return null;
+        }
+        try {
+            return Instant.parse(text);
+        } catch (RuntimeException ignored) {
+            return null;
+        }
     }
 
     private long longValue(Object value) {
@@ -781,5 +1146,32 @@ public final class RunStatusService {
             items.add(step);
         }
         return items;
+    }
+
+    private record ProgressInfo(int currentStep, int totalSteps, int percent, long estimatedTotalMs) {}
+
+    private record ReportStatusContext(
+            String status,
+            Instant startedAt,
+            Instant finishedAt,
+            long durationMs,
+            int totalSteps,
+            int completedSteps,
+            int assertionsPassed,
+            int assertionsTotal,
+            String projectKey,
+            String environment,
+            String model,
+            String owner,
+            Instant updatedAt) {
+        private static ReportStatusContext empty() {
+            return new ReportStatusContext("", null, null, 0, 0, 0, 0, 0, "", "", "", "", null);
+        }
+    }
+
+    private record LivePageStatusContext(String url, String pageState, Instant updatedAt) {
+        private static LivePageStatusContext empty() {
+            return new LivePageStatusContext("", "", null);
+        }
     }
 }

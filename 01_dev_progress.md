@@ -5149,6 +5149,133 @@ Remaining limits:
 - `dataDiff` table rows still retain the existing synthetic fallback path when the diff endpoint itself is unavailable
 - `reportDetail` still keeps snapshot-derived fallback when backend detail reads fail
 
+## 2026-05-07 P3-4 monitor status artifact/context follow-up
+
+## Task
+- Continue the current `P3-4 monitor` mainline by tightening `GET /api/phase3/runs/{runId}/status`:
+  - prefer stronger run-local artifact and persisted runtime context when those sources already exist
+  - remove the default fake 8-step progress shape from the no-artifact fallback
+  - avoid new protocols such as `status.json`, and keep response-shape changes minimal
+
+## Completed
+- Updated `RunStatusService.java`:
+  - `GET /api/phase3/runs/{runId}/status` now reads run-local `report.json` first for:
+    - stronger terminal status
+    - progress totals/completion
+    - elapsed/duration timing
+    - assertion counters
+    - run metadata (`projectKey`, `environment`, `model`, `owner`)
+  - the same status payload now prefers run-local `live-page.json` for:
+    - `currentPage.url`
+    - `currentPage.state`
+  - `lastUpdatedAt` now prefers the latest known artifact-backed timestamp from:
+    - `report.json`
+    - `live-page.json`
+    - `runtime.log`
+    - then falls back to the latest scheduler event timestamp
+  - when no stronger progress artifact exists, `/status` no longer fabricates the old default `8`-step shape; it returns conservative `0 / 0 / 0` progress instead
+  - scheduler persistence still remains the fallback shell for lifecycle status, `aiCalls`, `heals`, and control gating when no stronger artifact data exists
+- Added backend regression coverage in `LocalAdminApiServerTest.java` for:
+  - artifact-backed terminal status/progress/current-page/assertion-count priority
+  - no-artifact conservative fallback progress
+- Synced monitor docs/backlog:
+  - `docs/phase3/interface/monitor/interface-spec.md`
+  - `docs/phase3/interface/monitor/functional-spec.md`
+  - `docs/phase3/interface/review-backlog.md`
+
+## Modified Files
+- `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/RunStatusService.java`
+- `apps/local-admin-api/src/test/java/com/example/webtest/admin/http/LocalAdminApiServerTest.java`
+- `docs/phase3/interface/monitor/interface-spec.md`
+- `docs/phase3/interface/monitor/functional-spec.md`
+- `docs/phase3/interface/review-backlog.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Ran targeted backend test:
+  - `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+- Not run:
+  - no frontend test run
+  - no broader multi-module build/test sweep
+
+## Remaining Limits
+- `status` now prefers report/live/runtime artifact context, but it still falls back to a scheduler-derived shell when those stronger artifacts are absent
+- `runtime-log` still uses a small text-to-entry mapping rather than a richer structured runtime artifact
+- `steps` still falls back to scheduler-event-derived or placeholder shaping when no run-local `report.json.steps[]` exists
+
+## 2026-05-07 P3-4 monitor live-page interface doc alignment follow-up
+
+## Task
+- Keep the current `P3-4 monitor` thread doc-only:
+  - fix the stale self-contradictory live-page wording in `monitor/interface-spec.md`
+  - do not change any code or expand into `status` / `steps` / `plugin`
+
+## Completed
+- Updated `docs/phase3/interface/monitor/interface-spec.md`:
+  - section `5.4 Live page viewport` no longer says `current state: placeholder only`
+  - it now matches the current real behavior already documented later in the same file and already implemented in `MonitorScreen`:
+    - `GET /api/phase3/runs/{runId}/live-page` returns backend-owned `AVAILABLE` / `UNAVAILABLE` shells
+    - `MonitorScreen` shows explicit unavailable copy for the unavailable shell
+    - when `screenshotPath` exists, the screen resolves the inline image through the artifact-content read path
+
+## Modified Files
+- `docs/phase3/interface/monitor/interface-spec.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Not run by explicit task boundary:
+  - no test run
+  - no build run
+
+## 2026-05-07 P3-4 monitor steps failed-state semantic follow-up
+
+## Task
+- Keep the current `P3-4 monitor /steps` slice narrow:
+  - fix report-backed step-state normalization so failed or skipped terminal steps are not shown as `TODO`
+  - keep scope inside `GET /api/phase3/runs/{runId}/steps` plus the current `MonitorScreen` consumption path
+
+## Completed
+- Updated backend report-step normalization:
+  - `RunStatusService.normalizeReportStepState()` now maps:
+    - `FAILED` / `FAIL` / `ERROR` / `BROKEN` / `TIMEOUT` -> `FAILED`
+    - `SKIPPED` / `SKIP` / `CANCELLED` / `ABORTED` -> `SKIPPED`
+  - report-backed terminal failure states are no longer collapsed into `TODO`
+- Updated frontend monitor contract/rendering:
+  - `RunStep.state` now includes `FAILED` and `SKIPPED`
+  - `MonitorScreen` step bar, step list, and detail badge now render distinct failed/skipped semantics instead of defaulting them to todo
+- Updated regression scaffolding:
+  - backend `/steps` coverage now asserts report-backed `FAILED` and `SKIPPED` mapping
+  - `MonitorScreen` coverage now asserts failed/skipped rows are not rendered with todo styling
+- Synced docs:
+  - `docs/phase3/interface/monitor/interface-spec.md`
+  - `docs/phase3/interface/monitor/functional-spec.md`
+  - `docs/phase3/interface/review-backlog.md`
+
+## Modified Files
+- `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/RunStatusService.java`
+- `apps/local-admin-api/src/test/java/com/example/webtest/admin/http/LocalAdminApiServerTest.java`
+- `ui/admin-console/src/types.ts`
+- `ui/admin-console/src/screens/MonitorScreen.tsx`
+- `ui/admin-console/src/screens/MonitorScreen.test.tsx`
+- `ui/admin-console/src/styles.css`
+- `docs/phase3/interface/monitor/interface-spec.md`
+- `docs/phase3/interface/monitor/functional-spec.md`
+- `docs/phase3/interface/review-backlog.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Not run by explicit task boundary:
+  - no test run
+  - no build run
+
+## Remaining Limits
+- `monitor /steps` still falls back to scheduler-event-derived or placeholder shaping when no run-local `report.json.steps[]` artifact exists
+- `monitor /status` still remains the more central deterministic runtime read left in the `P3-4` chain
+- Pause/Abort still record intent only and do not trigger real execution-control workflows
+
 ## 2026-05-07 P3-4 monitor live-page backend-artifact follow-up
 
 ## Task
@@ -5250,6 +5377,54 @@ Remaining limits:
 ## Remaining Limits
 - `monitor` `runtime-log` now prefers run-local `runtime.log`, but it still uses a very small text-to-entry mapping rather than a richer structured runtime artifact
 - `monitor` `status` / `steps` still remain deterministic when no stronger runtime artifacts exist
+- Pause/Abort still record intent only; no true execution-control workflow exists in Phase 3
+
+## 2026-05-07 P3-4 monitor steps report-artifact follow-up
+
+## Task
+- Continue the current `P3-4 monitor` line by tightening `GET /api/phase3/runs/{runId}/steps`:
+  - prefer stronger run-local step artifacts when they already exist
+  - avoid inventing a new `steps.json` contract or broad runtime refactors
+  - keep fallback semantics explicit when no stronger step artifact is available
+
+## Completed
+- Updated `RunStatusService.java`:
+  - `GET /api/phase3/runs/{runId}/steps` now checks run-local `report.json.steps[]` first
+  - when `report.json.steps[]` exists, the backend maps those entries into monitor step payloads
+  - mapped fields now include:
+    - `index`
+    - `label` from `stepName` / `action`
+    - normalized `state` from report step status
+    - `durationMs`
+    - optional `startedAt`
+    - optional `note` from `message` or `artifactPath`
+  - when no run-local report-step artifact exists, the endpoint keeps the existing scheduler-event-derived and placeholder fallback path
+- Updated `LocalAdminApiServerTest.java`:
+  - added a backend regression that covers both:
+    - run-local `report.json.steps[]` taking precedence over scheduler step shaping
+    - scheduler-event fallback remaining active when the artifact is absent
+- Synced `monitor/interface-spec.md`, `monitor/functional-spec.md`, and `review-backlog.md`:
+  - `steps` is now documented as `report.json.steps[]`-first rather than purely deterministic
+  - fallback is documented as scheduler-event-derived or placeholder shaping, not artifact-backed
+
+## Modified Files
+- `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/RunStatusService.java`
+- `apps/local-admin-api/src/test/java/com/example/webtest/admin/http/LocalAdminApiServerTest.java`
+- `docs/phase3/interface/monitor/interface-spec.md`
+- `docs/phase3/interface/monitor/functional-spec.md`
+- `docs/phase3/interface/review-backlog.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Not run by explicit task boundary:
+  - no test run
+  - no build run
+
+## Remaining Limits
+- `monitor` `steps` now prefers run-local `report.json.steps[]`, but it still depends on a small field mapping instead of a dedicated runtime step artifact
+- `monitor` `runtime-log` now prefers run-local `runtime.log`, but it still uses a very small text-to-entry mapping rather than a richer structured runtime artifact
+- `monitor` `status` still remains deterministic when no stronger runtime artifacts exist
 - Pause/Abort still record intent only; no true execution-control workflow exists in Phase 3
 
 ## 2026-05-07 P3-3 dataDiff main payload unavailable-shell follow-up

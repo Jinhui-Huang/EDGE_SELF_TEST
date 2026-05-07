@@ -139,7 +139,7 @@ Current behavior:
 Visible elements:
 
 - ordered step list
-- done/running/todo state
+- done/running/failed/skipped/todo state
 - duration
 - heal note
 
@@ -150,6 +150,11 @@ Functional role:
 Current behavior:
 
 - timeline driven by `steps` from `GET /api/phase3/runs/{runId}/steps`
+- when run-local `report.json.steps[]` exists, the backend prefers artifact-backed step entries over deterministic shaping
+- artifact-backed terminal failure semantics are preserved:
+  - `FAILED` / `ERROR` -> `FAILED`
+  - `SKIPPED` / `CANCELLED` / `ABORTED` -> `SKIPPED`
+- when no run-local report step artifact exists, the current scheduler-event-derived or placeholder fallback remains in place and is not presented as artifact-backed data
 - rows are clickable and open a local step-detail panel inside `MonitorScreen`
 
 ### 6.4 Live Page Panel
@@ -226,9 +231,11 @@ The screen currently takes limited contextual display data from:
 The screen loads runtime data from dedicated APIs when `selectedRunId` is provided:
 
 - `runStatus` from `GET /api/phase3/runs/{runId}/status` — run identity, progress, counters, control state
-- `steps` from `GET /api/phase3/runs/{runId}/steps` — step timeline and state
+- `steps` from `GET /api/phase3/runs/{runId}/steps` — artifact-backed `report.json.steps[]` when available, preserving `FAILED` / `SKIPPED` terminal semantics; otherwise scheduler-event-derived or placeholder step shaping
 - `runtimeLog` from `GET /api/phase3/runs/{runId}/runtime-log` — artifact-backed `runtime.log` entries when available, otherwise scheduler-event-derived AI/runtime notes
 - `livePage` from `GET /api/phase3/runs/{runId}/live-page` — backend-owned availability status, current page URL/state/highlight, and optional run-local screenshot path
+
+- `runStatus` now prefers run-local `report.json` / `live-page.json` / artifact timestamps when available and otherwise keeps a conservative scheduler-backed shell
 
 ## 8. Screen Inputs and Outputs
 
@@ -380,7 +387,9 @@ The `monitor` screen is not currently responsible for:
 ## 15. Remaining Limits
 
 - `livePage` now prefers run-local live-page artifacts and returns an explicit unavailable shell when none exist.
-- `status`, `steps`, and `runtimeLog` still remain deterministic runtime reads when no stronger run-local runtime artifacts exist.
+- `status` now prefers stronger run-local `report.json` / `live-page.json` / `runtime.log` timestamp context when those artifacts exist, but it still falls back to a scheduler-derived shell when they do not.
+- `steps` now preserves backend-owned failed/skipped terminal semantics when report-backed artifacts exist, but it still falls back to scheduler-event-derived or placeholder shaping when those artifacts do not exist.
+- `runtimeLog` still remains partly deterministic when no stronger run-local runtime artifacts exist.
 - Step rows and runtime log rows now open local drill-down detail panels using existing runtime payload only; no new backend interface is required.
 - Live page panel can now inline image-like screenshots, but it still does not render a richer DOM summary.
 - Pause/Abort record intent only; the backend does not trigger real execution-control workflows in Phase 3.

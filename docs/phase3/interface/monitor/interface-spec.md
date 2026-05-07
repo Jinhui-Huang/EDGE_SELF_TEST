@@ -135,9 +135,11 @@ When `selectedRunId` is null (e.g., direct sidebar navigation), the screen shows
 
 - user action: inspect only today
 - request: none today
-- intended future behavior:
-  - show current page screenshot or runtime page summary
-- current state: placeholder only
+- current behavior:
+  - reads the existing `GET /api/phase3/runs/{runId}/live-page` payload only
+  - shows explicit unavailable copy when the backend returns the `UNAVAILABLE` shell
+  - when `status === "AVAILABLE"` and `screenshotPath` is present, resolves the image through the existing run artifact-content read path
+- current state: implemented
 
 ## 6. Relationship to Other Interfaces
 
@@ -185,6 +187,10 @@ Recommended relationship:
 Purpose:
 
 - load top-level live state for one run
+- prefer run-local `report.json` for stronger status/progress/assertion metadata when that artifact exists
+- prefer run-local `live-page.json` for `currentPage.url` / `currentPage.state` when that artifact exists
+- prefer the latest artifact-backed timestamp (`report.json`, `live-page.json`, `runtime.log`) for `lastUpdatedAt` when available
+- when no strong run-local progress artifact exists, keep the current response shell but return conservative progress values instead of fabricating a default 8-step shape
 
 Response body:
 
@@ -228,6 +234,7 @@ Response body:
 Purpose:
 
 - load current and completed step timeline for the monitored run
+- prefer run-local `report.json.steps[]` when the artifact exists; otherwise fall back to scheduler step events or the existing placeholder shaping
 
 Response body:
 
@@ -237,20 +244,37 @@ Response body:
   "items": [
     {
       "index": 1,
-      "label": "open /cart",
+      "label": "Open checkout page",
       "state": "DONE",
-      "durationMs": 800
+      "durationMs": 1200,
+      "note": "artifacts/step-1.png"
     },
     {
-      "index": 5,
-      "label": "click 'Pay'",
+      "index": 2,
+      "label": "Click pay button",
       "state": "RUNNING",
-      "durationMs": 0,
-      "startedAt": "2026-04-20T05:31:48Z"
+      "durationMs": 0
+    },
+    {
+      "index": 3,
+      "label": "Submit payment",
+      "state": "FAILED",
+      "durationMs": 950,
+      "note": "payment button not found"
     }
   ]
 }
 ```
+
+Step state semantics on the current contract:
+
+- `DONE`: successful terminal step
+- `RUNNING`: current in-progress step
+- `FAILED`: failed/error terminal step from run-local report artifacts
+- `SKIPPED`: skipped/cancelled/aborted non-success terminal step from run-local report artifacts
+- `TODO`: not-started or placeholder fallback step
+
+When no run-local `report.json.steps[]` artifact is available, the endpoint keeps the existing scheduler-event-derived or placeholder fallback path rather than claiming that artifact-backed step data exists.
 
 ### 7.3 Runtime-Log Read Interface
 
@@ -505,7 +529,8 @@ Current implementation:
 ## 11. Remaining Limits
 
 - `live-page` now prefers run-local `live-page.json` / screenshot artifacts and returns an explicit `UNAVAILABLE` shell when they are absent.
-- `status` and `steps` still remain deterministic runtime reads when no stronger run-local runtime artifacts exist.
+- `status` now prefers run-local `report.json` / `live-page.json` / `runtime.log` timestamps for stronger terminal status, progress, assertions, current-page, and `lastUpdatedAt` semantics, but it still falls back to a scheduler-derived shell when those stronger artifacts are absent.
+- `steps` now prefers run-local `report.json.steps[]`; when that artifact is present, failed/skipped terminal semantics are preserved instead of being collapsed into `TODO`; when the artifact is absent it still falls back to scheduler-event-derived or placeholder shaping.
 - `runtime-log` now prefers run-local `runtime.log` artifacts; when they are absent it still falls back to scheduler-event-derived shaping.
 - Pause/Abort record intent only; the backend does not trigger real execution-control workflows in Phase 3.
 - Step rows and runtime log rows now use local detail panels rather than a separate page or route.
