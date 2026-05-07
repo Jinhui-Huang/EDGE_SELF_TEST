@@ -179,7 +179,9 @@ Functional role:
 
 Current behavior:
 
-- values come from the API report when backend detail read succeeds, and otherwise fall back to the snapshot-derived report view model
+- values come from the API report when backend detail read succeeds
+- missing `report.json` now resolves to a backend-owned `UNAVAILABLE` shell in the main summary card
+- snapshot-derived report-view-model fallback remains only when the backend detail read itself fails
 
 ### 6.5 Page Screenshots Panel
 
@@ -224,6 +226,7 @@ Current behavior:
 ### 7.2 Primary and Fallback Detail Model
 
 - `GET /api/phase3/runs/{runId}/report` is the primary detail source
+- missing `report.json` now returns a backend-owned `UNAVAILABLE` shell instead of forcing immediate snapshot fallback
 - `selectReportViewModel(snapshot, selectedRunId)` is used only as snapshot-derived fallback when the backend detail read fails
 - this means the detail page is backend-first, but still inherits the synthetic derivation rules from `reportViewModel.ts` on fallback
 

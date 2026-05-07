@@ -1120,7 +1120,7 @@ class LocalAdminApiServerTest {
                     request(server, "/api/phase3/runs/nonexistent-run/report"),
                     HttpResponse.BodyHandlers.ofString());
             assertEquals(200, fallback.statusCode());
-            assertTrue(fallback.body().contains("\"UNKNOWN\""));
+            assertTrue(fallback.body().contains("\"UNAVAILABLE\""));
             assertTrue(fallback.body().contains("\"nonexistent-run\""));
         }
     }

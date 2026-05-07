@@ -216,6 +216,7 @@ export function ReportDetailScreen({
   const runName = apiReport?.runName ?? fallbackReport?.runName ?? selectedRunId ?? "";
   const hasApiData = apiReport !== null;
   const hasFallback = fallbackReport !== null;
+  const apiReportUnavailable = apiReport?.status === "UNAVAILABLE";
 
   if (!selectedRunId) {
     return (
@@ -359,41 +360,47 @@ export function ReportDetailScreen({
         <div className="reportOverviewGrid">
           <section className="reportPanelCard">
             <div className="reportPanelTitle">{t(C.summary)}</div>
-            <div className="reportSummaryHead">
-              <div className="reportProgressRing" style={{ "--progress": `${Math.round((stepsPassed / Math.max(1, stepsTotal)) * 360)}deg` } as CSSProperties}>
-                <div>{`${stepsPassed}/${stepsTotal}`}</div>
-              </div>
-              <div className="reportSummaryRate">
-                <span>{t(C.stepsPassed)}</span>
-                <strong>{`${Math.round((stepsPassed / Math.max(1, stepsTotal)) * 100)}%`}</strong>
-              </div>
-            </div>
-            <div className="reportStatGrid">
-              <div className="reportStatCard">
-                <span>{t(C.duration)}</span>
-                <strong>{duration}</strong>
-              </div>
-              <div className="reportStatCard success">
-                <span>{t(C.assertionsLbl)}</span>
-                <strong>{`${assertionsPassed}/${assertionsTotal}`}</strong>
-              </div>
-              <div className="reportStatCard accent">
-                <span>{t(C.aiCalls)}</span>
-                <strong>{aiCalls}</strong>
-              </div>
-              <div className="reportStatCard accent4">
-                <span>{t(C.aiCost)}</span>
-                <strong>{aiCost}</strong>
-              </div>
-              <div className="reportStatCard warning">
-                <span>{t(C.heals)}</span>
-                <strong>{heals}</strong>
-              </div>
-              <div className="reportStatCard success">
-                <span>{t(C.recoveryLbl)}</span>
-                <strong>{recovery}</strong>
-              </div>
-            </div>
+            {apiReportUnavailable ? (
+              <p>{t(C.noReportAvailable)}</p>
+            ) : (
+              <>
+                <div className="reportSummaryHead">
+                  <div className="reportProgressRing" style={{ "--progress": `${Math.round((stepsPassed / Math.max(1, stepsTotal)) * 360)}deg` } as CSSProperties}>
+                    <div>{`${stepsPassed}/${stepsTotal}`}</div>
+                  </div>
+                  <div className="reportSummaryRate">
+                    <span>{t(C.stepsPassed)}</span>
+                    <strong>{`${Math.round((stepsPassed / Math.max(1, stepsTotal)) * 100)}%`}</strong>
+                  </div>
+                </div>
+                <div className="reportStatGrid">
+                  <div className="reportStatCard">
+                    <span>{t(C.duration)}</span>
+                    <strong>{duration}</strong>
+                  </div>
+                  <div className="reportStatCard success">
+                    <span>{t(C.assertionsLbl)}</span>
+                    <strong>{`${assertionsPassed}/${assertionsTotal}`}</strong>
+                  </div>
+                  <div className="reportStatCard accent">
+                    <span>{t(C.aiCalls)}</span>
+                    <strong>{aiCalls}</strong>
+                  </div>
+                  <div className="reportStatCard accent4">
+                    <span>{t(C.aiCost)}</span>
+                    <strong>{aiCost}</strong>
+                  </div>
+                  <div className="reportStatCard warning">
+                    <span>{t(C.heals)}</span>
+                    <strong>{heals}</strong>
+                  </div>
+                  <div className="reportStatCard success">
+                    <span>{t(C.recoveryLbl)}</span>
+                    <strong>{recovery}</strong>
+                  </div>
+                </div>
+              </>
+            )}
           </section>
 
           <section className="reportPanelCard reportPanelMedia">

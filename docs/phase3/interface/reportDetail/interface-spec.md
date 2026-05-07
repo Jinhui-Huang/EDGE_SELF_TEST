@@ -4,6 +4,7 @@ Update note:
 - Current App-level report selection uses canonical `runId`.
 - `ReportsScreen` opens detail through `onOpenDetail(runId)`.
 - `cases` history handoff now also prefers dedicated backend `runId`; only older history rows may still fall back to `runName`.
+- missing `report.json` artifacts now return a backend-owned `UNAVAILABLE` shell for the main report payload instead of forcing the UI straight into snapshot-derived summary fallback.
 - `reportDetail` reads `GET /api/phase3/runs/{runId}/report` and tab-specific run endpoints, with snapshot fallback only when backend reads fail.
 - missing `recovery.json` artifacts now return a backend-owned `UNAVAILABLE` shell (`items: []`) instead of deterministic mock recovery steps.
 - missing `ai-decisions.json` artifacts now return a backend-owned `UNAVAILABLE` shell (`items: []`) instead of deterministic mock decision logs.
@@ -36,7 +37,7 @@ This document distinguishes:
 Current `reportDetail` screen conclusion:
 
 - current direct read sources:
-  - `GET /api/phase3/runs/{runId}/report` (main report, loaded on mount)
+  - `GET /api/phase3/runs/{runId}/report` (main report, loaded on mount; missing artifacts now return explicit `UNAVAILABLE` shell data)
   - `GET /api/phase3/runs/{runId}/steps` (on Steps tab activation)
   - `GET /api/phase3/runs/{runId}/assertions` (on Assertions tab activation)
   - `GET /api/phase3/runs/{runId}/recovery` (on Recovery tab activation)
@@ -49,7 +50,7 @@ Current `reportDetail` screen conclusion:
   - back to `reports`
   - open `dataDiff`
   - re-run handoff into `execution` with run context pre-filled
-- fallback to `selectReportViewModel(snapshot, selectedRunId)` when API is unavailable
+- fallback to `selectReportViewModel(snapshot, selectedRunId)` when the main report read fails before any backend-owned shell can be consumed
 - backend implementation: `ReportArtifactService.java` provides all report-detail read endpoints
 
 ## 3. Current Read Context: GET /api/phase3/admin-console
@@ -82,7 +83,7 @@ Relevant snapshot fields for this screen:
 
 ## 4. Current Detail Layer
 
-The current detail screen reads real report-detail interfaces first and falls back to the snapshot-derived view model only when API data is unavailable.
+The current detail screen reads real report-detail interfaces first; missing `report.json` now resolves to a backend-owned `UNAVAILABLE` shell, while snapshot-derived fallback remains only for broader API-read failures.
 
 ### 4.1 Current Derivation Entry Point
 
@@ -467,7 +468,7 @@ Current implementation:
 
 Backend error semantics:
 
-- `GET /api/phase3/runs/{runId}/report` returns `404` when report artifact does not exist
+- `GET /api/phase3/runs/{runId}/report` returns a backend-owned `UNAVAILABLE` shell when `report.json` does not exist
 - `GET /api/phase3/runs/{runId}/artifacts` returns `200` with empty items when no artifacts are available
 - recovery now returns an explicit backend-owned `UNAVAILABLE` empty shell when no real `recovery.json` exists
 - ai-decisions now returns an explicit backend-owned `UNAVAILABLE` empty shell when no real `ai-decisions.json` exists
@@ -479,7 +480,7 @@ Resolved items:
 - All tabs are now wired with tab-specific API fetches.
 - `Download artifacts` fetches artifact list from backend and opens listing drawer.
 - `Re-run` hands off run context into `execution` via App-level handoff.
-- Overview tab shows real report data from `GET /api/phase3/runs/{runId}/report` with fallback to synthetic view model.
+- Overview tab now distinguishes backend-owned `UNAVAILABLE` report shells from true snapshot-fallback cases.
 - Recovery and AI decisions backend endpoints are implemented in `ReportArtifactService`; both now use file-backed reads with `UNAVAILABLE` empty-shell fallback.
 
 Remaining items:

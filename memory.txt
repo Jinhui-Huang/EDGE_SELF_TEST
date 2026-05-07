@@ -2233,3 +2233,20 @@
     - no test run
     - no build run
     - no commit / push
+- 2026-05-07: Implemented the next small but more central `P3-3` slice on `reportDetail` by tightening the main report shell.
+  - Backend:
+    - missing `report.json` now surfaces as `status: "UNAVAILABLE"` in the main `GET /api/phase3/runs/{runId}/report` shell instead of generic `UNKNOWN`
+  - Frontend:
+    - `ReportDetailScreen` overview summary card now shows `No report available` for the backend-owned `UNAVAILABLE` shell
+    - it no longer renders misleading 0/0 summary stats for the no-artifact case
+  - Docs:
+    - synced `reportDetail/interface-spec.md`
+    - synced `reportDetail/functional-spec.md`
+    - refined `review-backlog.md` so this pass is recorded as another concrete `P3-3` reduction of snapshot/fake dependence
+  - Remaining limits:
+    - snapshot-derived fallback still remains for broader backend read failures
+    - artifact/screenshot inline viewing is still not implemented
+  - Keep the explicit boundary:
+    - no test run
+    - no build run
+    - no commit / push

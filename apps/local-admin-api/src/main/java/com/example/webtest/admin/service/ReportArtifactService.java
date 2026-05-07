@@ -358,7 +358,7 @@ public final class ReportArtifactService {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("runId", runId);
         result.put("runName", runId);
-        result.put("status", "UNKNOWN");
+        result.put("status", "UNAVAILABLE");
         result.put("startedAt", "");
         result.put("finishedAt", "");
         result.put("durationMs", 0);

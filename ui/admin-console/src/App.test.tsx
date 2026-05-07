@@ -2148,6 +2148,51 @@ describe("App", () => {
     expect(await screen.findByText("No recovery data available")).toBeInTheDocument();
   });
 
+  it("shows report unavailable summary state when the backend returns an empty-shell report", async () => {
+    const unavailableReportResponse = {
+      runId: "checkout-web-nightly",
+      runName: "checkout-web-nightly",
+      status: "UNAVAILABLE",
+      startedAt: "",
+      finishedAt: "",
+      durationMs: 0,
+      projectKey: "",
+      projectName: "",
+      caseId: "",
+      caseName: "",
+      tags: [],
+      environment: "",
+      model: "",
+      operator: "",
+      entry: "",
+      stepsTotal: 0,
+      stepsPassed: 0,
+      assertionsTotal: 0,
+      assertionsPassed: 0,
+      artifactCount: 0,
+      outputDir: "",
+      summary: { total: 0, passed: 0, failed: 0, skipped: 0 },
+      steps: [],
+      assertions: [],
+      artifacts: []
+    };
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
+      if (url.endsWith("/api/phase3/runs/checkout-web-nightly/report")) return jsonResponse(unavailableReportResponse);
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    await screen.findByText("Recent runs");
+    await userEvent.click(screen.getByRole("button", { name: "Open run checkout-web-nightly" }));
+
+    expect(await screen.findByText("UNAVAILABLE")).toBeInTheDocument();
+    expect(await screen.findByText("No report available")).toBeInTheDocument();
+  });
+
   it("calls re-restore endpoint and shows status feedback in dataDiff", async () => {
     const restoreResultResponse = {
       runId: "checkout-web-nightly",

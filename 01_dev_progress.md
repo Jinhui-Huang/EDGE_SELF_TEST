@@ -5234,6 +5234,46 @@ Remaining limits:
 - `reportDetail` main summary still keeps snapshot-derived fallback when backend detail reads fail
 - screenshot/artifact content still remains listing-path-only rather than inline view/download
 
+## 2026-05-07 P3-3 reportDetail main report unavailable-shell follow-up
+
+## Task
+- Continue `P3-3` with one small but more central `reportDetail` code slice:
+  - tighten the missing-artifact semantics of `GET /api/phase3/runs/{runId}/report`
+  - reduce how often the overview summary needs to lean on snapshot-derived fallback for no-artifact cases
+
+## Completed
+- Updated backend main-report fallback:
+  - `ReportArtifactService.java` now marks missing `report.json` report shells as `status: "UNAVAILABLE"` instead of generic `UNKNOWN`
+- Updated `ReportDetailScreen.tsx` overview summary card:
+  - when the backend returns the `UNAVAILABLE` main-report shell, the summary card now shows `No report available`
+  - the card no longer renders misleading 0/0 progress + stat summaries for the no-artifact case
+- Synced scaffolding/docs:
+  - `LocalAdminApiServerTest.java`
+  - `App.test.tsx`
+  - `docs/phase3/interface/reportDetail/interface-spec.md`
+  - `docs/phase3/interface/reportDetail/functional-spec.md`
+  - `docs/phase3/interface/review-backlog.md`
+
+## Modified Files
+- `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/ReportArtifactService.java`
+- `apps/local-admin-api/src/test/java/com/example/webtest/admin/http/LocalAdminApiServerTest.java`
+- `ui/admin-console/src/screens/ReportDetailScreen.tsx`
+- `ui/admin-console/src/App.test.tsx`
+- `docs/phase3/interface/reportDetail/interface-spec.md`
+- `docs/phase3/interface/reportDetail/functional-spec.md`
+- `docs/phase3/interface/review-backlog.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Not run by explicit task boundary:
+  - no test run
+  - no build run
+
+## Remaining Limits
+- snapshot-derived fallback still remains for broader backend read failures, not just missing `report.json`
+- screenshot/artifact content still remains listing-path-only rather than inline view/download
+
 ## 2026-05-07 P3-3 reportDetail ai-decisions backend-owned empty-shell follow-up
 
 ## Task
