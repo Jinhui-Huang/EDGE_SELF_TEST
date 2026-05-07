@@ -530,7 +530,7 @@ Resolved items (P2-3):
 
 Remaining items:
 
-- History tab run-row handoff now resolves canonical `runId` from `snapshot.reports` by matching `runName`, and only falls back to `runName` when the snapshot has no matching report row.
+- History tab run-row handoff now prefers backend-provided `runId` from `GET /api/phase3/cases/{caseId}/history`; fallback to `runName` is kept only for older history payloads that still omit `runId`.
 - Sidebar `Plans` / `Info` / `Recent runs` still depend on the existing `plans` / `history` reads succeeding; they do not introduce a second data source.
 
 ## 16. Suggested Output Files for This Screen Folder

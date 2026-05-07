@@ -269,6 +269,7 @@ describe("CasesScreen", () => {
           caseId: "checkout-smoke",
           runs: [
             {
+              runId: "canonical-run-001",
               runName: "checkout-web-smoke-001",
               status: "SUCCESS",
               finishedAt: "2026-05-06T09:20:00Z",
@@ -302,6 +303,7 @@ describe("CasesScreen", () => {
           caseId: "checkout-smoke",
           runs: [
             {
+              runId: "canonical-run-001",
               runName: "checkout-web-smoke-001",
               status: "SUCCESS",
               finishedAt: "2026-05-06T09:20:00Z",
@@ -321,7 +323,7 @@ describe("CasesScreen", () => {
     await userEvent.click(screen.getByRole("button", { name: "History" }));
     await userEvent.click(await screen.findByRole("button", { name: "Open history run checkout-web-smoke-001 in report detail" }));
 
-    expect(onOpenHistoryRun).toHaveBeenCalledWith("checkout-web-smoke-001");
+    expect(onOpenHistoryRun).toHaveBeenCalledWith("canonical-run-001");
   });
 
   it("saves state machine and resets tab state when switching cases", async () => {

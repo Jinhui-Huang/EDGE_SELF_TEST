@@ -37,7 +37,7 @@ type CasesScreenProps = {
   saveCaseCatalogLabel: string;
   locale: Locale;
   onPrepareCase: (caseId: string) => void;
-  onOpenHistoryRun: (runName: string) => void;
+  onOpenHistoryRun: (runIdOrRunName: string) => void;
   onCaseChange: (index: number, key: keyof CaseItem, value: string | boolean) => void;
   onAddCaseRow: (projectKey?: string | null) => void;
   onRemoveCaseRow: (index: number) => void;
@@ -1143,7 +1143,7 @@ export function CasesScreen({
                               type="button"
                               className="casesHistoryRun"
                               aria-label={`Open history run ${run.runName} in report detail`}
-                              onClick={() => onOpenHistoryRun(run.runName)}
+                              onClick={() => onOpenHistoryRun(run.runId ?? run.runName)}
                             >
                               <span className={`casesStatusBadge ${run.status === "SUCCESS" ? "isActive" : ""}`}>{run.status}</span>
                               <strong>{run.runName}</strong>
@@ -1262,7 +1262,7 @@ export function CasesScreen({
                             type="button"
                             className="casesHistoryRun"
                             aria-label={`Open recent run ${run.runName} in report detail`}
-                            onClick={() => onOpenHistoryRun(run.runName)}
+                            onClick={() => onOpenHistoryRun(run.runId ?? run.runName)}
                           >
                             <span className={`casesStatusBadge ${classifyRunStatus(run.status) === "pass" ? "isActive" : ""}`}>{run.status}</span>
                             <strong>{run.runName}</strong>

@@ -3928,6 +3928,65 @@ Remaining limits:
 - project-rail counts still partly reflect snapshot-derived fallback rows rather than a purely persisted document registry
 - document detail remains backend-first, but parse-result fallback content is still shown when no persisted backend document exists
 
+## 2026-05-07 P3-2 canonical runId in cases history payload
+
+## Task
+- Continue the new backlog mainline at `P3-2`:
+  - add dedicated canonical `runId` to `GET /api/phase3/cases/{caseId}/history`
+  - switch `cases` history/recent-run handoff to prefer backend-provided `runId`
+  - keep fallback only for older history payloads that still omit `runId`
+  - sync the adjacent `cases` / `reports` / `reportDetail` / `dataDiff` docs and progress records
+
+## Completed
+- Updated `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/CaseDetailService.java`:
+  - default `history` payload now includes dedicated `runId` for each run row
+- Updated shared/frontend history consumption:
+  - `ui/admin-console/src/types.ts`
+    - `CaseHistoryResponse.runs[]` now carries optional `runId`
+  - `ui/admin-console/src/screens/CasesScreen.tsx`
+    - history-tab and sidebar recent-run clicks now hand off `run.runId ?? run.runName`
+    - current backend payloads therefore prefer canonical `runId`, while older payloads still retain the compatibility path
+- Updated regression scaffolding:
+  - `apps/local-admin-api/src/test/java/com/example/webtest/admin/http/LocalAdminApiServerTest.java`
+    - case-history endpoint check now asserts `runId`
+  - `ui/admin-console/src/screens/CasesScreen.test.tsx`
+    - history callback now receives canonical `runId` when present
+  - `ui/admin-console/src/App.test.tsx`
+    - `cases -> reportDetail` handoff test now uses backend-provided `runId`
+    - fallback test now explicitly documents the older-history-without-`runId` path
+- Synced docs:
+  - `docs/phase3/interface/cases/functional-spec.md`
+  - `docs/phase3/interface/cases/interface-spec.md`
+  - `docs/phase3/interface/reports/interface-spec.md`
+  - `docs/phase3/interface/reportDetail/interface-spec.md`
+  - `docs/phase3/interface/dataDiff/interface-spec.md`
+  - `docs/phase3/interface/review-backlog.md`
+
+## Modified Files
+- `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/CaseDetailService.java`
+- `apps/local-admin-api/src/test/java/com/example/webtest/admin/http/LocalAdminApiServerTest.java`
+- `ui/admin-console/src/types.ts`
+- `ui/admin-console/src/screens/CasesScreen.tsx`
+- `ui/admin-console/src/screens/CasesScreen.test.tsx`
+- `ui/admin-console/src/App.test.tsx`
+- `docs/phase3/interface/cases/functional-spec.md`
+- `docs/phase3/interface/cases/interface-spec.md`
+- `docs/phase3/interface/reports/interface-spec.md`
+- `docs/phase3/interface/reportDetail/interface-spec.md`
+- `docs/phase3/interface/dataDiff/interface-spec.md`
+- `docs/phase3/interface/review-backlog.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Not run by design in this pass:
+  - no test run
+  - no build run
+
+## Remaining Limits
+- fallback to `runName` is still retained for older history payloads that may not yet include dedicated `runId`
+- this pass only stabilizes the `cases` history handoff contract; it does not attempt wider report-chain backend-native cleanup
+
 ## 2026-05-07 Cases sidebar recent-runs history reuse follow-up
 
 ## Task

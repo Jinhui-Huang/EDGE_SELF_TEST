@@ -265,9 +265,9 @@ public final class CaseDetailService {
         Map<String, Object> doc = new LinkedHashMap<>();
         doc.put("caseId", caseId);
         doc.put("runs", List.of(
-                Map.of("runName", caseId + "-run-001", "status", "SUCCESS",
+                Map.of("runId", caseId + "-run-001", "runName", caseId + "-run-001", "status", "SUCCESS",
                         "finishedAt", now, "reportEntry", "HTML / artifacts / cleanup"),
-                Map.of("runName", caseId + "-run-002", "status", "FAILED",
+                Map.of("runId", caseId + "-run-002", "runName", caseId + "-run-002", "status", "FAILED",
                         "finishedAt", now, "reportEntry", "Locator mismatch on entry")));
         doc.put("maintenanceEvents", List.of(
                 Map.of("at", now, "type", "DSL_UPDATED",

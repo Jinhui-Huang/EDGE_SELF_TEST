@@ -225,7 +225,7 @@ Identifier note:
 
 - current UI selection now revolves around canonical `runId`
 - future backend path parameters should treat `{runId}` as the canonical run identifier
-- history-adjacent handoff code may still temporarily resolve incoming `runName` onto canonical `runId` when the upstream payload has no dedicated `runId`
+- `cases` history handoff now normally arrives with a dedicated canonical `runId`; only older history payloads that still omit `runId` may require temporary `runName` fallback
 
 Because the current list is synthetic, the screen would benefit from dedicated report-list/report-summary interfaces.
 

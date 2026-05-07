@@ -3,6 +3,7 @@
 Update note:
 - Current App-level report selection uses canonical `runId`.
 - `ReportsScreen` opens detail through `onOpenDetail(runId)`.
+- `cases` history handoff now also prefers dedicated backend `runId`; only older history rows may still fall back to `runName`.
 - `reportDetail` reads `GET /api/phase3/runs/{runId}/report` and tab-specific run endpoints, with snapshot fallback only when backend reads fail.
 
 ## 1. Scope and Design Basis

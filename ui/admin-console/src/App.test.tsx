@@ -2288,26 +2288,13 @@ describe("App", () => {
     };
     const fetchMock = vi.fn().mockImplementation((call: unknown) => {
       const url = String(call);
-      if (url.endsWith("/api/phase3/admin-console")) {
-        return jsonResponse({
-          ...snapshot,
-          reports: [
-            ...snapshot.reports,
-            {
-              runId: "canonical-run-001",
-              runName: "checkout-web-smoke-001",
-              status: "SUCCESS",
-              finishedAt: "2026-05-06 09:20",
-              entry: "History drill-down report"
-            }
-          ]
-        });
-      }
+      if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
       if (url.endsWith("/api/phase3/cases/checkout-smoke/history")) {
         return jsonResponse({
           caseId: "checkout-smoke",
           runs: [
             {
+              runId: "canonical-run-001",
               runName: "checkout-web-smoke-001",
               status: "SUCCESS",
               finishedAt: "2026-05-06T09:20:00Z",
@@ -2340,7 +2327,7 @@ describe("App", () => {
     expect(await screen.findByRole("heading", { name: "Checkout smoke" })).toBeInTheDocument();
   });
 
-  it("falls back to history runName when snapshot reports cannot resolve a canonical runId", async () => {
+  it("falls back to history runName when older history data omits a dedicated runId", async () => {
     const historyReportResponse = {
       ...reportResponse,
       runId: "orphan-history-run",

@@ -474,7 +474,7 @@ It does not authorize UI or backend changes in the current phase.
   - sidebar `Plans` now reuses already loaded case-plan data instead of static local plan rows
   - sidebar `Info` / `Recent runs` now reuse already loaded case-history data instead of static placeholder run summaries
 - Remaining limits:
-  - case-history payload still has no dedicated canonical `runId`, so history run-row handoff still falls back to `runName` when `snapshot.reports` cannot resolve a matching canonical `runId`
+  - case-history payload now exposes dedicated `runId`; fallback to `runName` remains only for older history rows that still omit `runId`
   - sidebar `Plans` / `Info` / `Recent runs` still depend on the existing `plans` / `history` reads succeeding and do not introduce a separate request path
   - plans and history remain read-only on the current Phase 3 boundary
 - Test coverage:
@@ -518,21 +518,19 @@ It does not authorize UI or backend changes in the current phase.
   - snapshot-derived shell rows still remain as fallback when no persisted backend document exists yet
   - project rail counts still partly reflect snapshot-derived fallback rows, not purely persisted document metadata
 
-### P3-2. Add canonical `runId` to `cases` history payload
+### P3-2. Add canonical `runId` to `cases` history payload DONE
 
 - Screens:
   - `cases`
   - `reports`
   - `reportDetail`
   - `dataDiff`
-- Why this is next:
-  - current history run-row handoff still needs history-adjacent `runName -> runId` resolution when the upstream payload lacks a dedicated canonical `runId`
-  - this is now one of the clearest remaining contract gaps in the run/report chain
-- Backend work still missing:
-  - add dedicated canonical `runId` to `GET /api/phase3/cases/{caseId}/history`
-  - stop relying on `snapshot.reports` matching or fallback to `runName` for downstream handoff
-- Expected outcome:
-  - `cases -> reportDetail/dataDiff` run drill-down becomes contract-stable and no longer depends on front-end resolution heuristics
+- Resolved:
+  - `GET /api/phase3/cases/{caseId}/history` now returns dedicated `runId` in each run row
+  - `CasesScreen` history and sidebar recent-run drill-down now prefer backend-provided `runId`
+  - `cases -> reportDetail -> dataDiff` run context now stays canonical without depending on `snapshot.reports` matching for normal current payloads
+- Remaining limits:
+  - fallback to `runName` is still kept for older history payloads that may not yet include `runId`
 
 ### P3-3. Finish backend-native report chain and reduce synthetic/fallback dependency
 

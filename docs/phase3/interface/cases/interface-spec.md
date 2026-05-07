@@ -423,7 +423,7 @@ These controls change screen state but do not call the backend directly.
 - user action: click
 - request: `GET /api/phase3/cases/{caseId}/history` on tab activation
 - provides: run records with status/name/time/reportEntry, maintenance events
-- run-row action: app-level handoff into `reportDetail` by reusing existing `openReportDetail(runName)`
+- run-row action: app-level handoff into `reportDetail` by reusing existing `openReportDetail(runId)`
 - explicit states: loading / empty / error
 - current state: implemented
 
@@ -468,7 +468,7 @@ These controls change screen state but do not call the backend directly.
 ### 8.3 Relationship to Reports and Report Detail
 
 - sidebar `Recent runs` and `History` tab rows both reuse the existing App-level `reportDetail` handoff
-- the current handoff passes `runName`, and `App.tsx` resolves canonical `runId` from `snapshot.reports` when possible because the case-history payload does not yet expose a dedicated canonical `runId`
+- the current handoff now prefers backend-provided `runId`; fallback to `runName` is kept only for older history payloads that still omit `runId`
 - the detail-hero run summary also reuses current-case `historyState` rather than showing a fixed weekly pass placeholder
 - sidebar `Owner` does not have a real Phase 3 data source today, so the screen now renders an explicit not-provided message instead of a fake owner value
 - the overview step-card assertion count is now derived from the same local `detailSteps` summary instead of a fixed placeholder value
@@ -820,12 +820,14 @@ Response body:
   "caseId": "checkout-smoke",
   "runs": [
     {
+      "runId": "checkout-web-smoke-20260420-001",
       "runName": "checkout-web-smoke-20260420-001",
       "status": "SUCCESS",
       "finishedAt": "2026-04-20T04:22:11Z",
       "reportEntry": "HTML / artifacts / cleanup"
     },
     {
+      "runId": "checkout-web-smoke-20260419-004",
       "runName": "checkout-web-smoke-20260419-004",
       "status": "FAILED",
       "finishedAt": "2026-04-19T22:08:40Z",
@@ -846,8 +848,8 @@ Response body:
 Current row click behavior:
 
 - clicking a run row routes to `reportDetail`
-- the App-level handoff first resolves a canonical `runId` from `snapshot.reports` by matching `runName`
-- when no matching snapshot report exists, the handoff falls back to the original `runName`
+- the App-level handoff first uses the dedicated `runId` from `GET /api/phase3/cases/{caseId}/history`
+- only older history rows that still omit `runId` fall back to the original `runName`
 - no new report-detail endpoint is added for this linkage
 
 ### 10.6 `Recent runs` Summary Panel
@@ -864,7 +866,7 @@ Current implementation:
   - recent run status bars
   - a short clickable recent-run list
 - same-case duplicate loads are skipped only while the current history read is `loading` or already `success`; manual tab activation can still retry after failure
-- sidebar recent-run clicks reuse the same `onOpenHistoryRun(runName)` -> `openReportDetail(runName)` App-level path as the main `History` tab
+- sidebar recent-run clicks reuse the same `onOpenHistoryRun(runId ?? runName)` -> `openReportDetail(runId ?? runName)` App-level path as the main `History` tab
 
 ### 10.7 `Plans` Sidebar Panel
 
@@ -954,5 +956,5 @@ Remaining findings:
 
 - `Pre-execution` is correctly a state handoff, not a backend request.
 - Sidebar `Plans` / `Info` / `Recent runs` depend on the existing `plans` / `history` reads succeeding and do not introduce a separate request path.
-- History tab handoff now resolves canonical `runId` from `snapshot.reports` when `runName` matches an existing report row, and falls back to `runName` only when no match exists.
+- History tab handoff now consumes backend-provided `runId` from `GET /api/phase3/cases/{caseId}/history`; fallback to `runName` is kept only for older history payloads that still omit `runId`.
 - Plans and history are read-only; write endpoints can be added when editing is required.

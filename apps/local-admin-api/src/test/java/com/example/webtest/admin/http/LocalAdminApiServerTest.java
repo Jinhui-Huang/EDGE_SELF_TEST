@@ -1658,6 +1658,7 @@ class LocalAdminApiServerTest {
                     HttpResponse.BodyHandlers.ofString());
             assertEquals(200, history.statusCode());
             assertTrue(history.body().contains("\"runs\""));
+            assertTrue(history.body().contains("\"runId\""));
             assertTrue(history.body().contains("\"maintenanceEvents\""));
         }
     }

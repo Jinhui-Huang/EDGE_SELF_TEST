@@ -164,7 +164,7 @@ Identifier note:
 
 - current page entry depends on selected canonical `runId` kept in `App.tsx`
 - future backend path parameters should use canonical `{runId}`
-- history-adjacent handoff code may still temporarily resolve incoming `runName` onto canonical `runId` when the upstream payload has no dedicated `runId`
+- `cases` history handoff now normally arrives with a dedicated canonical `runId`; only older history payloads that still omit `runId` may require temporary `runName` fallback
 
 ### 8.1 Diff Summary Interface
 

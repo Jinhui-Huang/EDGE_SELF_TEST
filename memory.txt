@@ -2105,3 +2105,21 @@
     - fallback shell rows still exist for non-persisted preview entries
     - project-rail counts still partly reflect snapshot-derived fallback rows
     - no test run / no build run in this pass by explicit task boundary
+- 2026-05-07: Implemented `P3-2` canonical `runId` in `cases` history payload.
+  - Backend:
+    - `GET /api/phase3/cases/{caseId}/history` default payload now includes dedicated `runId` for each run row
+  - Frontend:
+    - `CasesScreen` history-tab and sidebar recent-run clicks now prefer `run.runId ?? run.runName`
+    - normal current payloads therefore hand off canonical `runId` directly into `reportDetail`
+    - fallback to `runName` is kept only for older history payloads that still omit `runId`
+  - Regression scaffolding:
+    - case-history endpoint check now asserts `runId`
+    - `CasesScreen` callback coverage now expects canonical `runId`
+    - App-level history handoff coverage now uses direct backend `runId`, with a separate older-payload fallback case
+  - Docs:
+    - synced `cases` / `reports` / `reportDetail` / `dataDiff` adjacent specs
+    - marked `P3-2` done in `review-backlog.md`
+  - Keep the explicit boundary:
+    - no test run
+    - no build run
+    - no commit / push

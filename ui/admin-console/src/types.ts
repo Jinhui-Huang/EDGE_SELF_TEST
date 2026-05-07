@@ -679,7 +679,7 @@ export type CasePlansResponse = {
 
 export type CaseHistoryResponse = {
   caseId: string;
-  runs: { runName: string; status: string; finishedAt: string; reportEntry: string }[];
+  runs: { runId?: string; runName: string; status: string; finishedAt: string; reportEntry: string }[];
   maintenanceEvents: { at: string; type: string; operator: string; summary: string }[];
 };
 
