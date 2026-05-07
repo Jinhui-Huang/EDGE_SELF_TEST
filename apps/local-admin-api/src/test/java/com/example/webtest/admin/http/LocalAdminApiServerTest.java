@@ -462,12 +462,23 @@ class LocalAdminApiServerTest {
             HttpClient client = HttpClient.newHttpClient();
 
             HttpResponse<String> requestMutation = client.send(
-                    request(server, "/api/phase3/scheduler/requests", "POST", Jsons.writeValueAsString(Map.of(
-                            "runId", "checkout-web-smoke",
-                            "projectKey", "checkout-web",
-                            "owner", "qa-platform",
-                            "environment", "prod-like",
-                            "detail", "Accepted from operator launch panel."))),
+                    request(server, "/api/phase3/scheduler/requests", "POST", Jsons.writeValueAsString(Map.ofEntries(
+                            Map.entry("runId", "checkout-web-smoke"),
+                            Map.entry("projectKey", "checkout-web"),
+                            Map.entry("owner", "qa-platform"),
+                            Map.entry("environment", "prod-like"),
+                            Map.entry("detail", "Accepted from operator launch panel."),
+                            Map.entry("pageTitle", "Checkout"),
+                            Map.entry("pageUrl", "https://checkout.example.test/pay"),
+                            Map.entry("pageDomain", "checkout.example.test"),
+                            Map.entry("pagePath", "/pay"),
+                            Map.entry("runtimeMode", "Audit-first"),
+                            Map.entry("queueState", "Queued"),
+                            Map.entry("auditState", "Idle"),
+                            Map.entry("locator", "#pay-submit"),
+                            Map.entry("bodySummary", "Review your order total before confirming payment."),
+                            Map.entry("headings", List.of("Checkout", "Payment details")),
+                            Map.entry("actionHints", List.of("Pay now"))))),
                     HttpResponse.BodyHandlers.ofString());
             HttpResponse<String> eventMutation = client.send(
                     request(server, "/api/phase3/scheduler/events", "POST", Jsons.writeValueAsString(Map.of(
@@ -503,6 +514,9 @@ class LocalAdminApiServerTest {
             assertTrue(persistedRequests.contains("\"checkout-web-smoke\""));
             assertTrue(persistedRequests.contains("\"PRE_EXECUTION\""));
             assertTrue(persistedRequests.contains("\"local-phase3-scheduler\""));
+            assertTrue(persistedRequests.contains("\"pageDomain\":\"checkout.example.test\""));
+            assertTrue(persistedRequests.contains("\"bodySummary\":\"Review your order total before confirming payment.\""));
+            assertTrue(persistedRequests.contains("\"headings\":[\"Checkout\",\"Payment details\"]"));
             assertTrue(persistedEvents.contains("\"STARTED\""));
             assertTrue(persistedEvents.contains("\"2026-04-18T11:00:00Z\""));
 

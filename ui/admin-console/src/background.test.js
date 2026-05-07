@@ -90,7 +90,70 @@ describe("background bridge", () => {
     });
   });
 
-  it("forwards native-host quick smoke requests without changing the scheduler payload", async () => {
+  it("enriches quick smoke scheduler requests with content-script DOM context before forwarding to native host", async () => {
+    globalThis.chrome.tabs.query = vi.fn().mockResolvedValue([{ id: 42, title: "Checkout", url: "https://checkout.example.test/pay" }]);
+    globalThis.chrome.tabs.sendMessage = vi.fn().mockResolvedValue({
+      ok: true,
+      data: {
+        headings: ["Checkout", "Payment details"],
+        formHints: ["Card number"],
+        actionHints: ["Pay now"],
+        bodySummary: "Review your order total before confirming payment."
+      }
+    });
+    globalThis.chrome.runtime.sendNativeMessage = vi.fn().mockResolvedValue({
+      ok: true,
+      data: {
+        status: "ACCEPTED",
+        entry: {
+          runId: "popup-run"
+        }
+      }
+    });
+    const background = await import("./../../../extension/edge-extension/background.js");
+
+    await expect(background.handleBridgeMessage({
+      channel: "native-host",
+      type: "SCHEDULER_REQUEST_CREATE",
+      payload: {
+        runId: "popup-run",
+        projectKey: "checkout-web",
+        status: "PRE_EXECUTION",
+        pageTitle: "Checkout",
+        pageDomain: "checkout.example.test"
+      }
+    })).resolves.toEqual({
+      ok: true,
+      data: {
+        status: "ACCEPTED",
+        entry: {
+          runId: "popup-run"
+        }
+      }
+    });
+
+    expect(globalThis.chrome.runtime.sendNativeMessage).toHaveBeenCalledWith(
+      "com.example.webtest.phase3.nativehost",
+      expect.objectContaining({
+        version: "1.0",
+        type: "SCHEDULER_REQUEST_CREATE",
+        payload: expect.objectContaining({
+          runId: "popup-run",
+          projectKey: "checkout-web",
+          status: "PRE_EXECUTION",
+          pageTitle: "Checkout",
+          pageDomain: "checkout.example.test",
+          headings: ["Checkout", "Payment details"],
+          formHints: ["Card number"],
+          actionHints: ["Pay now"],
+          bodySummary: "Review your order total before confirming payment."
+        })
+      })
+    );
+  });
+
+  it("falls back to the original quick smoke payload when content-script DOM context is unavailable", async () => {
+    globalThis.chrome.tabs.sendMessage = vi.fn().mockRejectedValue(new Error("No receiving end"));
     globalThis.chrome.runtime.sendNativeMessage = vi.fn().mockResolvedValue({
       ok: true,
       data: {
@@ -110,20 +173,16 @@ describe("background bridge", () => {
         projectKey: "checkout-web",
         status: "PRE_EXECUTION"
       }
-    })).resolves.toEqual({
+    })).resolves.toMatchObject({
       ok: true,
       data: {
-        status: "ACCEPTED",
-        entry: {
-          runId: "popup-run"
-        }
+        status: "ACCEPTED"
       }
     });
 
     expect(globalThis.chrome.runtime.sendNativeMessage).toHaveBeenCalledWith(
       "com.example.webtest.phase3.nativehost",
       expect.objectContaining({
-        version: "1.0",
         type: "SCHEDULER_REQUEST_CREATE",
         payload: {
           runId: "popup-run",

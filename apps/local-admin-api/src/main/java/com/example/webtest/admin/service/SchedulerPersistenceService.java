@@ -41,6 +41,7 @@ public final class SchedulerPersistenceService {
         entry.put("title", firstNonBlank(text(payload, "title"), buildTitle(runId, environment)));
         entry.put("detail", firstNonBlank(text(payload, "detail"), "Accepted into the local scheduler request queue."));
         entry.put("status", normalizeRequestStatus(firstNonBlank(text(payload, "status"), "PRE_EXECUTION")));
+        copyRequestContext(payload, entry);
         entry.put("schedulerId", schedulerId);
         Integer position = integerValue(payload.get("position"));
         if (position != null && position > 0) {
@@ -124,6 +125,22 @@ public final class SchedulerPersistenceService {
         return readSnapshot(path.toAbsolutePath().normalize(), listKey).schedulerId();
     }
 
+    private void copyRequestContext(Map<String, Object> payload, Map<String, Object> entry) {
+        putIfNotBlank(entry, "pageTitle", text(payload, "pageTitle"));
+        putIfNotBlank(entry, "pageUrl", text(payload, "pageUrl"));
+        putIfNotBlank(entry, "pageDomain", text(payload, "pageDomain"));
+        putIfNotBlank(entry, "pagePath", text(payload, "pagePath"));
+        putIfNotBlank(entry, "runtimeMode", text(payload, "runtimeMode"));
+        putIfNotBlank(entry, "queueState", text(payload, "queueState"));
+        putIfNotBlank(entry, "auditState", text(payload, "auditState"));
+        putIfNotBlank(entry, "nextAction", text(payload, "nextAction"));
+        putIfNotBlank(entry, "locator", text(payload, "locator"));
+        putIfNotBlank(entry, "bodySummary", text(payload, "bodySummary"));
+        putIfStringList(entry, "headings", payload.get("headings"));
+        putIfStringList(entry, "formHints", payload.get("formHints"));
+        putIfStringList(entry, "actionHints", payload.get("actionHints"));
+    }
+
     private Map<String, Object> accepted(
             String kind,
             Path path,
@@ -204,6 +221,25 @@ public final class SchedulerPersistenceService {
     private void putIfNonNegative(Map<String, Object> target, String key, Integer value) {
         if (value != null && value >= 0) {
             target.put(key, value);
+        }
+    }
+
+    private void putIfStringList(Map<String, Object> target, String key, Object rawValue) {
+        if (!(rawValue instanceof List<?> list)) {
+            return;
+        }
+        List<String> values = new ArrayList<>();
+        for (Object item : list) {
+            if (item == null) {
+                continue;
+            }
+            String text = String.valueOf(item).trim();
+            if (!text.isEmpty()) {
+                values.add(text);
+            }
+        }
+        if (!values.isEmpty()) {
+            target.put(key, values);
         }
     }
 

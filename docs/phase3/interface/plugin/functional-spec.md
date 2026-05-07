@@ -162,7 +162,7 @@ Current behavior:
 - admin-console mirror: display-only
 - real extension popup:
   - `Pick element` requests pick mode through popup -> background -> content script, then renders selected element info and locator candidates
-  - `Quick smoke test` submits a lightweight pre-execution scheduler request from current page context and renders deterministic launch state/result
+  - `Quick smoke test` submits a lightweight pre-execution scheduler request from current page context, now carrying shared page/runtime fields plus lightweight DOM snapshot context into the persisted scheduler request entry, and renders deterministic launch state/result
   - `Page summary` requests a current-tab page summary through popup -> background -> content-script -> native-host -> local-admin-api, preferring existing popup/tab/runtime context fields plus lightweight DOM snapshot fields over backend-local rules
   - `Open in platform` requests a platform handoff URL through the same chain, now carrying current page identity/runtime context plus lightweight DOM snapshot fields into the platform `execution` handoff
 
@@ -389,6 +389,7 @@ The `plugin` screen is not currently responsible for:
 - `Pick element`, `Quick smoke test`, `Page summary`, `Open in platform`, `Copy`, and `Use in DSL` are now implemented in the real extension popup chain.
 - `Page summary` now prefers real popup/native-host/tab payload and, when available, a lightweight content-script DOM snapshot for headings/form landmarks/action hints/body summary before falling back to backend-local rules.
 - `Open in platform` and `Use in DSL` now carry richer popup/native-host/tab/content-script context through `PLATFORM_HANDOFF_PREPARE`, and `App.tsx` consumes that context into `execution` / `aiGenerate` without adding a new route system.
+- `Quick smoke test` now reuses that same caller-context-first pattern so the persisted scheduler request keeps richer page/runtime/DOM startup context, while still staying on the existing scheduler request protocol.
 - Real pick mode stays fully inside the extension boundary:
   - popup triggers
   - background bridges

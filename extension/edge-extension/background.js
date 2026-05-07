@@ -179,7 +179,8 @@ export async function handleBridgeMessage(message, sender = null) {
         })
       };
     }
-    if (message?.type === "PLATFORM_HANDOFF_PREPARE") {
+    if (message?.type === "PLATFORM_HANDOFF_PREPARE"
+      || message?.type === "SCHEDULER_REQUEST_CREATE") {
       return {
         ok: true,
         data: await sendToNativeHost({

@@ -106,11 +106,13 @@ export function buildRequestTitle(form) {
 }
 
 export function buildSchedulerRequestPayload(form, tab) {
+  const pageContext = buildCurrentPageContextPayload(tab, latestSnapshot);
   return {
     ...form,
     status: "PRE_EXECUTION",
     title: buildRequestTitle(form),
-    detail: buildContextDetail(form.detail, tab)
+    detail: buildContextDetail(form.detail, tab),
+    ...pageContext
   };
 }
 

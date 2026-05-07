@@ -63,12 +63,17 @@ class NativeHostMessageProcessorTest {
                     "1.0",
                     "SCHEDULER_REQUEST_CREATE",
                     "req-2",
-                    Map.of(
-                            "runId", "popup-checkout-smoke",
-                            "projectKey", "checkout-web")));
+                    Map.ofEntries(
+                            Map.entry("runId", "popup-checkout-smoke"),
+                            Map.entry("projectKey", "checkout-web"),
+                            Map.entry("pageTitle", "Checkout"),
+                            Map.entry("pageDomain", "checkout.example.test"),
+                            Map.entry("bodySummary", "Review your order total before confirming payment."))));
 
             assertTrue(response.ok());
             assertTrue(requestBody.get().contains("\"runId\":\"popup-checkout-smoke\""));
+            assertTrue(requestBody.get().contains("\"pageDomain\":\"checkout.example.test\""));
+            assertTrue(requestBody.get().contains("\"bodySummary\":\"Review your order total before confirming payment.\""));
             Map<String, Object> data = (Map<String, Object>) response.data();
             assertEquals("accepted", data.get("status"));
         }

@@ -110,6 +110,7 @@ It does not authorize UI or backend changes in the current phase.
 - Remaining limits:
   - `Pick element` was still visual-only at the end of P0-4 and was completed later in P0-5
   - `Quick smoke test` was still visual-only at the end of P0-5 and is completed later in P0-6 by reusing the scheduler request chain
+  - `Quick smoke test` now also carries richer popup/tab/content-script context through `SCHEDULER_REQUEST_CREATE`, but downstream execution/monitor/report consumers still do not actively surface most of those richer request fields yet
   - `Page summary` now prefers real popup/native-host/tab payload plus lightweight content-script DOM context for headings/form landmarks/action hints/body summary; richer DOM understanding beyond that small snapshot still does not exist yet
   - `Open in platform` / `Use in DSL` now also carry richer popup/tab/content-script context through `PLATFORM_HANDOFF_PREPARE`, but platform consumption still stays inside the current lightweight query-param/App-state handoff model
   - `Use in DSL` currently hands off into `aiGenerate`, not directly into the `cases` DSL editor

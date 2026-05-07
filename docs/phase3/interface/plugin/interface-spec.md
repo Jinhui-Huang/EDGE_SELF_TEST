@@ -427,10 +427,17 @@ Concrete implementation design:
 
 1. popup sends:
    - `SCHEDULER_REQUEST_CREATE` through the existing `native-host` bridge channel
+   - caller payload reuses the shared current-page context builder:
+     - page title/url/domain/path
+     - runtime context
+     - locator
 2. background forwards:
    - the same scheduler request envelope to native-host
+   - background first asks the active-tab content script for the same lightweight DOM snapshot used by `Page summary` / platform handoff
+   - if unavailable, background keeps the original scheduler payload and continues
 3. native-host forwards:
    - `POST /api/phase3/scheduler/requests`
+4. local-admin-api persists the scheduler request with that richer startup context still attached to the request entry
 4. popup renders deterministic launch result:
    - `pending` / `success` / `error`
    - `runId`
@@ -523,6 +530,6 @@ These align with the extension/native-message design docs.
 - `Page summary` now prefers the real popup/native-host/tab payload and, when available, a lightweight content-script DOM snapshot for headings/form landmarks/action hints/body summary before falling back to backend-local rules.
 - `Open in platform` and `Use in DSL` now reuse that same caller-context-first pattern so platform handoff URLs carry richer page/runtime/DOM context instead of only the thinnest query shell.
 - `Pick element` is now implemented through popup/background/content-script only; it does not involve native-host or local-admin-api DOM collection.
-- `Quick smoke test` intentionally reuses the scheduler request interface instead of adding a dedicated popup execution protocol.
+- `Quick smoke test` intentionally reuses the scheduler request interface instead of adding a dedicated popup execution protocol, and the request entry now keeps richer page/runtime/DOM startup context instead of only a thin detail string.
 - Quick actions should primarily map to extension/background/native interfaces plus extension-specific local-admin-api endpoints, or existing scheduler interfaces when the responsibility already matches, not to normal admin-console REST mutations.
 - The screen remains an Edge extension front-end template shell, not a normal platform management page.

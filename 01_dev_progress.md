@@ -5345,6 +5345,72 @@ Remaining limits:
 - `Use in DSL` still targets `aiGenerate`, not direct `cases` DSL insertion
 - quick smoke and pick mode main flows were intentionally left unchanged in this slice
 
+## 2026-05-08 P3-4 plugin quick-smoke richer-context follow-up
+
+## Task
+- Continue the current `P3-4 plugin` mainline by tightening `Quick smoke test`:
+  - reuse the shared current-page context builder for `SCHEDULER_REQUEST_CREATE`
+  - reuse background/content-script DOM enrichment
+  - keep the existing scheduler request protocol instead of opening a new popup execution protocol
+
+## Completed
+- Updated popup/background quick-smoke request shaping:
+  - `popup.js` now reuses the shared current-page context builder for `buildSchedulerRequestPayload(...)`
+  - quick-smoke scheduler requests now carry:
+    - page title/url/domain/path
+    - runtime context
+    - locator
+    - existing scheduler request fields
+  - `background.js` now applies the same lightweight content-script DOM snapshot enrichment to `SCHEDULER_REQUEST_CREATE` that it already applies to `PAGE_SUMMARY_GET` and `PLATFORM_HANDOFF_PREPARE`
+  - when content-script messaging is unavailable, background safely falls back to the original scheduler payload
+- Updated local-admin-api scheduler request persistence:
+  - `SchedulerPersistenceService.appendRequest(...)` now persists richer page/runtime/DOM startup context fields on the scheduler request entry when they are present
+  - the canonical scheduler request contract stays compatible:
+    - `runId`
+    - `projectKey`
+    - `owner`
+    - `environment`
+    - `status`
+    - `title`
+    - `detail`
+  - richer context remains additive rather than replacing those canonical fields
+- Updated regression coverage:
+  - popup test now asserts richer `SCHEDULER_REQUEST_CREATE` payload shaping
+  - background bridge tests now assert quick-smoke DOM-context enrichment and safe fallback
+  - native-host test now asserts richer scheduler request payload forwarding
+  - local-admin-api test now asserts scheduler request persistence remains compatible while retaining richer context fields
+- Synced plugin docs/backlog:
+  - `docs/phase3/interface/plugin/interface-spec.md`
+  - `docs/phase3/interface/plugin/functional-spec.md`
+  - `docs/phase3/interface/review-backlog.md`
+
+## Modified Files
+- `extension/edge-extension/popup.js`
+- `extension/edge-extension/background.js`
+- `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/SchedulerPersistenceService.java`
+- `ui/admin-console/src/popup.test.js`
+- `ui/admin-console/src/background.test.js`
+- `apps/native-host/src/test/java/com/example/webtest/nativehost/NativeHostMessageProcessorTest.java`
+- `apps/local-admin-api/src/test/java/com/example/webtest/admin/http/LocalAdminApiServerTest.java`
+- `docs/phase3/interface/plugin/interface-spec.md`
+- `docs/phase3/interface/plugin/functional-spec.md`
+- `docs/phase3/interface/review-backlog.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Ran targeted frontend tests:
+  - `npm test -- --run popup.test.js background.test.js`
+- Ran targeted native-host test:
+  - `mvn -pl apps/native-host -Dtest=NativeHostMessageProcessorTest test`
+- Ran targeted local-admin-api test:
+  - `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+
+## Remaining Limits
+- richer quick-smoke startup context is now persisted on scheduler request entries, but downstream execution/monitor/report consumers still do not actively surface most of those fields yet
+- quick smoke still remains a lightweight scheduler enqueue action rather than a fuller popup execution runtime
+- pick mode main flow was intentionally left unchanged in this slice
+
 ## 2026-05-07 P3-4 monitor status artifact/context follow-up
 
 ## Task

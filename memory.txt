@@ -2548,3 +2548,25 @@
   - Remaining limits:
     - platform handoff still uses lightweight query params plus App-local state mapping; it does not introduce typed route models or persisted cross-app context
     - `Use in DSL` still targets `aiGenerate`, not direct `cases` DSL insertion
+- 2026-05-08: Continued `P3-4 plugin` by tightening `Quick smoke test`.
+  - Extension popup/background:
+    - `popup.js` now reuses the shared current-page context builder for `buildSchedulerRequestPayload(...)`
+    - quick-smoke scheduler requests now carry page title/url/domain/path, runtime context, locator, and the existing scheduler request fields together
+    - `background.js` now applies the same lightweight content-script DOM snapshot enrichment to `SCHEDULER_REQUEST_CREATE` that it already applies to `PAGE_SUMMARY_GET` and `PLATFORM_HANDOFF_PREPARE`
+    - when content-script messaging is unavailable, quick-smoke request forwarding safely falls back to the original scheduler payload
+  - Backend:
+    - `SchedulerPersistenceService.appendRequest(...)` now persists richer page/runtime/DOM startup context fields on scheduler request entries when present
+    - the canonical scheduler request shape remains compatible and the richer fields stay additive
+  - Tests/docs:
+    - popup test now asserts richer `SCHEDULER_REQUEST_CREATE` payload shaping
+    - background bridge tests now assert quick-smoke DOM-context enrichment and safe fallback
+    - native-host test now asserts richer scheduler request payload forwarding
+    - local-admin-api test now asserts scheduler request persistence remains compatible while retaining richer context fields
+    - synced `plugin/interface-spec.md`, `plugin/functional-spec.md`, and `review-backlog.md`
+  - Verification:
+    - ran `npm test -- --run popup.test.js background.test.js`
+    - ran `mvn -pl apps/native-host -Dtest=NativeHostMessageProcessorTest test`
+    - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+  - Remaining limits:
+    - richer quick-smoke startup context is now persisted on scheduler request entries, but downstream execution/monitor/report consumers still do not actively surface most of those fields yet
+    - quick smoke still remains a lightweight scheduler enqueue action rather than a fuller popup execution runtime

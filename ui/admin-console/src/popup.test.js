@@ -330,7 +330,16 @@ describe("popup helpers", () => {
         environment: "staging-edge",
         detail: "review current page | Page: Checkout | URL: https://checkout.example.test/pay",
         status: "PRE_EXECUTION",
-        title: "popup-run / staging-edge"
+        title: "popup-run / staging-edge",
+        pageTitle: "Checkout",
+        pageUrl: "https://checkout.example.test/pay",
+        pageDomain: "checkout.example.test",
+        pagePath: "/pay",
+        runtimeMode: "",
+        queueState: "",
+        auditState: "",
+        nextAction: "",
+        locator: ""
       }
     });
     expect(document.getElementById("quickSmokeState").textContent).toBe("ACCEPTED");
