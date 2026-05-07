@@ -84,6 +84,31 @@ export async function sendToContentScript(message) {
   return response.data;
 }
 
+function mergePageSummaryContext(payload, domContext) {
+  const safePayload = payload && typeof payload === "object" ? payload : {};
+  const safeContext = domContext && typeof domContext === "object" ? domContext : {};
+  return {
+    ...safePayload,
+    headings: Array.isArray(safeContext.headings) ? safeContext.headings : [],
+    formHints: Array.isArray(safeContext.formHints) ? safeContext.formHints : [],
+    actionHints: Array.isArray(safeContext.actionHints) ? safeContext.actionHints : [],
+    bodySummary: typeof safeContext.bodySummary === "string" ? safeContext.bodySummary : ""
+  };
+}
+
+async function enrichPageSummaryPayload(payload) {
+  try {
+    const domContext = await sendToContentScript({
+      channel: "content-script",
+      type: "CS_PAGE_SUMMARY_CONTEXT_GET",
+      payload: {}
+    });
+    return mergePageSummaryContext(payload, domContext);
+  } catch {
+    return payload && typeof payload === "object" ? payload : {};
+  }
+}
+
 export async function handleBridgeMessage(message, sender = null) {
   try {
     if (message?.channel === "platform-open") {
@@ -144,6 +169,15 @@ export async function handleBridgeMessage(message, sender = null) {
     }
     if (message?.channel !== "native-host") {
       return null;
+    }
+    if (message?.type === "PAGE_SUMMARY_GET") {
+      return {
+        ok: true,
+        data: await sendToNativeHost({
+          ...message,
+          payload: await enrichPageSummaryPayload(message.payload)
+        })
+      };
     }
     return {
       ok: true,

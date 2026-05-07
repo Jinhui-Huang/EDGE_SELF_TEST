@@ -17,6 +17,31 @@ function shortText(value, maxLength = 80) {
   return `${text.slice(0, maxLength - 3)}...`;
 }
 
+function findVisibleText(element, maxLength = 80) {
+  if (!(element instanceof HTMLElement)) {
+    return "";
+  }
+  if (element.hidden || element.getAttribute("aria-hidden") === "true") {
+    return "";
+  }
+  return shortText(element.innerText || element.textContent || "", maxLength);
+}
+
+function collectUniqueTexts(elements, limit = 3, maxLength = 80) {
+  const values = [];
+  for (const element of elements) {
+    const text = findVisibleText(element, maxLength);
+    if (!text || values.includes(text)) {
+      continue;
+    }
+    values.push(text);
+    if (values.length >= limit) {
+      break;
+    }
+  }
+  return values;
+}
+
 function cssEscapeSimple(value) {
   return String(value || "").replace(/["\\]/g, "\\$&");
 }
@@ -56,6 +81,44 @@ function findElementText(element) {
     return "";
   }
   return shortText(element.innerText || element.textContent || "");
+}
+
+function summarizeBodyText() {
+  const root = document.querySelector("main, article, [role='main'], form") || document.body;
+  if (!(root instanceof HTMLElement)) {
+    return "";
+  }
+  const paragraphs = collectUniqueTexts(root.querySelectorAll("p, li"), 3, 90);
+  if (paragraphs.length > 0) {
+    return shortText(paragraphs.join(" "), 180);
+  }
+  return shortText(root.innerText || root.textContent || "", 180);
+}
+
+export function buildPageSummaryContext() {
+  const headings = collectUniqueTexts(
+    document.querySelectorAll("main h1, article h1, h1, main h2, article h2, h2, [role='heading']"),
+    3,
+    70
+  );
+  const actionHints = collectUniqueTexts(
+    document.querySelectorAll("main button, article button, button, [role='button'], input[type='submit'], input[type='button']"),
+    3,
+    60
+  );
+  const formHints = collectUniqueTexts(
+    document.querySelectorAll("main label, article label, label, input, select, textarea, [aria-label]"),
+    3,
+    60
+  );
+  const bodySummary = summarizeBodyText();
+
+  return {
+    headings,
+    formHints,
+    actionHints,
+    bodySummary
+  };
 }
 
 function buildLocatorCandidates(element) {
@@ -233,24 +296,31 @@ export function startPickMode() {
   return { started: true };
 }
 
-export async function handlePickMessage(message) {
+export async function handleContentMessage(message) {
   switch (message?.type) {
     case "CS_PICK_ELEMENT_START":
       return startPickMode();
     case "CS_PICK_ELEMENT_STOP":
       stopPickMode();
       return { stopped: true };
+    case "CS_PAGE_SUMMARY_CONTEXT_GET":
+      return buildPageSummaryContext();
     default:
       throw new Error("Unsupported content message.");
   }
 }
 
+export async function handlePickMessage(message) {
+  return handleContentMessage(message);
+}
+
 if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    if (!message?.type?.startsWith("CS_PICK_ELEMENT_")) {
+    if (message?.type !== "CS_PAGE_SUMMARY_CONTEXT_GET"
+      && !message?.type?.startsWith("CS_PICK_ELEMENT_")) {
       return undefined;
     }
-    void handlePickMessage(message)
+    void handleContentMessage(message)
       .then((data) => sendResponse({ ok: true, data }))
       .catch((error) => sendResponse({
         ok: false,

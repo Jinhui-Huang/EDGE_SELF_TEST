@@ -5222,6 +5222,61 @@ Remaining limits:
 - admin-console `plugin` screen still remains a mirror/demo shell; the real quick action continues to live in the extension popup runtime
 - quick smoke, pick mode, and platform handoff chains were intentionally left unchanged in this slice
 
+## 2026-05-08 P3-4 plugin page-summary DOM context follow-up
+
+## Task
+- Continue the current `P3-4 plugin` `page-summary` slice:
+  - add lightweight content-script DOM context to `PAGE_SUMMARY_GET`
+  - keep fallback safe when content-script context is unavailable
+  - avoid expanding into quick smoke, pick mode, or platform handoff
+
+## Completed
+- Updated extension-side `page-summary` enrichment:
+  - `content-script.js` now exposes `CS_PAGE_SUMMARY_CONTEXT_GET`
+  - the content script returns a lightweight DOM snapshot with:
+    - visible headings
+    - form landmarks
+    - primary action hints
+    - short body summary
+  - `background.js` now intercepts `PAGE_SUMMARY_GET`, asks the active tab content script for that DOM snapshot first, and merges it into the outgoing native-host payload
+  - when content-script messaging is unavailable, background safely falls back to the original tab/runtime payload and still forwards the request
+- Updated local-admin-api `page-summary` assembly:
+  - `ExtensionActionService.java` now consumes caller-provided DOM context fields when present
+  - summary text and signals now surface heading/action/form/body cues from the caller payload instead of trying to derive richer page understanding on the backend
+- Updated regression coverage:
+  - background bridge test now asserts page-summary payload enrichment from content-script DOM context
+  - background bridge test now also asserts fallback to the original payload when content-script messaging fails
+  - content-script test now asserts the lightweight DOM snapshot shape
+  - local-admin-api test now asserts page-summary summary text reflects caller-provided DOM context
+- Synced plugin docs/backlog:
+  - `docs/phase3/interface/plugin/interface-spec.md`
+  - `docs/phase3/interface/plugin/functional-spec.md`
+  - `docs/phase3/interface/review-backlog.md`
+
+## Modified Files
+- `extension/edge-extension/content-script.js`
+- `extension/edge-extension/background.js`
+- `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/ExtensionActionService.java`
+- `ui/admin-console/src/background.test.js`
+- `ui/admin-console/src/content-script.test.js`
+- `apps/local-admin-api/src/test/java/com/example/webtest/admin/http/LocalAdminApiServerTest.java`
+- `docs/phase3/interface/plugin/interface-spec.md`
+- `docs/phase3/interface/plugin/functional-spec.md`
+- `docs/phase3/interface/review-backlog.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Ran targeted frontend tests:
+  - `npm test -- --run background.test.js content-script.test.js popup.test.js`
+- Ran targeted local-admin-api test:
+  - `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+
+## Remaining Limits
+- `page-summary` now includes only a lightweight content-script DOM snapshot; it still does not perform richer DOM extraction such as structured field/value understanding or deeper content summarization
+- admin-console `plugin` screen still remains a mirror/demo shell; the real quick action continues to live in the extension popup runtime
+- quick smoke, pick mode, and platform handoff chains were intentionally left unchanged in this slice
+
 ## 2026-05-07 P3-4 monitor status artifact/context follow-up
 
 ## Task

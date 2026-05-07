@@ -2501,3 +2501,23 @@
   - Remaining limits:
     - `page-summary` still does not use DOM/content-script extraction for richer page understanding
     - quick smoke, pick mode, and platform handoff chains were intentionally left unchanged in this slice
+- 2026-05-08: Continued `P3-4 plugin` by adding lightweight DOM context to `POST /api/phase3/extension/page-summary`.
+  - Extension/content-script:
+    - `content-script.js` now exposes `CS_PAGE_SUMMARY_CONTEXT_GET`
+    - the content script returns a lightweight DOM snapshot with visible headings, form landmarks, primary action hints, and a short body summary
+    - `background.js` now intercepts `PAGE_SUMMARY_GET`, asks the active tab content script for that DOM snapshot first, and merges it into the payload sent to native-host
+    - when content-script messaging is unavailable, background safely falls back to the existing tab/runtime payload and still forwards the request
+  - Backend:
+    - `ExtensionActionService` now consumes caller-provided DOM context fields and folds them into page-summary signals and summary text
+    - backend still remains caller-payload-first; no DOM parsing was moved into local-admin-api
+  - Tests/docs:
+    - background bridge test now asserts page-summary DOM-context enrichment and safe fallback
+    - content-script test now asserts the lightweight DOM snapshot shape
+    - local-admin-api test now asserts that page-summary summary text reflects caller-provided DOM context
+    - synced `plugin/interface-spec.md`, `plugin/functional-spec.md`, and `review-backlog.md`
+  - Verification:
+    - ran `npm test -- --run background.test.js content-script.test.js popup.test.js`
+    - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+  - Remaining limits:
+    - `page-summary` still uses only a lightweight DOM snapshot; it does not yet perform richer structured page understanding
+    - quick smoke, pick mode, and platform handoff chains were intentionally left unchanged in this slice

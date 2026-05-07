@@ -86,4 +86,27 @@ describe("content script pick mode", () => {
     });
     expect(document.getElementById("__phase3_pick_highlight__")).toBeNull();
   });
+
+  it("extracts lightweight DOM context for page summary requests", async () => {
+    document.body.innerHTML = `
+      <main>
+        <h1>Checkout</h1>
+        <h2>Payment details</h2>
+        <p>Review your order total and enter the card details to complete payment.</p>
+        <form>
+          <label>Card number</label>
+          <label>Expiry date</label>
+          <button type="submit">Pay now</button>
+        </form>
+      </main>
+    `;
+    const content = await import("./../../../extension/edge-extension/content-script.js");
+
+    expect(content.buildPageSummaryContext()).toEqual({
+      headings: ["Checkout", "Payment details"],
+      formHints: ["Card number", "Expiry date"],
+      actionHints: ["Pay now"],
+      bodySummary: "Review your order total and enter the card details to complete payment."
+    });
+  });
 });

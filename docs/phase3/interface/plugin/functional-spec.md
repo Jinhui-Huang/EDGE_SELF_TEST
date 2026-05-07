@@ -163,7 +163,7 @@ Current behavior:
 - real extension popup:
   - `Pick element` requests pick mode through popup -> background -> content script, then renders selected element info and locator candidates
   - `Quick smoke test` submits a lightweight pre-execution scheduler request from current page context and renders deterministic launch state/result
-  - `Page summary` requests a current-tab page summary through popup -> background -> native-host -> local-admin-api, preferring existing popup/tab/runtime context fields over backend-local rules
+  - `Page summary` requests a current-tab page summary through popup -> background -> content-script -> native-host -> local-admin-api, preferring existing popup/tab/runtime context fields plus lightweight DOM snapshot fields over backend-local rules
   - `Open in platform` requests a platform handoff URL through the same chain, then background opens the platform tab
 
 ### 6.5 Pick Mode Panel
@@ -387,7 +387,7 @@ The `plugin` screen is not currently responsible for:
 - The screen now consumes `ExtensionPopupSnapshot` from `GET /api/phase3/extension-popup` (AdminConsoleSnapshot dependency removed).
 - The admin-console `plugin` screen remains a mirror/demo shell; the real quick actions now live in `extension/edge-extension/popup.html` + `popup.js`.
 - `Pick element`, `Quick smoke test`, `Page summary`, `Open in platform`, `Copy`, and `Use in DSL` are now implemented in the real extension popup chain.
-- `Page summary` now prefers real popup/native-host/tab payload for title/url/domain/path/runtime context, but it still does not use DOM/content-script extraction for richer page understanding.
+- `Page summary` now prefers real popup/native-host/tab payload and, when available, a lightweight content-script DOM snapshot for headings/form landmarks/action hints/body summary before falling back to backend-local rules.
 - Real pick mode stays fully inside the extension boundary:
   - popup triggers
   - background bridges

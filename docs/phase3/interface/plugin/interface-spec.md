@@ -140,7 +140,7 @@ Still missing:
 #### `Page summary`
 
 - user action: click
-- request: popup -> background -> native-host -> `POST /api/phase3/extension/page-summary`
+- request: popup -> background -> content script (`CS_PAGE_SUMMARY_CONTEXT_GET`) -> native-host -> `POST /api/phase3/extension/page-summary`
 - owner: `extension/edge-extension/popup.js` + `background.js` + native-host + local-admin-api
 - current state: implemented in the real extension popup
 
@@ -401,9 +401,15 @@ Concrete implementation design:
 
 1. popup sends:
    - `PAGE_SUMMARY_GET` with active-tab title/url plus already-known popup runtime context
-2. native-host forwards:
+2. background first asks the active-tab content script for a lightweight DOM snapshot:
+   - visible headings
+   - form landmarks
+   - primary action hints
+   - short body summary
+   - if unavailable, background keeps the existing tab/runtime payload and continues
+3. native-host forwards:
    - `POST /api/phase3/extension/page-summary`
-3. popup renders:
+4. popup renders:
    - summary
    - domain
    - path
@@ -511,7 +517,7 @@ These align with the extension/native-message design docs.
 - The popup snapshot contract is implemented and consumed (AdminConsoleSnapshot dependency removed).
 - Popup snapshot data is deterministic mock from the backend when no real extension context exists.
 - `Page summary`, `Quick smoke test`, `Open in platform`, `Copy`, and `Use in DSL` are now implemented in the real extension popup runtime.
-- `Page summary` now prefers the real popup/native-host/tab payload for title/url/domain/path/runtime context, but it still does not use DOM/content-script extraction for richer page understanding.
+- `Page summary` now prefers the real popup/native-host/tab payload and, when available, a lightweight content-script DOM snapshot for headings/form landmarks/action hints/body summary before falling back to backend-local rules.
 - `Pick element` is now implemented through popup/background/content-script only; it does not involve native-host or local-admin-api DOM collection.
 - `Quick smoke test` intentionally reuses the scheduler request interface instead of adding a dedicated popup execution protocol.
 - Quick actions should primarily map to extension/background/native interfaces plus extension-specific local-admin-api endpoints, or existing scheduler interfaces when the responsibility already matches, not to normal admin-console REST mutations.

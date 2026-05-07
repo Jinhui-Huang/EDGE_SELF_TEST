@@ -37,6 +37,10 @@ public final class ExtensionActionService {
         String auditState = textOr(payload, "auditState", "");
         String nextAction = textOr(payload, "nextAction", "");
         String locator = textOr(payload, "locator", "");
+        List<String> headings = stringList(payload.get("headings"));
+        List<String> formHints = stringList(payload.get("formHints"));
+        List<String> actionHints = stringList(payload.get("actionHints"));
+        String bodySummary = textOr(payload, "bodySummary", "");
         String runtimeSummary = buildRuntimeSummary(runtimeMode, queueState, auditState);
 
         List<String> signals = new ArrayList<>();
@@ -52,6 +56,18 @@ public final class ExtensionActionService {
         if (!locator.isBlank()) {
             signals.add("Recommended locator " + locator + " is ready for clipboard or DSL handoff.");
         }
+        if (!headings.isEmpty()) {
+            signals.add("Visible headings " + String.join(" -> ", headings) + " came from the content-script DOM snapshot.");
+        }
+        if (!actionHints.isEmpty()) {
+            signals.add("Primary actions " + String.join(", ", actionHints) + " came from the content-script DOM snapshot.");
+        }
+        if (!formHints.isEmpty()) {
+            signals.add("Form landmarks " + String.join(", ", formHints) + " came from the content-script DOM snapshot.");
+        }
+        if (!bodySummary.isBlank()) {
+            signals.add("Body summary came from the content-script DOM snapshot.");
+        }
 
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("status", "READY");
@@ -61,7 +77,7 @@ public final class ExtensionActionService {
         response.put("host", pageDomain);
         response.put("path", pagePath);
         response.put("runtimeSummary", runtimeSummary);
-        response.put("summary", buildSummary(pageTitle, pageDomain, pagePath, runtimeSummary, locator));
+        response.put("summary", buildSummary(pageTitle, pageDomain, pagePath, runtimeSummary, locator, headings, formHints, actionHints, bodySummary));
         response.put("signals", signals);
         response.put("recommendedAction", !nextAction.isBlank()
                 ? nextAction
@@ -148,7 +164,11 @@ public final class ExtensionActionService {
             String pageDomain,
             String pagePath,
             String runtimeSummary,
-            String locator) {
+            String locator,
+            List<String> headings,
+            List<String> formHints,
+            List<String> actionHints,
+            String bodySummary) {
         String route = !pageDomain.isBlank()
                 ? pageDomain + (pagePath.isBlank() ? "" : pagePath)
                 : (!pagePath.isBlank() ? pagePath : pageTitle);
@@ -157,6 +177,18 @@ public final class ExtensionActionService {
                 .append(" on ")
                 .append(route.isBlank() ? "the current page" : route)
                 .append(".");
+        if (!headings.isEmpty()) {
+            builder.append(" Visible headings: ").append(String.join(" -> ", headings)).append(".");
+        }
+        if (!actionHints.isEmpty()) {
+            builder.append(" Primary actions: ").append(String.join(", ", actionHints)).append(".");
+        }
+        if (!formHints.isEmpty()) {
+            builder.append(" Form landmarks: ").append(String.join(", ", formHints)).append(".");
+        }
+        if (!bodySummary.isBlank()) {
+            builder.append(" Page cues: ").append(bodySummary).append(".");
+        }
         if (!runtimeSummary.isBlank()) {
             builder.append(" Runtime: ").append(runtimeSummary).append(".");
         }
@@ -223,6 +255,23 @@ public final class ExtensionActionService {
             }
         }
         return "";
+    }
+
+    private List<String> stringList(Object rawValue) {
+        if (!(rawValue instanceof List<?> list)) {
+            return List.of();
+        }
+        List<String> values = new ArrayList<>();
+        for (Object item : list) {
+            if (item == null) {
+                continue;
+            }
+            String text = String.valueOf(item).trim();
+            if (!text.isEmpty()) {
+                values.add(text);
+            }
+        }
+        return values;
     }
 
     private String encode(String value) {

@@ -2347,16 +2347,20 @@ class LocalAdminApiServerTest {
             HttpClient client = HttpClient.newHttpClient();
 
             HttpResponse<String> pageSummary = client.send(
-                    request(server, "/api/phase3/extension/page-summary", "POST", Jsons.writeValueAsString(Map.of(
-                            "pageTitle", "Checkout - Payment",
-                            "pageUrl", "https://checkout.example.test/pay",
-                            "pageDomain", "checkout.example.test",
-                            "pagePath", "/pay",
-                            "runtimeMode", "Audit-first",
-                            "queueState", "2 queued / 1 active / 1 waiting",
-                            "auditState", "Latest run active",
-                            "nextAction", "Keep the platform execution monitor open.",
-                            "locator", "#pay-submit"))),
+                    request(server, "/api/phase3/extension/page-summary", "POST", Jsons.writeValueAsString(Map.ofEntries(
+                            Map.entry("pageTitle", "Checkout - Payment"),
+                            Map.entry("pageUrl", "https://checkout.example.test/pay"),
+                            Map.entry("pageDomain", "checkout.example.test"),
+                            Map.entry("pagePath", "/pay"),
+                            Map.entry("runtimeMode", "Audit-first"),
+                            Map.entry("queueState", "2 queued / 1 active / 1 waiting"),
+                            Map.entry("auditState", "Latest run active"),
+                            Map.entry("nextAction", "Keep the platform execution monitor open."),
+                            Map.entry("locator", "#pay-submit"),
+                            Map.entry("headings", List.of("Checkout", "Payment details")),
+                            Map.entry("formHints", List.of("Card number", "Expiry date")),
+                            Map.entry("actionHints", List.of("Pay now")),
+                            Map.entry("bodySummary", "Review your order total and enter the card details to complete payment")))),
                     HttpResponse.BodyHandlers.ofString());
             HttpResponse<String> executionHandoff = client.send(
                     request(server, "/api/phase3/extension/platform-handoff", "POST", Jsons.writeValueAsString(Map.of(
@@ -2382,6 +2386,10 @@ class LocalAdminApiServerTest {
             assertTrue(pageSummary.body().contains("\"path\":\"/pay\""));
             assertTrue(pageSummary.body().contains("\"runtimeSummary\":\"Audit-first | 2 queued / 1 active / 1 waiting | Latest run active\""));
             assertTrue(pageSummary.body().contains("Viewing Checkout - Payment on checkout.example.test/pay."));
+            assertTrue(pageSummary.body().contains("Visible headings: Checkout -> Payment details."));
+            assertTrue(pageSummary.body().contains("Primary actions: Pay now."));
+            assertTrue(pageSummary.body().contains("Form landmarks: Card number, Expiry date."));
+            assertTrue(pageSummary.body().contains("Page cues: Review your order total and enter the card details to complete payment."));
             assertTrue(pageSummary.body().contains("\"recommendedAction\""));
             assertTrue(pageSummary.body().contains("Keep the platform execution monitor open."));
             assertTrue(pageSummary.body().contains("pay-submit"));
