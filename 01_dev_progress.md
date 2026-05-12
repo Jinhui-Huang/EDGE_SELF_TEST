@@ -5368,6 +5368,51 @@ Remaining limits:
 - Ran:
   - `npm test -- --run src/screens/MonitorScreen.test.tsx`
 
+## 2026-05-12 P3-4 monitor runtime-log availability marker follow-up
+
+## Task
+- Continue the same additive-marker pattern from `/steps` onto `/runtime-log`
+- keep the existing log-entry shape (`items`, `source`, `message`, `detail`, `nextCursor`) intact
+- let the front end prefer the new marker while retaining legacy empty-list compatibility
+
+## Completed
+- Updated backend `RunStatusService`:
+  - `GET /api/phase3/runs/{runId}/runtime-log` now adds `availability`
+  - `availability: "AVAILABLE"` when runtime-log artifact rows, scheduler-event rows, or request-context shell rows exist
+  - `availability: "UNAVAILABLE"` only when all three sources are empty and the endpoint returns `items: []`
+- Updated frontend types and screen logic:
+  - `RuntimeLogResponse` now includes optional `availability`
+  - `MonitorScreen` now tracks `runtimeLogAvailability`
+  - runtime-log empty-state rendering now prefers the backend marker and falls back to the old `items.length === 0` interpretation when the marker is absent
+- Updated tests:
+  - backend monitor test now asserts runtime-log availability for artifact-backed, scheduler-event-backed, request-context-backed, and empty-fallback responses
+  - front-end monitor test now covers both:
+    - `availability: "UNAVAILABLE"` runtime-log empty state
+    - legacy runtime-log payload without `availability`
+- Synced docs:
+  - `monitor/interface-spec.md`
+  - `monitor/functional-spec.md`
+
+## Modified Files
+- `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/RunStatusService.java`
+- `apps/local-admin-api/src/test/java/com/example/webtest/admin/http/LocalAdminApiServerTest.java`
+- `ui/admin-console/src/types.ts`
+- `ui/admin-console/src/screens/MonitorScreen.tsx`
+- `ui/admin-console/src/screens/MonitorScreen.test.tsx`
+- `docs/phase3/interface/monitor/interface-spec.md`
+- `docs/phase3/interface/monitor/functional-spec.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Ran:
+  - `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+  - `npm test -- --run src/screens/MonitorScreen.test.tsx`
+
+## Remaining Limits
+- `runtime-log` availability only distinguishes `AVAILABLE` vs `UNAVAILABLE`; it does not yet carry reason codes for artifact-backed vs scheduler-backed vs request-context-backed availability
+- this slice does not alter runtime-log entry metadata, paging, or any non-monitor contract
+
 ## Remaining Limits
 - `runtime-log` fallback is now more informative when request context exists, but it still remains a compact shell rather than a richer structured runtime artifact model
 - if scheduler requests also lack persisted page/runtime/locator fields, runtime-log fallback can still end up sparse or empty

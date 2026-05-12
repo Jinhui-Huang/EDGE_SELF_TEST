@@ -2662,3 +2662,18 @@
     - `MonitorScreen.test.tsx` now includes a legacy `/steps` payload without `availability` and asserts the two no-step copy blocks still render
   - Verification:
     - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`
+- 2026-05-12: Continued the same additive-marker pattern on `P3-4 monitor /runtime-log`.
+  - Backend:
+    - `GET /api/phase3/runs/{runId}/runtime-log` now includes `availability`
+    - `availability: "AVAILABLE"` when artifact rows, scheduler-event rows, or request-context shell rows exist
+    - `availability: "UNAVAILABLE"` only when all three runtime-log sources are empty and the endpoint returns `items: []`
+  - Frontend:
+    - `RuntimeLogResponse` now accepts the additive `availability` field
+    - `MonitorScreen` now prefers that backend marker for runtime-log empty-state rendering and still falls back to the old empty-list interpretation when legacy payloads omit the marker
+  - Tests/docs:
+    - backend monitor test now asserts runtime-log availability across artifact-backed, scheduler-event-backed, request-context-backed, and empty-fallback cases
+    - front-end monitor test now covers both marker-driven and legacy runtime-log empty payloads
+    - synced `monitor/interface-spec.md` and `monitor/functional-spec.md`
+  - Verification:
+    - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+    - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`

@@ -304,6 +304,7 @@ Response body:
 ```json
 {
   "runId": "checkout-web-smoke",
+  "availability": "AVAILABLE",
   "items": [
     {
       "at": "2026-04-20T05:31:48Z",
@@ -329,6 +330,9 @@ When no run-local `runtime.log` artifact exists, the endpoint keeps the current 
 - `model` preserved only when the fallback scheduler event actually carries it
 - if non-step scheduler events are also absent or too thin to form runtime-log rows, the backend can emit a few `source: "scheduler-request-context"` entries instead
 - those shell entries expose persisted startup context such as page identity, runtime summary, next action, and locator cues so `monitor` does not collapse into an empty runtime-log panel
+- only when artifact rows, scheduler-event rows, and request-context shell rows are all absent does the endpoint return:
+  - `availability: "UNAVAILABLE"`
+  - `items: []`
 
 ### 7.4 Live-Page Read Interface
 
@@ -544,8 +548,10 @@ Current implementation:
 - `steps` now prefers run-local `report.json.steps[]`; when that artifact is present, failed/skipped terminal semantics are preserved instead of being collapsed into `TODO`; when the artifact is absent it falls back only to scheduler-backed `STEP_*` events and otherwise returns an empty list.
 - `steps` now also carries a backend-owned `availability` marker so the front end can distinguish `AVAILABLE` vs `UNAVAILABLE` empty-state semantics without changing the `items` row structure.
 - when `steps.items` is empty, `MonitorScreen` now prefers that backend-owned marker and renders explicit no-step copy in both the progress area and the step-list panel; if the marker is absent, it still falls back to the old `items.length === 0` interpretation for compatibility.
+- `runtime-log` now also carries a backend-owned `availability` marker so the front end can distinguish a truly unavailable runtime-log stream from a merely short list without changing the existing log-entry shape.
 - `runtime-log` now prefers run-local `runtime.log` artifacts; when they are absent it still falls back to scheduler-event-derived shaping.
 - when artifact-backed and scheduler-event-backed runtime notes are both unavailable, `runtime-log` now emits a small backend-owned request-context shell instead of returning an empty panel when persisted scheduler request context exists.
+- when `runtimeLog.items` is empty, `MonitorScreen` now prefers that backend-owned marker and still falls back to the old empty-list interpretation for legacy payload compatibility.
 - Pause/Abort record intent only; the backend does not trigger real execution-control workflows in Phase 3.
 - Step rows and runtime log rows now use local detail panels rather than a separate page or route.
 - Live page panel now inlines image-like screenshots when `screenshotPath` is present, but it still does not render a richer DOM summary.

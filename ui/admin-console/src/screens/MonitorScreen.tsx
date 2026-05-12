@@ -45,6 +45,7 @@ export function MonitorScreen({
   const [steps, setSteps] = useState<RunStep[]>([]);
   const [stepsAvailability, setStepsAvailability] = useState<"AVAILABLE" | "UNAVAILABLE">("UNAVAILABLE");
   const [runtimeLog, setRuntimeLog] = useState<RuntimeLogEntry[]>([]);
+  const [runtimeLogAvailability, setRuntimeLogAvailability] = useState<"AVAILABLE" | "UNAVAILABLE">("UNAVAILABLE");
   const [livePage, setLivePage] = useState<LivePage | null>(null);
   const [selectedStep, setSelectedStep] = useState<RunStep | null>(null);
   const [selectedLog, setSelectedLog] = useState<RuntimeLogEntry | null>(null);
@@ -69,13 +70,16 @@ export function MonitorScreen({
       const stepsData = stepsRes.ok
         ? ((await stepsRes.json()) as RunStepsResponse)
         : { items: [], availability: "UNAVAILABLE" as const };
-      const logData = logRes.ok ? ((await logRes.json()) as RuntimeLogResponse) : { items: [] };
+      const logData = logRes.ok
+        ? ((await logRes.json()) as RuntimeLogResponse)
+        : { items: [], availability: "UNAVAILABLE" as const, nextCursor: null };
       const liveData = liveRes.ok ? ((await liveRes.json()) as LivePage) : null;
 
       setRunStatus(statusData);
       setSteps(stepsData.items ?? []);
       setStepsAvailability(resolveStepsAvailability(stepsData));
       setRuntimeLog(logData.items ?? []);
+      setRuntimeLogAvailability(resolveRuntimeLogAvailability(logData));
       setLivePage(liveData);
       setLoadState("loaded");
     } catch (error) {
@@ -84,6 +88,7 @@ export function MonitorScreen({
       setSteps([]);
       setStepsAvailability("UNAVAILABLE");
       setRuntimeLog([]);
+      setRuntimeLogAvailability("UNAVAILABLE");
       setLivePage(null);
       setLoadState("error");
     }
@@ -99,6 +104,7 @@ export function MonitorScreen({
       setSteps([]);
       setStepsAvailability("UNAVAILABLE");
       setRuntimeLog([]);
+      setRuntimeLogAvailability("UNAVAILABLE");
       setLivePage(null);
       return;
     }
@@ -215,6 +221,7 @@ export function MonitorScreen({
   const queueLead = snapshot.workQueue[0];
   const runningStep = steps.find((step) => step.state === "RUNNING");
   const showUnavailableSteps = stepsAvailability === "UNAVAILABLE";
+  const showUnavailableRuntimeLog = runtimeLogAvailability === "UNAVAILABLE";
   const activeDetailKind = selectedStep ? "step" : selectedLog ? "log" : null;
   const livePageStatus = livePage?.status ?? "UNAVAILABLE";
   const liveScreenshotUrl = runId && livePage?.screenshotPath
@@ -455,7 +462,7 @@ export function MonitorScreen({
             {status === "RUNNING" ? <span className="monitorBadge info dot">live</span> : null}
           </div>
           <div className="monitorLogList">
-            {runtimeLog.length > 0 ? runtimeLog.map((entry, index) => (
+            {!showUnavailableRuntimeLog ? runtimeLog.map((entry, index) => (
               <button
                 key={`${entry.at}-${entry.type}-${index}`}
                 type="button"
@@ -756,4 +763,11 @@ function resolveStepsAvailability(stepsData: RunStepsResponse): "AVAILABLE" | "U
     return stepsData.availability;
   }
   return (stepsData.items?.length ?? 0) > 0 ? "AVAILABLE" : "UNAVAILABLE";
+}
+
+function resolveRuntimeLogAvailability(logData: RuntimeLogResponse): "AVAILABLE" | "UNAVAILABLE" {
+  if (logData.availability === "AVAILABLE" || logData.availability === "UNAVAILABLE") {
+    return logData.availability;
+  }
+  return (logData.items?.length ?? 0) > 0 ? "AVAILABLE" : "UNAVAILABLE";
 }

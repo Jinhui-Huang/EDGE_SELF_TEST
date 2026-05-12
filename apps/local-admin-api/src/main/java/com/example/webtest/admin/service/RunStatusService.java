@@ -235,6 +235,7 @@ public final class RunStatusService {
         if (!artifactItems.isEmpty()) {
             Map<String, Object> artifactResult = new LinkedHashMap<>();
             artifactResult.put("runId", runId);
+            artifactResult.put("availability", "AVAILABLE");
             artifactResult.put("items", artifactItems);
             artifactResult.put("nextCursor", null);
             return artifactResult;
@@ -265,6 +266,7 @@ public final class RunStatusService {
         // If no log events exist, return an empty but valid list
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("runId", runId);
+        result.put("availability", items.isEmpty() ? "UNAVAILABLE" : "AVAILABLE");
         result.put("items", items);
         result.put("nextCursor", null);
         return result;

@@ -325,6 +325,7 @@ export type RuntimeLogEntry = {
 
 export type RuntimeLogResponse = {
   runId: string;
+  availability?: "AVAILABLE" | "UNAVAILABLE";
   items: RuntimeLogEntry[];
   nextCursor: string | null;
 };
