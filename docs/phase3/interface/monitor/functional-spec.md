@@ -154,7 +154,7 @@ Current behavior:
 - artifact-backed terminal failure semantics are preserved:
   - `FAILED` / `ERROR` -> `FAILED`
   - `SKIPPED` / `CANCELLED` / `ABORTED` -> `SKIPPED`
-- when no run-local report step artifact exists, the current scheduler-event-derived or placeholder fallback remains in place and is not presented as artifact-backed data
+- when no run-local report step artifact exists, only scheduler-backed `STEP_*` events remain; if those events are absent, the backend returns an empty step list instead of fabricating a placeholder execution flow
 - rows are clickable and open a local step-detail panel inside `MonitorScreen`
 
 ### 6.4 Live Page Panel
@@ -231,7 +231,7 @@ The screen currently takes limited contextual display data from:
 The screen loads runtime data from dedicated APIs when `selectedRunId` is provided:
 
 - `runStatus` from `GET /api/phase3/runs/{runId}/status` — run identity, progress, counters, control state
-- `steps` from `GET /api/phase3/runs/{runId}/steps` — artifact-backed `report.json.steps[]` when available, preserving `FAILED` / `SKIPPED` terminal semantics; otherwise scheduler-event-derived or placeholder step shaping
+- `steps` from `GET /api/phase3/runs/{runId}/steps` — artifact-backed `report.json.steps[]` when available, preserving `FAILED` / `SKIPPED` terminal semantics; otherwise only scheduler-backed `STEP_*` rows, or empty when scheduler cannot support a real step timeline
 - `runtimeLog` from `GET /api/phase3/runs/{runId}/runtime-log` — artifact-backed `runtime.log` entries when available, otherwise scheduler-event-derived AI/runtime notes
 - `livePage` from `GET /api/phase3/runs/{runId}/live-page` — backend-owned availability status, current page URL/state/highlight, and optional run-local screenshot path
 
@@ -389,7 +389,7 @@ The `monitor` screen is not currently responsible for:
 
 - `livePage` now prefers run-local live-page artifacts and returns an explicit unavailable shell when none exist.
 - `status` now prefers stronger run-local `report.json` / `live-page.json` / `runtime.log` timestamp context when those artifacts exist, but it still falls back to a scheduler-derived shell when they do not.
-- `steps` now preserves backend-owned failed/skipped terminal semantics when report-backed artifacts exist, but it still falls back to scheduler-event-derived or placeholder shaping when those artifacts do not exist.
+- `steps` now preserves backend-owned failed/skipped terminal semantics when report-backed artifacts exist; without those artifacts it falls back only to scheduler-backed `STEP_*` rows and otherwise stays empty instead of simulating a fake execution flow.
 - `runtimeLog` still remains partly deterministic when no stronger run-local runtime artifacts exist.
 - Step rows and runtime log rows now open local drill-down detail panels using existing runtime payload only; no new backend interface is required.
 - Live page panel can now inline image-like screenshots, but it still does not render a richer DOM summary.

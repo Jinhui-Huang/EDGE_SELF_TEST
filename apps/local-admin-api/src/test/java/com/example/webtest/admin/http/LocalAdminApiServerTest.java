@@ -867,7 +867,7 @@ class LocalAdminApiServerTest {
     }
 
     @Test
-    void monitorStepsPrefersRunLocalReportStepsAndFallsBackToSchedulerEvents(@TempDir Path tempDir) throws Exception {
+    void monitorStepsPrefersRunLocalReportStepsThenSchedulerEventsThenEmptyFallback(@TempDir Path tempDir) throws Exception {
         Path runsDir = tempDir.resolve("runs");
         Path artifactRunDir = runsDir.resolve("checkout-web-smoke");
         Files.createDirectories(artifactRunDir);
@@ -914,7 +914,8 @@ class LocalAdminApiServerTest {
         Files.writeString(schedulerRequestsFile, Jsons.writeValueAsString(Map.of(
                 "requests", List.of(
                         Map.of("runId", "checkout-web-smoke"),
-                        Map.of("runId", "missing-report-steps")))), StandardCharsets.UTF_8);
+                        Map.of("runId", "missing-report-steps"),
+                        Map.of("runId", "missing-report-steps-empty")))), StandardCharsets.UTF_8);
         Files.writeString(schedulerEventsFile, Jsons.writeValueAsString(Map.of(
                 "events", List.of(
                         Map.of(
@@ -927,6 +928,11 @@ class LocalAdminApiServerTest {
                                 "type", "STEP_DONE",
                                 "detail", "Open checkout fallback",
                                 "durationMs", 800,
+                                "at", "2026-05-07T09:05:00Z"),
+                        Map.of(
+                                "runId", "missing-report-steps-empty",
+                                "type", "RUNNING",
+                                "detail", "scheduler status only",
                                 "at", "2026-05-07T09:05:00Z")))), StandardCharsets.UTF_8);
 
         Clock clock = Clock.fixed(Instant.parse("2026-05-07T09:10:00Z"), ZoneOffset.UTC);
@@ -962,6 +968,9 @@ class LocalAdminApiServerTest {
             HttpResponse<String> fallbackBacked = client.send(
                     request(server, "/api/phase3/runs/missing-report-steps/steps"),
                     HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> emptyFallback = client.send(
+                    request(server, "/api/phase3/runs/missing-report-steps-empty/steps"),
+                    HttpResponse.BodyHandlers.ofString());
 
             assertEquals(200, artifactBacked.statusCode());
             assertTrue(artifactBacked.body().contains("\"label\":\"Open checkout page\""));
@@ -978,6 +987,11 @@ class LocalAdminApiServerTest {
             assertEquals(200, fallbackBacked.statusCode());
             assertTrue(fallbackBacked.body().contains("\"label\":\"Open checkout fallback\""));
             assertTrue(fallbackBacked.body().contains("\"durationMs\":800"));
+
+            assertEquals(200, emptyFallback.statusCode());
+            assertTrue(emptyFallback.body().contains("\"items\":[]"));
+            assertTrue(!emptyFallback.body().contains("\"label\":\"open target\""));
+            assertTrue(!emptyFallback.body().contains("\"state\":\"TODO\""));
         }
     }
 

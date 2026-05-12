@@ -2615,3 +2615,18 @@
     - backend monitor test now includes a `runId`-only scheduler request case and asserts the runtime-log fallback stays empty instead of fabricating a misleading page-context entry
   - Verification:
     - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+- 2026-05-12: Continued `P3-4 monitor` by tightening `GET /api/phase3/runs/{runId}/steps` fallback.
+  - Backend:
+    - `RunStatusService.getRunSteps(...)` keeps the effective priority:
+      - `report.json.steps[]`
+      - scheduler `STEP_*` events
+      - empty fallback
+    - removed the old hardcoded placeholder-step generator
+    - when no run-local report steps exist and scheduler does not provide real `STEP_*` events, the backend now returns `items: []` instead of fabricating an 8-step placeholder flow
+  - Tests/docs:
+    - backend monitor test now asserts the empty fallback when only non-step scheduler events exist
+    - synced `monitor/interface-spec.md`, `monitor/functional-spec.md`, and `review-backlog.md`
+  - Verification:
+    - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+  - Remaining limits:
+    - `steps` empty fallback is more honest than the old placeholder flow, but there is still no dedicated unavailable-state contract for the step timeline

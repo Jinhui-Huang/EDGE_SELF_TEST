@@ -136,8 +136,6 @@ public final class RunStatusService {
         }
 
         List<Map<String, Object>> events = findEvents(runId);
-        String currentStatus = deriveStatus(findRequest(runId), events);
-        boolean isRunning = "RUNNING".equals(currentStatus);
 
         List<Map<String, Object>> items = new ArrayList<>();
         int stepIndex = 0;
@@ -165,11 +163,6 @@ public final class RunStatusService {
                 }
                 items.add(step);
             }
-        }
-
-        // If no step events exist, generate placeholder steps from request context
-        if (items.isEmpty()) {
-            items = buildPlaceholderSteps(isRunning);
         }
 
         Map<String, Object> result = new LinkedHashMap<>();
@@ -1270,34 +1263,6 @@ public final class RunStatusService {
         response.put("requestedState", requestedState);
         response.put("message", message);
         return response;
-    }
-
-    private List<Map<String, Object>> buildPlaceholderSteps(boolean isRunning) {
-        String[] labels = {"open target", "fill form", "click submit", "assert page",
-                "verify data", "check result", "validate state", "complete"};
-        List<Map<String, Object>> items = new ArrayList<>();
-        for (int i = 0; i < labels.length; i++) {
-            Map<String, Object> step = new LinkedHashMap<>();
-            step.put("index", i + 1);
-            step.put("label", labels[i]);
-            if (isRunning) {
-                if (i < 4) {
-                    step.put("state", "DONE");
-                    step.put("durationMs", 600 + i * 200);
-                } else if (i == 4) {
-                    step.put("state", "RUNNING");
-                    step.put("durationMs", 0);
-                } else {
-                    step.put("state", "TODO");
-                    step.put("durationMs", 0);
-                }
-            } else {
-                step.put("state", "TODO");
-                step.put("durationMs", 0);
-            }
-            items.add(step);
-        }
-        return items;
     }
 
     private record ProgressInfo(int currentStep, int totalSteps, int percent, long estimatedTotalMs) {}

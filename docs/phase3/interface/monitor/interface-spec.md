@@ -235,7 +235,7 @@ Response body:
 Purpose:
 
 - load current and completed step timeline for the monitored run
-- prefer run-local `report.json.steps[]` when the artifact exists; otherwise fall back to scheduler step events or the existing placeholder shaping
+- prefer run-local `report.json.steps[]` when the artifact exists; otherwise fall back only to scheduler step events that actually exist
 
 Response body:
 
@@ -273,9 +273,9 @@ Step state semantics on the current contract:
 - `RUNNING`: current in-progress step
 - `FAILED`: failed/error terminal step from run-local report artifacts
 - `SKIPPED`: skipped/cancelled/aborted non-success terminal step from run-local report artifacts
-- `TODO`: not-started or placeholder fallback step
+- `TODO`: not-started scheduler-backed step only when a real `STEP_TODO`-like event exists
 
-When no run-local `report.json.steps[]` artifact is available, the endpoint keeps the existing scheduler-event-derived or placeholder fallback path rather than claiming that artifact-backed step data exists.
+When no run-local `report.json.steps[]` artifact is available, the endpoint keeps only scheduler-event-derived step rows. If scheduler data does not provide real `STEP_*` events, the backend now returns an empty step list rather than fabricating a placeholder execution flow.
 
 ### 7.3 Runtime-Log Read Interface
 
@@ -535,7 +535,7 @@ Current implementation:
 
 - `live-page` now prefers run-local `live-page.json` / screenshot artifacts and returns an explicit `UNAVAILABLE` shell when they are absent.
 - `status` now prefers run-local `report.json` / `live-page.json` / `runtime.log` timestamps for stronger terminal status, progress, assertions, current-page, and `lastUpdatedAt` semantics, but it still falls back to a scheduler-derived shell when those stronger artifacts are absent.
-- `steps` now prefers run-local `report.json.steps[]`; when that artifact is present, failed/skipped terminal semantics are preserved instead of being collapsed into `TODO`; when the artifact is absent it still falls back to scheduler-event-derived or placeholder shaping.
+- `steps` now prefers run-local `report.json.steps[]`; when that artifact is present, failed/skipped terminal semantics are preserved instead of being collapsed into `TODO`; when the artifact is absent it falls back only to scheduler-backed `STEP_*` events and otherwise returns an empty list.
 - `runtime-log` now prefers run-local `runtime.log` artifacts; when they are absent it still falls back to scheduler-event-derived shaping.
 - when artifact-backed and scheduler-event-backed runtime notes are both unavailable, `runtime-log` now emits a small backend-owned request-context shell instead of returning an empty panel when persisted scheduler request context exists.
 - Pause/Abort record intent only; the backend does not trigger real execution-control workflows in Phase 3.

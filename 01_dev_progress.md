@@ -5237,6 +5237,46 @@ Remaining limits:
 - Ran:
   - `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
 
+## 2026-05-12 P3-4 monitor steps empty-fallback follow-up
+
+## Task
+- Continue the narrow `P3-4 monitor` line by tightening `GET /api/phase3/runs/{runId}/steps`
+- keep the priority explicit as `report.json.steps[]` -> scheduler `STEP_*` events -> empty fallback
+- remove fake placeholder step flows when the backend does not actually know a step timeline
+
+## Completed
+- Updated backend `RunStatusService`:
+  - removed the old hardcoded placeholder-step generator
+  - `GET /api/phase3/runs/{runId}/steps` now returns:
+    - report-backed steps when `report.json.steps[]` exists
+    - scheduler-backed step rows when real `STEP_*` events exist
+    - empty `items` when neither source can support a real step timeline
+- Updated `LocalAdminApiServerTest.java`:
+  - kept coverage for report-backed precedence
+  - kept coverage for scheduler step fallback
+  - added coverage for the new empty fallback when only non-step scheduler events exist
+- Synced docs:
+  - `monitor/interface-spec.md`
+  - `monitor/functional-spec.md`
+  - `review-backlog.md`
+
+## Modified Files
+- `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/RunStatusService.java`
+- `apps/local-admin-api/src/test/java/com/example/webtest/admin/http/LocalAdminApiServerTest.java`
+- `docs/phase3/interface/monitor/interface-spec.md`
+- `docs/phase3/interface/monitor/functional-spec.md`
+- `docs/phase3/interface/review-backlog.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Ran:
+  - `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+
+## Remaining Limits
+- `steps` no longer fabricates a placeholder flow, but when both report artifacts and scheduler step events are absent the screen still has only an empty timeline rather than a richer unavailable-state contract
+- no new step-status endpoint or explicit `unavailable` marker was introduced in this slice
+
 ## Remaining Limits
 - `runtime-log` fallback is now more informative when request context exists, but it still remains a compact shell rather than a richer structured runtime artifact model
 - if scheduler requests also lack persisted page/runtime/locator fields, runtime-log fallback can still end up sparse or empty
