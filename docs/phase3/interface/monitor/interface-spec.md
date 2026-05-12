@@ -191,6 +191,7 @@ Purpose:
 - prefer run-local `live-page.json` for `currentPage.url` / `currentPage.state` when that artifact exists
 - prefer the latest artifact-backed timestamp (`report.json`, `live-page.json`, `runtime.log`) for `lastUpdatedAt` when available
 - when no strong run-local progress artifact exists, keep the current response shell but return conservative progress values instead of fabricating a default 8-step shape
+- when those stronger artifacts are absent, prefer persisted scheduler request context (`pageUrl`, `runtimeMode`, `queueState`, `auditState`) over the older thin `targetUrl`-only fallback
 
 Response body:
 
@@ -283,7 +284,9 @@ When no run-local `report.json.steps[]` artifact is available, the endpoint keep
 Purpose:
 
 - load AI decisions, heals, state recognition, and runtime notes for the run
-- prefer run-local `runtime.log` entries when the artifact exists; otherwise fall back to scheduler-event-derived runtime notes
+- prefer run-local `runtime.log` entries when the artifact exists
+- otherwise fall back to scheduler-event-derived runtime notes
+- when neither source yields usable runtime-log rows, synthesize a small backend-owned shell from persisted scheduler request context (`pageUrl`, `pageTitle`, `runtimeMode`, `queueState`, `auditState`, `nextAction`, `locator`, `bodySummary`)
 
 Query parameters:
 
@@ -313,11 +316,13 @@ Response body:
 }
 ```
 
-When no run-local `runtime.log` artifact exists, the endpoint keeps the current scheduler-event-derived fallback path rather than claiming that artifact-backed runtime logs are available:
+When no run-local `runtime.log` artifact exists, the endpoint keeps the current fallback chain rather than claiming that artifact-backed runtime logs are available:
 
 - `source: "scheduler-events"`
 - `summary` derived from the event `detail` / `title`
 - `model` preserved only when the fallback scheduler event actually carries it
+- if non-step scheduler events are also absent or too thin to form runtime-log rows, the backend can emit a few `source: "scheduler-request-context"` entries instead
+- those shell entries expose persisted startup context such as page identity, runtime summary, next action, and locator cues so `monitor` does not collapse into an empty runtime-log panel
 
 ### 7.4 Live-Page Read Interface
 
@@ -346,20 +351,20 @@ Response body:
 }
 ```
 
-When no run-local live-page artifact is available, the backend returns an explicit unavailable shell instead of fabricating a live page:
+When no run-local live-page artifact is available, the backend returns an explicit unavailable shell instead of fabricating a live page. That shell may still carry persisted scheduler request context such as page identity, runtime summary, and locator cues:
 
 ```json
 {
   "runId": "checkout-web-smoke",
   "status": "UNAVAILABLE",
   "capturedAt": "2026-04-20T05:31:49Z",
-  "url": "",
-  "title": "",
-  "pageState": "unavailable",
+  "url": "https://app.acme.example/checkout/payment",
+  "title": "Payment review",
+  "pageState": "audit-first / queued / watching payment iframe",
   "highlight": {
     "stepIndex": 0,
-    "action": "",
-    "target": ""
+    "action": "Verify the payment CTA before unblocking release.",
+    "target": "#pay-now"
   },
   "screenshotPath": null
 }
@@ -532,6 +537,7 @@ Current implementation:
 - `status` now prefers run-local `report.json` / `live-page.json` / `runtime.log` timestamps for stronger terminal status, progress, assertions, current-page, and `lastUpdatedAt` semantics, but it still falls back to a scheduler-derived shell when those stronger artifacts are absent.
 - `steps` now prefers run-local `report.json.steps[]`; when that artifact is present, failed/skipped terminal semantics are preserved instead of being collapsed into `TODO`; when the artifact is absent it still falls back to scheduler-event-derived or placeholder shaping.
 - `runtime-log` now prefers run-local `runtime.log` artifacts; when they are absent it still falls back to scheduler-event-derived shaping.
+- when artifact-backed and scheduler-event-backed runtime notes are both unavailable, `runtime-log` now emits a small backend-owned request-context shell instead of returning an empty panel when persisted scheduler request context exists.
 - Pause/Abort record intent only; the backend does not trigger real execution-control workflows in Phase 3.
 - Step rows and runtime log rows now use local detail panels rather than a separate page or route.
 - Live page panel now inlines image-like screenshots when `screenshotPath` is present, but it still does not render a richer DOM summary.

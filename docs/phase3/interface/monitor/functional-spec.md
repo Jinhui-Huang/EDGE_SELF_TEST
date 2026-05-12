@@ -194,7 +194,7 @@ Current behavior:
 
 - log items driven by `runtimeLog` from `GET /api/phase3/runs/{runId}/runtime-log`
 - when run-local `runtime.log` exists, the backend prefers artifact-backed log entries over deterministic shaping
-- when no run-local runtime log artifact exists, the current scheduler-event-derived fallback remains in place and is not presented as artifact-backed data
+- when no run-local runtime log artifact exists, scheduler-event-derived fallback remains in place; if those events still do not yield usable runtime-log rows, a compact persisted request-context shell is shown instead of claiming artifact-backed runtime logs
 - rows are clickable and open a local runtime-log detail panel inside `MonitorScreen`
 
 ### 6.6 Footer Summary
@@ -235,7 +235,8 @@ The screen loads runtime data from dedicated APIs when `selectedRunId` is provid
 - `runtimeLog` from `GET /api/phase3/runs/{runId}/runtime-log` — artifact-backed `runtime.log` entries when available, otherwise scheduler-event-derived AI/runtime notes
 - `livePage` from `GET /api/phase3/runs/{runId}/live-page` — backend-owned availability status, current page URL/state/highlight, and optional run-local screenshot path
 
-- `runStatus` now prefers run-local `report.json` / `live-page.json` / artifact timestamps when available and otherwise keeps a conservative scheduler-backed shell
+- `runStatus` now prefers run-local `report.json` / `live-page.json` / artifact timestamps when available and otherwise keeps a conservative scheduler-backed shell that can still surface persisted scheduler request page/runtime context
+- `runtimeLog` now follows an explicit fallback chain: run-local `runtime.log` artifact first, then scheduler-event-derived runtime notes, then a small persisted scheduler request-context shell when neither source yields usable runtime-log rows
 
 ## 8. Screen Inputs and Outputs
 

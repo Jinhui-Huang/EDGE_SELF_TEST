@@ -2570,3 +2570,48 @@
   - Remaining limits:
     - richer quick-smoke startup context is now persisted on scheduler request entries, but downstream execution/monitor/report consumers still do not actively surface most of those fields yet
     - quick smoke still remains a lightweight scheduler enqueue action rather than a fuller popup execution runtime
+- 2026-05-08: Continued `P3-4 monitor` by letting downstream fallback consume persisted scheduler request context.
+  - Backend:
+    - `RunStatusService.getRunStatus(...)` now prefers persisted request `pageUrl` for scheduler-only `currentPage.url` fallback instead of only `targetUrl`
+    - scheduler-only `currentPage.state` now prefers a compact runtime summary derived from persisted `runtimeMode`, `queueState`, and `auditState`
+    - `GET /api/phase3/runs/{runId}/live-page` unavailable shells now carry persisted request-backed `url`, `title`, runtime-summary `pageState`, `nextAction`/`bodySummary` context, and `locator` target when those fields exist
+    - live-page available shells also now reuse request-backed `pageUrl`, `pageTitle`, and `locator` fallback more consistently when live artifacts are partial
+  - Frontend:
+    - `MonitorScreen` now keeps the explicit unavailable live-page copy but also renders the returned shell context (`title`, `url`, `pageState`, context, locator`) instead of hiding it
+  - Tests/docs:
+    - backend monitor test now asserts richer request context survives into `/status` fallback and `/live-page` unavailable shells
+    - frontend monitor test now asserts unavailable live-page rendering shows the richer fallback context
+    - synced `monitor/interface-spec.md`, `monitor/functional-spec.md`, and `review-backlog.md`
+  - Verification:
+    - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`
+    - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+  - Remaining limits:
+    - downstream execution/report chains still do not broadly consume all persisted quick-smoke scheduler context fields
+    - `monitor/status` still remains a scheduler-derived shell when strong run-local artifacts are absent; this slice only made that shell more truthful
+- 2026-05-12: Continued `P3-4 monitor` by tightening `GET /api/phase3/runs/{runId}/runtime-log` fallback one more step.
+  - Backend:
+    - `RunStatusService.getRunRuntimeLog(...)` keeps the explicit priority:
+      - `runtime.log` artifact
+      - non-step scheduler events
+      - persisted scheduler request context shell
+    - when no run-local `runtime.log` exists and scheduler events do not yield usable runtime-log rows, the backend now emits a few `source: "scheduler-request-context"` entries derived from persisted request fields:
+      - page identity from `pageTitle` / `pageUrl`
+      - runtime summary from `runtimeMode` / `queueState` / `auditState`
+      - operator guidance from `nextAction` / `bodySummary`
+      - locator cue from `locator`
+  - Tests/docs:
+    - backend monitor test now asserts request-context runtime-log fallback in addition to artifact-first and scheduler-event fallback precedence
+    - synced `monitor/interface-spec.md`, `monitor/functional-spec.md`, and `review-backlog.md`
+  - Verification:
+    - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+  - Remaining limits:
+    - runtime-log request-context fallback is still a compact shell, not a richer structured runtime artifact model
+    - if persisted scheduler requests also lack page/runtime/locator context, fallback runtime-log can still remain sparse
+- 2026-05-12: Applied a small review follow-up on the same `P3-4 monitor /runtime-log` request-context slice.
+  - Backend:
+    - `buildRequestContextRuntimeLogEntries(...)` no longer lets `runId` by itself trigger the `Prepared page context...` shell entry
+    - that page-context entry now appears only when real page identity fields such as `pageTitle` or `pageUrl` exist
+  - Tests:
+    - backend monitor test now includes a `runId`-only scheduler request case and asserts the runtime-log fallback stays empty instead of fabricating a misleading page-context entry
+  - Verification:
+    - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`

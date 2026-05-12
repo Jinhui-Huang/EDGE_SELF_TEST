@@ -5149,6 +5149,114 @@ Remaining limits:
 - `dataDiff` table rows still retain the existing synthetic fallback path when the diff endpoint itself is unavailable
 - `reportDetail` still keeps snapshot-derived fallback when backend detail reads fail
 
+## 2026-05-08 P3-4 monitor scheduler-context fallback follow-up
+
+## Task
+- Continue `P3-4` on one narrow downstream-consumption slice:
+  - let `monitor/status` and the live-page unavailable shell start consuming the richer scheduler request context persisted by quick-smoke
+  - avoid any new monitor protocol or broad UI refactor
+
+## Completed
+- Updated backend `RunStatusService`:
+  - `GET /api/phase3/runs/{runId}/status` now prefers persisted scheduler request `pageUrl` over the older thin `targetUrl` fallback when no stronger live-page artifact exists
+  - scheduler-only `currentPage.state` now prefers persisted runtime context (`runtimeMode / queueState / auditState`) instead of the old generic `active` / `idle` shell when stronger artifacts are absent
+  - `GET /api/phase3/runs/{runId}/live-page` unavailable shells now carry persisted request context when available:
+    - `url` from `pageUrl`
+    - `title` from `pageTitle`
+    - `pageState` from runtime context summary
+    - `highlight.action` from `nextAction` / `bodySummary`
+    - `highlight.target` from `locator`
+  - live-page available shells also now reuse request-backed `pageUrl` / `pageTitle` / `locator` fallbacks more consistently when artifact fields are partial
+- Updated `MonitorScreen.tsx`:
+  - the `UNAVAILABLE` live-page branch now keeps the explicit unavailable copy
+  - it also renders the existing live-page shell fields (`title`, `url`, `pageState`, context, locator`) so operators can still see richer startup context without any new frontend contract
+- Added regression coverage:
+  - backend test now asserts richer scheduler request context is surfaced through `/status` fallback and `/live-page` unavailable shells when strong artifacts are missing
+  - frontend monitor test now asserts the unavailable live-page panel shows richer fallback context instead of only an empty message
+- Synced docs:
+  - `monitor/interface-spec.md`
+  - `monitor/functional-spec.md`
+  - `review-backlog.md`
+
+## Modified Files
+- `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/RunStatusService.java`
+- `apps/local-admin-api/src/test/java/com/example/webtest/admin/http/LocalAdminApiServerTest.java`
+- `ui/admin-console/src/screens/MonitorScreen.tsx`
+- `ui/admin-console/src/screens/MonitorScreen.test.tsx`
+- `docs/phase3/interface/monitor/interface-spec.md`
+- `docs/phase3/interface/monitor/functional-spec.md`
+- `docs/phase3/interface/review-backlog.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Ran:
+  - `npm test -- --run src/screens/MonitorScreen.test.tsx`
+  - `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+
+## Remaining Limits
+- richer scheduler request context is now visible in `monitor/status` and `live-page` fallback shells, but downstream execution/report flows still do not broadly consume or render all persisted quick-smoke context fields
+- `monitor/status` still falls back to scheduler-derived shell semantics when strong run-local artifacts are absent; this slice only made that shell more truthful
+- Pause/Abort still remain intent-recording only; no real execution-control workflow was added here
+
+## 2026-05-12 P3-4 monitor runtime-log request-context fallback follow-up
+
+## Task
+- Continue the same narrow `P3-4 monitor` chain:
+  - tighten `GET /api/phase3/runs/{runId}/runtime-log`
+  - keep the priority explicit as `runtime.log artifact` -> `scheduler events` -> `persisted scheduler request context shell`
+  - avoid any new endpoint, route, plugin protocol, or broader monitor refactor
+
+## Completed
+- Updated backend `RunStatusService`:
+  - `GET /api/phase3/runs/{runId}/runtime-log` still prefers run-local `runtime.log` lines first
+  - when the artifact is absent, it still prefers non-step scheduler-event-derived runtime-log rows next
+  - when both sources fail to yield usable runtime-log rows, it now emits a small backend-owned `scheduler-request-context` shell derived from persisted request fields:
+    - page identity from `pageTitle` / `pageUrl`
+    - runtime summary from `runtimeMode` / `queueState` / `auditState`
+    - operator guidance from `nextAction` / `bodySummary`
+    - locator cue from `locator`
+- Updated `LocalAdminApiServerTest.java`:
+  - added backend regression coverage for the new request-context fallback shell
+  - existing precedence coverage for artifact-backed and scheduler-event-backed runtime-log paths remains intact
+- Synced docs:
+  - `monitor/interface-spec.md`
+  - `monitor/functional-spec.md`
+  - `review-backlog.md`
+
+## Modified Files
+- `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/RunStatusService.java`
+- `apps/local-admin-api/src/test/java/com/example/webtest/admin/http/LocalAdminApiServerTest.java`
+- `docs/phase3/interface/monitor/interface-spec.md`
+- `docs/phase3/interface/monitor/functional-spec.md`
+- `docs/phase3/interface/review-backlog.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Ran:
+  - `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+
+## Remaining Limits
+- `runtime-log` fallback is now more informative when request context exists, but it still remains a compact shell rather than a richer structured runtime artifact model
+- if scheduler requests also lack persisted page/runtime/locator fields, runtime-log fallback can still end up sparse or empty
+- Pause/Abort semantics remain unchanged
+
+## 2026-05-12 P3-4 monitor runtime-log request-context review follow-up
+
+## Completed
+- Tightened `RunStatusService.buildRequestContextRuntimeLogEntries(...)`:
+  - `runId` no longer triggers the page-context shell by itself
+  - the `Prepared page context...` runtime-log entry is now emitted only when real page identity fields such as `pageTitle` or `pageUrl` exist
+  - `runId` remains available as detail context only when that page-context entry is legitimately emitted
+- Expanded backend regression coverage:
+  - added a `runId`-only scheduler request case
+  - verified that `GET /api/phase3/runs/{runId}/runtime-log` stays empty instead of fabricating a misleading `scheduler-request-context` page entry
+
+## Verification
+- Ran:
+  - `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+
 ## 2026-05-08 P3-4 plugin page-summary context-first follow-up
 
 ## Task

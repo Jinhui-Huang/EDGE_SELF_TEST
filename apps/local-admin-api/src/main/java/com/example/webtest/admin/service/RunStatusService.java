@@ -90,9 +90,12 @@ public final class RunStatusService {
         result.put("progress", progress);
 
         Map<String, Object> currentPage = new LinkedHashMap<>();
-        currentPage.put("url", firstNonBlank(livePageContext.url(), textOr(request, "targetUrl", "")));
+        currentPage.put("url", firstNonBlank(
+                livePageContext.url(),
+                requestPageUrl(request)));
         currentPage.put("state", firstNonBlank(
                 livePageContext.pageState(),
+                requestPageState(request),
                 "RUNNING".equals(status) ? "active" : "idle"));
         result.put("currentPage", currentPage);
 
@@ -242,6 +245,7 @@ public final class RunStatusService {
             return artifactResult;
         }
 
+        Map<String, Object> request = findRequest(runId);
         List<Map<String, Object>> events = findEvents(runId);
 
         List<Map<String, Object>> items = new ArrayList<>();
@@ -258,6 +262,9 @@ public final class RunStatusService {
                 entry.put("source", "scheduler-events");
                 items.add(entry);
             }
+        }
+        if (items.isEmpty()) {
+            items.addAll(buildRequestContextRuntimeLogEntries(runId, request));
         }
 
         // If no log events exist, return an empty but valid list
@@ -303,6 +310,102 @@ public final class RunStatusService {
             items.add(entry);
         }
         return items;
+    }
+
+    private List<Map<String, Object>> buildRequestContextRuntimeLogEntries(String runId, Map<String, Object> request) {
+        if (request == null || request.isEmpty()) {
+            return List.of();
+        }
+
+        String at = firstNonBlank(
+                textOr(request, "requestedAt", ""),
+                Instant.now(clock).toString());
+        List<Map<String, Object>> items = new ArrayList<>();
+
+        String pageUrl = requestPageUrl(request);
+        String pageTitle = firstNonBlank(
+                textOr(request, "pageTitle", ""),
+                textOr(request, "title", ""),
+                requestPageIdentity(request));
+        if (!pageTitle.isBlank() || !pageUrl.isBlank()) {
+            Map<String, Object> pageDetail = new LinkedHashMap<>();
+            putIfNotBlank(pageDetail, "pageTitle", pageTitle);
+            putIfNotBlank(pageDetail, "pageUrl", pageUrl);
+            putIfNotBlank(pageDetail, "runId", runId);
+            items.add(runtimeLogShellEntry(
+                    at,
+                    "INFO",
+                    "Prepared page context is available for fallback monitor inspection.",
+                    firstNonBlank(
+                            !pageTitle.isBlank() && !pageUrl.isBlank()
+                                    ? pageTitle + " at " + pageUrl
+                                    : "",
+                            pageTitle,
+                            pageUrl,
+                            runId),
+                    pageDetail));
+        }
+
+        String runtimeSummary = requestPageState(request);
+        Map<String, Object> runtimeDetail = new LinkedHashMap<>();
+        putIfNotBlank(runtimeDetail, "runtimeMode", textOr(request, "runtimeMode", ""));
+        putIfNotBlank(runtimeDetail, "queueState", textOr(request, "queueState", ""));
+        putIfNotBlank(runtimeDetail, "auditState", textOr(request, "auditState", ""));
+        if (!runtimeSummary.isBlank()) {
+            items.add(runtimeLogShellEntry(
+                    at,
+                    "INFO",
+                    "Persisted runtime context is the strongest fallback signal currently available.",
+                    runtimeSummary,
+                    runtimeDetail));
+        }
+
+        String guidance = firstNonBlank(
+                textOr(request, "nextAction", ""),
+                textOr(request, "bodySummary", ""));
+        Map<String, Object> guidanceDetail = new LinkedHashMap<>();
+        putIfNotBlank(guidanceDetail, "nextAction", textOr(request, "nextAction", ""));
+        putIfNotBlank(guidanceDetail, "bodySummary", textOr(request, "bodySummary", ""));
+        if (!guidance.isBlank()) {
+            items.add(runtimeLogShellEntry(
+                    at,
+                    "DECISION",
+                    guidance,
+                    "Persisted startup guidance is shown because no stronger runtime-log artifact or scheduler runtime event is available.",
+                    guidanceDetail));
+        }
+
+        String locator = textOr(request, "locator", "");
+        if (!locator.isBlank()) {
+            Map<String, Object> locatorDetail = new LinkedHashMap<>();
+            putIfNotBlank(locatorDetail, "locator", locator);
+            items.add(runtimeLogShellEntry(
+                    at,
+                    "INFO",
+                    "Persisted locator cue is available for live inspection fallback.",
+                    locator,
+                    locatorDetail));
+        }
+        return items;
+    }
+
+    private Map<String, Object> runtimeLogShellEntry(
+            String at,
+            String type,
+            String summary,
+            String message,
+            Map<String, Object> detail) {
+        Map<String, Object> entry = new LinkedHashMap<>();
+        entry.put("at", at);
+        entry.put("type", type);
+        entry.put("model", "");
+        entry.put("summary", summary);
+        entry.put("source", "scheduler-request-context");
+        entry.put("message", message);
+        if (detail != null && !detail.isEmpty()) {
+            entry.put("detail", detail);
+        }
+        return entry;
     }
 
     @SuppressWarnings("unchecked")
@@ -450,7 +553,7 @@ public final class RunStatusService {
             return buildAvailableLivePage(runId, request, status, latestStep, latestStepIndex, liveArtifact, screenshot);
         }
 
-        return buildUnavailableLivePage(runId);
+        return buildUnavailableLivePage(runId, request, status);
     }
 
     private Map<String, Object> buildAvailableLivePage(
@@ -467,13 +570,16 @@ public final class RunStatusService {
         result.put("capturedAt", resolveCapturedAt(liveArtifact, screenshot));
         result.put("url", firstNonBlank(
                 textOr(liveArtifact, "url", ""),
-                textOr(request, "targetUrl", "")));
+                requestPageUrl(request)));
         result.put("title", firstNonBlank(
                 textOr(liveArtifact, "title", ""),
+                textOr(request, "pageTitle", ""),
                 textOr(request, "title", ""),
+                requestPageIdentity(request),
                 runId));
         result.put("pageState", firstNonBlank(
                 textOr(liveArtifact, "pageState", ""),
+                requestPageState(request),
                 screenshot != null ? "artifact-captured" : "",
                 status.equals("RUNNING") ? "active" : "idle"));
 
@@ -482,8 +588,12 @@ public final class RunStatusService {
         highlight.put("stepIndex", intValue(artifactHighlight.getOrDefault("stepIndex", latestStepIndex)));
         highlight.put("action", firstNonBlank(
                 textOr(artifactHighlight, "action", ""),
-                latestStep != null ? textOr(latestStep, "detail", "") : ""));
-        highlight.put("target", textOr(artifactHighlight, "target", ""));
+                latestStep != null ? textOr(latestStep, "detail", "") : "",
+                textOr(request, "nextAction", ""),
+                textOr(request, "bodySummary", "")));
+        highlight.put("target", firstNonBlank(
+                textOr(artifactHighlight, "target", ""),
+                textOr(request, "locator", "")));
         result.put("highlight", highlight);
         result.put("screenshotPath", screenshot != null
                 ? runDirRelativePath(resolveRunDir(runId), screenshot)
@@ -491,18 +601,25 @@ public final class RunStatusService {
         return result;
     }
 
-    private Map<String, Object> buildUnavailableLivePage(String runId) {
+    private Map<String, Object> buildUnavailableLivePage(String runId, Map<String, Object> request, String status) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("runId", runId);
         result.put("status", "UNAVAILABLE");
         result.put("capturedAt", Instant.now(clock).toString());
-        result.put("url", "");
-        result.put("title", "");
-        result.put("pageState", "unavailable");
+        result.put("url", requestPageUrl(request));
+        result.put("title", firstNonBlank(
+                textOr(request, "pageTitle", ""),
+                textOr(request, "title", ""),
+                requestPageIdentity(request)));
+        result.put("pageState", firstNonBlank(
+                requestPageState(request),
+                "RUNNING".equals(status) ? "active" : "unavailable"));
         result.put("highlight", Map.of(
                 "stepIndex", 0,
-                "action", "",
-                "target", ""));
+                "action", firstNonBlank(
+                        textOr(request, "nextAction", ""),
+                        textOr(request, "bodySummary", "")),
+                "target", textOr(request, "locator", "")));
         result.put("screenshotPath", null);
         return result;
     }
@@ -1079,6 +1196,41 @@ public final class RunStatusService {
             }
         }
         return 0;
+    }
+
+    private String requestPageUrl(Map<String, Object> request) {
+        return firstNonBlank(
+                textOr(request, "pageUrl", ""),
+                textOr(request, "targetUrl", ""));
+    }
+
+    private String requestPageIdentity(Map<String, Object> request) {
+        String domain = textOr(request, "pageDomain", "");
+        String path = textOr(request, "pagePath", "");
+        if (!domain.isBlank() && !path.isBlank()) {
+            return domain + path;
+        }
+        return firstNonBlank(domain, path, "");
+    }
+
+    private String requestPageState(Map<String, Object> request) {
+        List<String> parts = new ArrayList<>();
+        addIfPresent(parts, textOr(request, "runtimeMode", ""));
+        addIfPresent(parts, textOr(request, "queueState", ""));
+        addIfPresent(parts, textOr(request, "auditState", ""));
+        return String.join(" / ", parts);
+    }
+
+    private void addIfPresent(List<String> target, String value) {
+        if (value != null && !value.isBlank()) {
+            target.add(value.trim());
+        }
+    }
+
+    private void putIfNotBlank(Map<String, Object> target, String key, String value) {
+        if (value != null && !value.isBlank()) {
+            target.put(key, value.trim());
+        }
     }
 
     private String textOr(Map<String, Object> map, String key, String fallback) {

@@ -27,6 +27,7 @@ import java.nio.file.attribute.FileTime;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -653,6 +654,22 @@ class LocalAdminApiServerTest {
         Files.writeString(executionHistoryFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
         Files.writeString(modelConfigFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
         Files.writeString(environmentConfigFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Map<String, Object> missingLiveRequest = new LinkedHashMap<>();
+        missingLiveRequest.put("runId", "missing-live-artifact");
+        missingLiveRequest.put("projectKey", "checkout-web");
+        missingLiveRequest.put("owner", "qa-platform");
+        missingLiveRequest.put("environment", "prod-like");
+        missingLiveRequest.put("targetUrl", "https://example.test/checkout");
+        missingLiveRequest.put("pageUrl", "https://example.test/checkout/payment");
+        missingLiveRequest.put("pageTitle", "Payment review");
+        missingLiveRequest.put("pageDomain", "example.test");
+        missingLiveRequest.put("pagePath", "/checkout/payment");
+        missingLiveRequest.put("runtimeMode", "audit-first");
+        missingLiveRequest.put("queueState", "queued");
+        missingLiveRequest.put("auditState", "watching payment iframe");
+        missingLiveRequest.put("nextAction", "Verify the payment CTA before unblocking release.");
+        missingLiveRequest.put("locator", "#pay-now");
+        missingLiveRequest.put("bodySummary", "Payment form is visible and the CTA stays above the fold.");
         Files.writeString(schedulerRequestsFile, Jsons.writeValueAsString(Map.of(
                 "requests", List.of(
                         Map.of(
@@ -662,13 +679,8 @@ class LocalAdminApiServerTest {
                                 "environment", "prod-like",
                                 "targetUrl", "https://example.test/checkout",
                                 "title", "Checkout smoke"),
-                        Map.of(
-                                "runId", "missing-live-artifact",
-                                "projectKey", "checkout-web",
-                                "owner", "qa-platform",
-                                "environment", "prod-like",
-                                "targetUrl", "https://example.test/checkout",
-                                "title", "Missing live page")))), StandardCharsets.UTF_8);
+                        missingLiveRequest))),
+                StandardCharsets.UTF_8);
         Files.writeString(schedulerEventsFile, Jsons.writeValueAsString(Map.of(
                 "events", List.of(
                         Map.of("runId", "checkout-web-smoke", "type", "STEP_RUNNING", "detail", "Inspect payment button", "at", "2026-05-07T09:03:30Z"),
@@ -715,12 +727,16 @@ class LocalAdminApiServerTest {
             assertEquals(200, unavailable.statusCode());
             assertTrue(unavailable.body().contains("\"status\":\"UNAVAILABLE\""));
             assertTrue(unavailable.body().contains("\"screenshotPath\":null"));
-            assertTrue(unavailable.body().contains("\"pageState\":\"unavailable\""));
+            assertTrue(unavailable.body().contains("\"url\":\"https://example.test/checkout/payment\""));
+            assertTrue(unavailable.body().contains("\"title\":\"Payment review\""));
+            assertTrue(unavailable.body().contains("\"pageState\":\"audit-first / queued / watching payment iframe\""));
+            assertTrue(unavailable.body().contains("\"action\":\"Verify the payment CTA before unblocking release."));
+            assertTrue(unavailable.body().contains("\"target\":\"#pay-now\""));
         }
     }
 
     @Test
-    void monitorRuntimeLogPrefersRunLocalRuntimeLogAndFallsBackToSchedulerEvents(@TempDir Path tempDir) throws Exception {
+    void monitorRuntimeLogPrefersRunLocalRuntimeLogThenSchedulerEventsThenRequestContext(@TempDir Path tempDir) throws Exception {
         Path runsDir = tempDir.resolve("runs");
         Path artifactRunDir = runsDir.resolve("checkout-web-smoke");
         Files.createDirectories(artifactRunDir);
@@ -741,10 +757,23 @@ class LocalAdminApiServerTest {
         Files.writeString(executionHistoryFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
         Files.writeString(modelConfigFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
         Files.writeString(environmentConfigFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Map<String, Object> requestContextFallback = new LinkedHashMap<>();
+        requestContextFallback.put("runId", "request-context-runtime-log");
+        requestContextFallback.put("requestedAt", "2026-05-07T09:06:30Z");
+        requestContextFallback.put("pageUrl", "https://example.test/checkout/payment");
+        requestContextFallback.put("pageTitle", "Payment review");
+        requestContextFallback.put("runtimeMode", "audit-first");
+        requestContextFallback.put("queueState", "queued");
+        requestContextFallback.put("auditState", "watching payment iframe");
+        requestContextFallback.put("nextAction", "Verify the payment CTA before unblocking release.");
+        requestContextFallback.put("locator", "#pay-now");
+        requestContextFallback.put("bodySummary", "Payment form is visible and the CTA stays above the fold.");
         Files.writeString(schedulerRequestsFile, Jsons.writeValueAsString(Map.of(
                 "requests", List.of(
                         Map.of("runId", "checkout-web-smoke"),
-                        Map.of("runId", "missing-runtime-log")))), StandardCharsets.UTF_8);
+                        Map.of("runId", "missing-runtime-log"),
+                        Map.of("runId", "request-context-runid-only"),
+                        requestContextFallback))), StandardCharsets.UTF_8);
         Files.writeString(schedulerEventsFile, Jsons.writeValueAsString(Map.of(
                 "events", List.of(
                         Map.of(
@@ -756,7 +785,17 @@ class LocalAdminApiServerTest {
                                 "runId", "missing-runtime-log",
                                 "type", "DECISION",
                                 "detail", "Scheduler event fallback",
-                                "at", "2026-05-07T09:05:00Z")))), StandardCharsets.UTF_8);
+                                "at", "2026-05-07T09:05:00Z"),
+                        Map.of(
+                                "runId", "request-context-runtime-log",
+                                "type", "STEP_RUNNING",
+                                "detail", "Open checkout",
+                                "at", "2026-05-07T09:06:00Z"),
+                        Map.of(
+                                "runId", "request-context-runid-only",
+                                "type", "STEP_RUNNING",
+                                "detail", "Queue accepted",
+                                "at", "2026-05-07T09:06:00Z")))), StandardCharsets.UTF_8);
 
         Clock clock = Clock.fixed(Instant.parse("2026-05-07T09:10:00Z"), ZoneOffset.UTC);
         SchedulerPersistenceService schedulerPersistence = new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, clock);
@@ -791,6 +830,12 @@ class LocalAdminApiServerTest {
             HttpResponse<String> fallbackBacked = client.send(
                     request(server, "/api/phase3/runs/missing-runtime-log/runtime-log"),
                     HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> requestContextBacked = client.send(
+                    request(server, "/api/phase3/runs/request-context-runtime-log/runtime-log"),
+                    HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> runIdOnlyBacked = client.send(
+                    request(server, "/api/phase3/runs/request-context-runid-only/runtime-log"),
+                    HttpResponse.BodyHandlers.ofString());
 
             assertEquals(200, artifactBacked.statusCode());
             assertTrue(artifactBacked.body().contains("\"source\":\"runtime.log\""));
@@ -803,6 +848,21 @@ class LocalAdminApiServerTest {
             assertEquals(200, fallbackBacked.statusCode());
             assertTrue(fallbackBacked.body().contains("\"source\":\"scheduler-events\""));
             assertTrue(fallbackBacked.body().contains("Scheduler event fallback"));
+
+            assertEquals(200, requestContextBacked.statusCode());
+            assertTrue(requestContextBacked.body().contains("\"source\":\"scheduler-request-context\""));
+            assertTrue(requestContextBacked.body().contains("Prepared page context is available for fallback monitor inspection."));
+            assertTrue(requestContextBacked.body().contains("\"message\":\"Payment review at https://example.test/checkout/payment\""));
+            assertTrue(requestContextBacked.body().contains("\"summary\":\"Persisted runtime context is the strongest fallback signal currently available.\""));
+            assertTrue(requestContextBacked.body().contains("\"message\":\"audit-first / queued / watching payment iframe\""));
+            assertTrue(requestContextBacked.body().contains("\"type\":\"DECISION\""));
+            assertTrue(requestContextBacked.body().contains("Verify the payment CTA before unblocking release."));
+            assertTrue(requestContextBacked.body().contains("\"locator\":\"#pay-now\""));
+
+            assertEquals(200, runIdOnlyBacked.statusCode());
+            assertTrue(runIdOnlyBacked.body().contains("\"items\":[]"));
+            assertTrue(!runIdOnlyBacked.body().contains("Prepared page context is available for fallback monitor inspection."));
+            assertTrue(!runIdOnlyBacked.body().contains("\"source\":\"scheduler-request-context\""));
         }
     }
 
@@ -969,6 +1029,21 @@ class LocalAdminApiServerTest {
         Files.writeString(executionHistoryFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
         Files.writeString(modelConfigFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
         Files.writeString(environmentConfigFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
+        Map<String, Object> fallbackStatusRequest = new LinkedHashMap<>();
+        fallbackStatusRequest.put("runId", "fallback-status");
+        fallbackStatusRequest.put("projectKey", "fallback-web");
+        fallbackStatusRequest.put("environment", "staging");
+        fallbackStatusRequest.put("executionModel", "gpt-4.1-mini");
+        fallbackStatusRequest.put("owner", "scheduler-owner");
+        fallbackStatusRequest.put("pageUrl", "https://fallback.example/checkout/payment");
+        fallbackStatusRequest.put("pageTitle", "Payment review");
+        fallbackStatusRequest.put("pageDomain", "fallback.example");
+        fallbackStatusRequest.put("pagePath", "/checkout/payment");
+        fallbackStatusRequest.put("runtimeMode", "audit-first");
+        fallbackStatusRequest.put("queueState", "queued");
+        fallbackStatusRequest.put("auditState", "watching payment iframe");
+        fallbackStatusRequest.put("targetUrl", "https://fallback.example/checkout");
+        fallbackStatusRequest.put("status", "RUNNING");
         Files.writeString(schedulerRequestsFile, Jsons.writeValueAsString(Map.of(
                 "requests", List.of(
                         Map.of(
@@ -979,14 +1054,7 @@ class LocalAdminApiServerTest {
                                 "owner", "scheduler-owner",
                                 "targetUrl", "https://fallback.example/checkout",
                                 "status", "RUNNING"),
-                        Map.of(
-                                "runId", "fallback-status",
-                                "projectKey", "fallback-web",
-                                "environment", "staging",
-                                "executionModel", "gpt-4.1-mini",
-                                "owner", "scheduler-owner",
-                                "targetUrl", "https://fallback.example/checkout",
-                                "status", "RUNNING")))), StandardCharsets.UTF_8);
+                        fallbackStatusRequest))), StandardCharsets.UTF_8);
         Files.writeString(schedulerEventsFile, Jsons.writeValueAsString(Map.of(
                 "events", List.of(
                         Map.of(
@@ -1078,8 +1146,8 @@ class LocalAdminApiServerTest {
             assertTrue(fallbackBacked.body().contains("\"totalSteps\":0"));
             assertTrue(fallbackBacked.body().contains("\"percent\":0"));
             assertTrue(fallbackBacked.body().contains("\"estimatedTotalMs\":0"));
-            assertTrue(fallbackBacked.body().contains("\"url\":\"https://fallback.example/checkout\""));
-            assertTrue(fallbackBacked.body().contains("\"state\":\"active\""));
+            assertTrue(fallbackBacked.body().contains("\"url\":\"https://fallback.example/checkout/payment\""));
+            assertTrue(fallbackBacked.body().contains("\"state\":\"audit-first / queued / watching payment iframe\""));
             assertTrue(fallbackBacked.body().contains("\"lastUpdatedAt\":\"2026-05-07T09:10:00Z\"")
                     || fallbackBacked.body().contains("\"lastUpdatedAt\":\"2026-05-07T09:06:00Z\""));
             assertTrue(!fallbackBacked.body().contains("\"totalSteps\":8"));

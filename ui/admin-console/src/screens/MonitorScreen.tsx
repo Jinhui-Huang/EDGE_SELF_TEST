@@ -363,13 +363,36 @@ export function MonitorScreen({
           </div>
           <div className="monitorViewport">
             {livePageStatus === "UNAVAILABLE" ? (
-              <p className="monitorEmptyHint">
+              <>
+                <p className="monitorEmptyHint">
                 {t(copy(
                   "No live page artifact available.",
                   "当前没有可读的 live page 产物。",
                   "利用可能な live page artifact はまだありません。"
                 ))}
-              </p>
+                </p>
+                <div className="monitorCheckoutMock">
+                  <div className="monitorCheckoutTitle">{livePage?.title || runId}</div>
+                  <div className="monitorCheckoutGrid">
+                    <div className="monitorField">
+                      <span>URL</span>
+                      <div>{livePage?.url ?? runStatus?.currentPage?.url ?? "--"}</div>
+                    </div>
+                    <div className="monitorField">
+                      <span>Page state</span>
+                      <div>{livePage?.pageState ?? runStatus?.currentPage?.state ?? "--"}</div>
+                    </div>
+                    <div className="monitorField">
+                      <span>Context</span>
+                      <div>{livePage?.highlight?.action || "--"}</div>
+                    </div>
+                    <div className="monitorField">
+                      <span>Locator</span>
+                      <div>{livePage?.highlight?.target || "--"}</div>
+                    </div>
+                  </div>
+                </div>
+              </>
             ) : (
               <>
                 {liveScreenshotUrl ? (

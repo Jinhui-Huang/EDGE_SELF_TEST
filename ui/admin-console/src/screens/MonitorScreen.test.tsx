@@ -348,10 +348,14 @@ describe("MonitorScreen", () => {
       livePage: {
         ...livePageResponse,
         status: "UNAVAILABLE",
-        title: "",
-        url: "",
-        pageState: "unavailable",
-        highlight: { stepIndex: 0, action: "", target: "" },
+        title: "Payment review",
+        url: "https://example.test/checkout/payment",
+        pageState: "audit-first / queued / watching payment iframe",
+        highlight: {
+          stepIndex: 0,
+          action: "Verify the payment CTA before unblocking release.",
+          target: "#pay-now"
+        },
         screenshotPath: null
       }
     }));
@@ -368,6 +372,11 @@ describe("MonitorScreen", () => {
 
     expect(await screen.findByText("No live page artifact available.")).toBeInTheDocument();
     expect(screen.queryByRole("img", { name: "Checkout" })).not.toBeInTheDocument();
+    expect(screen.getByText("Payment review")).toBeInTheDocument();
+    expect(screen.getByText("https://example.test/checkout/payment")).toBeInTheDocument();
+    expect(screen.getByText("audit-first / queued / watching payment iframe")).toBeInTheDocument();
+    expect(screen.getByText("Verify the payment CTA before unblocking release.")).toBeInTheDocument();
+    expect(screen.getByText("#pay-now")).toBeInTheDocument();
   });
 
   it("renders an inline screenshot preview when the live-page payload provides one", async () => {
