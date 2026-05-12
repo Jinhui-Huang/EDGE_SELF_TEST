@@ -5277,6 +5277,38 @@ Remaining limits:
 - `steps` no longer fabricates a placeholder flow, but when both report artifacts and scheduler step events are absent the screen still has only an empty timeline rather than a richer unavailable-state contract
 - no new step-status endpoint or explicit `unavailable` marker was introduced in this slice
 
+## 2026-05-12 P3-4 monitor empty-step copy follow-up
+
+## Task
+- Continue the same `monitor` polish line after the backend empty-step fallback change
+- do not change `/steps` contract
+- add explicit front-end no-data copy when `steps.items` is empty
+
+## Completed
+- Updated `ui/admin-console/src/screens/MonitorScreen.tsx`:
+  - the progress area now shows explicit no-step copy when the step bar is empty
+  - the step-list panel now shows a more specific explanation that neither report step artifacts nor scheduler step timeline data are available yet
+- Updated `ui/admin-console/src/screens/MonitorScreen.test.tsx`:
+  - empty-step regression now asserts the new explicit copy
+- Synced docs:
+  - `monitor/interface-spec.md`
+  - `monitor/functional-spec.md`
+
+## Modified Files
+- `ui/admin-console/src/screens/MonitorScreen.tsx`
+- `ui/admin-console/src/screens/MonitorScreen.test.tsx`
+- `docs/phase3/interface/monitor/interface-spec.md`
+- `docs/phase3/interface/monitor/functional-spec.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Ran:
+  - `npm test -- --run src/screens/MonitorScreen.test.tsx`
+
+## Remaining Limits
+- this slice only adds explicit no-step copy; it does not introduce a richer unavailable-state payload or dedicated backend marker for the step timeline
+
 ## Remaining Limits
 - `runtime-log` fallback is now more informative when request context exists, but it still remains a compact shell rather than a richer structured runtime artifact model
 - if scheduler requests also lack persisted page/runtime/locator fields, runtime-log fallback can still end up sparse or empty

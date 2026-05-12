@@ -536,6 +536,7 @@ Current implementation:
 - `live-page` now prefers run-local `live-page.json` / screenshot artifacts and returns an explicit `UNAVAILABLE` shell when they are absent.
 - `status` now prefers run-local `report.json` / `live-page.json` / `runtime.log` timestamps for stronger terminal status, progress, assertions, current-page, and `lastUpdatedAt` semantics, but it still falls back to a scheduler-derived shell when those stronger artifacts are absent.
 - `steps` now prefers run-local `report.json.steps[]`; when that artifact is present, failed/skipped terminal semantics are preserved instead of being collapsed into `TODO`; when the artifact is absent it falls back only to scheduler-backed `STEP_*` events and otherwise returns an empty list.
+- when `steps.items` is empty, `MonitorScreen` now renders explicit no-step copy in both the progress area and the step-list panel so operators understand that neither report artifacts nor scheduler steps are available.
 - `runtime-log` now prefers run-local `runtime.log` artifacts; when they are absent it still falls back to scheduler-event-derived shaping.
 - when artifact-backed and scheduler-event-backed runtime notes are both unavailable, `runtime-log` now emits a small backend-owned request-context shell instead of returning an empty panel when persisted scheduler request context exists.
 - Pause/Abort record intent only; the backend does not trigger real execution-control workflows in Phase 3.

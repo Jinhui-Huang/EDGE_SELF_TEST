@@ -237,6 +237,7 @@ The screen loads runtime data from dedicated APIs when `selectedRunId` is provid
 
 - `runStatus` now prefers run-local `report.json` / `live-page.json` / artifact timestamps when available and otherwise keeps a conservative scheduler-backed shell that can still surface persisted scheduler request page/runtime context
 - `runtimeLog` now follows an explicit fallback chain: run-local `runtime.log` artifact first, then scheduler-event-derived runtime notes, then a small persisted scheduler request-context shell when neither source yields usable runtime-log rows
+- when `steps.items` is empty, `MonitorScreen` now shows explicit no-step copy instead of leaving the progress/timeline areas visually blank
 
 ## 8. Screen Inputs and Outputs
 

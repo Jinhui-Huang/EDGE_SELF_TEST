@@ -292,6 +292,15 @@ export function MonitorScreen({
               <span key={step.index} className={`monitorStepBarItem ${normalizeStepState(step.state)}`} />
             ))}
           </div>
+          {steps.length === 0 ? (
+            <p className="monitorEmptyHint">
+              {t(copy(
+                "No scheduler-backed step timeline is available yet.",
+                "当前还没有可用的调度步骤时间线。",
+                "利用可能なスケジューラ由来のステップタイムラインはまだありません。"
+              ))}
+            </p>
+          ) : null}
         </div>
         <div className="monitorMiniStats">
           <MiniStat
@@ -347,7 +356,11 @@ export function MonitorScreen({
               );
             }) : (
               <p className="monitorEmptyHint">
-                {t(copy("No step data available.", "暂无步骤数据。", "ステップデータがありません。"))}
+                {t(copy(
+                  "No report step artifact or scheduler step timeline is available yet.",
+                  "当前没有 report step artifact，也没有可用的调度步骤时间线。",
+                  "report step artifact もスケジューラのステップタイムラインもまだ利用できません。"
+                ))}
               </p>
             )}
           </div>

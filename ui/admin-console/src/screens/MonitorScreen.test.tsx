@@ -315,7 +315,8 @@ describe("MonitorScreen", () => {
       />
     );
 
-    expect(await screen.findByText("No step data available.")).toBeInTheDocument();
+    expect(await screen.findByText("No scheduler-backed step timeline is available yet.")).toBeInTheDocument();
+    expect(screen.getByText("No report step artifact or scheduler step timeline is available yet.")).toBeInTheDocument();
     expect(screen.getByText("No runtime log entries.")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Step detail" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Runtime log detail" })).not.toBeInTheDocument();
