@@ -5309,6 +5309,65 @@ Remaining limits:
 ## Remaining Limits
 - this slice only adds explicit no-step copy; it does not introduce a richer unavailable-state payload or dedicated backend marker for the step timeline
 
+## 2026-05-12 P3-4 monitor steps-availability marker follow-up
+
+## Task
+- Continue the same small `monitor` line by adding a backend-owned availability marker to `/steps`
+- keep the existing `items` shape intact
+- let the front end prefer the marker while retaining empty-list compatibility behavior
+
+## Completed
+- Updated backend `RunStatusService`:
+  - `GET /api/phase3/runs/{runId}/steps` now adds `availability`
+  - `availability: "AVAILABLE"` when report-backed or scheduler-backed step rows exist
+  - `availability: "UNAVAILABLE"` when the endpoint falls through to the empty fallback
+- Updated frontend types and screen logic:
+  - `RunStepsResponse` now includes optional `availability`
+  - `MonitorScreen` now prefers the backend marker when deciding whether to show the no-step empty-state copy
+  - if the marker is absent, the screen still falls back to `items.length === 0` for compatibility
+- Updated tests:
+  - backend monitor test now asserts `availability` for artifact-backed, scheduler-backed, and empty-fallback step responses
+  - frontend monitor test now feeds `availability: "UNAVAILABLE"` into the empty-step case and keeps the no-step copy assertions
+- Synced docs:
+  - `monitor/interface-spec.md`
+  - `monitor/functional-spec.md`
+
+## Modified Files
+- `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/RunStatusService.java`
+- `apps/local-admin-api/src/test/java/com/example/webtest/admin/http/LocalAdminApiServerTest.java`
+- `ui/admin-console/src/types.ts`
+- `ui/admin-console/src/screens/MonitorScreen.tsx`
+- `ui/admin-console/src/screens/MonitorScreen.test.tsx`
+- `docs/phase3/interface/monitor/interface-spec.md`
+- `docs/phase3/interface/monitor/functional-spec.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Ran:
+  - `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+  - `npm test -- --run src/screens/MonitorScreen.test.tsx`
+
+## Remaining Limits
+- the new marker only distinguishes `AVAILABLE` vs `UNAVAILABLE`; it does not add richer reason codes or timeline provenance
+- this slice does not alter step row metadata, paging, or any non-monitor contract
+
+## 2026-05-12 P3-4 monitor steps-availability review follow-up
+
+## Completed
+- Tightened `MonitorScreen.tsx` so both no-step render sites now use the same derived boolean:
+  - progress-area no-step copy
+  - `Steps timeline` panel no-step copy
+- Kept the compatibility boundary inside `resolveStepsAvailability(...)`:
+  - legacy `/steps` payloads that omit `availability` still fall back to `items.length === 0`
+- Expanded `MonitorScreen.test.tsx`:
+  - added a legacy empty-step payload case without `availability`
+  - verified the two no-step copy blocks still render and no step drill-down appears
+
+## Verification
+- Ran:
+  - `npm test -- --run src/screens/MonitorScreen.test.tsx`
+
 ## Remaining Limits
 - `runtime-log` fallback is now more informative when request context exists, but it still remains a compact shell rather than a richer structured runtime artifact model
 - if scheduler requests also lack persisted page/runtime/locator fields, runtime-log fallback can still end up sparse or empty

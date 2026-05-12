@@ -131,6 +131,7 @@ public final class RunStatusService {
         if (!artifactSteps.isEmpty()) {
             Map<String, Object> artifactResult = new LinkedHashMap<>();
             artifactResult.put("runId", runId);
+            artifactResult.put("availability", "AVAILABLE");
             artifactResult.put("items", artifactSteps);
             return artifactResult;
         }
@@ -167,6 +168,7 @@ public final class RunStatusService {
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("runId", runId);
+        result.put("availability", items.isEmpty() ? "UNAVAILABLE" : "AVAILABLE");
         result.put("items", items);
         return result;
     }

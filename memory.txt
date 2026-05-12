@@ -2639,3 +2639,26 @@
     - synced `monitor/interface-spec.md` and `monitor/functional-spec.md`
   - Verification:
     - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`
+- 2026-05-12: Continued the same `P3-4 monitor` line by adding a backend-owned `/steps` availability marker.
+  - Backend:
+    - `GET /api/phase3/runs/{runId}/steps` now includes `availability`
+    - `availability: "AVAILABLE"` when report-backed or scheduler-backed step rows exist
+    - `availability: "UNAVAILABLE"` when the endpoint returns the empty fallback
+  - Frontend:
+    - `RunStepsResponse` now accepts the additive `availability` field
+    - `MonitorScreen` now prefers that backend marker when deciding whether to show the no-step copy, while still falling back to the old empty-list interpretation for compatibility
+  - Tests/docs:
+    - backend monitor test now asserts step availability across artifact-backed, scheduler-backed, and empty-fallback cases
+    - front-end monitor test now feeds `availability: "UNAVAILABLE"` into the empty-step case
+    - synced `monitor/interface-spec.md` and `monitor/functional-spec.md`
+  - Verification:
+    - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+    - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`
+- 2026-05-12: Applied a small review follow-up on the same `P3-4 monitor /steps availability` slice.
+  - Frontend:
+    - both no-step render sites in `MonitorScreen` now use the same derived `showUnavailableSteps` boolean instead of split marker-vs-length checks
+    - the compatibility fallback remains centralized in `resolveStepsAvailability(...)`
+  - Tests:
+    - `MonitorScreen.test.tsx` now includes a legacy `/steps` payload without `availability` and asserts the two no-step copy blocks still render
+  - Verification:
+    - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`

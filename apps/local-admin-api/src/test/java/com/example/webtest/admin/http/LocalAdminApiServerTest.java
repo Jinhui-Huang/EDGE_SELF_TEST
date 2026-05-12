@@ -973,6 +973,7 @@ class LocalAdminApiServerTest {
                     HttpResponse.BodyHandlers.ofString());
 
             assertEquals(200, artifactBacked.statusCode());
+            assertTrue(artifactBacked.body().contains("\"availability\":\"AVAILABLE\""));
             assertTrue(artifactBacked.body().contains("\"label\":\"Open checkout page\""));
             assertTrue(artifactBacked.body().contains("\"state\":\"DONE\""));
             assertTrue(artifactBacked.body().contains("\"note\":\"report-backed step\""));
@@ -985,10 +986,12 @@ class LocalAdminApiServerTest {
             assertTrue(!artifactBacked.body().contains("scheduler step should not win"));
 
             assertEquals(200, fallbackBacked.statusCode());
+            assertTrue(fallbackBacked.body().contains("\"availability\":\"AVAILABLE\""));
             assertTrue(fallbackBacked.body().contains("\"label\":\"Open checkout fallback\""));
             assertTrue(fallbackBacked.body().contains("\"durationMs\":800"));
 
             assertEquals(200, emptyFallback.statusCode());
+            assertTrue(emptyFallback.body().contains("\"availability\":\"UNAVAILABLE\""));
             assertTrue(emptyFallback.body().contains("\"items\":[]"));
             assertTrue(!emptyFallback.body().contains("\"label\":\"open target\""));
             assertTrue(!emptyFallback.body().contains("\"state\":\"TODO\""));

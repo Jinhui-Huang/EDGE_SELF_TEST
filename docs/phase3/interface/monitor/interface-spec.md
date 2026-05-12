@@ -242,6 +242,7 @@ Response body:
 ```json
 {
   "runId": "checkout-web-smoke",
+  "availability": "AVAILABLE",
   "items": [
     {
       "index": 1,
@@ -275,7 +276,12 @@ Step state semantics on the current contract:
 - `SKIPPED`: skipped/cancelled/aborted non-success terminal step from run-local report artifacts
 - `TODO`: not-started scheduler-backed step only when a real `STEP_TODO`-like event exists
 
-When no run-local `report.json.steps[]` artifact is available, the endpoint keeps only scheduler-event-derived step rows. If scheduler data does not provide real `STEP_*` events, the backend now returns an empty step list rather than fabricating a placeholder execution flow.
+When no run-local `report.json.steps[]` artifact is available, the endpoint keeps only scheduler-event-derived step rows. If scheduler data does not provide real `STEP_*` events, the backend now returns:
+
+- `availability: "UNAVAILABLE"`
+- `items: []`
+
+This lets the front end distinguish a backend-owned empty timeline from a merely short timeline without changing the existing step-row structure.
 
 ### 7.3 Runtime-Log Read Interface
 
@@ -536,7 +542,8 @@ Current implementation:
 - `live-page` now prefers run-local `live-page.json` / screenshot artifacts and returns an explicit `UNAVAILABLE` shell when they are absent.
 - `status` now prefers run-local `report.json` / `live-page.json` / `runtime.log` timestamps for stronger terminal status, progress, assertions, current-page, and `lastUpdatedAt` semantics, but it still falls back to a scheduler-derived shell when those stronger artifacts are absent.
 - `steps` now prefers run-local `report.json.steps[]`; when that artifact is present, failed/skipped terminal semantics are preserved instead of being collapsed into `TODO`; when the artifact is absent it falls back only to scheduler-backed `STEP_*` events and otherwise returns an empty list.
-- when `steps.items` is empty, `MonitorScreen` now renders explicit no-step copy in both the progress area and the step-list panel so operators understand that neither report artifacts nor scheduler steps are available.
+- `steps` now also carries a backend-owned `availability` marker so the front end can distinguish `AVAILABLE` vs `UNAVAILABLE` empty-state semantics without changing the `items` row structure.
+- when `steps.items` is empty, `MonitorScreen` now prefers that backend-owned marker and renders explicit no-step copy in both the progress area and the step-list panel; if the marker is absent, it still falls back to the old `items.length === 0` interpretation for compatibility.
 - `runtime-log` now prefers run-local `runtime.log` artifacts; when they are absent it still falls back to scheduler-event-derived shaping.
 - when artifact-backed and scheduler-event-backed runtime notes are both unavailable, `runtime-log` now emits a small backend-owned request-context shell instead of returning an empty panel when persisted scheduler request context exists.
 - Pause/Abort record intent only; the backend does not trigger real execution-control workflows in Phase 3.

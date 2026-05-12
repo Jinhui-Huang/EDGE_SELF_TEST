@@ -308,6 +308,7 @@ export type RunStep = {
 
 export type RunStepsResponse = {
   runId: string;
+  availability?: "AVAILABLE" | "UNAVAILABLE";
   items: RunStep[];
 };
 

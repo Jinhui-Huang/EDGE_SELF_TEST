@@ -66,6 +66,7 @@ const runStatusResponse: RunStatus = {
 
 const stepsResponse: RunStepsResponse = {
   runId: "checkout-web-smoke",
+  availability: "AVAILABLE",
   items: [
     { index: 1, label: "Open home", state: "DONE", durationMs: 2000 },
     {
@@ -215,6 +216,7 @@ describe("MonitorScreen", () => {
       if (url.includes("/runs/member-center-run/steps")) {
         return jsonResponse({
           runId: "member-center-run",
+          availability: "AVAILABLE",
           items: [{ index: 1, label: "Open profile", state: "RUNNING", durationMs: 500 }]
         });
       }
@@ -269,6 +271,7 @@ describe("MonitorScreen", () => {
     vi.stubGlobal("fetch", createFetchMock({
       steps: {
         runId: "checkout-web-smoke",
+        availability: "AVAILABLE",
         items: [
           { index: 1, label: "Submit payment", state: "FAILED", durationMs: 950, note: "payment button not found" },
           { index: 2, label: "Archive receipt", state: "SKIPPED", durationMs: 0 }
@@ -301,7 +304,7 @@ describe("MonitorScreen", () => {
 
   it("does not expose drill-down when steps and runtime logs are empty", async () => {
     vi.stubGlobal("fetch", createFetchMock({
-      steps: { runId: "checkout-web-smoke", items: [] },
+      steps: { runId: "checkout-web-smoke", availability: "UNAVAILABLE", items: [] },
       runtimeLog: { runId: "checkout-web-smoke", items: [], nextCursor: null }
     }));
 
@@ -322,6 +325,27 @@ describe("MonitorScreen", () => {
     expect(screen.queryByRole("heading", { name: "Runtime log detail" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Open step detail/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Open runtime log detail/i })).not.toBeInTheDocument();
+  });
+
+  it("keeps the no-step empty state when legacy step payloads omit availability", async () => {
+    vi.stubGlobal("fetch", createFetchMock({
+      steps: { runId: "checkout-web-smoke", items: [] },
+      runtimeLog: { runId: "checkout-web-smoke", items: [], nextCursor: null }
+    }));
+
+    render(
+      <MonitorScreen
+        snapshot={snapshot}
+        title="Execution monitor"
+        locale="en"
+        selectedRunId="checkout-web-smoke"
+        apiBaseUrl="http://127.0.0.1:8787"
+      />
+    );
+
+    expect(await screen.findByText("No scheduler-backed step timeline is available yet.")).toBeInTheDocument();
+    expect(screen.getByText("No report step artifact or scheduler step timeline is available yet.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Open step detail/i })).not.toBeInTheDocument();
   });
 
   it("stays in error state without opening detail when the status API fails", async () => {

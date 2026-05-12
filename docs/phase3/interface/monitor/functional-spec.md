@@ -236,8 +236,9 @@ The screen loads runtime data from dedicated APIs when `selectedRunId` is provid
 - `livePage` from `GET /api/phase3/runs/{runId}/live-page` — backend-owned availability status, current page URL/state/highlight, and optional run-local screenshot path
 
 - `runStatus` now prefers run-local `report.json` / `live-page.json` / artifact timestamps when available and otherwise keeps a conservative scheduler-backed shell that can still surface persisted scheduler request page/runtime context
+- `steps` now also carries a backend-owned availability marker so the front end can distinguish a truly unavailable step timeline from a merely short one without changing the existing row structure
 - `runtimeLog` now follows an explicit fallback chain: run-local `runtime.log` artifact first, then scheduler-event-derived runtime notes, then a small persisted scheduler request-context shell when neither source yields usable runtime-log rows
-- when `steps.items` is empty, `MonitorScreen` now shows explicit no-step copy instead of leaving the progress/timeline areas visually blank
+- when `steps.items` is empty, `MonitorScreen` now prefers the backend-owned steps availability marker and shows explicit no-step copy instead of leaving the progress/timeline areas visually blank; if the marker is absent it still falls back to the empty-list interpretation for compatibility
 
 ## 8. Screen Inputs and Outputs
 
