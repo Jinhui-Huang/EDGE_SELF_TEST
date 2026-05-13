@@ -2835,3 +2835,14 @@
     - synced `monitor/interface-spec.md` and `monitor/functional-spec.md`
   - Verification:
     - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+- 2026-05-13: Extended the same control-intent visibility line into request-context-backed `monitor/live-page` shells.
+  - Backend:
+    - when `live-page` falls back to a request-context-backed `UNAVAILABLE` shell and `status` is `PAUSING` / `ABORTING`, the lightweight `summary` now appends a control note
+    - the note explains that pause/abort was requested, who requested it, and why
+    - artifact-backed live-page payloads and no-source shells are left unchanged
+  - Tests/docs:
+    - backend monitor test now asserts both `PAUSING` and `ABORTING` request-context-backed live-page shells include the appended control note
+    - the no-source branch still asserts no summary is emitted
+    - synced `monitor/interface-spec.md` and `monitor/functional-spec.md`
+  - Verification:
+    - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`

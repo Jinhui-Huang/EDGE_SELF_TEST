@@ -679,7 +679,7 @@ public final class RunStatusService {
             return buildAvailableLivePage(runId, request, status, latestStep, latestStepIndex, liveArtifact, screenshot);
         }
 
-        return buildUnavailableLivePage(runId, request, status);
+        return buildUnavailableLivePage(runId, request, status, latestControlRequestInfo(status, events));
     }
 
     private Map<String, Object> buildAvailableLivePage(
@@ -729,18 +729,27 @@ public final class RunStatusService {
         return result;
     }
 
-    private Map<String, Object> buildUnavailableLivePage(String runId, Map<String, Object> request, String status) {
+    private Map<String, Object> buildUnavailableLivePage(
+            String runId,
+            Map<String, Object> request,
+            String status,
+            ControlRequestInfo controlRequestInfo) {
         Map<String, Object> result = new LinkedHashMap<>();
+        boolean requestContextBacked = hasLivePageRequestContext(request);
         result.put("runId", runId);
         result.put("status", "UNAVAILABLE");
-        result.put("sourceLayer", hasLivePageRequestContext(request) ? "REQUEST_CONTEXT" : "NONE");
+        result.put("sourceLayer", requestContextBacked ? "REQUEST_CONTEXT" : "NONE");
         result.put("capturedAt", Instant.now(clock).toString());
         result.put("url", requestPageUrl(request));
         result.put("title", firstNonBlank(
                 textOr(request, "pageTitle", ""),
                 textOr(request, "title", ""),
                 requestPageIdentity(request)));
-        putIfNotBlank(result, "summary", resolveLivePageSummary(Map.of(), request));
+        String livePageSummary = resolveLivePageSummary(Map.of(), request);
+        if (requestContextBacked) {
+            livePageSummary = appendLivePageControlNote(livePageSummary, status, controlRequestInfo);
+        }
+        putIfNotBlank(result, "summary", livePageSummary);
         result.put("pageState", firstNonBlank(
                 requestPageState(request),
                 "RUNNING".equals(status) ? "active" : "unavailable"));
@@ -759,6 +768,33 @@ public final class RunStatusService {
                 textOr(liveArtifact, "summary", ""),
                 textOr(request, "bodySummary", ""),
                 textOr(request, "nextAction", ""));
+    }
+
+    private String appendLivePageControlNote(String summary, String status, ControlRequestInfo controlRequestInfo) {
+        String controlNote = buildLivePageControlNote(status, controlRequestInfo);
+        if (controlNote.isBlank()) {
+            return summary;
+        }
+        if (summary.isBlank()) {
+            return controlNote;
+        }
+        return summary + " " + controlNote;
+    }
+
+    private String buildLivePageControlNote(String status, ControlRequestInfo controlRequestInfo) {
+        if (controlRequestInfo == null || controlRequestInfo.requestedBy().isBlank()) {
+            return "";
+        }
+        String action = "PAUSING".equals(status)
+                ? "Pause requested"
+                : "ABORTING".equals(status) ? "Abort requested" : "";
+        if (action.isBlank()) {
+            return "";
+        }
+        String reason = controlRequestInfo.requestReason().isBlank()
+                ? ""
+                : ": " + controlRequestInfo.requestReason();
+        return action + " by " + controlRequestInfo.requestedBy() + reason + ".";
     }
 
     private boolean hasLivePageRequestContext(Map<String, Object> request) {

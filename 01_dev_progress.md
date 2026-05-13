@@ -5722,6 +5722,33 @@ Remaining limits:
 - control rows still live inside the scheduler-events fallback layer; there is no richer dedicated control log model yet
 - this slice does not add any new runtime-log source layer or front-end control-specific affordance
 
+## 2026-05-13 P3-4 monitor live-page control-note follow-up
+
+## Task
+- Extend the same control-intent visibility line into request-context-backed `GET /api/phase3/runs/{runId}/live-page` shells
+- keep the contract additive and small by reusing existing `summary`
+- avoid touching screenshot / highlight / locator structure
+
+## Completed
+- Backend:
+  - when `live-page` falls back to a request-context-backed `UNAVAILABLE` shell and `status` is `PAUSING` / `ABORTING`, the lightweight `summary` now appends a control note
+  - the note explains that pause/abort was requested, who requested it, and why
+  - artifact-backed live-page payloads and no-source shells are left unchanged
+- Frontend:
+  - no code change was required; the existing live-page `summary` rendering now naturally surfaces the appended control note
+- Tests/docs:
+  - backend monitor test now asserts both `PAUSING` and `ABORTING` request-context-backed live-page shells include the appended control note
+  - the no-source branch still asserts no summary is emitted
+  - synced `monitor/interface-spec.md` and `monitor/functional-spec.md`
+
+## Verification
+- Ran:
+  - `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+
+## Remaining Limits
+- control notes are still collapsed into a single lightweight `live-page.summary` string rather than a richer structured control-note field
+- this slice does not add any front-end control-specific live-page affordance beyond the existing summary block
+
 ## Remaining Limits
 - `runtime-log` fallback is now more informative when request context exists, but it still remains a compact shell rather than a richer structured runtime artifact model
 - if scheduler requests also lack persisted page/runtime/locator fields, runtime-log fallback can still end up sparse or empty

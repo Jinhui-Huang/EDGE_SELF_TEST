@@ -420,6 +420,7 @@ The optional top-level `summary` follows a small additive fallback chain:
 - `live-page.json.summary`
 - persisted scheduler request `bodySummary`
 - persisted scheduler request `nextAction`
+- when the shell is request-context-backed and `status` is `PAUSING` / `ABORTING`, the backend may append a lightweight control note to that summary explaining who requested the control action and why
 
 Current screen behavior:
 

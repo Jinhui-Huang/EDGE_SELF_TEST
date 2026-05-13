@@ -656,7 +656,7 @@ class LocalAdminApiServerTest {
         Files.writeString(modelConfigFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
         Files.writeString(environmentConfigFile, Jsons.writeValueAsString(Map.of("items", List.of())), StandardCharsets.UTF_8);
         Map<String, Object> missingLiveRequest = new LinkedHashMap<>();
-        missingLiveRequest.put("runId", "missing-live-artifact");
+        missingLiveRequest.put("runId", "missing-live-pausing");
         missingLiveRequest.put("projectKey", "checkout-web");
         missingLiveRequest.put("owner", "qa-platform");
         missingLiveRequest.put("environment", "prod-like");
@@ -671,6 +671,9 @@ class LocalAdminApiServerTest {
         missingLiveRequest.put("nextAction", "Verify the payment CTA before unblocking release.");
         missingLiveRequest.put("locator", "#pay-now");
         missingLiveRequest.put("bodySummary", "Payment form is visible and the CTA stays above the fold.");
+        Map<String, Object> abortingLiveRequest = new LinkedHashMap<>(missingLiveRequest);
+        abortingLiveRequest.put("runId", "missing-live-aborting");
+        abortingLiveRequest.put("owner", "ops-oncall");
         Files.writeString(schedulerRequestsFile, Jsons.writeValueAsString(Map.of(
                 "requests", List.of(
                         Map.of(
@@ -680,12 +683,16 @@ class LocalAdminApiServerTest {
                                 "environment", "prod-like",
                                 "targetUrl", "https://example.test/checkout",
                                 "title", "Checkout smoke"),
-                        missingLiveRequest))),
+                        missingLiveRequest,
+                        abortingLiveRequest))),
                 StandardCharsets.UTF_8);
         Files.writeString(schedulerEventsFile, Jsons.writeValueAsString(Map.of(
                 "events", List.of(
                         Map.of("runId", "checkout-web-smoke", "type", "STEP_RUNNING", "detail", "Inspect payment button", "at", "2026-05-07T09:03:30Z"),
-                        Map.of("runId", "missing-live-artifact", "type", "STEP_RUNNING", "detail", "Open checkout", "at", "2026-05-07T09:00:00Z")))), StandardCharsets.UTF_8);
+                        Map.of("runId", "missing-live-pausing", "type", "PAUSING", "status", "PAUSING",
+                                "owner", "qa-platform", "detail", "Need manual verification before payment submit", "at", "2026-05-07T09:00:00Z"),
+                        Map.of("runId", "missing-live-aborting", "type", "ABORTING", "status", "ABORTING",
+                                "owner", "ops-oncall", "detail", "Unsafe DOM mismatch after payment redirect", "at", "2026-05-07T09:01:00Z")))), StandardCharsets.UTF_8);
 
         Clock clock = Clock.fixed(Instant.parse("2026-05-07T09:10:00Z"), ZoneOffset.UTC);
         SchedulerPersistenceService schedulerPersistence = new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, clock);
@@ -725,7 +732,7 @@ class LocalAdminApiServerTest {
             assertTrue(available.body().contains("\"pageState\":\"checkout.form\""));
 
             HttpResponse<String> unavailable = client.send(
-                    request(server, "/api/phase3/runs/missing-live-artifact/live-page"),
+                    request(server, "/api/phase3/runs/missing-live-pausing/live-page"),
                     HttpResponse.BodyHandlers.ofString());
             assertEquals(200, unavailable.statusCode());
             assertTrue(unavailable.body().contains("\"status\":\"UNAVAILABLE\""));
@@ -733,10 +740,18 @@ class LocalAdminApiServerTest {
             assertTrue(unavailable.body().contains("\"screenshotPath\":null"));
             assertTrue(unavailable.body().contains("\"url\":\"https://example.test/checkout/payment\""));
             assertTrue(unavailable.body().contains("\"title\":\"Payment review\""));
-            assertTrue(unavailable.body().contains("\"summary\":\"Payment form is visible and the CTA stays above the fold.\""));
+            assertTrue(unavailable.body().contains("\"summary\":\"Payment form is visible and the CTA stays above the fold. Pause requested by qa-platform: Need manual verification before payment submit.\""));
             assertTrue(unavailable.body().contains("\"pageState\":\"audit-first / queued / watching payment iframe\""));
             assertTrue(unavailable.body().contains("\"action\":\"Verify the payment CTA before unblocking release."));
             assertTrue(unavailable.body().contains("\"target\":\"#pay-now\""));
+
+            HttpResponse<String> abortingUnavailable = client.send(
+                    request(server, "/api/phase3/runs/missing-live-aborting/live-page"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, abortingUnavailable.statusCode());
+            assertTrue(abortingUnavailable.body().contains("\"status\":\"UNAVAILABLE\""));
+            assertTrue(abortingUnavailable.body().contains("\"sourceLayer\":\"REQUEST_CONTEXT\""));
+            assertTrue(abortingUnavailable.body().contains("\"summary\":\"Payment form is visible and the CTA stays above the fold. Abort requested by ops-oncall: Unsafe DOM mismatch after payment redirect.\""));
 
             HttpResponse<String> noSource = client.send(
                     request(server, "/api/phase3/runs/no-live-source/live-page"),
