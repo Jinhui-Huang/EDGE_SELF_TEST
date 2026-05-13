@@ -839,6 +839,7 @@ class LocalAdminApiServerTest {
 
             assertEquals(200, artifactBacked.statusCode());
             assertTrue(artifactBacked.body().contains("\"availability\":\"AVAILABLE\""));
+            assertTrue(artifactBacked.body().contains("\"sourceLayer\":\"RUNTIME_ARTIFACT\""));
             assertTrue(artifactBacked.body().contains("\"source\":\"runtime.log\""));
             assertTrue(artifactBacked.body().contains("Confirmed pay button candidate[0]"));
             assertTrue(artifactBacked.body().contains("\"type\":\"WARNING\""));
@@ -848,11 +849,13 @@ class LocalAdminApiServerTest {
 
             assertEquals(200, fallbackBacked.statusCode());
             assertTrue(fallbackBacked.body().contains("\"availability\":\"AVAILABLE\""));
+            assertTrue(fallbackBacked.body().contains("\"sourceLayer\":\"SCHEDULER_EVENTS\""));
             assertTrue(fallbackBacked.body().contains("\"source\":\"scheduler-events\""));
             assertTrue(fallbackBacked.body().contains("Scheduler event fallback"));
 
             assertEquals(200, requestContextBacked.statusCode());
             assertTrue(requestContextBacked.body().contains("\"availability\":\"AVAILABLE\""));
+            assertTrue(requestContextBacked.body().contains("\"sourceLayer\":\"REQUEST_CONTEXT\""));
             assertTrue(requestContextBacked.body().contains("\"source\":\"scheduler-request-context\""));
             assertTrue(requestContextBacked.body().contains("Prepared page context is available for fallback monitor inspection."));
             assertTrue(requestContextBacked.body().contains("\"message\":\"Payment review at https://example.test/checkout/payment\""));
@@ -864,6 +867,7 @@ class LocalAdminApiServerTest {
 
             assertEquals(200, runIdOnlyBacked.statusCode());
             assertTrue(runIdOnlyBacked.body().contains("\"availability\":\"UNAVAILABLE\""));
+            assertTrue(runIdOnlyBacked.body().contains("\"sourceLayer\":\"NONE\""));
             assertTrue(runIdOnlyBacked.body().contains("\"items\":[]"));
             assertTrue(!runIdOnlyBacked.body().contains("Prepared page context is available for fallback monitor inspection."));
             assertTrue(!runIdOnlyBacked.body().contains("\"source\":\"scheduler-request-context\""));

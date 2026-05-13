@@ -236,6 +236,7 @@ public final class RunStatusService {
             Map<String, Object> artifactResult = new LinkedHashMap<>();
             artifactResult.put("runId", runId);
             artifactResult.put("availability", "AVAILABLE");
+            artifactResult.put("sourceLayer", "RUNTIME_ARTIFACT");
             artifactResult.put("items", artifactItems);
             artifactResult.put("nextCursor", null);
             return artifactResult;
@@ -267,9 +268,24 @@ public final class RunStatusService {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("runId", runId);
         result.put("availability", items.isEmpty() ? "UNAVAILABLE" : "AVAILABLE");
+        result.put("sourceLayer", items.isEmpty()
+                ? "NONE"
+                : hasSchedulerEventRuntimeLog(events)
+                        ? "SCHEDULER_EVENTS"
+                        : "REQUEST_CONTEXT");
         result.put("items", items);
         result.put("nextCursor", null);
         return result;
+    }
+
+    private boolean hasSchedulerEventRuntimeLog(List<Map<String, Object>> events) {
+        for (Map<String, Object> event : events) {
+            String type = textOr(event, "type", "");
+            if (!type.startsWith("STEP_")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private List<Map<String, Object>> readRuntimeLogArtifact(Path runDir) throws IOException {

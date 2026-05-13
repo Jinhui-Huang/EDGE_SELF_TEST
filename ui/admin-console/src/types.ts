@@ -326,6 +326,7 @@ export type RuntimeLogEntry = {
 export type RuntimeLogResponse = {
   runId: string;
   availability?: "AVAILABLE" | "UNAVAILABLE";
+  sourceLayer?: "RUNTIME_ARTIFACT" | "SCHEDULER_EVENTS" | "REQUEST_CONTEXT" | "NONE";
   items: RuntimeLogEntry[];
   nextCursor: string | null;
 };

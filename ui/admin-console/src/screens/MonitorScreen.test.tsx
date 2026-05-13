@@ -200,6 +200,39 @@ describe("MonitorScreen", () => {
     expect(screen.getByText(/candidateCount/)).toBeInTheDocument();
   });
 
+  it("shows the backend-owned runtime log source-layer hint", async () => {
+    vi.stubGlobal("fetch", createFetchMock({
+      runtimeLog: {
+        runId: "checkout-web-smoke",
+        availability: "AVAILABLE",
+        sourceLayer: "REQUEST_CONTEXT",
+        items: [
+          {
+            at: "2026-05-05T10:03:45Z",
+            type: "INFO",
+            model: "",
+            source: "scheduler-request-context",
+            summary: "Persisted startup guidance is active.",
+            message: "Open checkout and verify the pay CTA."
+          }
+        ],
+        nextCursor: null
+      }
+    }));
+
+    render(
+      <MonitorScreen
+        snapshot={snapshot}
+        title="Execution monitor"
+        locale="en"
+        selectedRunId="checkout-web-smoke"
+        apiBaseUrl="http://127.0.0.1:8787"
+      />
+    );
+
+    expect(await screen.findByText("Source: request-context fallback")).toBeInTheDocument();
+  });
+
   it("resets the selected detail when runId changes", async () => {
     const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
       const url = String(input);
@@ -307,7 +340,13 @@ describe("MonitorScreen", () => {
   it("does not expose drill-down when steps and runtime logs are empty", async () => {
     vi.stubGlobal("fetch", createFetchMock({
       steps: { runId: "checkout-web-smoke", availability: "UNAVAILABLE", items: [] },
-      runtimeLog: { runId: "checkout-web-smoke", availability: "UNAVAILABLE", items: [], nextCursor: null }
+      runtimeLog: {
+        runId: "checkout-web-smoke",
+        availability: "UNAVAILABLE",
+        sourceLayer: "NONE",
+        items: [],
+        nextCursor: null
+      }
     }));
 
     render(
@@ -322,6 +361,7 @@ describe("MonitorScreen", () => {
 
     expect(await screen.findByText("No scheduler-backed step timeline is available yet.")).toBeInTheDocument();
     expect(screen.getByText("No report step artifact or scheduler step timeline is available yet.")).toBeInTheDocument();
+    expect(screen.getByText("Source: none")).toBeInTheDocument();
     expect(screen.getByText("No runtime log entries.")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Step detail" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Runtime log detail" })).not.toBeInTheDocument();
@@ -365,6 +405,7 @@ describe("MonitorScreen", () => {
       />
     );
 
+    expect(await screen.findByText("Source: none")).toBeInTheDocument();
     expect(await screen.findByText("No runtime log entries.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Open runtime log detail/i })).not.toBeInTheDocument();
   });

@@ -2677,3 +2677,22 @@
   - Verification:
     - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
     - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`
+- 2026-05-12: Continued the same additive-marker pattern on `P3-4 monitor /runtime-log` with a top-level provenance hint.
+  - Backend:
+    - `GET /api/phase3/runs/{runId}/runtime-log` now also includes `sourceLayer`
+    - `sourceLayer` values:
+      - `RUNTIME_ARTIFACT`
+      - `SCHEDULER_EVENTS`
+      - `REQUEST_CONTEXT`
+      - `NONE`
+  - Frontend:
+    - `RuntimeLogResponse` now accepts the additive `sourceLayer` field
+    - `MonitorScreen` now shows a lightweight source hint in the runtime-log panel header
+    - when the marker is absent, the screen falls back to minimal inference from existing entry `source` values or empty-list semantics for legacy compatibility
+  - Tests/docs:
+    - backend monitor test now asserts runtime-log source-layer values across artifact-backed, scheduler-event-backed, request-context-backed, and empty-fallback cases
+    - front-end monitor test now covers marker-driven source hints plus a legacy empty runtime-log payload without `sourceLayer`
+    - synced `monitor/interface-spec.md` and `monitor/functional-spec.md`
+  - Verification:
+    - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+    - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`

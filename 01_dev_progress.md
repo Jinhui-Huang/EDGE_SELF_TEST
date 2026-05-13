@@ -5413,6 +5413,54 @@ Remaining limits:
 - `runtime-log` availability only distinguishes `AVAILABLE` vs `UNAVAILABLE`; it does not yet carry reason codes for artifact-backed vs scheduler-backed vs request-context-backed availability
 - this slice does not alter runtime-log entry metadata, paging, or any non-monitor contract
 
+## 2026-05-12 P3-4 monitor runtime-log source-layer follow-up
+
+## Task
+- Continue the same additive-marker pattern on `/runtime-log`
+- keep `items`, `source`, `message`, `detail`, `availability`, and `nextCursor` intact
+- add one more top-level provenance field for lightweight front-end consumption
+
+## Completed
+- Updated backend `RunStatusService`:
+  - `GET /api/phase3/runs/{runId}/runtime-log` now includes `sourceLayer`
+  - `RUNTIME_ARTIFACT` when run-local `runtime.log` rows win
+  - `SCHEDULER_EVENTS` when non-step scheduler-event fallback wins
+  - `REQUEST_CONTEXT` when request-context shell rows win
+  - `NONE` when the endpoint returns `items: []`
+- Updated frontend types and screen logic:
+  - `RuntimeLogResponse` now includes optional `sourceLayer`
+  - `MonitorScreen` now renders a lightweight source hint in the runtime-log panel header
+  - the screen prefers the backend marker first and falls back to a minimal legacy inference from existing entry `source` values or empty-list semantics when the marker is absent
+- Updated tests:
+  - backend monitor test now asserts runtime-log `sourceLayer` across artifact-backed, scheduler-event-backed, request-context-backed, and empty-fallback cases
+  - front-end monitor test now covers:
+    - marker-driven `Source: request-context fallback`
+    - marker-driven `Source: none`
+    - legacy empty runtime-log payload without `sourceLayer`
+- Synced docs:
+  - `monitor/interface-spec.md`
+  - `monitor/functional-spec.md`
+
+## Modified Files
+- `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/RunStatusService.java`
+- `apps/local-admin-api/src/test/java/com/example/webtest/admin/http/LocalAdminApiServerTest.java`
+- `ui/admin-console/src/types.ts`
+- `ui/admin-console/src/screens/MonitorScreen.tsx`
+- `ui/admin-console/src/screens/MonitorScreen.test.tsx`
+- `docs/phase3/interface/monitor/interface-spec.md`
+- `docs/phase3/interface/monitor/functional-spec.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Ran:
+  - `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+  - `npm test -- --run src/screens/MonitorScreen.test.tsx`
+
+## Remaining Limits
+- `sourceLayer` is still a coarse top-level provenance marker; it does not explain mixed-source or per-entry provenance beyond the existing row-level `source`
+- this slice does not alter runtime-log paging, entry metadata, or any non-monitor contract
+
 ## Remaining Limits
 - `runtime-log` fallback is now more informative when request context exists, but it still remains a compact shell rather than a richer structured runtime artifact model
 - if scheduler requests also lack persisted page/runtime/locator fields, runtime-log fallback can still end up sparse or empty

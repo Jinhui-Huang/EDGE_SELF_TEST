@@ -46,6 +46,7 @@ export function MonitorScreen({
   const [stepsAvailability, setStepsAvailability] = useState<"AVAILABLE" | "UNAVAILABLE">("UNAVAILABLE");
   const [runtimeLog, setRuntimeLog] = useState<RuntimeLogEntry[]>([]);
   const [runtimeLogAvailability, setRuntimeLogAvailability] = useState<"AVAILABLE" | "UNAVAILABLE">("UNAVAILABLE");
+  const [runtimeLogSourceLayer, setRuntimeLogSourceLayer] = useState<RuntimeLogResponse["sourceLayer"] | null>(null);
   const [livePage, setLivePage] = useState<LivePage | null>(null);
   const [selectedStep, setSelectedStep] = useState<RunStep | null>(null);
   const [selectedLog, setSelectedLog] = useState<RuntimeLogEntry | null>(null);
@@ -80,6 +81,7 @@ export function MonitorScreen({
       setStepsAvailability(resolveStepsAvailability(stepsData));
       setRuntimeLog(logData.items ?? []);
       setRuntimeLogAvailability(resolveRuntimeLogAvailability(logData));
+      setRuntimeLogSourceLayer(resolveRuntimeLogSourceLayer(logData));
       setLivePage(liveData);
       setLoadState("loaded");
     } catch (error) {
@@ -89,6 +91,7 @@ export function MonitorScreen({
       setStepsAvailability("UNAVAILABLE");
       setRuntimeLog([]);
       setRuntimeLogAvailability("UNAVAILABLE");
+      setRuntimeLogSourceLayer(null);
       setLivePage(null);
       setLoadState("error");
     }
@@ -105,6 +108,7 @@ export function MonitorScreen({
       setStepsAvailability("UNAVAILABLE");
       setRuntimeLog([]);
       setRuntimeLogAvailability("UNAVAILABLE");
+      setRuntimeLogSourceLayer(null);
       setLivePage(null);
       return;
     }
@@ -222,6 +226,7 @@ export function MonitorScreen({
   const runningStep = steps.find((step) => step.state === "RUNNING");
   const showUnavailableSteps = stepsAvailability === "UNAVAILABLE";
   const showUnavailableRuntimeLog = runtimeLogAvailability === "UNAVAILABLE";
+  const runtimeLogSourceText = runtimeLogSourceLayer ? describeRuntimeLogSourceLayer(runtimeLogSourceLayer, t) : null;
   const activeDetailKind = selectedStep ? "step" : selectedLog ? "log" : null;
   const livePageStatus = livePage?.status ?? "UNAVAILABLE";
   const liveScreenshotUrl = runId && livePage?.screenshotPath
@@ -460,6 +465,7 @@ export function MonitorScreen({
           <div className="monitorPanelHeader">
             <h3>{t(copy("AI runtime log", "AI 运行时日志", "AI ランタイムログ"))}</h3>
             {status === "RUNNING" ? <span className="monitorBadge info dot">live</span> : null}
+            {runtimeLogSourceText ? <span className="monitorPill mono">{runtimeLogSourceText}</span> : null}
           </div>
           <div className="monitorLogList">
             {!showUnavailableRuntimeLog ? runtimeLog.map((entry, index) => (
@@ -770,4 +776,47 @@ function resolveRuntimeLogAvailability(logData: RuntimeLogResponse): "AVAILABLE"
     return logData.availability;
   }
   return (logData.items?.length ?? 0) > 0 ? "AVAILABLE" : "UNAVAILABLE";
+}
+
+function resolveRuntimeLogSourceLayer(logData: RuntimeLogResponse): RuntimeLogResponse["sourceLayer"] | null {
+  if (logData.sourceLayer === "RUNTIME_ARTIFACT"
+    || logData.sourceLayer === "SCHEDULER_EVENTS"
+    || logData.sourceLayer === "REQUEST_CONTEXT"
+    || logData.sourceLayer === "NONE") {
+    return logData.sourceLayer;
+  }
+
+  const firstSource = logData.items.find((entry) => typeof entry.source === "string" && entry.source.length > 0)?.source;
+  if (firstSource === "runtime.log") {
+    return "RUNTIME_ARTIFACT";
+  }
+  if (firstSource === "scheduler-events") {
+    return "SCHEDULER_EVENTS";
+  }
+  if (firstSource === "scheduler-request-context") {
+    return "REQUEST_CONTEXT";
+  }
+  if ((logData.items?.length ?? 0) === 0) {
+    return "NONE";
+  }
+  return null;
+}
+
+function describeRuntimeLogSourceLayer(
+  sourceLayer: NonNullable<RuntimeLogResponse["sourceLayer"]>,
+  t: (copySet: Copy) => string
+): string {
+  const prefix = t(copy("Source", "来源", "ソース"));
+  switch (sourceLayer) {
+    case "RUNTIME_ARTIFACT":
+      return `${prefix}: ${t(copy("runtime artifact", "runtime artifact", "runtime artifact"))}`;
+    case "SCHEDULER_EVENTS":
+      return `${prefix}: ${t(copy("scheduler events", "scheduler events", "scheduler events"))}`;
+    case "REQUEST_CONTEXT":
+      return `${prefix}: ${t(copy("request-context fallback", "request-context fallback", "request-context fallback"))}`;
+    case "NONE":
+      return `${prefix}: ${t(copy("none", "none", "none"))}`;
+    default:
+      return prefix;
+  }
 }
