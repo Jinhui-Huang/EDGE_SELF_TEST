@@ -582,6 +582,7 @@ public final class RunStatusService {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("runId", runId);
         result.put("status", "AVAILABLE");
+        result.put("sourceLayer", "LIVE_ARTIFACT");
         result.put("capturedAt", resolveCapturedAt(liveArtifact, screenshot));
         result.put("url", firstNonBlank(
                 textOr(liveArtifact, "url", ""),
@@ -620,6 +621,7 @@ public final class RunStatusService {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("runId", runId);
         result.put("status", "UNAVAILABLE");
+        result.put("sourceLayer", hasLivePageRequestContext(request) ? "REQUEST_CONTEXT" : "NONE");
         result.put("capturedAt", Instant.now(clock).toString());
         result.put("url", requestPageUrl(request));
         result.put("title", firstNonBlank(
@@ -637,6 +639,21 @@ public final class RunStatusService {
                 "target", textOr(request, "locator", "")));
         result.put("screenshotPath", null);
         return result;
+    }
+
+    private boolean hasLivePageRequestContext(Map<String, Object> request) {
+        if (request == null || request.isEmpty()) {
+            return false;
+        }
+        return !requestPageUrl(request).isBlank()
+                || !firstNonBlank(
+                        textOr(request, "pageTitle", ""),
+                        textOr(request, "title", ""),
+                        requestPageIdentity(request)).isBlank()
+                || !requestPageState(request).isBlank()
+                || !textOr(request, "nextAction", "").isBlank()
+                || !textOr(request, "bodySummary", "").isBlank()
+                || !textOr(request, "locator", "").isBlank();
     }
 
     // ---- POST /api/phase3/runs/{runId}/pause ----

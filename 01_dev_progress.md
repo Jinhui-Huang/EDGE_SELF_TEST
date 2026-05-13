@@ -5508,6 +5508,37 @@ Remaining limits:
 - `steps.sourceLayer` is a coarse top-level provenance marker; it does not explain mixed-source timelines or per-step provenance
 - this slice does not alter step-row metadata or any non-monitor contract
 
+## 2026-05-13 P3-4 monitor live-page source-layer follow-up
+
+## Task
+- Continue the same small `monitor` provenance line on `/live-page`
+- keep `status`, `url`, `title`, `pageState`, `highlight`, and `screenshotPath` intact
+- only add a top-level `sourceLayer` and a lightweight front-end hint
+
+## Completed
+- Backend:
+  - `GET /api/phase3/runs/{runId}/live-page` now includes `sourceLayer`
+  - `sourceLayer: "LIVE_ARTIFACT"` when run-local `live-page.json` or screenshot artifacts back the response
+  - `sourceLayer: "REQUEST_CONTEXT"` when live artifacts are absent but the `UNAVAILABLE` shell still carries persisted scheduler request context
+  - `sourceLayer: "NONE"` when neither live artifacts nor request-context shell data are available
+- Frontend:
+  - `LivePage` now includes optional `sourceLayer`
+  - `MonitorScreen` now shows a lightweight live-page source hint in the panel header
+  - when the marker is absent, the screen falls back to minimal legacy inference from `status`, `screenshotPath`, and existing shell fields
+- Tests/docs:
+  - backend monitor test now asserts live-page `sourceLayer` across artifact-backed, request-context-backed, and no-source responses
+  - front-end monitor test now covers marker-driven live-page hints plus a legacy unavailable live-page payload without `sourceLayer`
+  - synced `monitor/interface-spec.md` and `monitor/functional-spec.md`
+
+## Verification
+- Ran:
+  - `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+  - `npm test -- --run src/screens/MonitorScreen.test.tsx`
+
+## Remaining Limits
+- `live-page.sourceLayer` is a coarse top-level provenance marker; it does not describe richer DOM-source provenance beyond artifact vs request-context fallback
+- this slice does not add a richer live-page summary model or any non-monitor contract
+
 ## Remaining Limits
 - `runtime-log` fallback is now more informative when request context exists, but it still remains a compact shell rather than a richer structured runtime artifact model
 - if scheduler requests also lack persisted page/runtime/locator fields, runtime-log fallback can still end up sparse or empty

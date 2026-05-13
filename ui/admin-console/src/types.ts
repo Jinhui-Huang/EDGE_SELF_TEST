@@ -335,6 +335,7 @@ export type RuntimeLogResponse = {
 export type LivePage = {
   runId: string;
   status: string;
+  sourceLayer?: "LIVE_ARTIFACT" | "REQUEST_CONTEXT" | "NONE";
   capturedAt: string;
   url: string;
   title: string;

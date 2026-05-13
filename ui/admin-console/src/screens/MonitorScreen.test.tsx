@@ -104,6 +104,7 @@ const runtimeLogResponse: RuntimeLogResponse = {
 const livePageResponse: LivePage = {
   runId: "checkout-web-smoke",
   status: "AVAILABLE",
+  sourceLayer: "LIVE_ARTIFACT",
   capturedAt: "2026-05-05T10:03:46Z",
   url: "https://example.test/checkout",
   title: "Checkout",
@@ -462,6 +463,7 @@ describe("MonitorScreen", () => {
       livePage: {
         ...livePageResponse,
         status: "UNAVAILABLE",
+        sourceLayer: "REQUEST_CONTEXT",
         title: "Payment review",
         url: "https://example.test/checkout/payment",
         pageState: "audit-first / queued / watching payment iframe",
@@ -485,6 +487,7 @@ describe("MonitorScreen", () => {
     );
 
     expect(await screen.findByText("No live page artifact available.")).toBeInTheDocument();
+    expect(screen.getByText("Source: request-context fallback")).toBeInTheDocument();
     expect(screen.queryByRole("img", { name: "Checkout" })).not.toBeInTheDocument();
     expect(screen.getByText("Payment review")).toBeInTheDocument();
     expect(screen.getByText("https://example.test/checkout/payment")).toBeInTheDocument();
@@ -516,5 +519,37 @@ describe("MonitorScreen", () => {
       "src",
       "http://127.0.0.1:8787/api/phase3/runs/checkout-web-smoke/artifacts/content?path=live%2Fstep-5.png"
     );
+    expect(screen.getByText("Source: live artifact")).toBeInTheDocument();
+  });
+
+  it("keeps the live-page source hint when legacy payloads omit the marker", async () => {
+    vi.stubGlobal("fetch", createFetchMock({
+      livePage: {
+        runId: "checkout-web-smoke",
+        status: "UNAVAILABLE",
+        capturedAt: "2026-05-05T10:03:46Z",
+        url: "https://example.test/checkout/payment",
+        title: "Payment review",
+        pageState: "audit-first / queued / watching payment iframe",
+        highlight: {
+          stepIndex: 0,
+          action: "Verify the payment CTA before unblocking release.",
+          target: "#pay-now"
+        },
+        screenshotPath: null
+      }
+    }));
+
+    render(
+      <MonitorScreen
+        snapshot={snapshot}
+        title="Execution monitor"
+        locale="en"
+        selectedRunId="checkout-web-smoke"
+        apiBaseUrl="http://127.0.0.1:8787"
+      />
+    );
+
+    expect(await screen.findByText("Source: request-context fallback")).toBeInTheDocument();
   });
 });

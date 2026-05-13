@@ -49,6 +49,7 @@ export function MonitorScreen({
   const [runtimeLogAvailability, setRuntimeLogAvailability] = useState<"AVAILABLE" | "UNAVAILABLE">("UNAVAILABLE");
   const [runtimeLogSourceLayer, setRuntimeLogSourceLayer] = useState<RuntimeLogResponse["sourceLayer"] | null>(null);
   const [livePage, setLivePage] = useState<LivePage | null>(null);
+  const [livePageSourceLayer, setLivePageSourceLayer] = useState<LivePage["sourceLayer"] | null>(null);
   const [selectedStep, setSelectedStep] = useState<RunStep | null>(null);
   const [selectedLog, setSelectedLog] = useState<RuntimeLogEntry | null>(null);
   const [pauseState, setPauseState] = useState<MutationState>({ kind: "idle", message: "" });
@@ -85,6 +86,7 @@ export function MonitorScreen({
       setRuntimeLogAvailability(resolveRuntimeLogAvailability(logData));
       setRuntimeLogSourceLayer(resolveRuntimeLogSourceLayer(logData));
       setLivePage(liveData);
+      setLivePageSourceLayer(liveData ? resolveLivePageSourceLayer(liveData) : null);
       setLoadState("loaded");
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : String(error));
@@ -96,6 +98,7 @@ export function MonitorScreen({
       setRuntimeLogAvailability("UNAVAILABLE");
       setRuntimeLogSourceLayer(null);
       setLivePage(null);
+      setLivePageSourceLayer(null);
       setLoadState("error");
     }
   }, [apiBaseUrl]);
@@ -114,6 +117,7 @@ export function MonitorScreen({
       setRuntimeLogAvailability("UNAVAILABLE");
       setRuntimeLogSourceLayer(null);
       setLivePage(null);
+      setLivePageSourceLayer(null);
       return;
     }
     void fetchMonitorData(runId);
@@ -232,6 +236,7 @@ export function MonitorScreen({
   const showUnavailableRuntimeLog = runtimeLogAvailability === "UNAVAILABLE";
   const stepsSourceText = stepsSourceLayer ? describeStepSourceLayer(stepsSourceLayer, t) : null;
   const runtimeLogSourceText = runtimeLogSourceLayer ? describeRuntimeLogSourceLayer(runtimeLogSourceLayer, t) : null;
+  const livePageSourceText = livePageSourceLayer ? describeLivePageSourceLayer(livePageSourceLayer, t) : null;
   const activeDetailKind = selectedStep ? "step" : selectedLog ? "log" : null;
   const livePageStatus = livePage?.status ?? "UNAVAILABLE";
   const liveScreenshotUrl = runId && livePage?.screenshotPath
@@ -394,6 +399,7 @@ export function MonitorScreen({
         <section className="monitorPanel">
           <div className="monitorPanelHeader">
             <h3>{t(copy("Live page", "实时页面", "ライブページ"))}</h3>
+            {livePageSourceText ? <span className="monitorPill mono">{livePageSourceText}</span> : null}
             <span className="monitorPill mono">
               <span className="monitorPillIcon info">▣</span>
               {livePageStatus === "AVAILABLE" ? safeHostname(livePage?.url) || "--" : "--"}
@@ -849,6 +855,41 @@ function describeRuntimeLogSourceLayer(
       return `${prefix}: ${t(copy("runtime artifact", "runtime artifact", "runtime artifact"))}`;
     case "SCHEDULER_EVENTS":
       return `${prefix}: ${t(copy("scheduler events", "scheduler events", "scheduler events"))}`;
+    case "REQUEST_CONTEXT":
+      return `${prefix}: ${t(copy("request-context fallback", "request-context fallback", "request-context fallback"))}`;
+    case "NONE":
+      return `${prefix}: ${t(copy("none", "none", "none"))}`;
+    default:
+      return prefix;
+  }
+}
+
+function resolveLivePageSourceLayer(liveData: LivePage): LivePage["sourceLayer"] | null {
+  if (liveData.sourceLayer === "LIVE_ARTIFACT"
+    || liveData.sourceLayer === "REQUEST_CONTEXT"
+    || liveData.sourceLayer === "NONE") {
+    return liveData.sourceLayer;
+  }
+  if (liveData.status === "AVAILABLE") {
+    return "LIVE_ARTIFACT";
+  }
+  const hasRequestContext = Boolean(
+    liveData.url
+    || liveData.title
+    || liveData.highlight?.action
+    || liveData.highlight?.target
+  );
+  return hasRequestContext ? "REQUEST_CONTEXT" : "NONE";
+}
+
+function describeLivePageSourceLayer(
+  sourceLayer: NonNullable<LivePage["sourceLayer"]>,
+  t: (copySet: Copy) => string
+): string {
+  const prefix = t(copy("Source", "来源", "ソース"));
+  switch (sourceLayer) {
+    case "LIVE_ARTIFACT":
+      return `${prefix}: ${t(copy("live artifact", "live artifact", "live artifact"))}`;
     case "REQUEST_CONTEXT":
       return `${prefix}: ${t(copy("request-context fallback", "request-context fallback", "request-context fallback"))}`;
     case "NONE":

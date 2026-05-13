@@ -362,6 +362,7 @@ Response body:
 {
   "runId": "checkout-web-smoke",
   "status": "AVAILABLE",
+  "sourceLayer": "LIVE_ARTIFACT",
   "capturedAt": "2026-04-20T05:31:49Z",
   "url": "https://app.acme.example/checkout",
   "title": "Checkout",
@@ -381,6 +382,7 @@ When no run-local live-page artifact is available, the backend returns an explic
 {
   "runId": "checkout-web-smoke",
   "status": "UNAVAILABLE",
+  "sourceLayer": "REQUEST_CONTEXT",
   "capturedAt": "2026-04-20T05:31:49Z",
   "url": "https://app.acme.example/checkout/payment",
   "title": "Payment review",
@@ -393,6 +395,12 @@ When no run-local live-page artifact is available, the backend returns an explic
   "screenshotPath": null
 }
 ```
+
+The top-level `sourceLayer` tells the front end which live-page layer currently owns the response:
+
+- `LIVE_ARTIFACT`
+- `REQUEST_CONTEXT`
+- `NONE`
 
 Current screen behavior:
 
@@ -569,6 +577,8 @@ Current implementation:
 - `runtime-log` now prefers run-local `runtime.log` artifacts; when they are absent it still falls back to scheduler-event-derived shaping.
 - when artifact-backed and scheduler-event-backed runtime notes are both unavailable, `runtime-log` now emits a small backend-owned request-context shell instead of returning an empty panel when persisted scheduler request context exists.
 - when `runtimeLog.items` is empty, `MonitorScreen` now prefers the backend-owned availability/source markers and still falls back to the old empty-list interpretation for legacy payload compatibility.
+- `live-page` now also carries a backend-owned `sourceLayer` marker so the front end can show whether the current viewport comes from run-local live artifacts, persisted request-context fallback, or no available source.
+- when `livePage.sourceLayer` is missing, `MonitorScreen` falls back to minimal legacy inference from `status`, `screenshotPath`, and the existing shell fields.
 - Pause/Abort record intent only; the backend does not trigger real execution-control workflows in Phase 3.
 - Step rows and runtime log rows now use local detail panels rather than a separate page or route.
 - Live page panel now inlines image-like screenshots when `screenshotPath` is present, but it still does not render a richer DOM summary.

@@ -2714,3 +2714,24 @@
   - Verification:
     - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
     - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`
+- 2026-05-13: Continued the same provenance-marker pattern on `P3-4 monitor /live-page`.
+  - Backend:
+    - `GET /api/phase3/runs/{runId}/live-page` now includes `sourceLayer`
+    - `sourceLayer` values:
+      - `LIVE_ARTIFACT`
+      - `REQUEST_CONTEXT`
+      - `NONE`
+    - `LIVE_ARTIFACT` is emitted when run-local `live-page.json` or screenshot artifacts back the response
+    - `REQUEST_CONTEXT` is emitted when no live artifact exists but the unavailable shell still carries persisted scheduler request context
+    - `NONE` is emitted when no live artifact and no request-context shell are available
+  - Frontend:
+    - `LivePage` now accepts the additive `sourceLayer` field
+    - `MonitorScreen` now shows a lightweight live-page source hint in the panel header
+    - when the marker is absent, the screen falls back to minimal legacy inference from `status`, `screenshotPath`, and existing shell fields
+  - Tests/docs:
+    - backend monitor test now asserts live-page source-layer values across artifact-backed, request-context-backed, and no-source responses
+    - front-end monitor test now covers marker-driven live-page hints plus a legacy unavailable live-page payload without `sourceLayer`
+    - synced `monitor/interface-spec.md` and `monitor/functional-spec.md`
+  - Verification:
+    - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+    - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`
