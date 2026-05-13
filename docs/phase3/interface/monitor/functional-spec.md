@@ -407,7 +407,7 @@ The `monitor` screen is not currently responsible for:
 - `runtimeLog` still remains partly deterministic when no stronger run-local runtime artifacts exist.
 - Step rows and runtime log rows now open local drill-down detail panels using existing runtime payload only; no new backend interface is required.
 - Live page panel can now inline image-like screenshots, but it still does not render a richer DOM summary.
-- Pause/Abort record intent only; the backend does not trigger real execution-control workflows in Phase 3.
+- Pause/Abort still do not trigger a real external execution-control workflow in Phase 3, but persisted control-phase events now read back through `status` as `PAUSING` / `ABORTING` so the screen can reflect in-progress control intent more honestly.
 
 ## 16. Suggested Output Files for This Screen Folder
 

@@ -2787,3 +2787,20 @@
   - Verification:
     - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
     - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`
+- 2026-05-13: Started the first small persisted control-state readback slice for `P3-4 monitor`.
+  - Backend:
+    - `POST /api/phase3/runs/{runId}/pause` now records a persisted `PAUSING` phase event instead of jumping straight to `PAUSED`
+    - `POST /api/phase3/runs/{runId}/abort` now records a persisted `ABORTING` phase event instead of jumping straight to `ABORTED`
+    - `GET /api/phase3/runs/{runId}/status` now reads those persisted phase events back before any stronger artifact-backed terminal status overrides them
+    - `control.canPause` / `control.canAbort` now align more closely with these phase states:
+      - `PAUSING` disables pause
+      - `ABORTING` disables both pause and abort
+  - Frontend:
+    - `MonitorScreen` consumes the existing `status` / `control` fields only; no new endpoint or extra control contract was added
+    - added a front-end regression asserting `ABORTING` disables both buttons
+  - Tests/docs:
+    - backend monitor test now asserts pause writes `PAUSING`, abort writes `ABORTING`, and `/status` reads both phase states back with aligned control booleans
+    - synced `monitor/interface-spec.md` and `monitor/functional-spec.md`
+  - Verification:
+    - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+    - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`

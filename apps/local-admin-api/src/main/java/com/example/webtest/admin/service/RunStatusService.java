@@ -123,8 +123,11 @@ public final class RunStatusService {
 
         Map<String, Object> control = new LinkedHashMap<>();
         boolean isTerminal = isTerminalStatus(status);
-        control.put("canPause", !isTerminal && !"PAUSED".equals(status) && !"PAUSING".equals(status));
-        control.put("canAbort", !isTerminal);
+        control.put("canPause", !isTerminal
+                && !"PAUSED".equals(status)
+                && !"PAUSING".equals(status)
+                && !"ABORTING".equals(status));
+        control.put("canAbort", !isTerminal && !"ABORTING".equals(status));
         result.put("control", control);
 
         result.put("lastUpdatedAt", resolveLastUpdatedAt(now, latestEvent, reportContext, livePageContext, runDir));
@@ -744,6 +747,10 @@ public final class RunStatusService {
             return controlResponse("ALREADY_PAUSED", "run-control-pause", runId, currentStatus,
                     "Run is already paused or pausing.");
         }
+        if ("ABORTING".equals(currentStatus)) {
+            return controlResponse("REJECTED", "run-control-pause", runId, currentStatus,
+                    "Run is already aborting.");
+        }
 
         // Parse optional operator/reason from body
         Map<String, Object> body = parseBodySafe(requestBody);
@@ -753,15 +760,15 @@ public final class RunStatusService {
         // Write a real scheduler event
         String eventPayload = Jsons.writeValueAsString(Map.of(
                 "runId", runId,
-                "type", "PAUSED",
-                "status", "PAUSED",
-                "state", "PAUSED",
+                "type", "PAUSING",
+                "status", "PAUSING",
+                "state", "PAUSING",
                 "owner", operator,
                 "detail", reason));
         schedulerPersistence.appendEvent(eventPayload);
 
         return controlResponse("ACCEPTED", "run-control-pause", runId, "PAUSING",
-                "Pause event recorded.");
+                "Pause request recorded.");
     }
 
     // ---- POST /api/phase3/runs/{runId}/abort ----
@@ -779,6 +786,10 @@ public final class RunStatusService {
             String status = "ABORTED".equals(currentStatus) ? "ALREADY_ABORTED" : "REJECTED";
             return controlResponse(status, "run-control-abort", runId, currentStatus, reason);
         }
+        if ("ABORTING".equals(currentStatus)) {
+            return controlResponse("REJECTED", "run-control-abort", runId, currentStatus,
+                    "Run is already aborting.");
+        }
 
         Map<String, Object> body = parseBodySafe(requestBody);
         String operator = textOr(body, "operator", "monitor");
@@ -786,15 +797,15 @@ public final class RunStatusService {
 
         String eventPayload = Jsons.writeValueAsString(Map.of(
                 "runId", runId,
-                "type", "ABORTED",
-                "status", "ABORTED",
-                "state", "ABORTED",
+                "type", "ABORTING",
+                "status", "ABORTING",
+                "state", "ABORTING",
                 "owner", operator,
                 "detail", reason));
         schedulerPersistence.appendEvent(eventPayload);
 
         return controlResponse("ACCEPTED", "run-control-abort", runId, "ABORTING",
-                "Abort event recorded.");
+                "Abort request recorded.");
     }
 
     // ---- Helpers ----

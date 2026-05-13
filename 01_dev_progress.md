@@ -5630,6 +5630,38 @@ Remaining limits:
 - `live-page.summary` is still a single lightweight text field; it does not expand into a richer DOM or region-level summary model
 - this slice does not add summary provenance reason codes beyond the existing `sourceLayer`
 
+## 2026-05-13 P3-4 monitor control-phase readback follow-up
+
+## Task
+- Start the first small `Pause / Abort` readback slice inside `local-admin-api`
+- do not connect a real external executor
+- make persisted control intent show up more honestly through existing `status` / `control` fields
+
+## Completed
+- Backend:
+  - `POST /api/phase3/runs/{runId}/pause` now records a persisted `PAUSING` phase event instead of jumping straight to `PAUSED`
+  - `POST /api/phase3/runs/{runId}/abort` now records a persisted `ABORTING` phase event instead of jumping straight to `ABORTED`
+  - `GET /api/phase3/runs/{runId}/status` now reads those phase events back before any stronger artifact-backed terminal status overrides them
+  - `control.canPause` / `control.canAbort` now align more closely with phase status:
+    - `PAUSING` disables pause
+    - `ABORTING` disables both pause and abort
+- Frontend:
+  - no new endpoint or extra control field was added
+  - `MonitorScreen` continues consuming existing `status` / `control` fields only
+  - added a regression asserting `ABORTING` disables both monitor buttons
+- Tests/docs:
+  - backend monitor test now asserts pause writes `PAUSING`, abort writes `ABORTING`, and `/status` reads both phase states back with aligned control booleans
+  - synced `monitor/interface-spec.md` and `monitor/functional-spec.md`
+
+## Verification
+- Ran:
+  - `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+  - `npm test -- --run src/screens/MonitorScreen.test.tsx`
+
+## Remaining Limits
+- control intent is still local-admin-api persisted state only; no real external executor or scheduler handshake exists yet
+- this slice does not add richer control reason codes or any new control-read endpoint
+
 ## Remaining Limits
 - `runtime-log` fallback is now more informative when request context exists, but it still remains a compact shell rather than a richer structured runtime artifact model
 - if scheduler requests also lack persisted page/runtime/locator fields, runtime-log fallback can still end up sparse or empty

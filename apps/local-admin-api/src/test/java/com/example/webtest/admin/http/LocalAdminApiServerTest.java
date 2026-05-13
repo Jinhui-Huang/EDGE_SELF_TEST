@@ -1532,6 +1532,19 @@ class LocalAdminApiServerTest {
                     HttpResponse.BodyHandlers.ofString());
             assertEquals(202, pauseOnRunning.statusCode());
             assertTrue(pauseOnRunning.body().contains("\"ACCEPTED\""));
+            assertTrue(pauseOnRunning.body().contains("\"requestedState\":\"PAUSING\""));
+
+            HttpResponse<String> pausingStatus = client.send(
+                    request(server, "/api/phase3/runs/running-run/status"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, pausingStatus.statusCode());
+            assertTrue(pausingStatus.body().contains("\"status\":\"PAUSING\""));
+            assertTrue(pausingStatus.body().contains("\"canPause\":false"));
+            assertTrue(pausingStatus.body().contains("\"canAbort\":true"));
+
+            String eventsAfterPause = Files.readString(schedulerEventsFile, StandardCharsets.UTF_8);
+            assertTrue(eventsAfterPause.contains("\"PAUSING\""));
+            assertTrue(!eventsAfterPause.contains("\"PAUSED\""));
 
             // Pause again on now-paused run should be rejected with 409
             HttpResponse<String> pauseAgain = client.send(
@@ -1539,6 +1552,37 @@ class LocalAdminApiServerTest {
                     HttpResponse.BodyHandlers.ofString());
             assertEquals(409, pauseAgain.statusCode());
             assertTrue(pauseAgain.body().contains("\"ALREADY_PAUSED\""));
+
+            Files.writeString(schedulerRequestsFile, Jsons.writeValueAsString(Map.of(
+                    "requests", List.of(Map.of(
+                            "runId", "aborting-run",
+                            "projectKey", "test-project",
+                            "owner", "qa",
+                            "environment", "staging",
+                            "status", "QUEUED")))), StandardCharsets.UTF_8);
+            Files.writeString(schedulerEventsFile, Jsons.writeValueAsString(Map.of(
+                    "events", List.of(
+                            Map.of("runId", "aborting-run", "type", "STARTED", "status", "RUNNING",
+                                    "at", "2026-04-18T10:10:00Z", "detail", "Started")))), StandardCharsets.UTF_8);
+
+            HttpResponse<String> abortOnRunning = client.send(
+                    request(server, "/api/phase3/runs/aborting-run/abort", "POST", "{}"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(202, abortOnRunning.statusCode());
+            assertTrue(abortOnRunning.body().contains("\"ACCEPTED\""));
+            assertTrue(abortOnRunning.body().contains("\"requestedState\":\"ABORTING\""));
+
+            HttpResponse<String> abortingStatus = client.send(
+                    request(server, "/api/phase3/runs/aborting-run/status"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, abortingStatus.statusCode());
+            assertTrue(abortingStatus.body().contains("\"status\":\"ABORTING\""));
+            assertTrue(abortingStatus.body().contains("\"canPause\":false"));
+            assertTrue(abortingStatus.body().contains("\"canAbort\":false"));
+
+            String eventsAfterAbort = Files.readString(schedulerEventsFile, StandardCharsets.UTF_8);
+            assertTrue(eventsAfterAbort.contains("\"ABORTING\""));
+            assertTrue(!eventsAfterAbort.contains("\"ABORTED\""));
         }
     }
 

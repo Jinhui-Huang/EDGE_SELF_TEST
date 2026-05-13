@@ -453,7 +453,9 @@ Response body:
 Functional rules:
 
 - return current-state result if run is already paused or finished
-- append a runtime-control event into scheduler/runtime history
+- append a persisted runtime-control phase event into scheduler/runtime history
+- until a stronger artifact-backed terminal status exists, `GET /api/phase3/runs/{runId}/status` should read that phase event back as `PAUSING`
+- while `status === "PAUSING"`, `control.canPause` is `false`
 
 ### 7.6 Abort Control Interface
 
@@ -486,7 +488,9 @@ Response body:
 Functional rules:
 
 - should be idempotent for already-finished runs
-- should be reflected later in run status and report status
+- append a persisted runtime-control phase event into scheduler/runtime history
+- until a stronger artifact-backed terminal status exists, `GET /api/phase3/runs/{runId}/status` should read that phase event back as `ABORTING`
+- while `status === "ABORTING"`, both `control.canPause` and `control.canAbort` are `false`
 
 ## 8. Implemented Route-State Design
 

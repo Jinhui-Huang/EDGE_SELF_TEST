@@ -229,6 +229,33 @@ describe("MonitorScreen", () => {
     expect(await screen.findByText("Source: scheduler fallback")).toBeInTheDocument();
   });
 
+  it("disables monitor controls when status reflects pausing or aborting", async () => {
+    vi.stubGlobal("fetch", createFetchMock({
+      status: {
+        ...runStatusResponse,
+        status: "ABORTING",
+        control: {
+          canPause: false,
+          canAbort: false
+        }
+      }
+    }));
+
+    render(
+      <MonitorScreen
+        snapshot={snapshot}
+        title="Execution monitor"
+        locale="en"
+        selectedRunId="checkout-web-smoke"
+        apiBaseUrl="http://127.0.0.1:8787"
+      />
+    );
+
+    expect(await screen.findByText("aborting")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Pause" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Abort" })).toBeDisabled();
+  });
+
   it("opens runtime log detail when clicking a runtime log row", async () => {
     vi.stubGlobal("fetch", createFetchMock());
 
