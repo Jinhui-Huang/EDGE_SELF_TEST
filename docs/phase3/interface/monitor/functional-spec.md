@@ -254,6 +254,8 @@ The screen loads runtime data from dedicated APIs when `selectedRunId` is provid
 - `MonitorScreen` now also shows a lightweight live-page source hint in the panel header and falls back to minimal legacy inference when older live-page payloads omit the marker
 - `MonitorScreen` now also shows the optional live-page `summary` text in the panel without changing the screenshot / highlight / locator structure
 - `MonitorScreen` now also shows a lightweight status source hint in the hero row and, when older status payloads omit the marker, only treats stronger artifact-like current-page signals as `RUN_ARTIFACTS`; otherwise it stays conservative with `SCHEDULER_FALLBACK`
+- when `runStatus.status` is `PAUSING` or `ABORTING`, `MonitorScreen` now shows a dedicated in-progress control-phase banner that warns runtime log, step timeline, and live-page panels may temporarily remain on an older snapshot while the control phase settles
+- that banner reuses the existing lightweight control-request readback fields (`requestedBy`, `requestReason`, and `requestedAt`) rather than introducing any new control-specific API contract
 
 ## 8. Screen Inputs and Outputs
 

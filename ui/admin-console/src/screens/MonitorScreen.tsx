@@ -243,6 +243,7 @@ export function MonitorScreen({
   const livePageSourceText = livePageSourceLayer ? describeLivePageSourceLayer(livePageSourceLayer, t) : null;
   const statusSourceText = statusSourceLayer ? describeStatusSourceLayer(statusSourceLayer, t) : null;
   const controlRequestSummary = describeControlRequestSummary(control, status, t);
+  const controlPhaseBanner = describeControlPhaseBanner(status, t);
   const activeDetailKind = selectedStep ? "step" : selectedLog ? "log" : null;
   const livePageStatus = livePage?.status ?? "UNAVAILABLE";
   const liveScreenshotUrl = runId && livePage?.screenshotPath
@@ -317,6 +318,9 @@ export function MonitorScreen({
           <span>{percentText}</span>
         </div>
         <div className="monitorProgressBody">
+          {controlPhaseBanner ? (
+            <p className="monitorControlFeedback warning">{controlPhaseBanner}</p>
+          ) : null}
           <div className="monitorProgressMeta">
             <div>
               <span className="monitorProgressLabel">
@@ -793,6 +797,21 @@ function describeControlRequestSummary(
   const atPart = requestedAt ? ` ${t(copy("at", "于", "at"))} ${formatTimestamp(requestedAt)}` : "";
   const reasonPart = requestReason ? ` - ${requestReason}` : "";
   return `${action}${byPart}${atPart}${reasonPart}`;
+}
+
+function describeControlPhaseBanner(status: string, t: (copySet: Copy) => string): string | null {
+  if (status !== "PAUSING" && status !== "ABORTING") {
+    return null;
+  }
+  const phaseLead = status === "PAUSING"
+    ? t(copy("Pause request is in progress.", "暂停请求进行中。", "一時停止リクエストを処理中です。"))
+    : t(copy("Abort request is in progress.", "终止请求进行中。", "中止リクエストを処理中です。"));
+  const snapshotNote = t(copy(
+    "Runtime log, steps, and live page may remain on the last snapshot until the control phase settles.",
+    "在控制阶段完成前，运行日志、步骤和实时页面可能暂时停留在旧快照上。",
+    "制御フェーズが落ち着くまで、ランタイムログ・ステップ・ライブページは直前のスナップショットのまま残ることがあります。"
+  ));
+  return `${phaseLead} ${snapshotNote}`;
 }
 
 function logTypeTone(type: string): string {

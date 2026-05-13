@@ -2846,3 +2846,15 @@
     - synced `monitor/interface-spec.md` and `monitor/functional-spec.md`
   - Verification:
     - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+- 2026-05-13: Added a pure-UI control-phase banner to `MonitorScreen` for persisted `PAUSING` / `ABORTING` states.
+  - Frontend:
+    - when `runStatus.status` is `PAUSING` or `ABORTING`, `MonitorScreen` now shows a dedicated control-phase banner
+    - the banner explicitly says the control request is still in progress
+    - it warns operators that runtime log, step timeline, and live-page panels may temporarily remain on an older snapshot while the control phase settles
+    - it reuses the existing `requestedBy`, `requestReason`, and `requestedAt` readback fields when present
+  - Tests/docs:
+    - front-end monitor regression now covers both `PAUSING` and `ABORTING`
+    - the assertions keep banner copy and button-disabled behavior coupled in the same scenarios
+    - synced `monitor/functional-spec.md`
+  - Verification:
+    - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`

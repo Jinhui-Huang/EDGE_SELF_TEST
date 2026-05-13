@@ -5749,6 +5749,32 @@ Remaining limits:
 - control notes are still collapsed into a single lightweight `live-page.summary` string rather than a richer structured control-note field
 - this slice does not add any front-end control-specific live-page affordance beyond the existing summary block
 
+## 2026-05-13 P3-4 monitor control-phase banner follow-up
+
+## Task
+- Stay on `P3-4 monitor`, but keep the next slice front-end only:
+  - based only on existing `status` / `control`
+  - add a clearer in-progress control-phase banner/copy for `PAUSING` / `ABORTING`
+  - do not add endpoints, do not change any response structure, do not touch report/plugin flows
+
+## Completed
+- Updated `ui/admin-console/src/screens/MonitorScreen.tsx`:
+  - when `runStatus.status` is `PAUSING` or `ABORTING`, the progress area now shows a dedicated control-phase banner
+  - the banner explicitly says the control request is in progress
+  - the banner warns operators that runtime log, step timeline, and live-page panels may temporarily remain on the last snapshot until the control phase settles
+  - the copy reuses the existing `requestedBy`, `requestReason`, and `requestedAt` readback fields when available
+- Expanded `ui/admin-console/src/screens/MonitorScreen.test.tsx`:
+  - added a `PAUSING` regression that asserts the banner copy and the disabled/enabled button state together
+  - expanded the `ABORTING` regression to assert the banner copy and the fully disabled control state together
+
+## Verification
+- Ran:
+  - `npm test -- --run src/screens/MonitorScreen.test.tsx`
+
+## Remaining Limits
+- this slice is explanatory UI only; it does not add any real executor-side pause/abort progress signal
+- runtime log, step timeline, and live-page panels still rely on their existing backend snapshot/fallback chains
+
 ## Remaining Limits
 - `runtime-log` fallback is now more informative when request context exists, but it still remains a compact shell rather than a richer structured runtime artifact model
 - if scheduler requests also lack persisted page/runtime/locator fields, runtime-log fallback can still end up sparse or empty

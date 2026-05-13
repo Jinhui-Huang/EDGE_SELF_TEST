@@ -229,7 +229,41 @@ describe("MonitorScreen", () => {
     expect(await screen.findByText("Source: scheduler fallback")).toBeInTheDocument();
   });
 
-  it("disables monitor controls when status reflects pausing or aborting", async () => {
+  it("shows a pausing control-phase banner and keeps pause disabled", async () => {
+    vi.stubGlobal("fetch", createFetchMock({
+      status: {
+        ...runStatusResponse,
+        status: "PAUSING",
+        control: {
+          canPause: false,
+          canAbort: true,
+          requestedBy: "qa-platform",
+          requestReason: "Need manual verification before payment submit",
+          requestedAt: "2026-05-05T10:04:30Z"
+        }
+      }
+    }));
+
+    render(
+      <MonitorScreen
+        snapshot={snapshot}
+        title="Execution monitor"
+        locale="en"
+        selectedRunId="checkout-web-smoke"
+        apiBaseUrl="http://127.0.0.1:8787"
+      />
+    );
+
+    expect(await screen.findByText("pausing")).toBeInTheDocument();
+    expect(screen.getByText(/Pause request is in progress/)).toBeInTheDocument();
+    expect(screen.getByText(/may remain on the last snapshot until the control phase settles/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Pause" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Abort" })).not.toBeDisabled();
+    expect(screen.getAllByText(/Pause requested by qa-platform/)).toHaveLength(1);
+    expect(screen.getAllByText(/Need manual verification before payment submit/)).toHaveLength(1);
+  });
+
+  it("shows an aborting control-phase banner and keeps both controls disabled", async () => {
     vi.stubGlobal("fetch", createFetchMock({
       status: {
         ...runStatusResponse,
@@ -255,10 +289,12 @@ describe("MonitorScreen", () => {
     );
 
     expect(await screen.findByText("aborting")).toBeInTheDocument();
+    expect(screen.getByText(/Abort request is in progress/)).toBeInTheDocument();
+    expect(screen.getByText(/may remain on the last snapshot until the control phase settles/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Pause" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Abort" })).toBeDisabled();
-    expect(screen.getByText(/Abort requested by ops-oncall/)).toBeInTheDocument();
-    expect(screen.getByText(/Unsafe DOM mismatch after payment redirect/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Abort requested by ops-oncall/)).toHaveLength(1);
+    expect(screen.getAllByText(/Unsafe DOM mismatch after payment redirect/)).toHaveLength(1);
   });
 
   it("opens runtime log detail when clicking a runtime log row", async () => {
