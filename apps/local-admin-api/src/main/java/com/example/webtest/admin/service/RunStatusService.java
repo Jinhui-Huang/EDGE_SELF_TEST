@@ -128,6 +128,12 @@ public final class RunStatusService {
                 && !"PAUSING".equals(status)
                 && !"ABORTING".equals(status));
         control.put("canAbort", !isTerminal && !"ABORTING".equals(status));
+        ControlRequestInfo controlRequestInfo = latestControlRequestInfo(status, events);
+        if (controlRequestInfo != null) {
+            putIfNotBlank(control, "requestedBy", controlRequestInfo.requestedBy());
+            putIfNotBlank(control, "requestReason", controlRequestInfo.requestReason());
+            putIfNotBlank(control, "requestedAt", controlRequestInfo.requestedAt());
+        }
         result.put("control", control);
 
         result.put("lastUpdatedAt", resolveLastUpdatedAt(now, latestEvent, reportContext, livePageContext, runDir));
@@ -181,6 +187,24 @@ public final class RunStatusService {
         return new ArtifactCounterInfo(
                 artifactAiCalls != null ? artifactAiCalls : runtimeAiCalls,
                 artifactHeals != null ? artifactHeals : runtimeHeals);
+    }
+
+    private ControlRequestInfo latestControlRequestInfo(String status, List<Map<String, Object>> events) {
+        if (!"PAUSING".equals(status) && !"ABORTING".equals(status)) {
+            return null;
+        }
+        for (int i = events.size() - 1; i >= 0; i--) {
+            Map<String, Object> event = events.get(i);
+            String eventStatus = textOr(event, "status", "");
+            String eventType = textOr(event, "type", "");
+            if (status.equalsIgnoreCase(eventStatus) || status.equalsIgnoreCase(eventType)) {
+                return new ControlRequestInfo(
+                        textOr(event, "owner", ""),
+                        textOr(event, "detail", ""),
+                        textOr(event, "at", ""));
+            }
+        }
+        return null;
     }
 
     // ---- GET /api/phase3/runs/{runId}/steps ----
@@ -1417,5 +1441,8 @@ public final class RunStatusService {
     }
 
     private record ArtifactCounterInfo(Integer aiCalls, Integer heals) {
+    }
+
+    private record ControlRequestInfo(String requestedBy, String requestReason, String requestedAt) {
     }
 }

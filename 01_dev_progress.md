@@ -5662,6 +5662,37 @@ Remaining limits:
 - control intent is still local-admin-api persisted state only; no real external executor or scheduler handshake exists yet
 - this slice does not add richer control reason codes or any new control-read endpoint
 
+## 2026-05-13 P3-4 monitor control-request readback follow-up
+
+## Task
+- Keep the next control slice inside existing `status` / `control`
+- add lightweight readback for who requested pause/abort, why, and when
+- avoid any new endpoint or external executor integration
+
+## Completed
+- Backend:
+  - when `status` is `PAUSING` or `ABORTING`, `status.control` now reuses the latest matching persisted control event to expose:
+    - `requestedBy`
+    - `requestReason`
+    - `requestedAt`
+  - the values are sourced from the existing persisted event `owner` / `detail` / `at`
+- Frontend:
+  - `RunStatus.control` now includes those optional additive fields
+  - `MonitorScreen` now shows a lightweight control summary line in the hero actions area so operators can see who requested the phase change, why, and when
+- Tests/docs:
+  - backend monitor test now asserts pause/abort `/status.control` readback fields
+  - front-end monitor test now asserts the aborting-state summary line renders
+  - synced `monitor/interface-spec.md` and `monitor/functional-spec.md`
+
+## Verification
+- Ran:
+  - `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+  - `npm test -- --run src/screens/MonitorScreen.test.tsx`
+
+## Remaining Limits
+- control request metadata is still only available during persisted `PAUSING` / `ABORTING` phase readback; there is no richer control history view yet
+- this slice does not add any new control-read endpoint or external executor handshake
+
 ## Remaining Limits
 - `runtime-log` fallback is now more informative when request context exists, but it still remains a compact shell rather than a richer structured runtime artifact model
 - if scheduler requests also lack persisted page/runtime/locator fields, runtime-log fallback can still end up sparse or empty

@@ -236,7 +236,10 @@ describe("MonitorScreen", () => {
         status: "ABORTING",
         control: {
           canPause: false,
-          canAbort: false
+          canAbort: false,
+          requestedBy: "ops-oncall",
+          requestReason: "Unsafe DOM mismatch after payment redirect",
+          requestedAt: "2026-05-05T10:05:00Z"
         }
       }
     }));
@@ -254,6 +257,8 @@ describe("MonitorScreen", () => {
     expect(await screen.findByText("aborting")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Pause" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Abort" })).toBeDisabled();
+    expect(screen.getByText(/Abort requested by ops-oncall/)).toBeInTheDocument();
+    expect(screen.getByText(/Unsafe DOM mismatch after payment redirect/)).toBeInTheDocument();
   });
 
   it("opens runtime log detail when clicking a runtime log row", async () => {

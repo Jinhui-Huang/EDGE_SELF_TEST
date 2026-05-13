@@ -456,6 +456,10 @@ Functional rules:
 - append a persisted runtime-control phase event into scheduler/runtime history
 - until a stronger artifact-backed terminal status exists, `GET /api/phase3/runs/{runId}/status` should read that phase event back as `PAUSING`
 - while `status === "PAUSING"`, `control.canPause` is `false`
+- while `status === "PAUSING"`, `status.control` may also read back:
+  - `requestedBy`
+  - `requestReason`
+  - `requestedAt`
 
 ### 7.6 Abort Control Interface
 
@@ -491,6 +495,10 @@ Functional rules:
 - append a persisted runtime-control phase event into scheduler/runtime history
 - until a stronger artifact-backed terminal status exists, `GET /api/phase3/runs/{runId}/status` should read that phase event back as `ABORTING`
 - while `status === "ABORTING"`, both `control.canPause` and `control.canAbort` are `false`
+- while `status === "ABORTING"`, `status.control` may also read back:
+  - `requestedBy`
+  - `requestReason`
+  - `requestedAt`
 
 ## 8. Implemented Route-State Design
 

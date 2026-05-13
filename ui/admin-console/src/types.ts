@@ -294,6 +294,9 @@ export type RunStatus = {
   control: {
     canPause: boolean;
     canAbort: boolean;
+    requestedBy?: string;
+    requestReason?: string;
+    requestedAt?: string;
   };
   lastUpdatedAt: string;
 };

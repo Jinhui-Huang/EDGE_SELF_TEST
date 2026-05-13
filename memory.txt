@@ -2804,3 +2804,20 @@
   - Verification:
     - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
     - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`
+- 2026-05-13: Added lightweight control-request readback fields to `monitor/status`.
+  - Backend:
+    - when `status` is `PAUSING` or `ABORTING`, `status.control` now reuses the latest matching persisted control event to expose:
+      - `requestedBy`
+      - `requestReason`
+      - `requestedAt`
+    - the fields are sourced from the existing persisted event `owner` / `detail` / `at`
+  - Frontend:
+    - `RunStatus.control` now accepts those additive fields
+    - `MonitorScreen` now shows a lightweight control summary line in the hero actions area so operators can see who requested the phase change, why, and when
+  - Tests/docs:
+    - backend monitor test now asserts pause/abort `/status.control` readback fields
+    - front-end monitor test now asserts the aborting-state summary line renders
+    - synced `monitor/interface-spec.md` and `monitor/functional-spec.md`
+  - Verification:
+    - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+    - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`

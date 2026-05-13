@@ -238,6 +238,7 @@ The screen loads runtime data from dedicated APIs when `selectedRunId` is provid
 - `runStatus` now prefers run-local `report.json` / `live-page.json` / artifact timestamps when available and otherwise keeps a conservative scheduler-backed shell that can still surface persisted scheduler request page/runtime context
 - `runStatus.counters.aiCalls` / `runStatus.counters.heals` now prefer artifact-backed report summary values first and then run-local `runtime.log` classification before falling back to scheduler-event counts
 - `runStatus` now also carries a backend-owned source-layer marker so the front end can show whether the run summary is artifact-strengthened or still scheduler-fallback-owned
+- when `runStatus.status` is `PAUSING` or `ABORTING`, `runStatus.control` may now also carry lightweight readback fields such as `requestedBy`, `requestReason`, and `requestedAt`
 - `steps` now also carries a backend-owned availability marker so the front end can distinguish a truly unavailable step timeline from a merely short one without changing the existing row structure
 - `steps` now also carries a backend-owned source-layer marker so the front end can show whether the current step timeline comes from report artifacts, scheduler events, or no available source
 - `runtimeLog` now follows an explicit fallback chain: run-local `runtime.log` artifact first, then scheduler-event-derived runtime notes, then a small persisted scheduler request-context shell when neither source yields usable runtime-log rows
@@ -407,7 +408,7 @@ The `monitor` screen is not currently responsible for:
 - `runtimeLog` still remains partly deterministic when no stronger run-local runtime artifacts exist.
 - Step rows and runtime log rows now open local drill-down detail panels using existing runtime payload only; no new backend interface is required.
 - Live page panel can now inline image-like screenshots, but it still does not render a richer DOM summary.
-- Pause/Abort still do not trigger a real external execution-control workflow in Phase 3, but persisted control-phase events now read back through `status` as `PAUSING` / `ABORTING` so the screen can reflect in-progress control intent more honestly.
+- Pause/Abort still do not trigger a real external execution-control workflow in Phase 3, but persisted control-phase events now read back through `status` as `PAUSING` / `ABORTING`, along with lightweight control-request metadata, so the screen can reflect in-progress control intent more honestly.
 
 ## 16. Suggested Output Files for This Screen Folder
 

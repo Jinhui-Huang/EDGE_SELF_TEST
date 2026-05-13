@@ -1528,7 +1528,10 @@ class LocalAdminApiServerTest {
 
             // Pause on running run should succeed
             HttpResponse<String> pauseOnRunning = client.send(
-                    request(server, "/api/phase3/runs/running-run/pause", "POST", "{}"),
+                    request(server, "/api/phase3/runs/running-run/pause", "POST",
+                            Jsons.writeValueAsString(Map.of(
+                                    "operator", "qa-platform",
+                                    "reason", "Need manual verification before payment submit"))),
                     HttpResponse.BodyHandlers.ofString());
             assertEquals(202, pauseOnRunning.statusCode());
             assertTrue(pauseOnRunning.body().contains("\"ACCEPTED\""));
@@ -1541,6 +1544,9 @@ class LocalAdminApiServerTest {
             assertTrue(pausingStatus.body().contains("\"status\":\"PAUSING\""));
             assertTrue(pausingStatus.body().contains("\"canPause\":false"));
             assertTrue(pausingStatus.body().contains("\"canAbort\":true"));
+            assertTrue(pausingStatus.body().contains("\"requestedBy\":\"qa-platform\""));
+            assertTrue(pausingStatus.body().contains("\"requestReason\":\"Need manual verification before payment submit\""));
+            assertTrue(pausingStatus.body().contains("\"requestedAt\":\"2026-04-18T11:00:00Z\""));
 
             String eventsAfterPause = Files.readString(schedulerEventsFile, StandardCharsets.UTF_8);
             assertTrue(eventsAfterPause.contains("\"PAUSING\""));
@@ -1566,7 +1572,10 @@ class LocalAdminApiServerTest {
                                     "at", "2026-04-18T10:10:00Z", "detail", "Started")))), StandardCharsets.UTF_8);
 
             HttpResponse<String> abortOnRunning = client.send(
-                    request(server, "/api/phase3/runs/aborting-run/abort", "POST", "{}"),
+                    request(server, "/api/phase3/runs/aborting-run/abort", "POST",
+                            Jsons.writeValueAsString(Map.of(
+                                    "operator", "ops-oncall",
+                                    "reason", "Unsafe DOM mismatch after payment redirect"))),
                     HttpResponse.BodyHandlers.ofString());
             assertEquals(202, abortOnRunning.statusCode());
             assertTrue(abortOnRunning.body().contains("\"ACCEPTED\""));
@@ -1579,6 +1588,9 @@ class LocalAdminApiServerTest {
             assertTrue(abortingStatus.body().contains("\"status\":\"ABORTING\""));
             assertTrue(abortingStatus.body().contains("\"canPause\":false"));
             assertTrue(abortingStatus.body().contains("\"canAbort\":false"));
+            assertTrue(abortingStatus.body().contains("\"requestedBy\":\"ops-oncall\""));
+            assertTrue(abortingStatus.body().contains("\"requestReason\":\"Unsafe DOM mismatch after payment redirect\""));
+            assertTrue(abortingStatus.body().contains("\"requestedAt\":\"2026-04-18T11:00:00Z\""));
 
             String eventsAfterAbort = Files.readString(schedulerEventsFile, StandardCharsets.UTF_8);
             assertTrue(eventsAfterAbort.contains("\"ABORTING\""));

@@ -242,6 +242,7 @@ export function MonitorScreen({
   const runtimeLogSourceText = runtimeLogSourceLayer ? describeRuntimeLogSourceLayer(runtimeLogSourceLayer, t) : null;
   const livePageSourceText = livePageSourceLayer ? describeLivePageSourceLayer(livePageSourceLayer, t) : null;
   const statusSourceText = statusSourceLayer ? describeStatusSourceLayer(statusSourceLayer, t) : null;
+  const controlRequestSummary = describeControlRequestSummary(control, status, t);
   const activeDetailKind = selectedStep ? "step" : selectedLog ? "log" : null;
   const livePageStatus = livePage?.status ?? "UNAVAILABLE";
   const liveScreenshotUrl = runId && livePage?.screenshotPath
@@ -293,6 +294,9 @@ export function MonitorScreen({
           ) : null}
           {abortState.kind !== "idle" ? (
             <span className={`monitorControlFeedback ${abortState.kind}`}>{abortState.message}</span>
+          ) : null}
+          {controlRequestSummary ? (
+            <span className="monitorControlFeedback neutral">{controlRequestSummary}</span>
           ) : null}
         </div>
       </section>
@@ -765,6 +769,30 @@ function describeStatusSourceLayer(
     default:
       return prefix;
   }
+}
+
+function describeControlRequestSummary(
+  control: RunStatus["control"] | null | undefined,
+  status: string,
+  t: (copySet: Copy) => string
+): string | null {
+  if (!control || (status !== "PAUSING" && status !== "ABORTING")) {
+    return null;
+  }
+  const requestedBy = control.requestedBy?.trim() ?? "";
+  const requestReason = control.requestReason?.trim() ?? "";
+  const requestedAt = control.requestedAt?.trim() ?? "";
+  if (!requestedBy && !requestReason && !requestedAt) {
+    return null;
+  }
+
+  const action = status === "PAUSING"
+    ? t(copy("Pause requested", "已请求暂停", "一時停止を要求済み"))
+    : t(copy("Abort requested", "已请求终止", "中止を要求済み"));
+  const byPart = requestedBy ? ` ${t(copy("by", "由", "by"))} ${requestedBy}` : "";
+  const atPart = requestedAt ? ` ${t(copy("at", "于", "at"))} ${formatTimestamp(requestedAt)}` : "";
+  const reasonPart = requestReason ? ` - ${requestReason}` : "";
+  return `${action}${byPart}${atPart}${reasonPart}`;
 }
 
 function logTypeTone(type: string): string {
