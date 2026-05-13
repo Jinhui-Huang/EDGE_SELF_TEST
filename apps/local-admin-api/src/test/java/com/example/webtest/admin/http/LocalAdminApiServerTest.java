@@ -1552,6 +1552,18 @@ class LocalAdminApiServerTest {
             assertTrue(eventsAfterPause.contains("\"PAUSING\""));
             assertTrue(!eventsAfterPause.contains("\"PAUSED\""));
 
+            HttpResponse<String> pausingRuntimeLog = client.send(
+                    request(server, "/api/phase3/runs/running-run/runtime-log"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, pausingRuntimeLog.statusCode());
+            assertTrue(pausingRuntimeLog.body().contains("\"type\":\"PAUSING\""));
+            assertTrue(pausingRuntimeLog.body().contains("\"source\":\"scheduler-events\""));
+            assertTrue(pausingRuntimeLog.body().contains("\"summary\":\"Pause requested from monitor control.\""));
+            assertTrue(pausingRuntimeLog.body().contains("\"message\":\"Need manual verification before payment submit\""));
+            assertTrue(pausingRuntimeLog.body().contains("\"requestedBy\":\"qa-platform\""));
+            assertTrue(pausingRuntimeLog.body().contains("\"requestedAt\":\"2026-04-18T11:00:00Z\""));
+            assertTrue(pausingRuntimeLog.body().contains("\"requestReason\":\"Need manual verification before payment submit\""));
+
             // Pause again on now-paused run should be rejected with 409
             HttpResponse<String> pauseAgain = client.send(
                     request(server, "/api/phase3/runs/running-run/pause", "POST", "{}"),
@@ -1595,6 +1607,18 @@ class LocalAdminApiServerTest {
             String eventsAfterAbort = Files.readString(schedulerEventsFile, StandardCharsets.UTF_8);
             assertTrue(eventsAfterAbort.contains("\"ABORTING\""));
             assertTrue(!eventsAfterAbort.contains("\"ABORTED\""));
+
+            HttpResponse<String> abortingRuntimeLog = client.send(
+                    request(server, "/api/phase3/runs/aborting-run/runtime-log"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, abortingRuntimeLog.statusCode());
+            assertTrue(abortingRuntimeLog.body().contains("\"type\":\"ABORTING\""));
+            assertTrue(abortingRuntimeLog.body().contains("\"source\":\"scheduler-events\""));
+            assertTrue(abortingRuntimeLog.body().contains("\"summary\":\"Abort requested from monitor control.\""));
+            assertTrue(abortingRuntimeLog.body().contains("\"message\":\"Unsafe DOM mismatch after payment redirect\""));
+            assertTrue(abortingRuntimeLog.body().contains("\"requestedBy\":\"ops-oncall\""));
+            assertTrue(abortingRuntimeLog.body().contains("\"requestedAt\":\"2026-04-18T11:00:00Z\""));
+            assertTrue(abortingRuntimeLog.body().contains("\"requestReason\":\"Unsafe DOM mismatch after payment redirect\""));
         }
     }
 

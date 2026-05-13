@@ -341,6 +341,10 @@ When no run-local `runtime.log` artifact exists, the endpoint keeps the current 
 - `source: "scheduler-events"`
 - `summary` derived from the event `detail` / `title`
 - `model` preserved only when the fallback scheduler event actually carries it
+- persisted `PAUSING` / `ABORTING` control events are exposed as backend-owned scheduler-event rows with:
+  - control-specific `summary`
+  - `message` carrying the request reason
+  - `detail.requestedBy` / `detail.requestedAt` / `detail.requestReason`
 - if non-step scheduler events are also absent or too thin to form runtime-log rows, the backend can emit a few `source: "scheduler-request-context"` entries instead
 - those shell entries expose persisted startup context such as page identity, runtime summary, next action, and locator cues so `monitor` does not collapse into an empty runtime-log panel
 - only when artifact rows, scheduler-event rows, and request-context shell rows are all absent does the endpoint return:

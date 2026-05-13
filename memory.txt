@@ -2821,3 +2821,17 @@
   - Verification:
     - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
     - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`
+- 2026-05-13: Extended the same persisted control readback line into `monitor/runtime-log`.
+  - Backend:
+    - when `runtime.log` artifact does not override control semantics, persisted `PAUSING` / `ABORTING` scheduler events now emit backend-owned scheduler-event log rows
+    - those rows keep the existing runtime-log entry shape and reuse:
+      - `source: "scheduler-events"`
+      - control-specific `summary`
+      - `message` for the request reason
+      - `detail.requestedBy` / `detail.requestedAt` / `detail.requestReason`
+  - Tests/docs:
+    - backend monitor test now asserts pause/abort `/runtime-log` exposes the corresponding control rows
+    - no front-end code change was needed because the existing runtime-log row/detail UI can already render `message` / `detail`
+    - synced `monitor/interface-spec.md` and `monitor/functional-spec.md`
+  - Verification:
+    - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`

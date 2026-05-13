@@ -5693,6 +5693,35 @@ Remaining limits:
 - control request metadata is still only available during persisted `PAUSING` / `ABORTING` phase readback; there is no richer control history view yet
 - this slice does not add any new control-read endpoint or external executor handshake
 
+## 2026-05-13 P3-4 monitor control-runtime-log follow-up
+
+## Task
+- Extend the same persisted control readback line into `GET /api/phase3/runs/{runId}/runtime-log`
+- keep the existing runtime-log entry shape intact
+- avoid any front-end contract expansion unless the current UI cannot render the data
+
+## Completed
+- Backend:
+  - when `runtime.log` artifact does not override control semantics, persisted `PAUSING` / `ABORTING` scheduler events now emit backend-owned scheduler-event log rows
+  - those rows keep the existing runtime-log entry shape and reuse:
+    - `source: "scheduler-events"`
+    - control-specific `summary`
+    - `message` for the request reason
+    - `detail.requestedBy` / `detail.requestedAt` / `detail.requestReason`
+- Frontend:
+  - no code change was required; the existing runtime-log row/detail UI already renders `summary`, `message`, and structured `detail`
+- Tests/docs:
+  - backend monitor test now asserts pause/abort `/runtime-log` exposes the corresponding control rows
+  - synced `monitor/interface-spec.md` and `monitor/functional-spec.md`
+
+## Verification
+- Ran:
+  - `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+
+## Remaining Limits
+- control rows still live inside the scheduler-events fallback layer; there is no richer dedicated control log model yet
+- this slice does not add any new runtime-log source layer or front-end control-specific affordance
+
 ## Remaining Limits
 - `runtime-log` fallback is now more informative when request context exists, but it still remains a compact shell rather than a richer structured runtime artifact model
 - if scheduler requests also lack persisted page/runtime/locator fields, runtime-log fallback can still end up sparse or empty

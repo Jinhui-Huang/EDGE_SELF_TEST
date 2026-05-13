@@ -337,14 +337,7 @@ public final class RunStatusService {
             String type = textOr(event, "type", "INFO");
             // Include all non-step events as log entries
             if (!type.startsWith("STEP_")) {
-                Map<String, Object> entry = new LinkedHashMap<>();
-                entry.put("at", textOr(event, "at", Instant.now(clock).toString()));
-                entry.put("type", type);
-                entry.put("model", textOr(event, "model", ""));
-                entry.put("summary", textOr(event, "detail",
-                        textOr(event, "title", type + " event")));
-                entry.put("source", "scheduler-events");
-                items.add(entry);
+                items.add(buildSchedulerEventRuntimeLogEntry(event));
             }
         }
         if (items.isEmpty()) {
@@ -363,6 +356,34 @@ public final class RunStatusService {
         result.put("items", items);
         result.put("nextCursor", null);
         return result;
+    }
+
+    private Map<String, Object> buildSchedulerEventRuntimeLogEntry(Map<String, Object> event) {
+        String at = textOr(event, "at", Instant.now(clock).toString());
+        String type = textOr(event, "type", "INFO");
+        String detail = textOr(event, "detail", "");
+        Map<String, Object> entry = new LinkedHashMap<>();
+        entry.put("at", at);
+        entry.put("type", type);
+        entry.put("model", textOr(event, "model", ""));
+        entry.put("source", "scheduler-events");
+        if ("PAUSING".equals(type) || "ABORTING".equals(type)) {
+            entry.put("summary", "PAUSING".equals(type)
+                    ? "Pause requested from monitor control."
+                    : "Abort requested from monitor control.");
+            entry.put("message", firstNonBlank(detail, textOr(event, "title", type + " event")));
+            Map<String, Object> detailMap = new LinkedHashMap<>();
+            putIfNotBlank(detailMap, "requestedBy", textOr(event, "owner", ""));
+            putIfNotBlank(detailMap, "requestedAt", at);
+            putIfNotBlank(detailMap, "requestReason", detail);
+            if (!detailMap.isEmpty()) {
+                entry.put("detail", detailMap);
+            }
+            return entry;
+        }
+        entry.put("summary", textOr(event, "detail",
+                textOr(event, "title", type + " event")));
+        return entry;
     }
 
     private boolean hasSchedulerEventRuntimeLog(List<Map<String, Object>> events) {
