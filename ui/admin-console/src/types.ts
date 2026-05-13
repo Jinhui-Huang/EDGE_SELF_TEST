@@ -309,6 +309,7 @@ export type RunStep = {
 export type RunStepsResponse = {
   runId: string;
   availability?: "AVAILABLE" | "UNAVAILABLE";
+  sourceLayer?: "REPORT_ARTIFACT" | "SCHEDULER_EVENTS" | "NONE";
   items: RunStep[];
 };
 

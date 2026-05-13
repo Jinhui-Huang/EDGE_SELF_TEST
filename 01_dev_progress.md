@@ -5461,6 +5461,53 @@ Remaining limits:
 - `sourceLayer` is still a coarse top-level provenance marker; it does not explain mixed-source or per-entry provenance beyond the existing row-level `source`
 - this slice does not alter runtime-log paging, entry metadata, or any non-monitor contract
 
+## 2026-05-13 P3-4 monitor steps source-layer follow-up
+
+## Task
+- Continue the same provenance-marker pattern from `/runtime-log` onto `/steps`
+- keep `items` and `availability` intact
+- add a lightweight front-end hint without changing step-row structure
+
+## Completed
+- Updated backend `RunStatusService`:
+  - `GET /api/phase3/runs/{runId}/steps` now includes `sourceLayer`
+  - `REPORT_ARTIFACT` when `report.json.steps[]` owns the response
+  - `SCHEDULER_EVENTS` when scheduler `STEP_*` rows own the response
+  - `NONE` when the endpoint returns `items: []`
+- Updated frontend types and screen logic:
+  - `RunStepsResponse` now includes optional `sourceLayer`
+  - `MonitorScreen` now shows a lightweight steps source hint in the panel header
+  - the screen prefers the backend marker first and falls back to minimal legacy inference from `items` plus existing fallback rules when the marker is absent
+- Updated tests:
+  - backend monitor test now asserts step `sourceLayer` across report-backed, scheduler-backed, and empty-fallback responses
+  - front-end monitor test now covers:
+    - marker-driven `Source: report artifact`
+    - marker-driven `Source: none`
+    - legacy empty-step payload without `sourceLayer`
+- Synced docs:
+  - `monitor/interface-spec.md`
+  - `monitor/functional-spec.md`
+
+## Modified Files
+- `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/RunStatusService.java`
+- `apps/local-admin-api/src/test/java/com/example/webtest/admin/http/LocalAdminApiServerTest.java`
+- `ui/admin-console/src/types.ts`
+- `ui/admin-console/src/screens/MonitorScreen.tsx`
+- `ui/admin-console/src/screens/MonitorScreen.test.tsx`
+- `docs/phase3/interface/monitor/interface-spec.md`
+- `docs/phase3/interface/monitor/functional-spec.md`
+- `01_dev_progress.md`
+- `memory.txt`
+
+## Verification
+- Ran:
+  - `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+  - `npm test -- --run src/screens/MonitorScreen.test.tsx`
+
+## Remaining Limits
+- `steps.sourceLayer` is a coarse top-level provenance marker; it does not explain mixed-source timelines or per-step provenance
+- this slice does not alter step-row metadata or any non-monitor contract
+
 ## Remaining Limits
 - `runtime-log` fallback is now more informative when request context exists, but it still remains a compact shell rather than a richer structured runtime artifact model
 - if scheduler requests also lack persisted page/runtime/locator fields, runtime-log fallback can still end up sparse or empty

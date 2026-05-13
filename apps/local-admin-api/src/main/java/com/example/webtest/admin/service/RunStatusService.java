@@ -132,6 +132,7 @@ public final class RunStatusService {
             Map<String, Object> artifactResult = new LinkedHashMap<>();
             artifactResult.put("runId", runId);
             artifactResult.put("availability", "AVAILABLE");
+            artifactResult.put("sourceLayer", "REPORT_ARTIFACT");
             artifactResult.put("items", artifactSteps);
             return artifactResult;
         }
@@ -169,6 +170,7 @@ public final class RunStatusService {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("runId", runId);
         result.put("availability", items.isEmpty() ? "UNAVAILABLE" : "AVAILABLE");
+        result.put("sourceLayer", items.isEmpty() ? "NONE" : "SCHEDULER_EVENTS");
         result.put("items", items);
         return result;
     }

@@ -44,6 +44,7 @@ export function MonitorScreen({
   const [runStatus, setRunStatus] = useState<RunStatus | null>(null);
   const [steps, setSteps] = useState<RunStep[]>([]);
   const [stepsAvailability, setStepsAvailability] = useState<"AVAILABLE" | "UNAVAILABLE">("UNAVAILABLE");
+  const [stepsSourceLayer, setStepsSourceLayer] = useState<RunStepsResponse["sourceLayer"] | null>(null);
   const [runtimeLog, setRuntimeLog] = useState<RuntimeLogEntry[]>([]);
   const [runtimeLogAvailability, setRuntimeLogAvailability] = useState<"AVAILABLE" | "UNAVAILABLE">("UNAVAILABLE");
   const [runtimeLogSourceLayer, setRuntimeLogSourceLayer] = useState<RuntimeLogResponse["sourceLayer"] | null>(null);
@@ -79,6 +80,7 @@ export function MonitorScreen({
       setRunStatus(statusData);
       setSteps(stepsData.items ?? []);
       setStepsAvailability(resolveStepsAvailability(stepsData));
+      setStepsSourceLayer(resolveStepsSourceLayer(stepsData));
       setRuntimeLog(logData.items ?? []);
       setRuntimeLogAvailability(resolveRuntimeLogAvailability(logData));
       setRuntimeLogSourceLayer(resolveRuntimeLogSourceLayer(logData));
@@ -89,6 +91,7 @@ export function MonitorScreen({
       setRunStatus(null);
       setSteps([]);
       setStepsAvailability("UNAVAILABLE");
+      setStepsSourceLayer(null);
       setRuntimeLog([]);
       setRuntimeLogAvailability("UNAVAILABLE");
       setRuntimeLogSourceLayer(null);
@@ -106,6 +109,7 @@ export function MonitorScreen({
       setRunStatus(null);
       setSteps([]);
       setStepsAvailability("UNAVAILABLE");
+      setStepsSourceLayer(null);
       setRuntimeLog([]);
       setRuntimeLogAvailability("UNAVAILABLE");
       setRuntimeLogSourceLayer(null);
@@ -226,6 +230,7 @@ export function MonitorScreen({
   const runningStep = steps.find((step) => step.state === "RUNNING");
   const showUnavailableSteps = stepsAvailability === "UNAVAILABLE";
   const showUnavailableRuntimeLog = runtimeLogAvailability === "UNAVAILABLE";
+  const stepsSourceText = stepsSourceLayer ? describeStepSourceLayer(stepsSourceLayer, t) : null;
   const runtimeLogSourceText = runtimeLogSourceLayer ? describeRuntimeLogSourceLayer(runtimeLogSourceLayer, t) : null;
   const activeDetailKind = selectedStep ? "step" : selectedLog ? "log" : null;
   const livePageStatus = livePage?.status ?? "UNAVAILABLE";
@@ -343,6 +348,7 @@ export function MonitorScreen({
       <div className="monitorGrid">
         <section className="monitorPanel">
           <div className="monitorPanelHeader">
+            {stepsSourceText ? <span className="monitorPill mono">{stepsSourceText}</span> : null}
             <h3>{t(copy("Steps timeline", "步骤时间线", "ステップタイムライン"))}</h3>
           </div>
           <div className="monitorStepList">
@@ -769,6 +775,37 @@ function resolveStepsAvailability(stepsData: RunStepsResponse): "AVAILABLE" | "U
     return stepsData.availability;
   }
   return (stepsData.items?.length ?? 0) > 0 ? "AVAILABLE" : "UNAVAILABLE";
+}
+
+function resolveStepsSourceLayer(stepsData: RunStepsResponse): RunStepsResponse["sourceLayer"] | null {
+  if (stepsData.sourceLayer === "REPORT_ARTIFACT"
+    || stepsData.sourceLayer === "SCHEDULER_EVENTS"
+    || stepsData.sourceLayer === "NONE") {
+    return stepsData.sourceLayer;
+  }
+  if ((stepsData.items?.length ?? 0) === 0) {
+    return "NONE";
+  }
+  return resolveStepsAvailability(stepsData) === "AVAILABLE"
+    ? "SCHEDULER_EVENTS"
+    : "NONE";
+}
+
+function describeStepSourceLayer(
+  sourceLayer: NonNullable<RunStepsResponse["sourceLayer"]>,
+  t: (copySet: Copy) => string
+): string {
+  const prefix = t(copy("Source", "来源", "ソース"));
+  switch (sourceLayer) {
+    case "REPORT_ARTIFACT":
+      return `${prefix}: ${t(copy("report artifact", "report artifact", "report artifact"))}`;
+    case "SCHEDULER_EVENTS":
+      return `${prefix}: ${t(copy("scheduler events", "scheduler events", "scheduler events"))}`;
+    case "NONE":
+      return `${prefix}: ${t(copy("none", "none", "none"))}`;
+    default:
+      return prefix;
+  }
 }
 
 function resolveRuntimeLogAvailability(logData: RuntimeLogResponse): "AVAILABLE" | "UNAVAILABLE" {

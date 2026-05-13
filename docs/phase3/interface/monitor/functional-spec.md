@@ -237,10 +237,12 @@ The screen loads runtime data from dedicated APIs when `selectedRunId` is provid
 
 - `runStatus` now prefers run-local `report.json` / `live-page.json` / artifact timestamps when available and otherwise keeps a conservative scheduler-backed shell that can still surface persisted scheduler request page/runtime context
 - `steps` now also carries a backend-owned availability marker so the front end can distinguish a truly unavailable step timeline from a merely short one without changing the existing row structure
+- `steps` now also carries a backend-owned source-layer marker so the front end can show whether the current step timeline comes from report artifacts, scheduler events, or no available source
 - `runtimeLog` now follows an explicit fallback chain: run-local `runtime.log` artifact first, then scheduler-event-derived runtime notes, then a small persisted scheduler request-context shell when neither source yields usable runtime-log rows
 - `runtimeLog` now also carries a backend-owned availability marker so the front end can distinguish a truly unavailable log stream from a merely short list without changing the existing log-entry structure
 - `runtimeLog` now also carries a backend-owned source-layer marker so the front end can show whether the current log stream comes from runtime artifacts, scheduler events, request-context fallback, or no available source
 - when `steps.items` is empty, `MonitorScreen` now prefers the backend-owned steps availability marker and shows explicit no-step copy instead of leaving the progress/timeline areas visually blank; if the marker is absent it still falls back to the empty-list interpretation for compatibility
+- `MonitorScreen` now also shows a lightweight steps source hint in the panel header and falls back to minimal legacy inference when older step payloads omit the marker
 - when `runtimeLog.items` is empty, `MonitorScreen` now prefers the backend-owned runtime-log availability/source markers for the empty-state message and source hint, and still falls back to the empty-list interpretation when legacy payloads omit the marker
 
 ## 8. Screen Inputs and Outputs

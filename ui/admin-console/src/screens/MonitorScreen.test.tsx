@@ -67,6 +67,7 @@ const runStatusResponse: RunStatus = {
 const stepsResponse: RunStepsResponse = {
   runId: "checkout-web-smoke",
   availability: "AVAILABLE",
+  sourceLayer: "SCHEDULER_EVENTS",
   items: [
     { index: 1, label: "Open home", state: "DONE", durationMs: 2000 },
     {
@@ -177,6 +178,31 @@ describe("MonitorScreen", () => {
     const detailPanel = screen.getByLabelText("Step detail panel");
     expect(within(detailPanel).getByText("#2 Fill cart")).toBeInTheDocument();
     expect(within(detailPanel).getAllByText("waiting for payment iframe").length).toBeGreaterThan(0);
+  });
+
+  it("shows the backend-owned step source-layer hint", async () => {
+    vi.stubGlobal("fetch", createFetchMock({
+      steps: {
+        runId: "checkout-web-smoke",
+        availability: "AVAILABLE",
+        sourceLayer: "REPORT_ARTIFACT",
+        items: [
+          { index: 1, label: "Open home", state: "DONE", durationMs: 2000 }
+        ]
+      }
+    }));
+
+    render(
+      <MonitorScreen
+        snapshot={snapshot}
+        title="Execution monitor"
+        locale="en"
+        selectedRunId="checkout-web-smoke"
+        apiBaseUrl="http://127.0.0.1:8787"
+      />
+    );
+
+    expect(await screen.findByText("Source: report artifact")).toBeInTheDocument();
   });
 
   it("opens runtime log detail when clicking a runtime log row", async () => {
@@ -361,7 +387,7 @@ describe("MonitorScreen", () => {
 
     expect(await screen.findByText("No scheduler-backed step timeline is available yet.")).toBeInTheDocument();
     expect(screen.getByText("No report step artifact or scheduler step timeline is available yet.")).toBeInTheDocument();
-    expect(screen.getByText("Source: none")).toBeInTheDocument();
+    expect(screen.getAllByText("Source: none").length).toBeGreaterThan(0);
     expect(screen.getByText("No runtime log entries.")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Step detail" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Runtime log detail" })).not.toBeInTheDocument();
@@ -387,6 +413,7 @@ describe("MonitorScreen", () => {
 
     expect(await screen.findByText("No scheduler-backed step timeline is available yet.")).toBeInTheDocument();
     expect(screen.getByText("No report step artifact or scheduler step timeline is available yet.")).toBeInTheDocument();
+    expect(screen.getAllByText("Source: none").length).toBeGreaterThan(0);
     expect(screen.queryByRole("button", { name: /Open step detail/i })).not.toBeInTheDocument();
   });
 

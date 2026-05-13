@@ -2696,3 +2696,21 @@
   - Verification:
     - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
     - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`
+- 2026-05-13: Continued the same provenance-marker pattern on `P3-4 monitor /steps`.
+  - Backend:
+    - `GET /api/phase3/runs/{runId}/steps` now includes `sourceLayer`
+    - `sourceLayer` values:
+      - `REPORT_ARTIFACT`
+      - `SCHEDULER_EVENTS`
+      - `NONE`
+  - Frontend:
+    - `RunStepsResponse` now accepts the additive `sourceLayer` field
+    - `MonitorScreen` now shows a lightweight steps source hint in the panel header
+    - when the marker is absent, the screen falls back to minimal legacy inference from `items` plus the existing availability/fallback rules
+  - Tests/docs:
+    - backend monitor test now asserts step source-layer values across report-backed, scheduler-backed, and empty-fallback cases
+    - front-end monitor test now covers marker-driven step source hints plus a legacy empty-step payload without `sourceLayer`
+    - synced `monitor/interface-spec.md` and `monitor/functional-spec.md`
+  - Verification:
+    - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+    - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`

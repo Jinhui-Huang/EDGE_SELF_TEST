@@ -243,7 +243,7 @@ Response body:
 {
   "runId": "checkout-web-smoke",
   "availability": "AVAILABLE",
-  "sourceLayer": "RUNTIME_ARTIFACT",
+  "sourceLayer": "REPORT_ARTIFACT",
   "items": [
     {
       "index": 1,
@@ -280,9 +280,14 @@ Step state semantics on the current contract:
 When no run-local `report.json.steps[]` artifact is available, the endpoint keeps only scheduler-event-derived step rows. If scheduler data does not provide real `STEP_*` events, the backend now returns:
 
 - `availability: "UNAVAILABLE"`
+- `sourceLayer: "NONE"`
 - `items: []`
 
-This lets the front end distinguish a backend-owned empty timeline from a merely short timeline without changing the existing step-row structure.
+This lets the front end distinguish a backend-owned empty timeline from a merely short timeline without changing the existing step-row structure. The top-level `sourceLayer` tells the front end which step-timeline layer currently owns the response:
+
+- `REPORT_ARTIFACT`
+- `SCHEDULER_EVENTS`
+- `NONE`
 
 ### 7.3 Runtime-Log Read Interface
 
@@ -556,7 +561,9 @@ Current implementation:
 - `status` now prefers run-local `report.json` / `live-page.json` / `runtime.log` timestamps for stronger terminal status, progress, assertions, current-page, and `lastUpdatedAt` semantics, but it still falls back to a scheduler-derived shell when those stronger artifacts are absent.
 - `steps` now prefers run-local `report.json.steps[]`; when that artifact is present, failed/skipped terminal semantics are preserved instead of being collapsed into `TODO`; when the artifact is absent it falls back only to scheduler-backed `STEP_*` events and otherwise returns an empty list.
 - `steps` now also carries a backend-owned `availability` marker so the front end can distinguish `AVAILABLE` vs `UNAVAILABLE` empty-state semantics without changing the `items` row structure.
+- `steps` now also carries a backend-owned `sourceLayer` marker so the front end can show whether the current step timeline comes from report artifacts, scheduler events, or no available source.
 - when `steps.items` is empty, `MonitorScreen` now prefers that backend-owned marker and renders explicit no-step copy in both the progress area and the step-list panel; if the marker is absent, it still falls back to the old `items.length === 0` interpretation for compatibility.
+- `MonitorScreen` now also shows a lightweight steps source hint in the panel header and falls back to minimal legacy inference when older step payloads omit the marker.
 - `runtime-log` now also carries a backend-owned `availability` marker so the front end can distinguish a truly unavailable runtime-log stream from a merely short list without changing the existing log-entry shape.
 - `runtime-log` now also carries a backend-owned `sourceLayer` marker so the front end can show whether the current log stream comes from runtime artifacts, scheduler events, request-context fallback, or no available source.
 - `runtime-log` now prefers run-local `runtime.log` artifacts; when they are absent it still falls back to scheduler-event-derived shaping.
