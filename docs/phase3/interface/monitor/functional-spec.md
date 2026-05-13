@@ -236,6 +236,7 @@ The screen loads runtime data from dedicated APIs when `selectedRunId` is provid
 - `livePage` from `GET /api/phase3/runs/{runId}/live-page` — backend-owned availability status, current page URL/state/highlight, and optional run-local screenshot path
 
 - `runStatus` now prefers run-local `report.json` / `live-page.json` / artifact timestamps when available and otherwise keeps a conservative scheduler-backed shell that can still surface persisted scheduler request page/runtime context
+- `runStatus.counters.aiCalls` / `runStatus.counters.heals` now prefer artifact-backed report summary values first and then run-local `runtime.log` classification before falling back to scheduler-event counts
 - `runStatus` now also carries a backend-owned source-layer marker so the front end can show whether the run summary is artifact-strengthened or still scheduler-fallback-owned
 - `steps` now also carries a backend-owned availability marker so the front end can distinguish a truly unavailable step timeline from a merely short one without changing the existing row structure
 - `steps` now also carries a backend-owned source-layer marker so the front end can show whether the current step timeline comes from report artifacts, scheduler events, or no available source

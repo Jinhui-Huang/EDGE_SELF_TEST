@@ -190,6 +190,7 @@ Purpose:
 - prefer run-local `report.json` for stronger status/progress/assertion metadata when that artifact exists
 - prefer run-local `live-page.json` for `currentPage.url` / `currentPage.state` when that artifact exists
 - prefer the latest artifact-backed timestamp (`report.json`, `live-page.json`, `runtime.log`) for `lastUpdatedAt` when available
+- prefer artifact-backed `aiCalls` / `heals` counters from report summary or run-local `runtime.log` when those artifacts can provide them; otherwise fall back to scheduler-event counts
 - when no strong run-local progress artifact exists, keep the current response shell but return conservative progress values instead of fabricating a default 8-step shape
 - when those stronger artifacts are absent, prefer persisted scheduler request context (`pageUrl`, `runtimeMode`, `queueState`, `auditState`) over the older thin `targetUrl`-only fallback
 
@@ -573,6 +574,7 @@ Current implementation:
 
 - `live-page` now prefers run-local `live-page.json` / screenshot artifacts and returns an explicit `UNAVAILABLE` shell when they are absent.
 - `status` now prefers run-local `report.json` / `live-page.json` / `runtime.log` timestamps for stronger terminal status, progress, assertions, current-page, and `lastUpdatedAt` semantics, but it still falls back to a scheduler-derived shell when those stronger artifacts are absent.
+- `status.counters.aiCalls` / `status.counters.heals` now prefer artifact-backed report summary values first and then run-local `runtime.log` classification before falling back to scheduler-event counts.
 - `steps` now prefers run-local `report.json.steps[]`; when that artifact is present, failed/skipped terminal semantics are preserved instead of being collapsed into `TODO`; when the artifact is absent it falls back only to scheduler-backed `STEP_*` events and otherwise returns an empty list.
 - `steps` now also carries a backend-owned `availability` marker so the front end can distinguish `AVAILABLE` vs `UNAVAILABLE` empty-state semantics without changing the `items` row structure.
 - `steps` now also carries a backend-owned `sourceLayer` marker so the front end can show whether the current step timeline comes from report artifacts, scheduler events, or no available source.

@@ -5569,6 +5569,34 @@ Remaining limits:
 - `status.sourceLayer` is a coarse top-level provenance marker; it does not break down mixed artifact contribution across report/live-page/runtime timestamp context
 - this slice does not add richer status reason codes or any non-monitor contract
 
+## 2026-05-13 P3-4 monitor status-counters artifact-priority follow-up
+
+## Task
+- Keep working on `GET /api/phase3/runs/{runId}/status`
+- tighten `counters.aiCalls` / `counters.heals`
+- do not change the response shape or expand into other monitor contracts
+
+## Completed
+- Backend:
+  - `status.counters.aiCalls` / `status.counters.heals` now prefer artifact-backed sources before scheduler-event fallback
+  - priority is:
+    - report summary counters when present
+    - run-local `runtime.log` line classification
+    - scheduler-event counts
+  - this keeps `/status` structure unchanged while avoiding stale scheduler-only counts for artifact-backed runs
+- Tests/docs:
+  - backend monitor test now asserts artifact-backed `aiCalls` / `heals` win over conflicting scheduler-event counts
+  - fallback status path still asserts scheduler-event `aiCalls` / `heals` when no artifact-backed counter source exists
+  - synced `monitor/interface-spec.md` and `monitor/functional-spec.md`
+
+## Verification
+- Ran:
+  - `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+
+## Remaining Limits
+- artifact-backed counter priority currently relies on explicit report summary fields or simple `runtime.log` line classification; it does not extract richer model-call provenance
+- this slice does not add counter reason codes or alter any other monitor contract
+
 ## Remaining Limits
 - `runtime-log` fallback is now more informative when request context exists, but it still remains a compact shell rather than a richer structured runtime artifact model
 - if scheduler requests also lack persisted page/runtime/locator fields, runtime-log fallback can still end up sparse or empty

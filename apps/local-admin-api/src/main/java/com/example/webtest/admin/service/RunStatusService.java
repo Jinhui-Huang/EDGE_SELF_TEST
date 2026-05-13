@@ -105,6 +105,7 @@ public final class RunStatusService {
 
         int eventAssertionsPassed = countEventType(events, "ASSERTION_PASSED");
         int eventAssertionsTotal = eventAssertionsPassed + countEventType(events, "ASSERTION_FAILED");
+        ArtifactCounterInfo artifactCounterInfo = readArtifactCounterInfo(runDir, reportContext);
         Map<String, Object> counters = new LinkedHashMap<>();
         counters.put("assertionsPassed", reportContext.assertionsTotal() > 0
                 ? reportContext.assertionsPassed()
@@ -112,8 +113,12 @@ public final class RunStatusService {
         counters.put("assertionsTotal", reportContext.assertionsTotal() > 0
                 ? reportContext.assertionsTotal()
                 : eventAssertionsTotal);
-        counters.put("aiCalls", countEventType(events, "AI_CALL"));
-        counters.put("heals", countEventType(events, "HEAL"));
+        counters.put("aiCalls", artifactCounterInfo.aiCalls() != null
+                ? artifactCounterInfo.aiCalls()
+                : countEventType(events, "AI_CALL"));
+        counters.put("heals", artifactCounterInfo.heals() != null
+                ? artifactCounterInfo.heals()
+                : countEventType(events, "HEAL"));
         result.put("counters", counters);
 
         Map<String, Object> control = new LinkedHashMap<>();
@@ -141,6 +146,38 @@ public final class RunStatusService {
         }
         Path runtimeLog = runDir.resolve("runtime.log").normalize();
         return runtimeLog.startsWith(runDir) && Files.isRegularFile(runtimeLog);
+    }
+
+    private ArtifactCounterInfo readArtifactCounterInfo(Path runDir, ReportStatusContext reportContext) throws IOException {
+        Integer artifactAiCalls = reportContext != null ? reportContext.aiCalls() : null;
+        Integer artifactHeals = reportContext != null ? reportContext.heals() : null;
+
+        if (artifactAiCalls != null && artifactHeals != null) {
+            return new ArtifactCounterInfo(artifactAiCalls, artifactHeals);
+        }
+        if (runDir == null || !Files.isDirectory(runDir)) {
+            return new ArtifactCounterInfo(artifactAiCalls, artifactHeals);
+        }
+
+        Path runtimeLog = runDir.resolve("runtime.log").normalize();
+        if (!runtimeLog.startsWith(runDir) || !Files.isRegularFile(runtimeLog)) {
+            return new ArtifactCounterInfo(artifactAiCalls, artifactHeals);
+        }
+
+        int runtimeAiCalls = 0;
+        int runtimeHeals = 0;
+        for (String line : Files.readAllLines(runtimeLog, StandardCharsets.UTF_8)) {
+            String normalized = line == null ? "" : line.toUpperCase(Locale.ROOT);
+            if (normalized.contains("AI_CALL") || normalized.contains("AI CALL")) {
+                runtimeAiCalls++;
+            }
+            if (normalized.contains("HEAL")) {
+                runtimeHeals++;
+            }
+        }
+        return new ArtifactCounterInfo(
+                artifactAiCalls != null ? artifactAiCalls : runtimeAiCalls,
+                artifactHeals != null ? artifactHeals : runtimeHeals);
     }
 
     // ---- GET /api/phase3/runs/{runId}/steps ----
@@ -502,6 +539,9 @@ public final class RunStatusService {
             failedSteps = Math.max(failedSteps, summaryFailed);
         }
 
+        Integer aiCalls = summary.containsKey("aiCalls") ? intValue(summary.get("aiCalls")) : null;
+        Integer heals = summary.containsKey("heals") ? intValue(summary.get("heals")) : null;
+
         Instant startedAt = instantValue(report.get("startedAt"));
         Instant finishedAt = instantValue(report.get("finishedAt"));
         long durationMs = longValue(summary.get("durationMs"));
@@ -536,6 +576,8 @@ public final class RunStatusService {
                 stringValue(report.get("environment")),
                 firstNonBlank(stringValue(report.get("model")), stringValue(report.get("executionModel"))),
                 firstNonBlank(stringValue(report.get("operator")), stringValue(report.get("owner"))),
+                aiCalls,
+                heals,
                 updatedAt);
     }
 
@@ -1340,9 +1382,11 @@ public final class RunStatusService {
             String environment,
             String model,
             String owner,
+            Integer aiCalls,
+            Integer heals,
             Instant updatedAt) {
         private static ReportStatusContext empty() {
-            return new ReportStatusContext("", null, null, 0, 0, 0, 0, 0, "", "", "", "", null);
+            return new ReportStatusContext("", null, null, 0, 0, 0, 0, 0, "", "", "", "", null, null, null);
         }
     }
 
@@ -1350,5 +1394,8 @@ public final class RunStatusService {
         private static LivePageStatusContext empty() {
             return new LivePageStatusContext("", "", null);
         }
+    }
+
+    private record ArtifactCounterInfo(Integer aiCalls, Integer heals) {
     }
 }

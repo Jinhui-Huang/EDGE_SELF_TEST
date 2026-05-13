@@ -2754,3 +2754,17 @@
   - Verification:
     - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
     - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`
+- 2026-05-13: Tightened `P3-4 monitor /status` counters without changing the response shape.
+  - Backend:
+    - `status.counters.aiCalls` / `status.counters.heals` now prefer stronger artifact-backed sources before scheduler-event fallback
+    - priority is:
+      - report summary counters when present
+      - run-local `runtime.log` line classification
+      - scheduler-event counts
+    - this keeps `/status` structure unchanged while reducing stale scheduler-only counts for artifact-backed runs
+  - Tests/docs:
+    - backend monitor test now asserts artifact-backed `aiCalls` / `heals` win over conflicting scheduler-event counts
+    - the fallback status path still asserts scheduler-event `aiCalls` / `heals` when no artifact-backed counter source exists
+    - synced `monitor/interface-spec.md` and `monitor/functional-spec.md`
+  - Verification:
+    - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`

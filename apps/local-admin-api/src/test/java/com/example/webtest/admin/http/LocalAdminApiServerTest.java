@@ -1049,7 +1049,10 @@ class LocalAdminApiServerTest {
                 "url", "https://example.test/checkout/review",
                 "pageState", "artifact-captured",
                 "capturedAt", "2026-05-07T09:04:10Z")), StandardCharsets.UTF_8);
-        Files.writeString(runtimeLog, "2026-05-07T09:04:11Z Final artifact flush", StandardCharsets.UTF_8);
+        Files.writeString(runtimeLog, String.join("\n",
+                "2026-05-07T09:04:09Z AI_CALL Responses planner invoked",
+                "2026-05-07T09:04:10Z AI_CALL Repair candidate ranked",
+                "2026-05-07T09:04:11Z HEAL locator healed once"), StandardCharsets.UTF_8);
         Files.setLastModifiedTime(reportJson, FileTime.from(Instant.parse("2026-05-07T09:04:12Z")));
         Files.setLastModifiedTime(livePageJson, FileTime.from(Instant.parse("2026-05-07T09:04:10Z")));
         Files.setLastModifiedTime(runtimeLog, FileTime.from(Instant.parse("2026-05-07T09:04:11Z")));
@@ -1118,9 +1121,19 @@ class LocalAdminApiServerTest {
                                 "at", "2026-05-07T09:03:33Z"),
                         Map.of(
                                 "runId", "fallback-status",
+                                "type", "AI_CALL",
+                                "detail", "fallback still counts scheduler ai call",
+                                "at", "2026-05-07T09:05:59Z"),
+                        Map.of(
+                                "runId", "fallback-status",
+                                "type", "HEAL",
+                                "detail", "fallback still counts scheduler heal",
+                                "at", "2026-05-07T09:06:00Z"),
+                        Map.of(
+                                "runId", "fallback-status",
                                 "type", "DECISION",
                                 "detail", "fallback still uses scheduler context",
-                                "at", "2026-05-07T09:06:00Z")))), StandardCharsets.UTF_8);
+                                "at", "2026-05-07T09:06:01Z")))), StandardCharsets.UTF_8);
 
         Clock clock = Clock.fixed(Instant.parse("2026-05-07T09:10:00Z"), ZoneOffset.UTC);
         SchedulerPersistenceService schedulerPersistence = new SchedulerPersistenceService(schedulerRequestsFile, schedulerEventsFile, clock);
@@ -1172,7 +1185,7 @@ class LocalAdminApiServerTest {
             assertTrue(artifactBacked.body().contains("\"state\":\"artifact-captured\""));
             assertTrue(artifactBacked.body().contains("\"assertionsPassed\":1"));
             assertTrue(artifactBacked.body().contains("\"assertionsTotal\":2"));
-            assertTrue(artifactBacked.body().contains("\"aiCalls\":1"));
+            assertTrue(artifactBacked.body().contains("\"aiCalls\":2"));
             assertTrue(artifactBacked.body().contains("\"heals\":1"));
             assertTrue(artifactBacked.body().contains("\"canPause\":false"));
             assertTrue(artifactBacked.body().contains("\"canAbort\":false"));
@@ -1188,8 +1201,10 @@ class LocalAdminApiServerTest {
             assertTrue(fallbackBacked.body().contains("\"estimatedTotalMs\":0"));
             assertTrue(fallbackBacked.body().contains("\"url\":\"https://fallback.example/checkout/payment\""));
             assertTrue(fallbackBacked.body().contains("\"state\":\"audit-first / queued / watching payment iframe\""));
+            assertTrue(fallbackBacked.body().contains("\"aiCalls\":1"));
+            assertTrue(fallbackBacked.body().contains("\"heals\":1"));
             assertTrue(fallbackBacked.body().contains("\"lastUpdatedAt\":\"2026-05-07T09:10:00Z\"")
-                    || fallbackBacked.body().contains("\"lastUpdatedAt\":\"2026-05-07T09:06:00Z\""));
+                    || fallbackBacked.body().contains("\"lastUpdatedAt\":\"2026-05-07T09:06:01Z\""));
             assertTrue(!fallbackBacked.body().contains("\"totalSteps\":8"));
         }
     }
