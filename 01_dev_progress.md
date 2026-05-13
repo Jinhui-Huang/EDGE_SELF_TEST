@@ -5775,6 +5775,32 @@ Remaining limits:
 - this slice is explanatory UI only; it does not add any real executor-side pause/abort progress signal
 - runtime log, step timeline, and live-page panels still rely on their existing backend snapshot/fallback chains
 
+## 2026-05-13 P3-4 monitor control-phase empty-state follow-up
+
+## Task
+- Stay on `P3-4 monitor`, but keep the next slice front-end only:
+  - make `steps`, `runtime-log`, and `live-page` empty states more context-aware during `PAUSING` / `ABORTING`
+  - use only existing `runStatus.status` / `control`
+  - do not add endpoints or change any response structure
+
+## Completed
+- Updated `ui/admin-console/src/screens/MonitorScreen.tsx`:
+  - empty `steps` copy now switches from generic no-data wording to control-phase temporary-stall wording when `status` is `PAUSING` or `ABORTING`
+  - empty `runtime-log` copy now does the same for in-progress pause/abort control phases
+  - `UNAVAILABLE` `live-page` now also shows a control-phase-specific empty-state note when pause/abort is still settling
+- Expanded `ui/admin-console/src/screens/MonitorScreen.test.tsx`:
+  - added a `PAUSING` regression for empty `steps`
+  - added an `ABORTING` regression for empty `runtime-log` plus unavailable `live-page`
+  - both regressions also keep the existing button-disabled expectations in place
+
+## Verification
+- Ran:
+  - `npm test -- --run src/screens/MonitorScreen.test.tsx`
+
+## Remaining Limits
+- this slice is still explanatory UI only; it does not add any real executor-side pause/abort progress signal
+- the `live-page` control-phase branch currently adds a contextual note ahead of the existing unavailable-shell content rather than introducing a separate structured empty-state model
+
 ## Remaining Limits
 - `runtime-log` fallback is now more informative when request context exists, but it still remains a compact shell rather than a richer structured runtime artifact model
 - if scheduler requests also lack persisted page/runtime/locator fields, runtime-log fallback can still end up sparse or empty

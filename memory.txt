@@ -2858,3 +2858,13 @@
     - synced `monitor/functional-spec.md`
   - Verification:
     - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`
+- 2026-05-13: Made monitor empty-state copy more control-phase-aware without changing any API contract.
+  - Frontend:
+    - when `steps` are unavailable during `PAUSING` / `ABORTING`, `MonitorScreen` now explains that newer scheduler/report step snapshots may not have arrived yet
+    - when `runtimeLog` is empty during `PAUSING` / `ABORTING`, the empty-state copy now explains that newer log entries may still be pending behind the control phase
+    - when `livePage` is `UNAVAILABLE` during `PAUSING` / `ABORTING`, the panel now also adds a control-phase-specific empty-state note ahead of the existing request-context shell fields
+  - Tests/docs:
+    - front-end monitor regression now covers `PAUSING` empty steps plus `ABORTING` empty runtime-log / unavailable live-page cases
+    - synced `monitor/functional-spec.md`
+  - Verification:
+    - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`

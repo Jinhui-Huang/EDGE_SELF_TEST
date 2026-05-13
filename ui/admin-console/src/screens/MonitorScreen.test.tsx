@@ -487,6 +487,89 @@ describe("MonitorScreen", () => {
     expect(screen.queryByRole("button", { name: /Open runtime log detail/i })).not.toBeInTheDocument();
   });
 
+  it("shows control-phase step empty-state copy while pausing", async () => {
+    vi.stubGlobal("fetch", createFetchMock({
+      status: {
+        ...runStatusResponse,
+        status: "PAUSING",
+        control: {
+          canPause: false,
+          canAbort: true,
+          requestedBy: "qa-platform",
+          requestReason: "Need manual verification before payment submit",
+          requestedAt: "2026-05-05T10:04:30Z"
+        }
+      },
+      steps: { runId: "checkout-web-smoke", availability: "UNAVAILABLE", sourceLayer: "NONE", items: [] }
+    }));
+
+    render(
+      <MonitorScreen
+        snapshot={snapshot}
+        title="Execution monitor"
+        locale="en"
+        selectedRunId="checkout-web-smoke"
+        apiBaseUrl="http://127.0.0.1:8787"
+      />
+    );
+
+    expect(await screen.findByText("No newer scheduler-backed step timeline is available while the pause request is still in progress.")).toBeInTheDocument();
+    expect(screen.getByText("No newer report step artifact or scheduler step timeline is available while the pause request is still in progress.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Pause" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Abort" })).not.toBeDisabled();
+  });
+
+  it("shows control-phase runtime-log and live-page empty-state copy while aborting", async () => {
+    vi.stubGlobal("fetch", createFetchMock({
+      status: {
+        ...runStatusResponse,
+        status: "ABORTING",
+        control: {
+          canPause: false,
+          canAbort: false,
+          requestedBy: "ops-oncall",
+          requestReason: "Unsafe DOM mismatch after payment redirect",
+          requestedAt: "2026-05-05T10:05:00Z"
+        }
+      },
+      runtimeLog: {
+        runId: "checkout-web-smoke",
+        availability: "UNAVAILABLE",
+        sourceLayer: "NONE",
+        items: [],
+        nextCursor: null
+      },
+      livePage: {
+        runId: "checkout-web-smoke",
+        status: "UNAVAILABLE",
+        sourceLayer: "REQUEST_CONTEXT",
+        url: "https://example.test/checkout",
+        title: "Checkout",
+        pageState: "stale-snapshot",
+        highlight: {
+          action: "Waiting for abort to settle",
+          target: "#pay-now"
+        },
+        screenshotPath: null
+      } as LivePage
+    }));
+
+    render(
+      <MonitorScreen
+        snapshot={snapshot}
+        title="Execution monitor"
+        locale="en"
+        selectedRunId="checkout-web-smoke"
+        apiBaseUrl="http://127.0.0.1:8787"
+      />
+    );
+
+    expect(await screen.findByText("No newer runtime log entries are available while the abort request is still in progress.")).toBeInTheDocument();
+    expect(screen.getByText("No newer live page artifact is available while the abort request is still in progress.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Pause" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Abort" })).toBeDisabled();
+  });
+
   it("keeps the no-step empty state when legacy step payloads omit availability", async () => {
     vi.stubGlobal("fetch", createFetchMock({
       steps: { runId: "checkout-web-smoke", items: [] },

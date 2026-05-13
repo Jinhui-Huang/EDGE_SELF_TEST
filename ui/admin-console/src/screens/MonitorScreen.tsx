@@ -335,7 +335,10 @@ export function MonitorScreen({
               <span key={step.index} className={`monitorStepBarItem ${normalizeStepState(step.state)}`} />
             ))}
           </div>
-          {showUnavailableSteps ? (
+          {showUnavailableSteps && isControlPhaseStatus(status) ? (
+            <p className="monitorEmptyHint">{describeStepsProgressEmptyHint(status, t)}</p>
+          ) : null}
+          {showUnavailableSteps && !isControlPhaseStatus(status) ? (
             <p className="monitorEmptyHint">
               {t(copy(
                 "No scheduler-backed step timeline is available yet.",
@@ -398,7 +401,9 @@ export function MonitorScreen({
                   </div>
                 </button>
               );
-            }) : (
+            }) : isControlPhaseStatus(status) ? (
+              <p className="monitorEmptyHint">{describeStepsPanelEmptyHint(status, t)}</p>
+            ) : (
               <p className="monitorEmptyHint">
                 {t(copy(
                   "No report step artifact or scheduler step timeline is available yet.",
@@ -422,6 +427,9 @@ export function MonitorScreen({
           <div className="monitorViewport">
             {livePageStatus === "UNAVAILABLE" ? (
               <>
+                {isControlPhaseStatus(status) ? (
+                  <p className="monitorEmptyHint">{describeLivePageEmptyHint(status, t)}</p>
+                ) : null}
                 <p className="monitorEmptyHint">
                 {t(copy(
                   "No live page artifact available.",
@@ -506,7 +514,9 @@ export function MonitorScreen({
             {runtimeLogSourceText ? <span className="monitorPill mono">{runtimeLogSourceText}</span> : null}
           </div>
           <div className="monitorLogList">
-            {!showUnavailableRuntimeLog ? runtimeLog.map((entry, index) => (
+            {showUnavailableRuntimeLog && isControlPhaseStatus(status) ? (
+              <p className="monitorEmptyHint">{describeRuntimeLogEmptyHint(status, t)}</p>
+            ) : !showUnavailableRuntimeLog ? runtimeLog.map((entry, index) => (
               <button
                 key={`${entry.at}-${entry.type}-${index}`}
                 type="button"
@@ -812,6 +822,94 @@ function describeControlPhaseBanner(status: string, t: (copySet: Copy) => string
     "制御フェーズが落ち着くまで、ランタイムログ・ステップ・ライブページは直前のスナップショットのまま残ることがあります。"
   ));
   return `${phaseLead} ${snapshotNote}`;
+}
+
+function isControlPhaseStatus(status: string): boolean {
+  return status === "PAUSING" || status === "ABORTING";
+}
+
+function describeStepsProgressEmptyHint(status: string, t: (copySet: Copy) => string): string {
+  if (status === "PAUSING") {
+    return t(copy(
+      "No newer scheduler-backed step timeline is available while the pause request is still in progress.",
+      "暂停请求仍在进行中，暂时还没有更新的 scheduler 步骤时间线。",
+      "一時停止リクエストの処理中は、新しい scheduler ベースのステップタイムラインがまだ出ないことがあります。"
+    ));
+  }
+  if (status === "ABORTING") {
+    return t(copy(
+      "No newer scheduler-backed step timeline is available while the abort request is still in progress.",
+      "终止请求仍在进行中，暂时还没有更新的 scheduler 步骤时间线。",
+      "中止リクエストの処理中は、新しい scheduler ベースのステップタイムラインがまだ出ないことがあります。"
+    ));
+  }
+  return t(copy(
+    "No scheduler-backed step timeline is available yet.",
+    "暂无可用的 scheduler 步骤时间线。",
+    "利用可能な scheduler ベースのステップタイムラインはまだありません。"
+  ));
+}
+
+function describeStepsPanelEmptyHint(status: string, t: (copySet: Copy) => string): string {
+  if (status === "PAUSING") {
+    return t(copy(
+      "No newer report step artifact or scheduler step timeline is available while the pause request is still in progress.",
+      "暂停请求仍在进行中，暂时还没有更新的 report step artifact 或 scheduler 步骤时间线。",
+      "一時停止リクエストの処理中は、新しい report step artifact や scheduler ステップタイムラインがまだ出ないことがあります。"
+    ));
+  }
+  if (status === "ABORTING") {
+    return t(copy(
+      "No newer report step artifact or scheduler step timeline is available while the abort request is still in progress.",
+      "终止请求仍在进行中，暂时还没有更新的 report step artifact 或 scheduler 步骤时间线。",
+      "中止リクエストの処理中は、新しい report step artifact や scheduler ステップタイムラインがまだ出ないことがあります。"
+    ));
+  }
+  return t(copy(
+    "No report step artifact or scheduler step timeline is available yet.",
+    "暂无 report step artifact 或 scheduler 步骤时间线。",
+    "report step artifact も scheduler ステップタイムラインもまだ利用できません。"
+  ));
+}
+
+function describeRuntimeLogEmptyHint(status: string, t: (copySet: Copy) => string): string {
+  if (status === "PAUSING") {
+    return t(copy(
+      "No newer runtime log entries are available while the pause request is still in progress.",
+      "暂停请求仍在进行中，暂时还没有新的运行时日志条目。",
+      "一時停止リクエストの処理中は、新しいランタイムログ項目がまだ出ないことがあります。"
+    ));
+  }
+  if (status === "ABORTING") {
+    return t(copy(
+      "No newer runtime log entries are available while the abort request is still in progress.",
+      "终止请求仍在进行中，暂时还没有新的运行时日志条目。",
+      "中止リクエストの処理中は、新しいランタイムログ項目がまだ出ないことがあります。"
+    ));
+  }
+  return t(copy("No runtime log entries.", "暂无运行时日志。", "ランタイムログがありません。"));
+}
+
+function describeLivePageEmptyHint(status: string, t: (copySet: Copy) => string): string {
+  if (status === "PAUSING") {
+    return t(copy(
+      "No newer live page artifact is available while the pause request is still in progress.",
+      "暂停请求仍在进行中，暂时还没有更新的 live page artifact。",
+      "一時停止リクエストの処理中は、新しい live page artifact がまだ出ないことがあります。"
+    ));
+  }
+  if (status === "ABORTING") {
+    return t(copy(
+      "No newer live page artifact is available while the abort request is still in progress.",
+      "终止请求仍在进行中，暂时还没有更新的 live page artifact。",
+      "中止リクエストの処理中は、新しい live page artifact がまだ出ないことがあります。"
+    ));
+  }
+  return t(copy(
+    "No live page artifact available.",
+    "暂无可用的 live page artifact。",
+    "利用可能な live page artifact はありません。"
+  ));
 }
 
 function logTypeTone(type: string): string {
