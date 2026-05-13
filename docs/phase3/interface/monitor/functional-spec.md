@@ -244,10 +244,12 @@ The screen loads runtime data from dedicated APIs when `selectedRunId` is provid
 - `runtimeLog` now also carries a backend-owned availability marker so the front end can distinguish a truly unavailable log stream from a merely short list without changing the existing log-entry structure
 - `runtimeLog` now also carries a backend-owned source-layer marker so the front end can show whether the current log stream comes from runtime artifacts, scheduler events, request-context fallback, or no available source
 - `livePage` now also carries a backend-owned source-layer marker so the front end can show whether the viewport comes from run-local live artifacts, persisted request-context fallback, or no available source
+- `livePage` now also carries an optional lightweight `summary` field that prefers `live-page.json.summary` and otherwise falls back to persisted request `bodySummary` / `nextAction`
 - when `steps.items` is empty, `MonitorScreen` now prefers the backend-owned steps availability marker and shows explicit no-step copy instead of leaving the progress/timeline areas visually blank; if the marker is absent it still falls back to the empty-list interpretation for compatibility
 - `MonitorScreen` now also shows a lightweight steps source hint in the panel header and falls back to minimal legacy inference when older step payloads omit the marker
 - when `runtimeLog.items` is empty, `MonitorScreen` now prefers the backend-owned runtime-log availability/source markers for the empty-state message and source hint, and still falls back to the empty-list interpretation when legacy payloads omit the marker
 - `MonitorScreen` now also shows a lightweight live-page source hint in the panel header and falls back to minimal legacy inference when older live-page payloads omit the marker
+- `MonitorScreen` now also shows the optional live-page `summary` text in the panel without changing the screenshot / highlight / locator structure
 - `MonitorScreen` now also shows a lightweight status source hint in the hero row and, when older status payloads omit the marker, only treats stronger artifact-like current-page signals as `RUN_ARTIFACTS`; otherwise it stays conservative with `SCHEDULER_FALLBACK`
 
 ## 8. Screen Inputs and Outputs

@@ -373,6 +373,7 @@ Response body:
   "capturedAt": "2026-04-20T05:31:49Z",
   "url": "https://app.acme.example/checkout",
   "title": "Checkout",
+  "summary": "Checkout form is stable and ready for payment review.",
   "pageState": "checkout.form",
   "highlight": {
     "stepIndex": 5,
@@ -393,6 +394,7 @@ When no run-local live-page artifact is available, the backend returns an explic
   "capturedAt": "2026-04-20T05:31:49Z",
   "url": "https://app.acme.example/checkout/payment",
   "title": "Payment review",
+  "summary": "Payment form is visible and the CTA stays above the fold.",
   "pageState": "audit-first / queued / watching payment iframe",
   "highlight": {
     "stepIndex": 0,
@@ -408,6 +410,12 @@ The top-level `sourceLayer` tells the front end which live-page layer currently 
 - `LIVE_ARTIFACT`
 - `REQUEST_CONTEXT`
 - `NONE`
+
+The optional top-level `summary` follows a small additive fallback chain:
+
+- `live-page.json.summary`
+- persisted scheduler request `bodySummary`
+- persisted scheduler request `nextAction`
 
 Current screen behavior:
 

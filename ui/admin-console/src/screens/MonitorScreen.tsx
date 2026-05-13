@@ -432,6 +432,12 @@ export function MonitorScreen({
                       <span>Page state</span>
                       <div>{livePage?.pageState ?? runStatus?.currentPage?.state ?? "--"}</div>
                     </div>
+                    {livePage?.summary ? (
+                      <div className="monitorField">
+                        <span>{t(copy("Summary", "摘要", "要約"))}</span>
+                        <div>{livePage.summary}</div>
+                      </div>
+                    ) : null}
                     <div className="monitorField">
                       <span>Context</span>
                       <div>{livePage?.highlight?.action || "--"}</div>
@@ -463,6 +469,12 @@ export function MonitorScreen({
                   <span>{t(copy("Page state", "页面状态", "ページ状態"))}</span>
                   <div>{livePage?.pageState ?? "--"}</div>
                 </div>
+                {livePage?.summary ? (
+                  <div className="monitorField">
+                    <span>{t(copy("Summary", "摘要", "要約"))}</span>
+                    <div>{livePage.summary}</div>
+                  </div>
+                ) : null}
                 <div className="monitorField">
                   <span>{t(copy("Active step", "当前步骤", "現在のステップ"))}</span>
                   <div>{livePage?.highlight?.action || "--"}</div>

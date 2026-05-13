@@ -5597,6 +5597,39 @@ Remaining limits:
 - artifact-backed counter priority currently relies on explicit report summary fields or simple `runtime.log` line classification; it does not extract richer model-call provenance
 - this slice does not add counter reason codes or alter any other monitor contract
 
+## 2026-05-13 P3-4 monitor live-page summary follow-up
+
+## Task
+- Keep the next `monitor` slice narrow on `GET /api/phase3/runs/{runId}/live-page`
+- add a lightweight top-level `summary`
+- avoid changing screenshot / highlight / locator structure or any non-monitor contract
+
+## Completed
+- Backend:
+  - `/live-page` now optionally includes top-level `summary`
+  - priority is:
+    - `live-page.json.summary`
+    - persisted scheduler request `bodySummary`
+    - persisted scheduler request `nextAction`
+  - when neither artifact nor request-context summary exists, the field is omitted
+- Frontend:
+  - `LivePage` now includes optional `summary`
+  - `MonitorScreen` now renders the summary text inside the `Live page` panel for both artifact-backed and request-context-backed shells
+  - screenshot / highlight / locator rendering remains unchanged
+- Tests/docs:
+  - backend monitor test now asserts artifact-backed and request-context-backed live-page summaries, plus omission on the no-source branch
+  - front-end monitor test now asserts live-page summary rendering for artifact-backed, request-context-backed, and legacy live-page payloads
+  - synced `monitor/interface-spec.md` and `monitor/functional-spec.md`
+
+## Verification
+- Ran:
+  - `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+  - `npm test -- --run src/screens/MonitorScreen.test.tsx`
+
+## Remaining Limits
+- `live-page.summary` is still a single lightweight text field; it does not expand into a richer DOM or region-level summary model
+- this slice does not add summary provenance reason codes beyond the existing `sourceLayer`
+
 ## Remaining Limits
 - `runtime-log` fallback is now more informative when request context exists, but it still remains a compact shell rather than a richer structured runtime artifact model
 - if scheduler requests also lack persisted page/runtime/locator fields, runtime-log fallback can still end up sparse or empty

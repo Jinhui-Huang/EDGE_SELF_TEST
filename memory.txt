@@ -2768,3 +2768,22 @@
     - synced `monitor/interface-spec.md` and `monitor/functional-spec.md`
   - Verification:
     - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+- 2026-05-13: Added a lightweight `summary` field to `P3-4 monitor /live-page`.
+  - Backend:
+    - `GET /api/phase3/runs/{runId}/live-page` now optionally includes top-level `summary`
+    - priority is:
+      - `live-page.json.summary`
+      - persisted scheduler request `bodySummary`
+      - persisted scheduler request `nextAction`
+    - when neither artifact nor request-context summary exists, the field is omitted
+  - Frontend:
+    - `LivePage` now accepts optional `summary`
+    - `MonitorScreen` now renders that summary text in the `Live page` panel for both artifact-backed and request-context-backed shells
+    - screenshot / highlight / locator rendering stays unchanged
+  - Tests/docs:
+    - backend monitor test now asserts artifact-backed and request-context-backed live-page summaries, plus omission on the no-source branch
+    - front-end monitor test now asserts live-page summary rendering for artifact-backed, request-context-backed, and legacy live-page payloads
+    - synced `monitor/interface-spec.md` and `monitor/functional-spec.md`
+  - Verification:
+    - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+    - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`

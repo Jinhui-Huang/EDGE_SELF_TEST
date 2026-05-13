@@ -109,6 +109,7 @@ const livePageResponse: LivePage = {
   capturedAt: "2026-05-05T10:03:46Z",
   url: "https://example.test/checkout",
   title: "Checkout",
+  summary: "Checkout form is stable and ready for payment review.",
   pageState: "ready",
   highlight: {
     stepIndex: 2,
@@ -559,6 +560,7 @@ describe("MonitorScreen", () => {
         sourceLayer: "REQUEST_CONTEXT",
         title: "Payment review",
         url: "https://example.test/checkout/payment",
+        summary: "Payment form is visible and the CTA stays above the fold.",
         pageState: "audit-first / queued / watching payment iframe",
         highlight: {
           stepIndex: 0,
@@ -584,6 +586,7 @@ describe("MonitorScreen", () => {
     expect(screen.queryByRole("img", { name: "Checkout" })).not.toBeInTheDocument();
     expect(screen.getByText("Payment review")).toBeInTheDocument();
     expect(screen.getByText("https://example.test/checkout/payment")).toBeInTheDocument();
+    expect(screen.getByText("Payment form is visible and the CTA stays above the fold.")).toBeInTheDocument();
     expect(screen.getByText("audit-first / queued / watching payment iframe")).toBeInTheDocument();
     expect(screen.getByText("Verify the payment CTA before unblocking release.")).toBeInTheDocument();
     expect(screen.getByText("#pay-now")).toBeInTheDocument();
@@ -612,6 +615,7 @@ describe("MonitorScreen", () => {
       "src",
       "http://127.0.0.1:8787/api/phase3/runs/checkout-web-smoke/artifacts/content?path=live%2Fstep-5.png"
     );
+    expect(screen.getByText("Checkout form is stable and ready for payment review.")).toBeInTheDocument();
     expect(screen.getByText("Source: live artifact")).toBeInTheDocument();
   });
 
@@ -623,6 +627,7 @@ describe("MonitorScreen", () => {
         capturedAt: "2026-05-05T10:03:46Z",
         url: "https://example.test/checkout/payment",
         title: "Payment review",
+        summary: "Payment form is visible and the CTA stays above the fold.",
         pageState: "audit-first / queued / watching payment iframe",
         highlight: {
           stepIndex: 0,
@@ -644,5 +649,6 @@ describe("MonitorScreen", () => {
     );
 
     expect(await screen.findByText("Source: request-context fallback")).toBeInTheDocument();
+    expect(screen.getByText("Payment form is visible and the CTA stays above the fold.")).toBeInTheDocument();
   });
 });

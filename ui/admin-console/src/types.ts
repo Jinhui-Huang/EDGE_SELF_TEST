@@ -340,6 +340,7 @@ export type LivePage = {
   capturedAt: string;
   url: string;
   title: string;
+  summary?: string;
   pageState: string;
   highlight: {
     stepIndex: number;

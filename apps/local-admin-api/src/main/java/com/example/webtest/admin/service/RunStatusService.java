@@ -656,6 +656,7 @@ public final class RunStatusService {
                 textOr(request, "title", ""),
                 requestPageIdentity(request),
                 runId));
+        putIfNotBlank(result, "summary", resolveLivePageSummary(liveArtifact, request));
         result.put("pageState", firstNonBlank(
                 textOr(liveArtifact, "pageState", ""),
                 requestPageState(request),
@@ -691,6 +692,7 @@ public final class RunStatusService {
                 textOr(request, "pageTitle", ""),
                 textOr(request, "title", ""),
                 requestPageIdentity(request)));
+        putIfNotBlank(result, "summary", resolveLivePageSummary(Map.of(), request));
         result.put("pageState", firstNonBlank(
                 requestPageState(request),
                 "RUNNING".equals(status) ? "active" : "unavailable"));
@@ -702,6 +704,13 @@ public final class RunStatusService {
                 "target", textOr(request, "locator", "")));
         result.put("screenshotPath", null);
         return result;
+    }
+
+    private String resolveLivePageSummary(Map<String, Object> liveArtifact, Map<String, Object> request) {
+        return firstNonBlank(
+                textOr(liveArtifact, "summary", ""),
+                textOr(request, "bodySummary", ""),
+                textOr(request, "nextAction", ""));
     }
 
     private boolean hasLivePageRequestContext(Map<String, Object> request) {

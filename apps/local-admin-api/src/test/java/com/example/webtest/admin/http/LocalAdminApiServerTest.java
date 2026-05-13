@@ -633,6 +633,7 @@ class LocalAdminApiServerTest {
                 "capturedAt", "2026-05-07T09:03:31Z",
                 "url", "https://example.test/checkout",
                 "title", "Checkout",
+                "summary", "Checkout form is stable and ready for payment review.",
                 "pageState", "checkout.form",
                 "highlight", Map.of(
                         "stepIndex", 2,
@@ -719,6 +720,7 @@ class LocalAdminApiServerTest {
             assertEquals(200, available.statusCode());
             assertTrue(available.body().contains("\"status\":\"AVAILABLE\""));
             assertTrue(available.body().contains("\"sourceLayer\":\"LIVE_ARTIFACT\""));
+            assertTrue(available.body().contains("\"summary\":\"Checkout form is stable and ready for payment review.\""));
             assertTrue(available.body().contains("\"screenshotPath\":\"live/step-5.png\""));
             assertTrue(available.body().contains("\"pageState\":\"checkout.form\""));
 
@@ -731,6 +733,7 @@ class LocalAdminApiServerTest {
             assertTrue(unavailable.body().contains("\"screenshotPath\":null"));
             assertTrue(unavailable.body().contains("\"url\":\"https://example.test/checkout/payment\""));
             assertTrue(unavailable.body().contains("\"title\":\"Payment review\""));
+            assertTrue(unavailable.body().contains("\"summary\":\"Payment form is visible and the CTA stays above the fold.\""));
             assertTrue(unavailable.body().contains("\"pageState\":\"audit-first / queued / watching payment iframe\""));
             assertTrue(unavailable.body().contains("\"action\":\"Verify the payment CTA before unblocking release."));
             assertTrue(unavailable.body().contains("\"target\":\"#pay-now\""));
@@ -742,6 +745,7 @@ class LocalAdminApiServerTest {
             assertTrue(noSource.body().contains("\"status\":\"UNAVAILABLE\""));
             assertTrue(noSource.body().contains("\"sourceLayer\":\"NONE\""));
             assertTrue(noSource.body().contains("\"screenshotPath\":null"));
+            assertTrue(!noSource.body().contains("\"summary\""));
         }
     }
 
