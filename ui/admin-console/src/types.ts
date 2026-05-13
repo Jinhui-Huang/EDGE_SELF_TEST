@@ -268,6 +268,7 @@ export type ConfigSubmitHandler = (
 
 export type RunStatus = {
   runId: string;
+  sourceLayer?: "RUN_ARTIFACTS" | "SCHEDULER_FALLBACK";
   projectKey: string;
   status: string;
   environment: string;

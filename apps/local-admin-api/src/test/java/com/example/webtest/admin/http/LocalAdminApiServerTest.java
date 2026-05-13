@@ -1158,6 +1158,7 @@ class LocalAdminApiServerTest {
 
             assertEquals(200, artifactBacked.statusCode());
             assertTrue(artifactBacked.body().contains("\"projectKey\":\"checkout-web\""));
+            assertTrue(artifactBacked.body().contains("\"sourceLayer\":\"RUN_ARTIFACTS\""));
             assertTrue(artifactBacked.body().contains("\"status\":\"FAILED\""));
             assertTrue(artifactBacked.body().contains("\"environment\":\"prod-like\""));
             assertTrue(artifactBacked.body().contains("\"model\":\"claude-4.5-sonnet\""));
@@ -1179,6 +1180,7 @@ class LocalAdminApiServerTest {
             assertTrue(!artifactBacked.body().contains("scheduler status should not win"));
 
             assertEquals(200, fallbackBacked.statusCode());
+            assertTrue(fallbackBacked.body().contains("\"sourceLayer\":\"SCHEDULER_FALLBACK\""));
             assertTrue(fallbackBacked.body().contains("\"status\":\"RUNNING\""));
             assertTrue(fallbackBacked.body().contains("\"currentStep\":0"));
             assertTrue(fallbackBacked.body().contains("\"totalSteps\":0"));

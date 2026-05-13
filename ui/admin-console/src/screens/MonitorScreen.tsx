@@ -42,6 +42,7 @@ export function MonitorScreen({
   const [loadState, setLoadState] = useState<LoadState>("idle");
   const [errorMessage, setErrorMessage] = useState("");
   const [runStatus, setRunStatus] = useState<RunStatus | null>(null);
+  const [statusSourceLayer, setStatusSourceLayer] = useState<RunStatus["sourceLayer"] | null>(null);
   const [steps, setSteps] = useState<RunStep[]>([]);
   const [stepsAvailability, setStepsAvailability] = useState<"AVAILABLE" | "UNAVAILABLE">("UNAVAILABLE");
   const [stepsSourceLayer, setStepsSourceLayer] = useState<RunStepsResponse["sourceLayer"] | null>(null);
@@ -79,6 +80,7 @@ export function MonitorScreen({
       const liveData = liveRes.ok ? ((await liveRes.json()) as LivePage) : null;
 
       setRunStatus(statusData);
+      setStatusSourceLayer(resolveStatusSourceLayer(statusData));
       setSteps(stepsData.items ?? []);
       setStepsAvailability(resolveStepsAvailability(stepsData));
       setStepsSourceLayer(resolveStepsSourceLayer(stepsData));
@@ -91,6 +93,7 @@ export function MonitorScreen({
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : String(error));
       setRunStatus(null);
+      setStatusSourceLayer(null);
       setSteps([]);
       setStepsAvailability("UNAVAILABLE");
       setStepsSourceLayer(null);
@@ -110,6 +113,7 @@ export function MonitorScreen({
       setLoadState("idle");
       setErrorMessage("");
       setRunStatus(null);
+      setStatusSourceLayer(null);
       setSteps([]);
       setStepsAvailability("UNAVAILABLE");
       setStepsSourceLayer(null);
@@ -237,6 +241,7 @@ export function MonitorScreen({
   const stepsSourceText = stepsSourceLayer ? describeStepSourceLayer(stepsSourceLayer, t) : null;
   const runtimeLogSourceText = runtimeLogSourceLayer ? describeRuntimeLogSourceLayer(runtimeLogSourceLayer, t) : null;
   const livePageSourceText = livePageSourceLayer ? describeLivePageSourceLayer(livePageSourceLayer, t) : null;
+  const statusSourceText = statusSourceLayer ? describeStatusSourceLayer(statusSourceLayer, t) : null;
   const activeDetailKind = selectedStep ? "step" : selectedLog ? "log" : null;
   const livePageStatus = livePage?.status ?? "UNAVAILABLE";
   const liveScreenshotUrl = runId && livePage?.screenshotPath
@@ -259,6 +264,7 @@ export function MonitorScreen({
               <span className="monitorPillIcon info">●</span>
               {runStatus?.model || "--"}
             </span>
+            {statusSourceText ? <span className="monitorPill mono">{statusSourceText}</span> : null}
           </div>
         </div>
         <div className="monitorHeroActions">
@@ -721,6 +727,31 @@ function statusToTone(status: string): string {
       return "coral";
     default:
       return "neutral";
+  }
+}
+
+function resolveStatusSourceLayer(statusData: RunStatus): RunStatus["sourceLayer"] | null {
+  if (statusData.sourceLayer === "RUN_ARTIFACTS" || statusData.sourceLayer === "SCHEDULER_FALLBACK") {
+    return statusData.sourceLayer;
+  }
+  if ((statusData.currentPage?.state ?? "") === "artifact-captured") {
+    return "RUN_ARTIFACTS";
+  }
+  return "SCHEDULER_FALLBACK";
+}
+
+function describeStatusSourceLayer(
+  sourceLayer: NonNullable<RunStatus["sourceLayer"]>,
+  t: (copySet: Copy) => string
+): string {
+  const prefix = t(copy("Source", "来源", "ソース"));
+  switch (sourceLayer) {
+    case "RUN_ARTIFACTS":
+      return `${prefix}: ${t(copy("run artifacts", "run artifacts", "run artifacts"))}`;
+    case "SCHEDULER_FALLBACK":
+      return `${prefix}: ${t(copy("scheduler fallback", "scheduler fallback", "scheduler fallback"))}`;
+    default:
+      return prefix;
   }
 }
 

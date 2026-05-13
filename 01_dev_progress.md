@@ -5539,6 +5539,36 @@ Remaining limits:
 - `live-page.sourceLayer` is a coarse top-level provenance marker; it does not describe richer DOM-source provenance beyond artifact vs request-context fallback
 - this slice does not add a richer live-page summary model or any non-monitor contract
 
+## 2026-05-13 P3-4 monitor status source-layer follow-up
+
+## Task
+- Continue the same small `monitor` provenance line on `/status`
+- keep `status`, `progress`, `counters`, `currentPage`, and `control` intact
+- only add a top-level `sourceLayer` and a lightweight front-end hint
+
+## Completed
+- Backend:
+  - `GET /api/phase3/runs/{runId}/status` now includes `sourceLayer`
+  - `sourceLayer: "RUN_ARTIFACTS"` when run-local `report.json`, `live-page.json`, or runtime artifact timestamp context strengthens the response
+  - `sourceLayer: "SCHEDULER_FALLBACK"` when the response still resolves to the scheduler-backed shell
+- Frontend:
+  - `RunStatus` now includes optional `sourceLayer`
+  - `MonitorScreen` now shows a lightweight status source hint in the hero row
+  - when the marker is absent, the screen falls back only to stronger artifact-like current-page signals such as `artifact-captured` and otherwise stays conservative with `SCHEDULER_FALLBACK`
+- Tests/docs:
+  - backend monitor test now asserts status `sourceLayer` across artifact-strengthened and scheduler-fallback responses
+  - front-end monitor test now covers marker-driven status hints plus a legacy status payload without `sourceLayer`
+  - synced `monitor/interface-spec.md` and `monitor/functional-spec.md`
+
+## Verification
+- Ran:
+  - `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+  - `npm test -- --run src/screens/MonitorScreen.test.tsx`
+
+## Remaining Limits
+- `status.sourceLayer` is a coarse top-level provenance marker; it does not break down mixed artifact contribution across report/live-page/runtime timestamp context
+- this slice does not add richer status reason codes or any non-monitor contract
+
 ## Remaining Limits
 - `runtime-log` fallback is now more informative when request context exists, but it still remains a compact shell rather than a richer structured runtime artifact model
 - if scheduler requests also lack persisted page/runtime/locator fields, runtime-log fallback can still end up sparse or empty

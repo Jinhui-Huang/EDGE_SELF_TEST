@@ -236,6 +236,7 @@ The screen loads runtime data from dedicated APIs when `selectedRunId` is provid
 - `livePage` from `GET /api/phase3/runs/{runId}/live-page` — backend-owned availability status, current page URL/state/highlight, and optional run-local screenshot path
 
 - `runStatus` now prefers run-local `report.json` / `live-page.json` / artifact timestamps when available and otherwise keeps a conservative scheduler-backed shell that can still surface persisted scheduler request page/runtime context
+- `runStatus` now also carries a backend-owned source-layer marker so the front end can show whether the run summary is artifact-strengthened or still scheduler-fallback-owned
 - `steps` now also carries a backend-owned availability marker so the front end can distinguish a truly unavailable step timeline from a merely short one without changing the existing row structure
 - `steps` now also carries a backend-owned source-layer marker so the front end can show whether the current step timeline comes from report artifacts, scheduler events, or no available source
 - `runtimeLog` now follows an explicit fallback chain: run-local `runtime.log` artifact first, then scheduler-event-derived runtime notes, then a small persisted scheduler request-context shell when neither source yields usable runtime-log rows
@@ -246,6 +247,7 @@ The screen loads runtime data from dedicated APIs when `selectedRunId` is provid
 - `MonitorScreen` now also shows a lightweight steps source hint in the panel header and falls back to minimal legacy inference when older step payloads omit the marker
 - when `runtimeLog.items` is empty, `MonitorScreen` now prefers the backend-owned runtime-log availability/source markers for the empty-state message and source hint, and still falls back to the empty-list interpretation when legacy payloads omit the marker
 - `MonitorScreen` now also shows a lightweight live-page source hint in the panel header and falls back to minimal legacy inference when older live-page payloads omit the marker
+- `MonitorScreen` now also shows a lightweight status source hint in the hero row and, when older status payloads omit the marker, only treats stronger artifact-like current-page signals as `RUN_ARTIFACTS`; otherwise it stays conservative with `SCHEDULER_FALLBACK`
 
 ## 8. Screen Inputs and Outputs
 

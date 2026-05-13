@@ -35,6 +35,7 @@ const snapshot: AdminConsoleSnapshot = {
 
 const runStatusResponse: RunStatus = {
   runId: "checkout-web-smoke",
+  sourceLayer: "RUN_ARTIFACTS",
   projectKey: "checkout-web",
   status: "RUNNING",
   environment: "prod-like",
@@ -204,6 +205,27 @@ describe("MonitorScreen", () => {
     );
 
     expect(await screen.findByText("Source: report artifact")).toBeInTheDocument();
+  });
+
+  it("shows the backend-owned status source-layer hint", async () => {
+    vi.stubGlobal("fetch", createFetchMock({
+      status: {
+        ...runStatusResponse,
+        sourceLayer: "SCHEDULER_FALLBACK"
+      }
+    }));
+
+    render(
+      <MonitorScreen
+        snapshot={snapshot}
+        title="Execution monitor"
+        locale="en"
+        selectedRunId="checkout-web-smoke"
+        apiBaseUrl="http://127.0.0.1:8787"
+      />
+    );
+
+    expect(await screen.findByText("Source: scheduler fallback")).toBeInTheDocument();
   });
 
   it("opens runtime log detail when clicking a runtime log row", async () => {
@@ -456,6 +478,77 @@ describe("MonitorScreen", () => {
     expect(await screen.findByText("Status API: HTTP 500")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Step detail" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Runtime log detail" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the status source hint conservative when legacy status payloads omit the marker", async () => {
+    vi.stubGlobal("fetch", createFetchMock({
+      status: {
+        runId: "checkout-web-smoke",
+        projectKey: "checkout-web",
+        status: "RUNNING",
+        environment: "prod-like",
+        model: "gpt-4.1-mini",
+        owner: "qa-platform",
+        progress: {
+          currentStep: 2,
+          totalSteps: 5,
+          percent: 40,
+          elapsedMs: 120000,
+          estimatedTotalMs: 300000
+        },
+        currentPage: {
+          url: "https://example.test/checkout",
+          state: "ready"
+        },
+        counters: {
+          assertionsPassed: 8,
+          assertionsTotal: 10,
+          aiCalls: 2,
+          heals: 1
+        },
+        control: {
+          canPause: true,
+          canAbort: true
+        },
+        lastUpdatedAt: "2026-05-05T10:04:00Z"
+      }
+    }));
+
+    render(
+      <MonitorScreen
+        snapshot={snapshot}
+        title="Execution monitor"
+        locale="en"
+        selectedRunId="checkout-web-smoke"
+        apiBaseUrl="http://127.0.0.1:8787"
+      />
+    );
+
+    expect(await screen.findByText("Source: scheduler fallback")).toBeInTheDocument();
+  });
+
+  it("still infers run-artifact status provenance from legacy artifact-like page state", async () => {
+    vi.stubGlobal("fetch", createFetchMock({
+      status: {
+        ...runStatusResponse,
+        currentPage: {
+          url: "https://example.test/checkout",
+          state: "artifact-captured"
+        }
+      }
+    }));
+
+    render(
+      <MonitorScreen
+        snapshot={snapshot}
+        title="Execution monitor"
+        locale="en"
+        selectedRunId="checkout-web-smoke"
+        apiBaseUrl="http://127.0.0.1:8787"
+      />
+    );
+
+    expect(await screen.findByText("Source: run artifacts")).toBeInTheDocument();
   });
 
   it("shows an explicit unavailable shell when no live-page artifact exists", async () => {

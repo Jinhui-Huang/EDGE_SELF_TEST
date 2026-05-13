@@ -72,9 +72,13 @@ public final class RunStatusService {
         long elapsedMs = resolveElapsedMs(reportContext.durationMs(), startedAt, finishedAt, now);
 
         ProgressInfo progressInfo = deriveProgressInfo(reportContext, events, status, elapsedMs);
+        String statusSourceLayer = hasRunArtifactStatusContext(runDir, reportContext, livePageContext)
+                ? "RUN_ARTIFACTS"
+                : "SCHEDULER_FALLBACK";
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("runId", runId);
+        result.put("sourceLayer", statusSourceLayer);
         result.put("projectKey", firstNonBlank(reportContext.projectKey(), textOr(request, "projectKey", "")));
         result.put("status", status);
         result.put("environment", firstNonBlank(reportContext.environment(), textOr(request, "environment", "")));
@@ -120,6 +124,23 @@ public final class RunStatusService {
 
         result.put("lastUpdatedAt", resolveLastUpdatedAt(now, latestEvent, reportContext, livePageContext, runDir));
         return result;
+    }
+
+    private boolean hasRunArtifactStatusContext(
+            Path runDir,
+            ReportStatusContext reportContext,
+            LivePageStatusContext livePageContext) {
+        if (reportContext != null && reportContext.updatedAt() != null) {
+            return true;
+        }
+        if (livePageContext != null && livePageContext.updatedAt() != null) {
+            return true;
+        }
+        if (runDir == null || !Files.isDirectory(runDir)) {
+            return false;
+        }
+        Path runtimeLog = runDir.resolve("runtime.log").normalize();
+        return runtimeLog.startsWith(runDir) && Files.isRegularFile(runtimeLog);
     }
 
     // ---- GET /api/phase3/runs/{runId}/steps ----

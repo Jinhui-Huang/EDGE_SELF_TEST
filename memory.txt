@@ -2735,3 +2735,22 @@
   - Verification:
     - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
     - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`
+- 2026-05-13: Continued the same provenance-marker pattern on `P3-4 monitor /status`.
+  - Backend:
+    - `GET /api/phase3/runs/{runId}/status` now includes `sourceLayer`
+    - `sourceLayer` values:
+      - `RUN_ARTIFACTS`
+      - `SCHEDULER_FALLBACK`
+    - `RUN_ARTIFACTS` is emitted when run-local `report.json`, `live-page.json`, or runtime artifact timestamp context strengthens the status response
+    - `SCHEDULER_FALLBACK` is emitted when the response still resolves to the scheduler-backed shell
+  - Frontend:
+    - `RunStatus` now accepts the additive `sourceLayer` field
+    - `MonitorScreen` now shows a lightweight status source hint in the hero row
+    - when the marker is absent, the screen falls back only to stronger artifact-like current-page signals such as `artifact-captured` and otherwise stays conservative with `SCHEDULER_FALLBACK`
+  - Tests/docs:
+    - backend monitor test now asserts status source-layer values across artifact-strengthened and scheduler-fallback responses
+    - front-end monitor test now covers marker-driven status hints plus a legacy status payload without `sourceLayer`
+    - synced `monitor/interface-spec.md` and `monitor/functional-spec.md`
+  - Verification:
+    - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+    - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`
