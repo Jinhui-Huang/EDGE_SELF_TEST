@@ -2533,7 +2533,6 @@ export function App() {
                 body: JSON.stringify({ operator: "monitor" })
               });
               const result = await response.json() as RunControlResponse;
-              void loadSnapshot();
               return result;
             }}
             onAbortRun={async (monitorRunId) => {
@@ -2543,7 +2542,6 @@ export function App() {
                 body: JSON.stringify({ operator: "monitor" })
               });
               const result = await response.json() as RunControlResponse;
-              void loadSnapshot();
               return result;
             }}
           />

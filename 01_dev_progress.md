@@ -5862,6 +5862,26 @@ Remaining limits:
 - this is still optimistic local feedback only; it does not confirm that an external executor has actually paused or aborted
 - the optimistic control overlay now clears on the same requested phase or on the direct terminal handoff paths currently covered (`PAUSING -> PAUSED`, `ABORTING -> ABORTED`), but there is still no richer general control-progress model or separate control event stream
 
+## 2026-05-14 P3-4 monitor control refresh ownership dedupe
+
+## Completed
+- Updated `ui/admin-console/src/App.tsx`:
+  - monitor `onPauseRun` / `onAbortRun` handlers no longer trigger top-level `loadSnapshot()`
+  - monitor control actions now rely on `MonitorScreen` as the single owner of the follow-up monitor refresh
+- Expanded `ui/admin-console/src/App.test.tsx`:
+  - added accepted pause coverage that asserts:
+    - no extra `/api/phase3/admin-console` reload happens after the control action
+    - the monitor run endpoints still refresh exactly once after the action
+  - added rejected abort coverage with the same no-extra-snapshot guarantee
+- Preserved existing screen behavior:
+  - `MonitorScreen.test.tsx` remains green for accepted optimistic feedback
+  - `MonitorScreen.test.tsx` remains green for non-accepted warning+refresh behavior
+
+## Verification
+- Ran:
+  - `npm test -- --run src/App.test.tsx -t "keeps monitor control refresh ownership inside MonitorScreen"`
+  - `npm test -- --run src/screens/MonitorScreen.test.tsx`
+
 ## Remaining Limits
 - `runtime-log` fallback is now more informative when request context exists, but it still remains a compact shell rather than a richer structured runtime artifact model
 - if scheduler requests also lack persisted page/runtime/locator fields, runtime-log fallback can still end up sparse or empty

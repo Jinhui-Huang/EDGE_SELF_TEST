@@ -2900,3 +2900,11 @@
   - Verification:
     - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
     - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`
+- 2026-05-14: Deduplicated monitor control refresh ownership on the front end.
+  - Frontend:
+    - `App.tsx` monitor `onPauseRun` / `onAbortRun` handlers no longer call top-level `loadSnapshot()`
+    - `MonitorScreen` remains the single owner of post-control monitor refresh via `fetchMonitorData(runId)`
+    - accepted optimistic feedback and non-accepted warning+refresh behavior are unchanged
+  - Verification:
+    - ran `npm test -- --run src/App.test.tsx -t "keeps monitor control refresh ownership inside MonitorScreen"`
+    - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`

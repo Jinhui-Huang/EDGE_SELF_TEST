@@ -2575,6 +2575,140 @@ describe("App", () => {
     expect(await screen.findByText("Open home")).toBeInTheDocument();
   });
 
+  it("keeps monitor control refresh ownership inside MonitorScreen for accepted pause", async () => {
+    let statusCalls = 0;
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
+      if (url.endsWith("/api/phase3/data-templates")) return jsonResponse(dataTemplatesResponse);
+      if (url.endsWith("/api/phase3/runs/checkout-web-smoke/status")) {
+        statusCalls += 1;
+        return jsonResponse(statusCalls === 1
+          ? monitorStatusResponse
+          : {
+              ...monitorStatusResponse,
+              status: "PAUSING",
+              control: {
+                canPause: false,
+                canAbort: true,
+                requestedBy: "monitor",
+                requestedAt: "2026-05-14T01:00:00Z"
+              }
+            });
+      }
+      if (url.endsWith("/api/phase3/runs/checkout-web-smoke/steps")) return jsonResponse(monitorStepsResponse);
+      if (url.endsWith("/api/phase3/runs/checkout-web-smoke/runtime-log")) return jsonResponse(monitorRuntimeLogResponse);
+      if (url.endsWith("/api/phase3/runs/checkout-web-smoke/live-page")) return jsonResponse(monitorLivePageResponse);
+      if (url.endsWith("/api/phase3/runs/checkout-web-smoke/pause")) {
+        return jsonResponse({
+          status: "ACCEPTED",
+          kind: "run-control-pause",
+          runId: "checkout-web-smoke",
+          requestedState: "PAUSING",
+          requestedBy: "monitor",
+          requestedAt: "2026-05-14T01:00:00Z",
+          message: "Pause requested"
+        }, 202);
+      }
+      throw new Error(`Unexpected fetch: ${url} ${init?.method ?? "GET"}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    await screen.findByText("Needs attention");
+    const executionNavButtons = await screen.findAllByRole("button", { name: /Execution/ });
+    await userEvent.click(executionNavButtons[0]);
+    const monitorButtons = await screen.findAllByText("Open Exec Monitor");
+    await userEvent.click(monitorButtons[0]);
+    await screen.findByText("40%");
+
+    await userEvent.click(await screen.findByRole("button", { name: "Pause" }));
+
+    expect(await screen.findByText("Pause requested")).toBeInTheDocument();
+    expect(await screen.findByText("pausing")).toBeInTheDocument();
+
+    const adminConsoleCalls = fetchMock.mock.calls.filter(
+      (call: unknown[]) => String(call[0]).endsWith("/api/phase3/admin-console")
+    );
+    expect(adminConsoleCalls).toHaveLength(1);
+
+    const statusRefreshCalls = fetchMock.mock.calls.filter(
+      (call: unknown[]) => String(call[0]).endsWith("/api/phase3/runs/checkout-web-smoke/status")
+    );
+    const stepsRefreshCalls = fetchMock.mock.calls.filter(
+      (call: unknown[]) => String(call[0]).endsWith("/api/phase3/runs/checkout-web-smoke/steps")
+    );
+    const runtimeRefreshCalls = fetchMock.mock.calls.filter(
+      (call: unknown[]) => String(call[0]).endsWith("/api/phase3/runs/checkout-web-smoke/runtime-log")
+    );
+    const livePageRefreshCalls = fetchMock.mock.calls.filter(
+      (call: unknown[]) => String(call[0]).endsWith("/api/phase3/runs/checkout-web-smoke/live-page")
+    );
+    expect(statusRefreshCalls).toHaveLength(2);
+    expect(stepsRefreshCalls).toHaveLength(2);
+    expect(runtimeRefreshCalls).toHaveLength(2);
+    expect(livePageRefreshCalls).toHaveLength(2);
+  });
+
+  it("keeps monitor control refresh ownership inside MonitorScreen for rejected abort", async () => {
+    let statusCalls = 0;
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
+      if (url.endsWith("/api/phase3/data-templates")) return jsonResponse(dataTemplatesResponse);
+      if (url.endsWith("/api/phase3/runs/checkout-web-smoke/status")) {
+        statusCalls += 1;
+        return jsonResponse({
+          ...monitorStatusResponse,
+          status: statusCalls === 1 ? "RUNNING" : "ABORTING",
+          control: {
+            canPause: statusCalls === 1,
+            canAbort: statusCalls === 1
+          }
+        });
+      }
+      if (url.endsWith("/api/phase3/runs/checkout-web-smoke/steps")) return jsonResponse(monitorStepsResponse);
+      if (url.endsWith("/api/phase3/runs/checkout-web-smoke/runtime-log")) return jsonResponse(monitorRuntimeLogResponse);
+      if (url.endsWith("/api/phase3/runs/checkout-web-smoke/live-page")) return jsonResponse(monitorLivePageResponse);
+      if (url.endsWith("/api/phase3/runs/checkout-web-smoke/abort")) {
+        return jsonResponse({
+          status: "REJECTED",
+          kind: "run-control-abort",
+          runId: "checkout-web-smoke",
+          requestedState: "RUNNING",
+          message: "Run is already aborting."
+        }, 409);
+      }
+      throw new Error(`Unexpected fetch: ${url} ${init?.method ?? "GET"}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    await screen.findByText("Needs attention");
+    const executionNavButtons = await screen.findAllByRole("button", { name: /Execution/ });
+    await userEvent.click(executionNavButtons[0]);
+    const monitorButtons = await screen.findAllByText("Open Exec Monitor");
+    await userEvent.click(monitorButtons[0]);
+    await screen.findByText("40%");
+
+    await userEvent.click(await screen.findByRole("button", { name: "Abort" }));
+
+    expect(await screen.findByText("Abort not accepted: Run is already aborting.")).toBeInTheDocument();
+    expect(await screen.findByText("aborting")).toBeInTheDocument();
+
+    const adminConsoleCalls = fetchMock.mock.calls.filter(
+      (call: unknown[]) => String(call[0]).endsWith("/api/phase3/admin-console")
+    );
+    expect(adminConsoleCalls).toHaveLength(1);
+
+    const statusRefreshCalls = fetchMock.mock.calls.filter(
+      (call: unknown[]) => String(call[0]).endsWith("/api/phase3/runs/checkout-web-smoke/status")
+    );
+    expect(statusRefreshCalls).toHaveLength(2);
+  });
+
   it("opens cases from execution prepared-case drill-down via the existing App handoff", async () => {
     const fetchMock = vi.fn().mockImplementation((call: unknown) => {
       const url = String(call);
