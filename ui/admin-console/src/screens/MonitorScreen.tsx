@@ -267,6 +267,7 @@ export function MonitorScreen({
   const estimatedFormatted = progress ? formatMs(progress.estimatedTotalMs) : "--";
   const percentText = progress ? `${progress.percent}%` : "0%";
   const queueLead = snapshot.workQueue[0];
+  const queuePressureText = runStatus?.queueState || queueLead?.detail || "--";
   const runningStep = steps.find((step) => step.state === "RUNNING");
   const showUnavailableSteps = stepsAvailability === "UNAVAILABLE";
   const showUnavailableRuntimeLog = runtimeLogAvailability === "UNAVAILABLE";
@@ -673,7 +674,7 @@ export function MonitorScreen({
       <section className="monitorFooter">
         <div className="monitorFooterItem">
           <span>{t(copy("Queue pressure", "队列压力", "キュー圧力"))}</span>
-          <strong>{queueLead?.detail ?? "--"}</strong>
+          <strong>{queuePressureText}</strong>
         </div>
         <div className="monitorFooterItem">
           <span>{t(copy("Last event", "最后事件", "最新イベント"))}</span>

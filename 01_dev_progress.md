@@ -5882,6 +5882,26 @@ Remaining limits:
   - `npm test -- --run src/App.test.tsx -t "keeps monitor control refresh ownership inside MonitorScreen"`
   - `npm test -- --run src/screens/MonitorScreen.test.tsx`
 
+## 2026-05-14 P3-4 monitor queue-pressure run-local fallback reduction
+
+## Completed
+- Updated backend `RunStatusService.java`:
+  - `GET /api/phase3/runs/{runId}/status` now emits optional top-level `queueState` when persisted request context provides it
+- Updated front-end monitor typing/rendering:
+  - `RunStatus` now accepts optional `queueState`
+  - `MonitorScreen` footer `Queue pressure` now prefers `runStatus.queueState`
+  - if the run-local status payload does not provide queue context, the footer still falls back to `snapshot.workQueue[0].detail`
+- Expanded regression coverage:
+  - `LocalAdminApiServerTest` now asserts scheduler-fallback status exposes `queueState`
+  - `MonitorScreen.test.tsx` now covers both:
+    - run-local `queueState` winning over parent snapshot footer detail
+    - legacy fallback to parent snapshot footer detail when `queueState` is absent
+
+## Verification
+- Ran:
+  - `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+  - `npm test -- --run src/screens/MonitorScreen.test.tsx`
+
 ## Remaining Limits
 - `runtime-log` fallback is now more informative when request context exists, but it still remains a compact shell rather than a richer structured runtime artifact model
 - if scheduler requests also lack persisted page/runtime/locator fields, runtime-log fallback can still end up sparse or empty

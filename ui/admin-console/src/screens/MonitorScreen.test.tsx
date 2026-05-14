@@ -229,6 +229,44 @@ describe("MonitorScreen", () => {
     expect(await screen.findByText("Source: scheduler fallback")).toBeInTheDocument();
   });
 
+  it("prefers run-local queue state over the parent snapshot footer detail", async () => {
+    vi.stubGlobal("fetch", createFetchMock({
+      status: {
+        ...runStatusResponse,
+        queueState: "2 queued / 1 active / 1 waiting"
+      }
+    }));
+
+    render(
+      <MonitorScreen
+        snapshot={snapshot}
+        title="Execution monitor"
+        locale="en"
+        selectedRunId="checkout-web-smoke"
+        apiBaseUrl="http://127.0.0.1:8787"
+      />
+    );
+
+    expect(await screen.findByText("2 queued / 1 active / 1 waiting")).toBeInTheDocument();
+    expect(screen.queryByText("1 active / 1 waiting")).not.toBeInTheDocument();
+  });
+
+  it("falls back to the parent snapshot footer detail when queue state is absent", async () => {
+    vi.stubGlobal("fetch", createFetchMock());
+
+    render(
+      <MonitorScreen
+        snapshot={snapshot}
+        title="Execution monitor"
+        locale="en"
+        selectedRunId="checkout-web-smoke"
+        apiBaseUrl="http://127.0.0.1:8787"
+      />
+    );
+
+    expect(await screen.findByText("1 active / 1 waiting")).toBeInTheDocument();
+  });
+
   it("shows a pausing control-phase banner and keeps pause disabled", async () => {
     vi.stubGlobal("fetch", createFetchMock({
       status: {

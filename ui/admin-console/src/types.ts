@@ -274,6 +274,7 @@ export type RunStatus = {
   environment: string;
   model: string;
   owner: string;
+  queueState?: string;
   progress: {
     currentStep: number;
     totalSteps: number;

@@ -84,6 +84,7 @@ public final class RunStatusService {
         result.put("environment", firstNonBlank(reportContext.environment(), textOr(request, "environment", "")));
         result.put("model", firstNonBlank(reportContext.model(), textOr(request, "executionModel", "")));
         result.put("owner", firstNonBlank(reportContext.owner(), textOr(request, "owner", "")));
+        putIfNotBlank(result, "queueState", textOr(request, "queueState", ""));
 
         Map<String, Object> progress = new LinkedHashMap<>();
         progress.put("currentStep", progressInfo.currentStep());

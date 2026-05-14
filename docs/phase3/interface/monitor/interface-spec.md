@@ -45,7 +45,7 @@ Current `monitor` screen conclusion:
 
 ### 3.1 Purpose for Monitor Screen
 
-The `monitor` screen currently uses the shared admin-console snapshot only as a shallow context source.
+The `monitor` screen currently uses the shared admin-console snapshot only as a shallow fallback context source.
 
 Relevant snapshot fields currently touched by the screen:
 
@@ -61,7 +61,7 @@ Relevant snapshot fields currently touched by the screen:
 - `reports[]`
   - provides fallback report entry text
 - `workQueue[]`
-  - provides queue title, owner, and detail
+  - now mainly provides fallback queue-detail text when run-local monitor status does not expose queue context
 - `timeline[]`
   - provides last-event footer summary
 
@@ -75,6 +75,7 @@ This snapshot is not sufficient for true monitor behavior because it does not pr
 - per-step timeline entries
 - runtime AI decision stream
 - pause/abort capability state
+- stable run-local queue context unless the dedicated runtime read model exposes it
 
 ## 4. API-Driven Runtime Data Model
 
@@ -205,6 +206,7 @@ Response body:
   "environment": "prod-like",
   "model": "claude-4.5-sonnet",
   "owner": "qa-platform",
+  "queueState": "2 queued / 1 active / 1 waiting",
   "progress": {
     "currentStep": 5,
     "totalSteps": 8,
@@ -229,6 +231,8 @@ Response body:
   "lastUpdatedAt": "2026-04-20T05:32:10Z"
 }
 ```
+
+`queueState` is additive and optional. When present, `MonitorScreen` should prefer it for small queue-context footer copy; when absent, the screen may still fall back to the older parent `snapshot.workQueue[0].detail`.
 
 The top-level `sourceLayer` tells the front end which status layer currently owns the response:
 

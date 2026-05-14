@@ -2908,3 +2908,13 @@
   - Verification:
     - ran `npm test -- --run src/App.test.tsx -t "keeps monitor control refresh ownership inside MonitorScreen"`
     - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`
+- 2026-05-14: Started shrinking monitor footer snapshot dependence by moving queue-pressure text to run-local status first.
+  - Backend:
+    - `GET /api/phase3/runs/{runId}/status` now adds optional top-level `queueState` from persisted request context when available
+  - Frontend:
+    - `RunStatus` now accepts optional `queueState`
+    - monitor footer `Queue pressure` now prefers `runStatus.queueState`
+    - when `queueState` is absent, the footer still falls back to `snapshot.workQueue[0].detail`
+  - Verification:
+    - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+    - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`
