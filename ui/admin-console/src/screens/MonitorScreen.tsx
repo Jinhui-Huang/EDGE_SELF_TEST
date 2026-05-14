@@ -267,7 +267,7 @@ export function MonitorScreen({
   const estimatedFormatted = progress ? formatMs(progress.estimatedTotalMs) : "--";
   const percentText = progress ? `${progress.percent}%` : "0%";
   const queuePressureFooter = resolveQueuePressureFooter(runStatus, snapshot.workQueue[0], t);
-  const lastEventFooter = resolveLastEventFooter(runStatus, snapshot.timeline[0]);
+  const lastEventFooter = resolveLastEventFooter(runStatus, snapshot.timeline[0], t);
   const queueStateSourceText = describeQueueStateSource(queuePressureFooter.source, t);
   const lastEventSourceText = describeLastEventSource(lastEventFooter.source, t);
   const runningStep = steps.find((step) => step.state === "RUNNING");
@@ -806,11 +806,18 @@ function resolveQueuePressureFooter(
 
 function resolveLastEventFooter(
   runStatus: RunStatus | null,
-  snapshotEvent?: AdminConsoleSnapshot["timeline"][number]
+  snapshotEvent: AdminConsoleSnapshot["timeline"][number] | undefined,
+  t: (copySet: Copy) => string
 ): { text: string; timeText: string; source: "ARTIFACT" | "SCHEDULER" | "NONE" } {
-  const text = runStatus?.lastEventSummary || snapshotEvent?.detail || snapshotEvent?.title || "--";
-  const timeText = runStatus?.lastEventAt ? formatTimestamp(runStatus.lastEventAt) : "";
   const source = resolveLastEventSource(runStatus);
+  const text = source === "ARTIFACT" || source === "SCHEDULER"
+    ? runStatus?.lastEventSummary || "--"
+    : runStatus?.lastEventSource === "NONE"
+      ? t(copy("No run-local event context is available yet.", "当前还没有可用的运行态事件上下文。", "まだ run-local のイベント文脈はありません。"))
+      : snapshotEvent?.detail || snapshotEvent?.title || "--";
+  const timeText = source === "ARTIFACT" || source === "SCHEDULER"
+    ? runStatus?.lastEventAt ? formatTimestamp(runStatus.lastEventAt) : ""
+    : "";
   return { text, timeText, source };
 }
 

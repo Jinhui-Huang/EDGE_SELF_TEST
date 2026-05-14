@@ -418,6 +418,31 @@ describe("MonitorScreen", () => {
     expect(screen.getByText("Event source: none")).toBeInTheDocument();
   });
 
+  it("stops using the parent snapshot timeline fallback when lastEventSource is explicitly NONE", async () => {
+    vi.stubGlobal("fetch", createFetchMock({
+      status: {
+        ...runStatusResponse,
+        lastEventSummary: undefined,
+        lastEventAt: undefined,
+        lastEventSource: "NONE"
+      }
+    }));
+
+    render(
+      <MonitorScreen
+        snapshot={snapshot}
+        title="Execution monitor"
+        locale="en"
+        selectedRunId="checkout-web-smoke"
+        apiBaseUrl="http://127.0.0.1:8787"
+      />
+    );
+
+    expect(await screen.findByText("No run-local event context is available yet.")).toBeInTheDocument();
+    expect(screen.getByText("Event source: none")).toBeInTheDocument();
+    expect(screen.queryByText("Parent snapshot fallback detail")).not.toBeInTheDocument();
+  });
+
   it("keeps footer fallback ordering explicit when neither run-local nor snapshot footer context exists", async () => {
     vi.stubGlobal("fetch", createFetchMock({
       status: {

@@ -5301,6 +5301,42 @@ Remaining limits:
 - this round only removes the snapshot queue fallback when the newer `queueStateSource: "NONE"` marker is present; older payloads still intentionally keep the legacy fallback path
 - other footer areas still retain their existing snapshot compatibility behavior
 
+## 2026-05-14 P3-4 monitor last-event fallback tightening
+
+## Completed
+- Updated `ui/admin-console/src/screens/MonitorScreen.tsx`:
+  - `Last event` now treats explicit `runStatus.lastEventSource === "NONE"` as authoritative run-local no-context state
+  - in that branch, the footer no longer falls back to `snapshot.timeline[0]`
+  - instead it shows explicit copy:
+    - `No run-local event context is available yet.`
+  - compatibility boundary remains aligned with `Queue pressure`:
+    - explicit marker present -> trust marker
+    - marker absent in older payloads -> keep the legacy snapshot fallback
+- Expanded front-end regression coverage:
+  - explicit `lastEventSource: "NONE"` now asserts the snapshot timeline fallback is suppressed
+  - legacy missing-marker fallback coverage remains intact
+- Synced docs/records:
+  - `docs/phase3/interface/monitor/interface-spec.md`
+  - `docs/phase3/interface/monitor/functional-spec.md`
+  - `memory.txt`
+  - `01_dev_progress.md`
+
+## Modified Files
+- `ui/admin-console/src/screens/MonitorScreen.tsx`
+- `ui/admin-console/src/screens/MonitorScreen.test.tsx`
+- `docs/phase3/interface/monitor/interface-spec.md`
+- `docs/phase3/interface/monitor/functional-spec.md`
+- `memory.txt`
+- `01_dev_progress.md`
+
+## Verification
+- Ran:
+  - `npm test -- --run src/screens/MonitorScreen.test.tsx`
+
+## Remaining Limits
+- this round only removes the snapshot last-event fallback when the newer `lastEventSource: "NONE"` marker is present; older payloads still intentionally keep the legacy fallback path
+- other footer areas still retain their existing snapshot compatibility behavior
+
 ## 2026-05-08 P3-4 monitor scheduler-context fallback follow-up
 
 ## Task

@@ -3017,3 +3017,17 @@
     - synced `monitor/interface-spec.md` and `monitor/functional-spec.md`
   - Verification:
     - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`
+- 2026-05-14: Applied the same first real footer fallback removal pattern to `Last event`.
+  - Frontend:
+    - when selected `runId` status payload now explicitly carries `lastEventSource: "NONE"`, `MonitorScreen` no longer falls back to parent `snapshot.timeline[0]`
+    - that branch now shows explicit run-local none copy instead:
+      - `No run-local event context is available yet.`
+    - compatibility boundary remains aligned with `Queue pressure`:
+      - explicit marker `NONE` -> trust run-local none semantics
+      - legacy payload missing `lastEventSource` -> keep the older snapshot timeline fallback
+  - Tests/docs:
+    - `MonitorScreen.test.tsx` now asserts explicit `lastEventSource: "NONE"` suppresses the snapshot timeline fallback
+    - existing legacy fallback coverage remains intact
+    - synced `monitor/interface-spec.md` and `monitor/functional-spec.md`
+  - Verification:
+    - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`

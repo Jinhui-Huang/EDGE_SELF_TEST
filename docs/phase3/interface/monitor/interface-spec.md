@@ -253,6 +253,8 @@ When `queueStateSource` is explicitly `NONE`, `MonitorScreen` should stop using 
 - `SCHEDULER`
 - `NONE`
 
+When `lastEventSource` is explicitly `NONE`, `MonitorScreen` should stop using the older parent `snapshot.timeline[0]` fallback and instead show a run-local no-context copy. Only older payloads that omit `lastEventSource` entirely should continue to use the legacy snapshot timeline fallback.
+
 The top-level `sourceLayer` tells the front end which status layer currently owns the response:
 
 - `RUN_ARTIFACTS`
