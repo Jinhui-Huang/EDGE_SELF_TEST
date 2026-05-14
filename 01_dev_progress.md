@@ -5337,6 +5337,34 @@ Remaining limits:
 - this round only removes the snapshot last-event fallback when the newer `lastEventSource: "NONE"` marker is present; older payloads still intentionally keep the legacy fallback path
 - other footer areas still retain their existing snapshot compatibility behavior
 
+## 2026-05-14 P3-4 monitor selected-run legacy fallback consolidation
+
+## Completed
+- Refactored `ui/admin-console/src/screens/MonitorScreen.tsx` so the remaining selected-run snapshot compatibility layer is explicit:
+  - introduced a small `legacyMonitorFallback` resolver/helper
+  - queue footer now reads snapshot compatibility only through that helper
+  - last-event footer now reads snapshot compatibility only through that helper
+- Kept behavior unchanged:
+  - legacy payloads still keep the existing snapshot fallback behavior
+  - explicit `queueStateSource: "NONE"` and `lastEventSource: "NONE"` still win and are not overridden by the compatibility layer
+- Expanded front-end regression coverage:
+  - existing queue/last-event fallback tests remain green
+  - added a combined regression that proves the consolidated helper does not override explicit none markers
+
+## Modified Files
+- `ui/admin-console/src/screens/MonitorScreen.tsx`
+- `ui/admin-console/src/screens/MonitorScreen.test.tsx`
+- `memory.txt`
+- `01_dev_progress.md`
+
+## Verification
+- Ran:
+  - `npm test -- --run src/screens/MonitorScreen.test.tsx`
+
+## Remaining Limits
+- this round only makes the selected-run snapshot compatibility layer explicit; it does not remove the remaining legacy fallback paths yet
+- queue and last-event footer compatibility still depend on snapshot data for older payloads that omit the newer run-local markers
+
 ## 2026-05-08 P3-4 monitor scheduler-context fallback follow-up
 
 ## Task

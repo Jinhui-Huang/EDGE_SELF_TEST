@@ -3031,3 +3031,17 @@
     - synced `monitor/interface-spec.md` and `monitor/functional-spec.md`
   - Verification:
     - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`
+- 2026-05-14: Explicitly consolidated selected-run snapshot compatibility into `legacyMonitorFallback`.
+  - Frontend:
+    - `MonitorScreen` now reads the remaining selected-run snapshot compatibility inputs through a single helper:
+      - queue fallback detail
+      - last-event fallback detail/title
+    - queue footer and last-event footer now consume that helper instead of each reading `snapshot.workQueue[0]` / `snapshot.timeline[0]` directly
+    - behavior stays unchanged:
+      - legacy payloads still keep the existing snapshot fallback
+      - explicit `queueStateSource: "NONE"` / `lastEventSource: "NONE"` still win and are not overridden by the compatibility layer
+  - Tests:
+    - existing queue/last-event fallback regressions remain green
+    - added a combined regression proving the new helper does not override explicit none markers
+  - Verification:
+    - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`

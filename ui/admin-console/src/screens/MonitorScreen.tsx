@@ -266,8 +266,9 @@ export function MonitorScreen({
   const elapsedFormatted = progress ? formatMs(progress.elapsedMs) : "--";
   const estimatedFormatted = progress ? formatMs(progress.estimatedTotalMs) : "--";
   const percentText = progress ? `${progress.percent}%` : "0%";
-  const queuePressureFooter = resolveQueuePressureFooter(runStatus, snapshot.workQueue[0], t);
-  const lastEventFooter = resolveLastEventFooter(runStatus, snapshot.timeline[0], t);
+  const legacyMonitorFallback = resolveLegacyMonitorFallback(snapshot);
+  const queuePressureFooter = resolveQueuePressureFooter(runStatus, legacyMonitorFallback, t);
+  const lastEventFooter = resolveLastEventFooter(runStatus, legacyMonitorFallback, t);
   const queueStateSourceText = describeQueueStateSource(queuePressureFooter.source, t);
   const lastEventSourceText = describeLastEventSource(lastEventFooter.source, t);
   const runningStep = steps.find((step) => step.state === "RUNNING");
@@ -790,14 +791,14 @@ function resolveLastEventSource(
 
 function resolveQueuePressureFooter(
   runStatus: RunStatus | null,
-  snapshotQueueItem: AdminConsoleSnapshot["workQueue"][number] | undefined,
+  legacyFallback: LegacyMonitorFallback,
   t: (copySet: Copy) => string
 ): { text: string; source: "REQUEST_CONTEXT" | "SNAPSHOT_FALLBACK" | "NONE" } {
-  const source = resolveQueueStateSource(runStatus, snapshotQueueItem?.detail);
+  const source = resolveQueueStateSource(runStatus, legacyFallback.queueDetail);
   const text = source === "REQUEST_CONTEXT"
     ? runStatus?.queueState || "--"
     : source === "SNAPSHOT_FALLBACK"
-      ? snapshotQueueItem?.detail || "--"
+      ? legacyFallback.queueDetail || "--"
       : runStatus?.queueStateSource === "NONE"
         ? t(copy("No run-local queue context is available yet.", "当前还没有可用的运行态队列上下文。", "まだ run-local のキュー文脈はありません。"))
         : "--";
@@ -806,7 +807,7 @@ function resolveQueuePressureFooter(
 
 function resolveLastEventFooter(
   runStatus: RunStatus | null,
-  snapshotEvent: AdminConsoleSnapshot["timeline"][number] | undefined,
+  legacyFallback: LegacyMonitorFallback,
   t: (copySet: Copy) => string
 ): { text: string; timeText: string; source: "ARTIFACT" | "SCHEDULER" | "NONE" } {
   const source = resolveLastEventSource(runStatus);
@@ -814,11 +815,25 @@ function resolveLastEventFooter(
     ? runStatus?.lastEventSummary || "--"
     : runStatus?.lastEventSource === "NONE"
       ? t(copy("No run-local event context is available yet.", "当前还没有可用的运行态事件上下文。", "まだ run-local のイベント文脈はありません。"))
-      : snapshotEvent?.detail || snapshotEvent?.title || "--";
+      : legacyFallback.lastEventDetail || legacyFallback.lastEventTitle || "--";
   const timeText = source === "ARTIFACT" || source === "SCHEDULER"
     ? runStatus?.lastEventAt ? formatTimestamp(runStatus.lastEventAt) : ""
     : "";
   return { text, timeText, source };
+}
+
+type LegacyMonitorFallback = {
+  queueDetail?: string;
+  lastEventDetail?: string;
+  lastEventTitle?: string;
+};
+
+function resolveLegacyMonitorFallback(snapshot: AdminConsoleSnapshot): LegacyMonitorFallback {
+  return {
+    queueDetail: snapshot.workQueue[0]?.detail,
+    lastEventDetail: snapshot.timeline[0]?.detail,
+    lastEventTitle: snapshot.timeline[0]?.title
+  };
 }
 
 function resolveQueueStateSource(
