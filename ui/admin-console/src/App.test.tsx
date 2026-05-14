@@ -2923,7 +2923,9 @@ describe("App", () => {
         title: "Checkout - Payment",
         url: "https://staging.example.test/checkout/payment",
         domain: "staging.example.test",
-        lastUpdatedAt: "2026-04-20T04:00:00Z"
+        lastUpdatedAt: "2026-04-20T04:00:00Z",
+        locator: "#pay-submit",
+        actionHints: ["Pay now"]
       },
       runtime: {
         mode: "Audit-first",
@@ -2963,6 +2965,8 @@ describe("App", () => {
     expect(screen.queryByText("3 forms / 8 buttons")).not.toBeInTheDocument();
     expect(screen.getAllByText("staging.example.test").length).toBeGreaterThan(0);
     expect(screen.getAllByText("edge.test")).toHaveLength(1);
+    expect(await screen.findByText("Pay now")).toBeInTheDocument();
+    expect(screen.getByText("locator: #pay-submit")).toBeInTheDocument();
 
     // Verify active run section shows runtime data from popup snapshot
     expect(await screen.findByText("running")).toBeInTheDocument();
@@ -2978,7 +2982,9 @@ describe("App", () => {
         title: "Checkout - Payment",
         url: "https://staging.example.test/checkout/payment",
         domain: "",
-        lastUpdatedAt: "2026-04-20T04:00:00Z"
+        lastUpdatedAt: "2026-04-20T04:00:00Z",
+        locator: "",
+        actionHints: []
       },
       runtime: {
         mode: "Audit-first",
@@ -3008,6 +3014,8 @@ describe("App", () => {
     expect(await screen.findByText("3 forms / 8 buttons")).toBeInTheDocument();
     expect(screen.getAllByText("edge.test")).toHaveLength(2);
     expect(screen.getByText("idle")).toBeInTheDocument();
+    expect(screen.getAllByText("Pay $89.10").length).toBeGreaterThan(0);
+    expect(screen.getByText("role=button / 140x38px / visible")).toBeInTheDocument();
   });
 
   it("shows plugin popup error state when extension-popup endpoint fails", async () => {

@@ -533,6 +533,8 @@ class LocalAdminApiServerTest {
             assertTrue(extension.body().contains("\"Checkout\""));
             assertTrue(extension.body().contains("\"https://checkout.example.test/pay\""));
             assertTrue(extension.body().contains("\"checkout.example.test\""));
+            assertTrue(extension.body().contains("\"locator\":\"#pay-submit\""));
+            assertTrue(extension.body().contains("\"actionHints\":[\"Pay now\"]"));
             assertTrue(extension.body().contains("\"Review your order total before confirming payment.\""));
             assertTrue(extension.body().contains("\"1 queued / 1 active / 0 waiting / 0 review\""));
         }

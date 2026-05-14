@@ -171,7 +171,9 @@ public final class Phase3MockDataService {
                         pageTitle,
                         pageUrl,
                         pageDomain,
-                        now.toString()),
+                        now.toString(),
+                        popupContext.locator(),
+                        popupContext.actionHints()),
                 new ExtensionPopupSnapshot.RuntimeStatus(
                         firstNonBlank(popupContext.runtimeMode(), "Audit-first"),
                         queueState(queueItems, executions),
@@ -204,6 +206,8 @@ public final class Phase3MockDataService {
                         textValue(request, "pageUrl"),
                         textValue(request, "pageDomain"),
                         textValue(request, "runtimeMode"),
+                        textValue(request, "locator"),
+                        stringListValue(request, "actionHints"),
                         textValue(request, "bodySummary"),
                         instantValue(textValue(request, "requestedAt")));
                 if (candidate.isEmpty()) {
@@ -883,6 +887,20 @@ public final class Phase3MockDataService {
         return text == null ? "" : text.trim();
     }
 
+    private List<String> stringListValue(com.fasterxml.jackson.databind.JsonNode node, String field) {
+        if (node == null || !node.path(field).isArray()) {
+            return List.of();
+        }
+        List<String> items = new ArrayList<>();
+        node.path(field).forEach(item -> {
+            String text = item.asText("").trim();
+            if (!text.isBlank()) {
+                items.add(text);
+            }
+        });
+        return List.copyOf(items);
+    }
+
     private int intValue(Object value) {
         if (value instanceof Number number) {
             return number.intValue();
@@ -1059,10 +1077,12 @@ public final class Phase3MockDataService {
             String pageUrl,
             String pageDomain,
             String runtimeMode,
+            String locator,
+            List<String> actionHints,
             String bodySummary,
             Instant requestedAt) {
         private static PopupRequestContext empty() {
-            return new PopupRequestContext("", "", "", "", "", null);
+            return new PopupRequestContext("", "", "", "", "", List.of(), "", null);
         }
 
         private boolean isEmpty() {
@@ -1070,6 +1090,8 @@ public final class Phase3MockDataService {
                     && pageUrl.isBlank()
                     && pageDomain.isBlank()
                     && runtimeMode.isBlank()
+                    && locator.isBlank()
+                    && actionHints.isEmpty()
                     && bodySummary.isBlank();
         }
     }

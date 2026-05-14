@@ -86,6 +86,10 @@ export function PluginPopupScreen({ apiBaseUrl, title, locale }: PluginPopupScre
   const pageAssistiveSummary = popupSnapshot?.summary?.trim() || "3 forms / 8 buttons";
   const queueState = runtime?.queueState ?? "Idle";
   const runtimeQueueBadge = runtime?.queueState?.trim().toLowerCase() || "idle";
+  const selectedElementLabel = page?.actionHints?.find((hint) => hint.trim().length > 0)?.trim() || "Pay $89.10";
+  const selectedElementMeta = page?.locator?.trim()
+    ? `locator: ${page.locator.trim()}`
+    : "role=button / 140x38px / visible";
   const isRunning = queueState.toLowerCase().includes("active") || queueState.toLowerCase().includes("running");
 
   return (
@@ -206,8 +210,8 @@ export function PluginPopupScreen({ apiBaseUrl, title, locale }: PluginPopupScre
             <h4>{t({ en: "Selected element", zh: "已选中元素", ja: "選択済み要素" })}</h4>
             <div className="pluginCodeCard">
               <div className="pluginCodeTag">&lt;button&gt;</div>
-              <div className="pluginCodeText">Pay $89.10</div>
-              <p>role=button / 140x38px / visible</p>
+              <div className="pluginCodeText">{selectedElementLabel}</div>
+              <p>{selectedElementMeta}</p>
             </div>
           </section>
 

@@ -189,6 +189,10 @@ Current behavior:
 
 - real extension popup enters page pick mode through popup -> background -> content script
 - content script highlights hovered and selected elements, then returns selected element summary plus locator candidates
+- the admin-console popup mirror now prefers persisted popup page context for the compact selected-element card:
+  - first `actionHints[0]` as the selected label
+  - `locator` as the selected meta line
+- the old `Pay $89.10` / `role=button / 140x38px / visible` text remains only as the demo fallback when popup page context omits those fields
 - popup renders tag / text / id / name, candidate locators, recommended locator, and recommendation reason
 - `Copy` writes the current real recommended locator to the popup-local clipboard
 - `Use in DSL` prepares a platform handoff into `aiGenerate` using the current real recommended locator

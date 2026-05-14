@@ -64,6 +64,7 @@ Current backend read priority for `popupSnapshot.page`:
 - `popupSnapshot.summary` is also rendered by the current-page block as the assistive summary copy when present
 - `popupSnapshot.page.domain` is also reused by the floating popup host label when present
 - `popupSnapshot.runtime.queueState` is also reused directly by the active-run badge when present
+- `popupSnapshot.page.locator` and `popupSnapshot.page.actionHints[]` are now also reused by the compact selected-element card in the popup mirror
 
 - persisted scheduler request context (`pageTitle`, `pageUrl`, `pageDomain`, `runtimeMode`, `bodySummary`) when available
 - legacy built-in popup demo defaults when persisted request context is absent

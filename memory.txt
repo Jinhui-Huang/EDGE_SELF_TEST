@@ -3138,3 +3138,23 @@
     - synced `plugin/interface-spec.md` and `plugin/functional-spec.md`
   - Verification:
     - ran `npm test -- --run src/App.test.tsx -t "plugin popup"`
+- 2026-05-14: Continued `P3-4 plugin` with the smallest selected-element realism follow-up.
+  - Backend:
+    - `GET /api/phase3/extension-popup` now also exposes additive popup page context fields:
+      - `page.locator`
+      - `page.actionHints[]`
+    - both fields prefer persisted scheduler request context and stay empty when that context is absent
+  - Frontend:
+    - the popup mirror `Selected element` card now prefers:
+      - `actionHints[0]` for the selected label
+      - `locator` for the selected meta line
+    - the old `Pay $89.10` / `role=button / 140x38px / visible` copy remains only as the legacy demo fallback when those fields are absent
+  - Tests/docs:
+    - `LocalAdminApiServerTest` now asserts `/extension-popup` returns `locator` and `actionHints[]`
+    - `App.test.tsx` now asserts:
+      - real popup context overrides the old fixed selected-element copy
+      - missing popup context still falls back to the old demo copy
+    - synced `plugin/interface-spec.md` and `plugin/functional-spec.md`
+  - Verification:
+    - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+    - ran `npm test -- --run src/App.test.tsx -t "plugin popup"`

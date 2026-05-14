@@ -5458,6 +5458,7 @@ Remaining limits:
 - continued that same plugin pass by moving the popup current-page assistive summary off the fixed `3 forms / 8 buttons` text and onto `popupSnapshot.summary`; the fixed copy now remains only as the legacy fallback when summary is absent
 - continued the same plugin cleanup by moving the floating popup host label off the fixed `edge.test` string and onto `popupSnapshot.page.domain`; `edge.test` now remains only as the legacy fallback when domain text is absent
 - continued the same plugin cleanup by moving the active-run badge off the old binary `running/idle` copy and onto `popupSnapshot.runtime.queueState`; `idle` now remains only as the legacy fallback when queue-state text is absent
+- continued the same plugin cleanup by moving the popup mirror selected-element card off the fixed `Pay $89.10` / `role=button / 140x38px / visible` copy and onto additive `/extension-popup` page context fields (`actionHints[0]` and `locator`); the old selected-element text now remains only as the legacy fallback when those fields are absent
 - malformed modern payloads still degrade to `--` for missing run-local footer text; the important guarantee remains that they do not silently fall back to snapshot data
 
 ## 2026-05-08 P3-4 monitor scheduler-context fallback follow-up

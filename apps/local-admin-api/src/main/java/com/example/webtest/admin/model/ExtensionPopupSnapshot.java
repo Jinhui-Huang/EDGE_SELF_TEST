@@ -10,7 +10,13 @@ public record ExtensionPopupSnapshot(
         RuntimeStatus runtime,
         List<String> hints) {
 
-    public record PageSummary(String title, String url, String domain, String lastUpdatedAt) {
+    public record PageSummary(
+            String title,
+            String url,
+            String domain,
+            String lastUpdatedAt,
+            String locator,
+            List<String> actionHints) {
     }
 
     public record RuntimeStatus(String mode, String queueState, String auditState, String nextAction) {

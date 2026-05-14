@@ -780,6 +780,8 @@ export type ExtensionPopupSnapshot = {
     url: string;
     domain: string;
     lastUpdatedAt: string;
+    locator?: string;
+    actionHints?: string[];
   };
   runtime: {
     mode: string;
