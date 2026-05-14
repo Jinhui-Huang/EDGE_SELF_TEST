@@ -56,6 +56,7 @@ export function MonitorScreen({
   const [selectedLog, setSelectedLog] = useState<RuntimeLogEntry | null>(null);
   const [pauseState, setPauseState] = useState<MutationState>({ kind: "idle", message: "" });
   const [abortState, setAbortState] = useState<MutationState>({ kind: "idle", message: "" });
+  const [controlFeedbackState, setControlFeedbackState] = useState<MutationState>({ kind: "idle", message: "" });
   const [optimisticControlResponse, setOptimisticControlResponse] = useState<RunControlResponse | null>(null);
 
   const fetchMonitorData = useCallback(async (fetchRunId: string) => {
@@ -127,6 +128,7 @@ export function MonitorScreen({
       setRuntimeLogSourceLayer(null);
       setLivePage(null);
       setLivePageSourceLayer(null);
+      setControlFeedbackState({ kind: "idle", message: "" });
       setOptimisticControlResponse(null);
       return;
     }
@@ -137,9 +139,20 @@ export function MonitorScreen({
     if (!runId || !onPauseRun) {
       return;
     }
+    setControlFeedbackState({ kind: "idle", message: "" });
+    setAbortState({ kind: "idle", message: "" });
     setPauseState({ kind: "pending", message: t(copy("Pausing...", "暂停中...", "一時停止中...")) });
     try {
       const result = await onPauseRun(runId);
+      if (result.status !== "ACCEPTED") {
+        const resultState = describeControlResultState("pause", result, t);
+        setOptimisticControlResponse(null);
+        setPauseState({ kind: "idle", message: "" });
+        setControlFeedbackState(resultState);
+        await fetchMonitorData(runId);
+        return;
+      }
+      setControlFeedbackState({ kind: "idle", message: "" });
       setOptimisticControlResponse(result);
       setPauseState({ kind: "success", message: t(copy("Pause requested", "已请求暂停", "一時停止を要求しました")) });
       await fetchMonitorData(runId);
@@ -152,9 +165,20 @@ export function MonitorScreen({
     if (!runId || !onAbortRun) {
       return;
     }
+    setControlFeedbackState({ kind: "idle", message: "" });
+    setPauseState({ kind: "idle", message: "" });
     setAbortState({ kind: "pending", message: t(copy("Aborting...", "中止中...", "中止中...")) });
     try {
       const result = await onAbortRun(runId);
+      if (result.status !== "ACCEPTED") {
+        const resultState = describeControlResultState("abort", result, t);
+        setOptimisticControlResponse(null);
+        setAbortState({ kind: "idle", message: "" });
+        setControlFeedbackState(resultState);
+        await fetchMonitorData(runId);
+        return;
+      }
+      setControlFeedbackState({ kind: "idle", message: "" });
       setOptimisticControlResponse(result);
       setAbortState({ kind: "success", message: t(copy("Abort requested", "已请求中止", "中止を要求しました")) });
       await fetchMonitorData(runId);
@@ -303,6 +327,9 @@ export function MonitorScreen({
           ) : null}
           {abortState.kind !== "idle" ? (
             <span className={`monitorControlFeedback ${abortState.kind}`}>{abortState.message}</span>
+          ) : null}
+          {controlFeedbackState.kind !== "idle" ? (
+            <span className={`monitorControlFeedback ${controlFeedbackState.kind}`}>{controlFeedbackState.message}</span>
           ) : null}
           {controlRequestSummary ? (
             <span className="monitorControlFeedback neutral">{controlRequestSummary}</span>
@@ -830,6 +857,48 @@ function describeControlPhaseBanner(status: string, t: (copySet: Copy) => string
     "制御フェーズが落ち着くまで、ランタイムログ・ステップ・ライブページは直前のスナップショットのまま残ることがあります。"
   ));
   return `${phaseLead} ${snapshotNote}`;
+}
+
+function describeControlResultState(
+  action: "pause" | "abort",
+  result: RunControlResponse,
+  t: (copySet: Copy) => string
+): MutationState {
+  const fallbackMessage = result.message || `Control returned ${result.status}.`;
+  switch (result.status) {
+    case "ALREADY_PAUSED":
+      return {
+        kind: "warning",
+        message: t(copy(
+          `Pause skipped: ${fallbackMessage}`,
+          `暂停已跳过：${fallbackMessage}`,
+          `一時停止はスキップされました: ${fallbackMessage}`
+        ))
+      };
+    case "ALREADY_ABORTED":
+      return {
+        kind: "warning",
+        message: t(copy(
+          `Abort skipped: ${fallbackMessage}`,
+          `终止已跳过：${fallbackMessage}`,
+          `中止はスキップされました: ${fallbackMessage}`
+        ))
+      };
+    case "REJECTED":
+      return {
+        kind: "warning",
+        message: t(copy(
+          `${action === "pause" ? "Pause" : "Abort"} not accepted: ${fallbackMessage}`,
+          `${action === "pause" ? "暂停" : "终止"}未被接受：${fallbackMessage}`,
+          `${action === "pause" ? "一時停止" : "中止"}は受理されませんでした: ${fallbackMessage}`
+        ))
+      };
+    default:
+      return {
+        kind: "error",
+        message: fallbackMessage
+      };
+  }
 }
 
 function mergeOptimisticControl(

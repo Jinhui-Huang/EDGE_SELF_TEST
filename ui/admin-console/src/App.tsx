@@ -2533,7 +2533,6 @@ export function App() {
                 body: JSON.stringify({ operator: "monitor" })
               });
               const result = await response.json() as RunControlResponse;
-              if (result.status !== "ACCEPTED") throw new Error(result.message || `Control rejected: ${result.status}`);
               void loadSnapshot();
               return result;
             }}
@@ -2544,7 +2543,6 @@ export function App() {
                 body: JSON.stringify({ operator: "monitor" })
               });
               const result = await response.json() as RunControlResponse;
-              if (result.status !== "ACCEPTED") throw new Error(result.message || `Control rejected: ${result.status}`);
               void loadSnapshot();
               return result;
             }}

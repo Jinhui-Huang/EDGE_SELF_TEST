@@ -2887,3 +2887,16 @@
   - Verification:
     - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
     - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`
+- 2026-05-14: Extended monitor control feedback to non-accepted pause/abort results.
+  - Backend/tests:
+    - `LocalAdminApiServerTest` now explicitly covers the remaining reject/idempotent readback cases:
+      - `ALREADY_PAUSED`
+      - `ALREADY_ABORTED`
+      - `REJECTED`
+  - Frontend:
+    - `App.tsx` no longer throws immediately on non-`ACCEPTED` monitor control responses
+    - `MonitorScreen` now shows inline warning feedback for `ALREADY_PAUSED`, `ALREADY_ABORTED`, and `REJECTED`
+    - that warning is rendered immediately before the refresh resolves, and the screen then forces a fresh monitor snapshot/status reload so the operator sees the latest persisted state instead of only an action error
+  - Verification:
+    - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+    - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`

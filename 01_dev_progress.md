@@ -5832,6 +5832,32 @@ Remaining limits:
   - `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
   - `npm test -- --run src/screens/MonitorScreen.test.tsx`
 
+## 2026-05-14 P3-4 monitor non-accepted control feedback
+
+## Completed
+- Extended backend coverage for non-accepted monitor control outcomes:
+  - `LocalAdminApiServerTest` now explicitly covers:
+    - `ALREADY_PAUSED`
+    - `ALREADY_ABORTED`
+    - `REJECTED`
+- Updated `ui/admin-console/src/App.tsx`:
+  - monitor pause/abort handlers no longer throw immediately on non-`ACCEPTED` responses
+  - they still trigger a fresh snapshot reload after the response returns
+- Updated `ui/admin-console/src/screens/MonitorScreen.tsx`:
+  - added a dedicated local warning-feedback path for non-`ACCEPTED` control results
+  - `ALREADY_PAUSED`, `ALREADY_ABORTED`, and `REJECTED` now surface as inline operator-visible warnings
+  - those warnings now appear immediately before the refresh resolves, and the screen then refreshes monitor data so they are followed by the latest persisted status/control state
+- Expanded front-end regression coverage:
+  - `MonitorScreen.test.tsx` now covers immediate local feedback plus follow-up refresh behavior for:
+    - `ALREADY_PAUSED`
+    - `ALREADY_ABORTED`
+    - `REJECTED`
+
+## Verification
+- Ran:
+  - `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+  - `npm test -- --run src/screens/MonitorScreen.test.tsx`
+
 ## Remaining Limits
 - this is still optimistic local feedback only; it does not confirm that an external executor has actually paused or aborted
 - the optimistic control overlay now clears on the same requested phase or on the direct terminal handoff paths currently covered (`PAUSING -> PAUSED`, `ABORTING -> ABORTED`), but there is still no richer general control-progress model or separate control event stream

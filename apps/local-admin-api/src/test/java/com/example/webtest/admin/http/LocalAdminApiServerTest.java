@@ -1511,6 +1511,19 @@ class LocalAdminApiServerTest {
                 assertTrue(!terminalEventsAfterAbort.contains("\"ABORTED\""));
             }
 
+            Files.writeString(schedulerEventsFile, Jsons.writeValueAsString(Map.of(
+                    "events", List.of(
+                            Map.of("runId", "finished-run", "type", "STARTED", "status", "RUNNING",
+                                    "at", "2026-04-18T10:00:00Z", "detail", "Started"),
+                            Map.of("runId", "finished-run", "type", "ABORTED", "status", "ABORTED",
+                                    "at", "2026-04-18T10:05:00Z", "detail", "Aborted")))), StandardCharsets.UTF_8);
+            HttpResponse<String> abortOnAborted = client.send(
+                    request(server, "/api/phase3/runs/finished-run/abort", "POST", "{}"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(409, abortOnAborted.statusCode());
+            assertTrue(abortOnAborted.body().contains("\"ALREADY_ABORTED\""));
+            assertTrue(abortOnAborted.body().contains("already aborted"));
+
             // Pause on terminal run (OK) should also be rejected with 409
             Files.writeString(schedulerEventsFile, Jsons.writeValueAsString(Map.of(
                     "events", List.of(

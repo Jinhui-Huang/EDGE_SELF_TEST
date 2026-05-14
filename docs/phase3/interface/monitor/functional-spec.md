@@ -257,6 +257,7 @@ The screen loads runtime data from dedicated APIs when `selectedRunId` is provid
 - when `runStatus.status` is `PAUSING` or `ABORTING`, `MonitorScreen` now shows a dedicated in-progress control-phase banner that warns runtime log, step timeline, and live-page panels may temporarily remain on an older snapshot while the control phase settles
 - that banner reuses the existing lightweight control-request readback fields (`requestedBy`, `requestReason`, and `requestedAt`) rather than introducing any new control-specific API contract
 - accepted `pause` / `abort` POST responses now also echo those same lightweight control-request fields, and `MonitorScreen` uses them for immediate optimistic control feedback before the next `status` readback catches up; that overlay is then cleared once `/status` reaches either the same requested phase or a direct stronger terminal handoff such as `PAUSING -> PAUSED` or `ABORTING -> ABORTED`
+- non-`ACCEPTED` `pause` / `abort` responses such as `ALREADY_PAUSED`, `ALREADY_ABORTED`, or `REJECTED` now also produce immediate local operator feedback in `MonitorScreen` before the refresh completes, and the screen then triggers a fresh monitor snapshot read so the warning is followed by the latest persisted status rather than only by a thrown action error
 - when those same `PAUSING` / `ABORTING` control phases coincide with empty `steps`, empty `runtimeLog`, or `UNAVAILABLE` `livePage`, the front end now swaps the generic no-data copy for context-aware temporary-stall wording so operators understand that newer snapshots may simply not have arrived yet
 
 ## 8. Screen Inputs and Outputs
@@ -349,6 +350,7 @@ Current implementation status:
 
 - idle (no runId), loading, loaded, and error states are implemented
 - runtime-control mutation pending/success/error states are implemented for Pause and Abort
+- non-`ACCEPTED` control results now surface as inline warning feedback plus a forced refresh instead of only bubbling as action errors
 - monitored run paused/aborted/finished states are rendered based on API response status
 
 ## 12. Validation and Rules

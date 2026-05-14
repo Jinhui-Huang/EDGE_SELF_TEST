@@ -473,6 +473,169 @@ describe("MonitorScreen", () => {
     expect(screen.queryByText(/Abort request is in progress/)).not.toBeInTheDocument();
   });
 
+  it("shows immediate warning feedback and refreshes into paused after ALREADY_PAUSED", async () => {
+    let statusCallCount = 0;
+    vi.stubGlobal("fetch", vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/status")) {
+        statusCallCount += 1;
+        return jsonResponse(statusCallCount === 1
+          ? runStatusResponse
+          : {
+              ...runStatusResponse,
+              status: "PAUSED",
+              control: {
+                canPause: false,
+                canAbort: true
+              }
+            });
+      }
+      if (url.endsWith("/steps")) return jsonResponse(stepsResponse);
+      if (url.endsWith("/runtime-log")) return jsonResponse(runtimeLogResponse);
+      if (url.endsWith("/live-page")) return jsonResponse(livePageResponse);
+      throw new Error(`Unexpected fetch: ${url}`);
+    }));
+    const onPauseRun = vi.fn().mockResolvedValue({
+      status: "ALREADY_PAUSED",
+      kind: "run-control-pause",
+      runId: "checkout-web-smoke",
+      requestedState: "PAUSING",
+      message: "Run is already paused or pausing."
+    });
+
+    render(
+      <MonitorScreen
+        snapshot={snapshot}
+        title="Execution monitor"
+        locale="en"
+        selectedRunId="checkout-web-smoke"
+        apiBaseUrl="http://127.0.0.1:8787"
+        onPauseRun={onPauseRun}
+      />
+    );
+
+    await userEvent.click(await screen.findByRole("button", { name: "Pause" }));
+
+    expect(await screen.findByText("Pause skipped: Run is already paused or pausing.")).toBeInTheDocument();
+    expect(await screen.findByText("paused")).toBeInTheDocument();
+    expect(screen.queryByText("pausing")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Pause request is in progress/)).not.toBeInTheDocument();
+  });
+
+  it("shows immediate warning feedback and refreshes into aborted after ALREADY_ABORTED", async () => {
+    let statusCallCount = 0;
+    vi.stubGlobal("fetch", vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/status")) {
+        statusCallCount += 1;
+        return jsonResponse(statusCallCount === 1
+          ? runStatusResponse
+          : {
+              ...runStatusResponse,
+              status: "ABORTED",
+              control: {
+                canPause: false,
+                canAbort: false
+              }
+            });
+      }
+      if (url.endsWith("/steps")) return jsonResponse(stepsResponse);
+      if (url.endsWith("/runtime-log")) return jsonResponse(runtimeLogResponse);
+      if (url.endsWith("/live-page")) return jsonResponse(livePageResponse);
+      throw new Error(`Unexpected fetch: ${url}`);
+    }));
+    const onAbortRun = vi.fn().mockResolvedValue({
+      status: "ALREADY_ABORTED",
+      kind: "run-control-abort",
+      runId: "checkout-web-smoke",
+      requestedState: "ABORTING",
+      message: "Run is already aborted."
+    });
+
+    render(
+      <MonitorScreen
+        snapshot={snapshot}
+        title="Execution monitor"
+        locale="en"
+        selectedRunId="checkout-web-smoke"
+        apiBaseUrl="http://127.0.0.1:8787"
+        onAbortRun={onAbortRun}
+      />
+    );
+
+    await userEvent.click(await screen.findByRole("button", { name: "Abort" }));
+
+    expect(await screen.findByText("Abort skipped: Run is already aborted.")).toBeInTheDocument();
+    expect(await screen.findByText("aborted")).toBeInTheDocument();
+    expect(screen.queryByText("aborting")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Abort request is in progress/)).not.toBeInTheDocument();
+  });
+
+  it("shows immediate warning feedback and refreshes after a rejected control result", async () => {
+    let statusCallCount = 0;
+    let releaseStatusRefresh: (() => void) | null = null;
+    const statusRefreshBlocked = new Promise<void>((resolve) => {
+      releaseStatusRefresh = resolve;
+    });
+    vi.stubGlobal("fetch", vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/status")) {
+        statusCallCount += 1;
+        if (statusCallCount === 1) {
+          return jsonResponse({
+            ...runStatusResponse,
+            status: "RUNNING",
+            control: {
+              canPause: true,
+              canAbort: true
+            }
+          });
+        }
+        return statusRefreshBlocked.then(() =>
+          jsonResponse({
+            ...runStatusResponse,
+            status: "ABORTING",
+            control: {
+              canPause: false,
+              canAbort: false
+            }
+          })
+        );
+      }
+      if (url.endsWith("/steps")) return jsonResponse(stepsResponse);
+      if (url.endsWith("/runtime-log")) return jsonResponse(runtimeLogResponse);
+      if (url.endsWith("/live-page")) return jsonResponse(livePageResponse);
+      throw new Error(`Unexpected fetch: ${url}`);
+    }));
+    const onAbortRun = vi.fn().mockResolvedValue({
+      status: "REJECTED",
+      kind: "run-control-abort",
+      runId: "checkout-web-smoke",
+      requestedState: "RUNNING",
+      message: "Run is already aborting."
+    });
+
+    render(
+      <MonitorScreen
+        snapshot={snapshot}
+        title="Execution monitor"
+        locale="en"
+        selectedRunId="checkout-web-smoke"
+        apiBaseUrl="http://127.0.0.1:8787"
+        onAbortRun={onAbortRun}
+      />
+    );
+
+    await userEvent.click(await screen.findByRole("button", { name: "Abort" }));
+
+    expect(onAbortRun).toHaveBeenCalledWith("checkout-web-smoke");
+    expect(await screen.findByText("Abort not accepted: Run is already aborting.")).toBeInTheDocument();
+    expect(screen.queryByText("aborting")).not.toBeInTheDocument();
+    releaseStatusRefresh?.();
+    expect(await screen.findByText("aborting")).toBeInTheDocument();
+    expect(screen.queryByText(/Abort requested by ops-oncall/)).not.toBeInTheDocument();
+  });
+
   it("opens runtime log detail when clicking a runtime log row", async () => {
     vi.stubGlobal("fetch", createFetchMock());
 
