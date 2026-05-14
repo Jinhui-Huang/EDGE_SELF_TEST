@@ -2959,10 +2959,51 @@ describe("App", () => {
     // Verify popup snapshot data renders — host connected status and page title
     expect(await screen.findByText(/host connected|主机已连接|ホスト接続済み/)).toBeInTheDocument();
     expect(await screen.findByText("Checkout - Payment")).toBeInTheDocument();
+    expect(await screen.findByText("Phase 3 popup assistive snapshot")).toBeInTheDocument();
+    expect(screen.queryByText("3 forms / 8 buttons")).not.toBeInTheDocument();
 
     // Verify active run section shows runtime data from popup snapshot
     expect(await screen.findByText("running")).toBeInTheDocument();
     expect(await screen.findByText("Review latest run")).toBeInTheDocument();
+  });
+
+  it("keeps the plugin popup demo assistive summary as a legacy fallback when the popup snapshot omits summary text", async () => {
+    const popupSnapshot = {
+      generatedAt: "2026-04-20T04:00:00Z",
+      status: "READY",
+      summary: "",
+      page: {
+        title: "Checkout - Payment",
+        url: "https://staging.example.test/checkout/payment",
+        domain: "staging.example.test",
+        lastUpdatedAt: "2026-04-20T04:00:00Z"
+      },
+      runtime: {
+        mode: "Audit-first",
+        queueState: "IDLE",
+        auditState: "READY",
+        nextAction: "Open platform"
+      },
+      hints: []
+    };
+
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
+      if (url.endsWith("/api/phase3/extension-popup")) return jsonResponse(popupSnapshot);
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+    await screen.findByText("Needs attention");
+
+    const allButtons = screen.getAllByRole("button");
+    const pluginNavButton = allButtons.find((btn) => btn.textContent?.includes("Plugin popup"));
+    expect(pluginNavButton).toBeTruthy();
+    await userEvent.click(pluginNavButton!);
+
+    expect(await screen.findByText("3 forms / 8 buttons")).toBeInTheDocument();
   });
 
   it("shows plugin popup error state when extension-popup endpoint fails", async () => {

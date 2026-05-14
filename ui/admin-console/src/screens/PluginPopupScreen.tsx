@@ -81,6 +81,8 @@ export function PluginPopupScreen({ apiBaseUrl, title, locale }: PluginPopupScre
   const pageTitle = page?.title ?? "Checkout - Payment";
   const pagePath = page?.url ? new URL(page.url).pathname : "/checkout/payment";
   const pageDomain = page?.domain ?? "staging.example.test";
+  const pageStatus = popupSnapshot?.status?.trim().toLowerCase() || "recognized";
+  const pageAssistiveSummary = popupSnapshot?.summary?.trim() || "3 forms / 8 buttons";
   const queueState = runtime?.queueState ?? "Idle";
   const isRunning = queueState.toLowerCase().includes("active") || queueState.toLowerCase().includes("running");
 
@@ -140,9 +142,9 @@ export function PluginPopupScreen({ apiBaseUrl, title, locale }: PluginPopupScre
                 <strong>{pageTitle}</strong>
                 <p>{pagePath}</p>
                 <div className="pluginBadgeRow">
-                  <span className="pluginBadge mint">recognized</span>
-                  <span className="pluginBadge info">3 forms / 8 buttons</span>
+                  <span className="pluginBadge mint">{pageStatus}</span>
                 </div>
+                <p>{pageAssistiveSummary}</p>
               </section>
 
               <div className="pluginDivider" />

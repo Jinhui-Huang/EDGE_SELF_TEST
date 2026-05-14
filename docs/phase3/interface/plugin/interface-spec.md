@@ -61,6 +61,8 @@ The screen fetches `GET ${apiBaseUrl}/api/phase3/extension-popup` on mount and r
 
 Current backend read priority for `popupSnapshot.page`:
 
+- `popupSnapshot.summary` is also rendered by the current-page block as the assistive summary copy when present
+
 - persisted scheduler request context (`pageTitle`, `pageUrl`, `pageDomain`, `runtimeMode`, `bodySummary`) when available
 - legacy built-in popup demo defaults when persisted request context is absent
 

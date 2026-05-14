@@ -3102,3 +3102,15 @@
     - synced `plugin/interface-spec.md` and `plugin/functional-spec.md`
   - Verification:
     - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+- 2026-05-14: Continued `P3-4 plugin` with the smallest popup assistive-copy follow-up.
+  - Frontend:
+    - `PluginPopupScreen` current-page block now prefers `popupSnapshot.summary` for assistive summary copy
+    - the old fixed `3 forms / 8 buttons` text remains only as the legacy demo fallback when the popup snapshot omits summary text
+    - the old fixed `recognized` badge now reflects `popupSnapshot.status` when available instead of staying fully hardcoded
+  - Tests/docs:
+    - `App.test.tsx` now asserts:
+      - popup summary text overrides the old fixed assistive copy
+      - empty summary payloads still fall back to the old demo text
+    - synced `plugin/interface-spec.md` and `plugin/functional-spec.md`
+  - Verification:
+    - ran `npm test -- --run src/App.test.tsx -t "plugin popup"`
