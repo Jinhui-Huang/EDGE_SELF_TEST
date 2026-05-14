@@ -2961,6 +2961,8 @@ describe("App", () => {
     expect(await screen.findByText("Checkout - Payment")).toBeInTheDocument();
     expect(await screen.findByText("Phase 3 popup assistive snapshot")).toBeInTheDocument();
     expect(screen.queryByText("3 forms / 8 buttons")).not.toBeInTheDocument();
+    expect(screen.getAllByText("staging.example.test").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("edge.test")).toHaveLength(1);
 
     // Verify active run section shows runtime data from popup snapshot
     expect(await screen.findByText("running")).toBeInTheDocument();
@@ -2975,7 +2977,7 @@ describe("App", () => {
       page: {
         title: "Checkout - Payment",
         url: "https://staging.example.test/checkout/payment",
-        domain: "staging.example.test",
+        domain: "",
         lastUpdatedAt: "2026-04-20T04:00:00Z"
       },
       runtime: {
@@ -3004,6 +3006,7 @@ describe("App", () => {
     await userEvent.click(pluginNavButton!);
 
     expect(await screen.findByText("3 forms / 8 buttons")).toBeInTheDocument();
+    expect(screen.getAllByText("edge.test")).toHaveLength(2);
   });
 
   it("shows plugin popup error state when extension-popup endpoint fails", async () => {

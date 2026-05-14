@@ -3114,3 +3114,15 @@
     - synced `plugin/interface-spec.md` and `plugin/functional-spec.md`
   - Verification:
     - ran `npm test -- --run src/App.test.tsx -t "plugin popup"`
+- 2026-05-14: Continued `P3-4 plugin` with one more popup host-label cleanup.
+  - Frontend:
+    - the floating popup header no longer hardcodes `edge.test`
+    - it now prefers `popupSnapshot.page.domain`
+    - `edge.test` remains only as the legacy fallback when the popup snapshot omits domain text
+  - Tests/docs:
+    - `App.test.tsx` now asserts:
+      - real popup domain hides the old fixed host label
+      - missing popup domain still falls back to `edge.test`
+    - synced `plugin/interface-spec.md` and `plugin/functional-spec.md`
+  - Verification:
+    - ran `npm test -- --run src/App.test.tsx -t "plugin popup"`

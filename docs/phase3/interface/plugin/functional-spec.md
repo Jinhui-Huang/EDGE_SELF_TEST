@@ -124,6 +124,7 @@ Current behavior:
 - page title, URL path, and domain rendered from `popupSnapshot.page`
 - assistive summary copy under the current-page block now prefers `popupSnapshot.summary`
 - the old `3 forms / 8 buttons` text remains only as a legacy demo fallback when the popup snapshot omits summary text
+- the floating popup host label now prefers `popupSnapshot.page.domain`; `edge.test` remains only as the demo fallback when the popup snapshot omits domain text
 - the popup snapshot now prefers persisted scheduler request page context when available
 - fallback values used when popup snapshot is not yet loaded
 

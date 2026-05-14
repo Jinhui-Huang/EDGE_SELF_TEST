@@ -81,6 +81,7 @@ export function PluginPopupScreen({ apiBaseUrl, title, locale }: PluginPopupScre
   const pageTitle = page?.title ?? "Checkout - Payment";
   const pagePath = page?.url ? new URL(page.url).pathname : "/checkout/payment";
   const pageDomain = page?.domain ?? "staging.example.test";
+  const popupHostLabel = page?.domain?.trim() || "edge.test";
   const pageStatus = popupSnapshot?.status?.trim().toLowerCase() || "recognized";
   const pageAssistiveSummary = popupSnapshot?.summary?.trim() || "3 forms / 8 buttons";
   const queueState = runtime?.queueState ?? "Idle";
@@ -122,7 +123,7 @@ export function PluginPopupScreen({ apiBaseUrl, title, locale }: PluginPopupScre
             <div className="pluginFloatingHeader">
               <div className="pluginFloatingBrand">E</div>
               <div>
-                <strong>edge.test</strong>
+                <strong>{popupHostLabel}</strong>
                 <p>
                   <span>
                     {loadState === "loading"
