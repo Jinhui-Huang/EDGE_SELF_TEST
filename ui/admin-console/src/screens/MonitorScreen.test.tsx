@@ -323,6 +323,30 @@ describe("MonitorScreen", () => {
     expect(screen.queryByText("1 active / 1 waiting")).not.toBeInTheDocument();
   });
 
+  it("never lets legacyMonitorFallback backfill queue text once a modern queue marker is present", async () => {
+    vi.stubGlobal("fetch", createFetchMock({
+      status: {
+        ...runStatusResponse,
+        queueState: undefined,
+        queueStateSource: "REQUEST_CONTEXT"
+      }
+    }));
+
+    render(
+      <MonitorScreen
+        snapshot={snapshot}
+        title="Execution monitor"
+        locale="en"
+        selectedRunId="checkout-web-smoke"
+        apiBaseUrl="http://127.0.0.1:8787"
+      />
+    );
+
+    expect((await screen.findAllByText("--")).length).toBeGreaterThan(0);
+    expect(screen.getByText("Queue source: request context")).toBeInTheDocument();
+    expect(screen.queryByText("1 active / 1 waiting")).not.toBeInTheDocument();
+  });
+
   it("prefers run-local last event summary and time over the parent snapshot timeline detail", async () => {
     vi.stubGlobal("fetch", createFetchMock({
       status: {

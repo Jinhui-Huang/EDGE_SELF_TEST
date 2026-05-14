@@ -5365,6 +5365,36 @@ Remaining limits:
 - this round only makes the selected-run snapshot compatibility layer explicit; it does not remove the remaining legacy fallback paths yet
 - queue and last-event footer compatibility still depend on snapshot data for older payloads that omit the newer run-local markers
 
+## 2026-05-14 P3-4 monitor queue modern-marker hard boundary
+
+## Completed
+- Updated `ui/admin-console/src/screens/MonitorScreen.tsx`:
+  - `resolveQueuePressureFooter()` now treats the presence of modern `queueStateSource` as a hard boundary
+  - once the marker exists:
+    - `REQUEST_CONTEXT` -> queue footer may only render run-local `queueState`
+    - `NONE` -> queue footer may only render the run-local none copy
+  - `legacyMonitorFallback` is now only eligible for queue footer when the marker is absent in older payloads
+- Expanded front-end regression coverage:
+  - added a malformed-modern-payload regression:
+    - `queueStateSource: "REQUEST_CONTEXT"`
+    - missing `queueState`
+    - snapshot fallback must still stay suppressed
+  - existing legacy fallback and explicit-none regressions remain green
+
+## Modified Files
+- `ui/admin-console/src/screens/MonitorScreen.tsx`
+- `ui/admin-console/src/screens/MonitorScreen.test.tsx`
+- `memory.txt`
+- `01_dev_progress.md`
+
+## Verification
+- Ran:
+  - `npm test -- --run src/screens/MonitorScreen.test.tsx`
+
+## Remaining Limits
+- queue footer now has an explicit modern-marker boundary, but other areas still rely on the broader selected-run legacy compatibility layer
+- malformed modern payloads still show a generic `--` when run-local queue text is missing; this round only guarantees they do not silently fall back to snapshot data
+
 ## 2026-05-08 P3-4 monitor scheduler-context fallback follow-up
 
 ## Task

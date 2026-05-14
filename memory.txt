@@ -3045,3 +3045,15 @@
     - added a combined regression proving the new helper does not override explicit none markers
   - Verification:
     - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`
+- 2026-05-14: Tightened `Queue pressure` again so modern markers bypass `legacyMonitorFallback` completely.
+  - Frontend:
+    - `resolveQueuePressureFooter()` now treats the presence of a modern `queueStateSource` marker as a hard boundary
+    - once that marker exists:
+      - `REQUEST_CONTEXT` -> only run-local `queueState` is allowed to render
+      - `NONE` -> only run-local none copy is allowed to render
+    - `legacyMonitorFallback` is now only consulted for queue footer when the marker is absent in older payloads
+  - Tests:
+    - added a regression proving even malformed modern payloads (`queueStateSource: "REQUEST_CONTEXT"` with missing `queueState`) still do not backfill from snapshot
+    - existing legacy fallback and explicit-none regressions remain green
+  - Verification:
+    - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`

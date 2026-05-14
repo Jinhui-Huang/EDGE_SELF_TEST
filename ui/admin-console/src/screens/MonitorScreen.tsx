@@ -794,6 +794,13 @@ function resolveQueuePressureFooter(
   legacyFallback: LegacyMonitorFallback,
   t: (copySet: Copy) => string
 ): { text: string; source: "REQUEST_CONTEXT" | "SNAPSHOT_FALLBACK" | "NONE" } {
+  if (hasModernQueueStateSourceMarker(runStatus)) {
+    const source = runStatus.queueStateSource === "REQUEST_CONTEXT" ? "REQUEST_CONTEXT" : "NONE";
+    const text = source === "REQUEST_CONTEXT"
+      ? runStatus.queueState || "--"
+      : t(copy("No run-local queue context is available yet.", "当前还没有可用的运行态队列上下文。", "まだ run-local のキュー文脈はありません。"));
+    return { text, source };
+  }
   const source = resolveQueueStateSource(runStatus, legacyFallback.queueDetail);
   const text = source === "REQUEST_CONTEXT"
     ? runStatus?.queueState || "--"
@@ -849,6 +856,10 @@ function resolveQueueStateSource(
     return "REQUEST_CONTEXT";
   }
   return snapshotQueueDetail ? "SNAPSHOT_FALLBACK" : "NONE";
+}
+
+function hasModernQueueStateSourceMarker(runStatus: RunStatus | null): boolean {
+  return runStatus?.queueStateSource === "REQUEST_CONTEXT" || runStatus?.queueStateSource === "NONE";
 }
 
 function describeQueueStateSource(
