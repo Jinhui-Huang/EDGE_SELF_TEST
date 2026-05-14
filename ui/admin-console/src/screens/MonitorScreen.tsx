@@ -839,15 +839,15 @@ function resolveSelectedRunFooter(
   legacyFallback: LegacyMonitorFallback,
   t: (copySet: Copy) => string
 ): SelectedRunFooter {
-  if (hasModernFooterMarkers(runStatus)) {
+  if (shouldUseLegacyMonitorFallback(runStatus)) {
     return {
-      queuePressure: resolveModernQueuePressureFooter(runStatus, t),
-      lastEvent: resolveModernLastEventFooter(runStatus, t)
+      queuePressure: resolveQueuePressureFooter(runStatus, legacyFallback, t),
+      lastEvent: resolveLastEventFooter(runStatus, legacyFallback, t)
     };
   }
   return {
-    queuePressure: resolveQueuePressureFooter(runStatus, legacyFallback, t),
-    lastEvent: resolveLastEventFooter(runStatus, legacyFallback, t)
+    queuePressure: resolveModernQueuePressureFooter(runStatus, t),
+    lastEvent: resolveModernLastEventFooter(runStatus, t)
   };
 }
 
@@ -889,6 +889,10 @@ function hasModernFooterMarkers(runStatus: RunStatus | null): runStatus is RunSt
   lastEventSource: "ARTIFACT" | "SCHEDULER" | "NONE";
 } {
   return hasModernQueueStateSourceMarker(runStatus) && hasModernLastEventSourceMarker(runStatus);
+}
+
+function shouldUseLegacyMonitorFallback(runStatus: RunStatus | null): runStatus is RunStatus | null {
+  return !hasModernFooterMarkers(runStatus);
 }
 
 function resolveModernQueuePressureFooter(

@@ -4,6 +4,7 @@ import com.example.webtest.admin.model.AdminConsoleSnapshot;
 import com.example.webtest.admin.model.ExtensionPopupSnapshot;
 import com.example.webtest.json.Jsons;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
@@ -149,17 +150,30 @@ public final class Phase3MockDataService {
         List<LocalExecutionSummary> executions = loadExecutionSummaries(schedulerState);
         List<QueueSnapshotItem> queueItems = loadQueueSnapshotItems(schedulerState);
         LocalExecutionSummary latestExecution = executions.isEmpty() ? null : executions.get(0);
+        PopupRequestContext popupContext = loadLatestPopupRequestContext();
+        String pageUrl = firstNonBlank(
+                popupContext.pageUrl(),
+                "https://staging.example.test/checkout/payment");
+        String pageDomain = firstNonBlank(
+                popupContext.pageDomain(),
+                hostFromUrl(pageUrl),
+                "staging.example.test");
+        String pageTitle = firstNonBlank(
+                popupContext.pageTitle(),
+                "Checkout - Payment");
         return new ExtensionPopupSnapshot(
                 now.toString(),
                 "READY",
-                "Phase 3 popup remains assistive and mirrors local platform queue and report status without owning heavy configuration.",
+                firstNonBlank(
+                        popupContext.bodySummary(),
+                        "Phase 3 popup remains assistive and mirrors local platform queue and report status without owning heavy configuration."),
                 new ExtensionPopupSnapshot.PageSummary(
-                        "Checkout - Payment",
-                        "https://staging.example.test/checkout/payment",
-                        "staging.example.test",
+                        pageTitle,
+                        pageUrl,
+                        pageDomain,
                         now.toString()),
                 new ExtensionPopupSnapshot.RuntimeStatus(
-                        "Audit-first",
+                        firstNonBlank(popupContext.runtimeMode(), "Audit-first"),
                         queueState(queueItems, executions),
                         auditState(latestExecution),
                         nextAction(queueItems, latestExecution)),
@@ -170,6 +184,39 @@ public final class Phase3MockDataService {
                         "Queue status otherwise falls back to config/phase3/execution-queue.json.",
                         "Execution history otherwise falls back to config/phase3/execution-history.json.",
                         "Latest run status is read from runs/*/report.json when present."));
+    }
+
+    private PopupRequestContext loadLatestPopupRequestContext() {
+        Path normalizedPath = schedulerRequestsPath.toAbsolutePath().normalize();
+        if (!Files.isRegularFile(normalizedPath)) {
+            return PopupRequestContext.empty();
+        }
+        try {
+            var root = Jsons.JSON.readTree(Files.readString(normalizedPath));
+            var requests = root.path("requests");
+            if (!requests.isArray()) {
+                return PopupRequestContext.empty();
+            }
+            PopupRequestContext latest = null;
+            for (var request : requests) {
+                PopupRequestContext candidate = new PopupRequestContext(
+                        textValue(request, "pageTitle"),
+                        textValue(request, "pageUrl"),
+                        textValue(request, "pageDomain"),
+                        textValue(request, "runtimeMode"),
+                        textValue(request, "bodySummary"),
+                        instantValue(textValue(request, "requestedAt")));
+                if (candidate.isEmpty()) {
+                    continue;
+                }
+                if (latest == null || isAfter(candidate.requestedAt(), latest.requestedAt())) {
+                    latest = candidate;
+                }
+            }
+            return latest == null ? PopupRequestContext.empty() : latest;
+        } catch (IOException e) {
+            return PopupRequestContext.empty();
+        }
     }
 
     private List<AdminConsoleSnapshot.StatCard> buildStats(
@@ -794,6 +841,48 @@ public final class Phase3MockDataService {
         return value;
     }
 
+    private String firstNonBlank(String... values) {
+        if (values == null) {
+            return "";
+        }
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return "";
+    }
+
+    private boolean isAfter(Instant left, Instant right) {
+        if (left == null) {
+            return false;
+        }
+        if (right == null) {
+            return true;
+        }
+        return left.isAfter(right);
+    }
+
+    private String hostFromUrl(String value) {
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+        try {
+            URI uri = URI.create(value);
+            return uri.getHost() == null ? "" : uri.getHost();
+        } catch (RuntimeException ignored) {
+            return "";
+        }
+    }
+
+    private String textValue(com.fasterxml.jackson.databind.JsonNode node, String field) {
+        if (node == null) {
+            return "";
+        }
+        String text = node.path(field).asText("");
+        return text == null ? "" : text.trim();
+    }
+
     private int intValue(Object value) {
         if (value instanceof Number number) {
             return number.intValue();
@@ -962,6 +1051,26 @@ public final class Phase3MockDataService {
             List<LocalExecutionSummary> executions) {
         private static SchedulerStateSnapshotData empty() {
             return new SchedulerStateSnapshotData(List.of(), List.of());
+        }
+    }
+
+    private record PopupRequestContext(
+            String pageTitle,
+            String pageUrl,
+            String pageDomain,
+            String runtimeMode,
+            String bodySummary,
+            Instant requestedAt) {
+        private static PopupRequestContext empty() {
+            return new PopupRequestContext("", "", "", "", "", null);
+        }
+
+        private boolean isEmpty() {
+            return pageTitle.isBlank()
+                    && pageUrl.isBlank()
+                    && pageDomain.isBlank()
+                    && runtimeMode.isBlank()
+                    && bodySummary.isBlank();
         }
     }
 

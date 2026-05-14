@@ -5453,6 +5453,8 @@ Remaining limits:
 
 ## Remaining Limits
 - this round only makes the modern-vs-legacy footer split explicit; it does not yet remove the legacy compatibility branch itself
+- when only part of the footer has modern markers, the marked side now stays on the run-local path while only the missing-marker side is allowed to use legacy compatibility
+- started the next `P3-4 plugin` realism pass by moving popup page identity off the fixed demo string path and onto persisted scheduler request context when available; the old popup demo values are now only the compatibility fallback
 - malformed modern payloads still degrade to `--` for missing run-local footer text; the important guarantee remains that they do not silently fall back to snapshot data
 
 ## 2026-05-08 P3-4 monitor scheduler-context fallback follow-up

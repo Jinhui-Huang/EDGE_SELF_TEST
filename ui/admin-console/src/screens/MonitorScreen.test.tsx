@@ -521,6 +521,35 @@ describe("MonitorScreen", () => {
     expect(screen.queryByText("Parent snapshot fallback detail")).not.toBeInTheDocument();
   });
 
+  it("keeps already-modern queue footer semantics on the run-local path while only missing last-event markers fall back through legacy compatibility", async () => {
+    vi.stubGlobal("fetch", createFetchMock({
+      status: {
+        ...runStatusResponse,
+        queueState: undefined,
+        queueStateSource: "NONE",
+        lastEventSummary: undefined,
+        lastEventAt: undefined,
+        lastEventSource: undefined
+      }
+    }));
+
+    render(
+      <MonitorScreen
+        snapshot={snapshot}
+        title="Execution monitor"
+        locale="en"
+        selectedRunId="checkout-web-smoke"
+        apiBaseUrl="http://127.0.0.1:8787"
+      />
+    );
+
+    expect(await screen.findByText("No run-local queue context is available yet.")).toBeInTheDocument();
+    expect(screen.getByText("Queue source: none")).toBeInTheDocument();
+    expect(screen.queryByText("1 active / 1 waiting")).not.toBeInTheDocument();
+    expect(screen.getByText("Parent snapshot fallback detail")).toBeInTheDocument();
+    expect(screen.getByText("Event source: none")).toBeInTheDocument();
+  });
+
   it("keeps legacyMonitorFallback available for legacy payloads but never overrides explicit none markers", async () => {
     vi.stubGlobal("fetch", createFetchMock({
       status: {

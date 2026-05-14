@@ -260,6 +260,9 @@ class LocalAdminApiServerTest {
             assertTrue(admin.body().contains("\"edge-stable-win11 / edge-beta-win11\""));
             assertEquals(200, extension.statusCode());
             assertTrue(extension.body().contains("\"runtime\""));
+            assertTrue(extension.body().contains("\"Checkout - Payment\""));
+            assertTrue(extension.body().contains("\"https://staging.example.test/checkout/payment\""));
+            assertTrue(extension.body().contains("\"staging.example.test\""));
             assertTrue(extension.body().contains("\"2 queued / 1 active / 1 waiting / 0 review\""));
             assertTrue(extension.body().contains("\"Latest local run is still active; keep audit review open until it settles\""));
         }
@@ -527,6 +530,10 @@ class LocalAdminApiServerTest {
             assertTrue(admin.body().contains("\"RUNNING\""));
 
             assertEquals(200, extension.statusCode());
+            assertTrue(extension.body().contains("\"Checkout\""));
+            assertTrue(extension.body().contains("\"https://checkout.example.test/pay\""));
+            assertTrue(extension.body().contains("\"checkout.example.test\""));
+            assertTrue(extension.body().contains("\"Review your order total before confirming payment.\""));
             assertTrue(extension.body().contains("\"1 queued / 1 active / 0 waiting / 0 review\""));
         }
     }

@@ -122,6 +122,7 @@ Functional role:
 Current behavior:
 
 - page title, URL path, and domain rendered from `popupSnapshot.page`
+- the popup snapshot now prefers persisted scheduler request page context when available
 - fallback values used when popup snapshot is not yet loaded
 
 ### 6.3 Active Run Section

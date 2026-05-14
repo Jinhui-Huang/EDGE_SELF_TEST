@@ -59,6 +59,11 @@ The screen fetches `GET ${apiBaseUrl}/api/phase3/extension-popup` on mount and r
 - `popupSnapshot.page` → current page section (title, URL path, domain)
 - `popupSnapshot.runtime` → active run section (mode, queue state, audit state, next action)
 
+Current backend read priority for `popupSnapshot.page`:
+
+- persisted scheduler request context (`pageTitle`, `pageUrl`, `pageDomain`, `runtimeMode`, `bodySummary`) when available
+- legacy built-in popup demo defaults when persisted request context is absent
+
 ### 3.2 Popup Snapshot Endpoint
 
 `GET /api/phase3/extension-popup`

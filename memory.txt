@@ -3072,14 +3072,33 @@
 - 2026-05-14: Split selected-run footer into explicit modern-vs-legacy paths.
   - Frontend:
     - `MonitorScreen` now resolves selected-run footer through a dedicated top-level branch:
-      - modern path when both footer markers are present
-      - legacy compatibility path when either marker is still absent
+      - modern path when `/status` already carries the modern footer markers
+      - legacy compatibility path only for footer fields that still arrive without markers
     - modern path now directly resolves:
       - queue footer from run-local `queueStateSource`
       - last-event footer from run-local `lastEventSource`
     - `legacyMonitorFallback` is only consulted from the dedicated legacy branch and no longer sits inline on the main footer path
   - Tests:
     - added a combined modern-path regression proving simultaneous queue + last-event markers prevent all snapshot fallback
-    - added a combined legacy-path regression proving missing markers still route through `legacyMonitorFallback`
+    - added a combined legacy-path regression proving missing-marker payloads still route through `legacyMonitorFallback`
+    - added a mixed-marker regression proving a queue footer that already has a modern marker keeps its run-local semantics even while an unmarked last-event footer still uses legacy compatibility
   - Verification:
     - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`
+- 2026-05-14: Started `P3-4 plugin` realism tightening with the smallest popup page-context slice.
+  - Backend:
+    - `GET /api/phase3/extension-popup` now prefers persisted scheduler request context for popup page identity:
+      - `page.title`
+      - `page.url`
+      - `page.domain`
+    - the same slice also reuses request-context `runtimeMode` and `bodySummary` when present
+    - if no persisted scheduler request context exists, the old popup demo defaults remain as the compatibility fallback
+  - Frontend:
+    - no UI contract change was needed
+    - `PluginPopupScreen` already renders `popupSnapshot.page` / `popupSnapshot.runtime`, so the more realistic backend payload flows through directly
+  - Tests/docs:
+    - backend extension-popup coverage now asserts both:
+      - legacy default popup page identity still works
+      - persisted scheduler request context overrides the old static page identity
+    - synced `plugin/interface-spec.md` and `plugin/functional-spec.md`
+  - Verification:
+    - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
