@@ -271,6 +271,7 @@ export function MonitorScreen({
   const queuePressureText = runStatus?.queueState || queueLead?.detail || "--";
   const lastEventText = runStatus?.lastEventSummary || snapshotLastEvent?.detail || snapshotLastEvent?.title || "--";
   const lastEventTimeText = runStatus?.lastEventAt ? formatTimestamp(runStatus.lastEventAt) : "";
+  const lastEventSourceText = describeLastEventSource(resolveLastEventSource(runStatus), t);
   const runningStep = steps.find((step) => step.state === "RUNNING");
   const showUnavailableSteps = stepsAvailability === "UNAVAILABLE";
   const showUnavailableRuntimeLog = runtimeLogAvailability === "UNAVAILABLE";
@@ -683,6 +684,7 @@ export function MonitorScreen({
           <span>{t(copy("Last event", "最后事件", "最新イベント"))}</span>
           <strong>{lastEventText}</strong>
           {lastEventTimeText ? <span className="monitorMono">{lastEventTimeText}</span> : null}
+          <span className="monitorMono muted">{lastEventSourceText}</span>
         </div>
         <div className="monitorFooterItem">
           <span>{t(copy("Owner", "负责人", "担当者"))}</span>
@@ -769,6 +771,35 @@ function formatDateTime(iso: string): string {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")} ${formatTimestamp(iso)}`;
   } catch {
     return iso;
+  }
+}
+
+function resolveLastEventSource(
+  runStatus: RunStatus | null
+): "ARTIFACT" | "SCHEDULER" | "NONE" {
+  if (runStatus?.lastEventSource === "ARTIFACT" || runStatus?.lastEventSource === "SCHEDULER" || runStatus?.lastEventSource === "NONE") {
+    return runStatus.lastEventSource;
+  }
+  if (!(runStatus?.lastEventSummary || runStatus?.lastEventAt)) {
+    return "NONE";
+  }
+  if (runStatus.sourceLayer === "RUN_ARTIFACTS" || (runStatus.currentPage?.state ?? "") === "artifact-captured") {
+    return "ARTIFACT";
+  }
+  return "SCHEDULER";
+}
+
+function describeLastEventSource(
+  source: "ARTIFACT" | "SCHEDULER" | "NONE",
+  t: (copySet: Copy) => string
+): string {
+  switch (source) {
+    case "ARTIFACT":
+      return t(copy("Event source: artifact", "事件来源：产物", "イベントソース: artifact"));
+    case "SCHEDULER":
+      return t(copy("Event source: scheduler", "事件来源：调度器", "イベントソース: scheduler"));
+    default:
+      return t(copy("Event source: none", "事件来源：无", "イベントソース: none"));
   }
 }
 

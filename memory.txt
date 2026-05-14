@@ -2942,3 +2942,26 @@
     - synced `monitor/interface-spec.md`
   - Verification:
     - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+- 2026-05-14: Added a tiny provenance marker for monitor footer `Last event`.
+  - Backend:
+    - `GET /api/phase3/runs/{runId}/status` now also includes additive `lastEventSource`
+    - values are kept minimal:
+      - `ARTIFACT`
+      - `SCHEDULER`
+      - `NONE`
+    - the marker follows the current last-event priority:
+      - artifact-backed `lastEventSummary` / `lastEventAt` -> `ARTIFACT`
+      - latest scheduler-event fallback -> `SCHEDULER`
+      - no run-local event context -> `NONE`
+    - the missing-run / no-event path was also tightened so `lastEventAt` no longer dereferences a null latest event while producing the `NONE` marker
+  - Frontend:
+    - `RunStatus` now accepts optional `lastEventSource`
+    - monitor footer `Last event` now shows a lightweight source hint beside the summary/time text
+    - when older status payloads omit the marker, `MonitorScreen` keeps a minimal compatibility inference path rather than breaking the footer
+  - Tests/docs:
+    - `LocalAdminApiServerTest` now asserts artifact / scheduler / none `lastEventSource` branches
+    - `MonitorScreen.test.tsx` now covers source hints plus legacy missing-marker compatibility
+    - synced `monitor/interface-spec.md` and `monitor/functional-spec.md`
+  - Verification:
+    - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+    - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`

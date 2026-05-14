@@ -1187,6 +1187,9 @@ class LocalAdminApiServerTest {
             HttpResponse<String> fallbackBacked = client.send(
                     request(server, "/api/phase3/runs/fallback-status/status"),
                     HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> missingBacked = client.send(
+                    request(server, "/api/phase3/runs/missing-status/status"),
+                    HttpResponse.BodyHandlers.ofString());
 
             assertEquals(200, artifactBacked.statusCode());
             assertTrue(artifactBacked.body().contains("\"projectKey\":\"checkout-web\""));
@@ -1208,6 +1211,7 @@ class LocalAdminApiServerTest {
             assertTrue(artifactBacked.body().contains("\"heals\":1"));
             assertTrue(artifactBacked.body().contains("\"lastEventSummary\":\"Report artifact recorded status FAILED.\""));
             assertTrue(artifactBacked.body().contains("\"lastEventAt\":\"2026-05-07T09:04:12Z\""));
+            assertTrue(artifactBacked.body().contains("\"lastEventSource\":\"ARTIFACT\""));
             assertTrue(artifactBacked.body().contains("\"canPause\":false"));
             assertTrue(artifactBacked.body().contains("\"canAbort\":false"));
             assertTrue(artifactBacked.body().contains("\"lastUpdatedAt\":\"2026-05-07T09:04:12Z\""));
@@ -1224,12 +1228,18 @@ class LocalAdminApiServerTest {
             assertTrue(fallbackBacked.body().contains("\"queueState\":\"queued\""));
             assertTrue(fallbackBacked.body().contains("\"lastEventSummary\":\"fallback still uses scheduler context\""));
             assertTrue(fallbackBacked.body().contains("\"lastEventAt\":\"2026-05-07T09:06:01Z\""));
+            assertTrue(fallbackBacked.body().contains("\"lastEventSource\":\"SCHEDULER\""));
             assertTrue(fallbackBacked.body().contains("\"state\":\"audit-first / queued / watching payment iframe\""));
             assertTrue(fallbackBacked.body().contains("\"aiCalls\":1"));
             assertTrue(fallbackBacked.body().contains("\"heals\":1"));
             assertTrue(fallbackBacked.body().contains("\"lastUpdatedAt\":\"2026-05-07T09:10:00Z\"")
                     || fallbackBacked.body().contains("\"lastUpdatedAt\":\"2026-05-07T09:06:01Z\""));
             assertTrue(!fallbackBacked.body().contains("\"totalSteps\":8"));
+
+            assertEquals(200, missingBacked.statusCode());
+            assertTrue(missingBacked.body().contains("\"lastEventSource\":\"NONE\""));
+            assertTrue(!missingBacked.body().contains("\"lastEventSummary\""));
+            assertTrue(!missingBacked.body().contains("\"lastEventAt\""));
         }
     }
 

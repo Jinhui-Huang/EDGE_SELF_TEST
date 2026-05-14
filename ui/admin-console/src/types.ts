@@ -277,6 +277,7 @@ export type RunStatus = {
   queueState?: string;
   lastEventSummary?: string;
   lastEventAt?: string;
+  lastEventSource?: "ARTIFACT" | "SCHEDULER" | "NONE";
   progress: {
     currentStep: number;
     totalSteps: number;

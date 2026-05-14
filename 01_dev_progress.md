@@ -5149,6 +5149,47 @@ Remaining limits:
 - `dataDiff` table rows still retain the existing synthetic fallback path when the diff endpoint itself is unavailable
 - `reportDetail` still keeps snapshot-derived fallback when backend detail reads fail
 
+## 2026-05-14 P3-4 monitor last-event provenance hint
+
+## Completed
+- Updated backend `RunStatusService.java`:
+  - `GET /api/phase3/runs/{runId}/status` now emits additive top-level `lastEventSource`
+  - values stay minimal:
+    - `ARTIFACT`
+    - `SCHEDULER`
+    - `NONE`
+  - the marker follows the existing last-event priority chain instead of introducing a new event model
+  - the no-event path was also tightened so `lastEventAt` no longer dereferences a null latest event while returning `lastEventSource: "NONE"`
+- Updated front-end monitor typing/rendering:
+  - `RunStatus` now accepts optional `lastEventSource`
+  - `MonitorScreen` footer `Last event` now shows a lightweight provenance hint
+  - if the marker is absent in older payloads, the footer still uses a small legacy inference path and does not break
+- Expanded regression coverage:
+  - `LocalAdminApiServerTest` now asserts artifact-backed, scheduler-backed, and no-event `lastEventSource` values
+  - `MonitorScreen.test.tsx` now covers:
+    - run-local source hint rendering
+    - legacy missing-marker compatibility
+
+## Modified Files
+- `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/RunStatusService.java`
+- `apps/local-admin-api/src/test/java/com/example/webtest/admin/http/LocalAdminApiServerTest.java`
+- `ui/admin-console/src/types.ts`
+- `ui/admin-console/src/screens/MonitorScreen.tsx`
+- `ui/admin-console/src/screens/MonitorScreen.test.tsx`
+- `docs/phase3/interface/monitor/interface-spec.md`
+- `docs/phase3/interface/monitor/functional-spec.md`
+- `memory.txt`
+- `01_dev_progress.md`
+
+## Verification
+- Ran:
+  - `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+  - `npm test -- --run src/screens/MonitorScreen.test.tsx`
+
+## Remaining Limits
+- `lastEventSource` is still only a coarse top-level provenance hint; it does not model per-entry provenance or richer event metadata
+- legacy payload inference remains intentionally minimal and only exists to preserve compatibility while older status payloads omit the marker
+
 ## 2026-05-08 P3-4 monitor scheduler-context fallback follow-up
 
 ## Task

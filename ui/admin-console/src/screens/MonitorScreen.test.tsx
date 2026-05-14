@@ -294,6 +294,7 @@ describe("MonitorScreen", () => {
 
     expect(await screen.findByText("Run-local scheduler event won")).toBeInTheDocument();
     expect(screen.getAllByText("19:03:45").length).toBeGreaterThan(0);
+    expect(screen.getByText("Event source: artifact")).toBeInTheDocument();
     expect(screen.queryByText("Parent snapshot fallback detail")).not.toBeInTheDocument();
   });
 
@@ -301,6 +302,7 @@ describe("MonitorScreen", () => {
     vi.stubGlobal("fetch", createFetchMock({
       status: {
         ...runStatusResponse,
+        sourceLayer: "SCHEDULER_FALLBACK",
         lastEventSummary: "Run-local summary without time"
       }
     }));
@@ -316,6 +318,37 @@ describe("MonitorScreen", () => {
     );
 
     expect(await screen.findByText("Run-local summary without time")).toBeInTheDocument();
+    expect(screen.getByText("Event source: scheduler")).toBeInTheDocument();
+  });
+
+  it("keeps the last-event source hint conservative when legacy status payloads omit the marker", async () => {
+    vi.stubGlobal("fetch", createFetchMock({
+      status: {
+        ...runStatusResponse,
+        sourceLayer: undefined,
+        lastEventSource: undefined,
+        lastEventSummary: "Legacy summary without artifact proof",
+        currentPage: {
+          url: "https://example.test/checkout",
+          state: "ready"
+        }
+      }
+    }));
+
+    render(
+      <MonitorScreen
+        snapshot={snapshot}
+        title="Execution monitor"
+        selectedRunId="checkout-web-smoke"
+        apiBaseUrl="http://127.0.0.1:4173"
+        onPauseRun={vi.fn()}
+        onAbortRun={vi.fn()}
+      />
+    );
+
+    expect(await screen.findByText("Legacy summary without artifact proof")).toBeInTheDocument();
+    expect(screen.getByText("Event source: scheduler")).toBeInTheDocument();
+    expect(screen.queryByText("Event source: artifact")).not.toBeInTheDocument();
   });
 
   it("falls back to the parent snapshot timeline detail when last event summary is absent", async () => {
@@ -332,6 +365,7 @@ describe("MonitorScreen", () => {
     );
 
     expect(await screen.findByText("Parent snapshot fallback detail")).toBeInTheDocument();
+    expect(screen.getByText("Event source: none")).toBeInTheDocument();
   });
 
   it("shows a pausing control-phase banner and keeps pause disabled", async () => {

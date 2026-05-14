@@ -143,7 +143,10 @@ public final class RunStatusService {
                 resolveLastEventSummary(latestEvent)));
         putIfNotBlank(result, "lastEventAt", firstNonBlank(
                 artifactLastEventInfo.at(),
-                textOr(latestEvent, "at", "")));
+                latestEvent != null ? textOr(latestEvent, "at", "") : ""));
+        result.put("lastEventSource", !artifactLastEventInfo.summary().isBlank() || !artifactLastEventInfo.at().isBlank()
+                ? "ARTIFACT"
+                : latestEvent != null && !latestEvent.isEmpty() ? "SCHEDULER" : "NONE");
         result.put("lastUpdatedAt", resolveLastUpdatedAt(now, latestEvent, reportContext, livePageContext, runDir));
         return result;
     }
