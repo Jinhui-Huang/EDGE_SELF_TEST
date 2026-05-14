@@ -192,6 +192,7 @@ Purpose:
 - prefer run-local `live-page.json` for `currentPage.url` / `currentPage.state` when that artifact exists
 - prefer the latest artifact-backed timestamp (`report.json`, `live-page.json`, `runtime.log`) for `lastUpdatedAt` when available
 - prefer artifact-backed `aiCalls` / `heals` counters from report summary or run-local `runtime.log` when those artifacts can provide them; otherwise fall back to scheduler-event counts
+- when `sourceLayer` is `RUN_ARTIFACTS`, prefer stronger artifact-derived `lastEventSummary` / `lastEventAt` when current report/live/runtime artifact context can provide them; otherwise fall back to the latest scheduler event
 - when no strong run-local progress artifact exists, keep the current response shell but return conservative progress values instead of fabricating a default 8-step shape
 - when those stronger artifacts are absent, prefer persisted scheduler request context (`pageUrl`, `runtimeMode`, `queueState`, `auditState`) over the older thin `targetUrl`-only fallback
 

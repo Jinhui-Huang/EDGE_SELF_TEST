@@ -137,10 +137,43 @@ public final class RunStatusService {
         }
         result.put("control", control);
 
-        putIfNotBlank(result, "lastEventSummary", resolveLastEventSummary(latestEvent));
-        putIfNotBlank(result, "lastEventAt", textOr(latestEvent, "at", ""));
+        ArtifactLastEventInfo artifactLastEventInfo = resolveArtifactLastEventInfo(runDir, reportContext, livePageContext);
+        putIfNotBlank(result, "lastEventSummary", firstNonBlank(
+                artifactLastEventInfo.summary(),
+                resolveLastEventSummary(latestEvent)));
+        putIfNotBlank(result, "lastEventAt", firstNonBlank(
+                artifactLastEventInfo.at(),
+                textOr(latestEvent, "at", "")));
         result.put("lastUpdatedAt", resolveLastUpdatedAt(now, latestEvent, reportContext, livePageContext, runDir));
         return result;
+    }
+
+    private ArtifactLastEventInfo resolveArtifactLastEventInfo(
+            Path runDir,
+            ReportStatusContext reportContext,
+            LivePageStatusContext livePageContext) throws IOException {
+        if (reportContext != null && reportContext.updatedAt() != null) {
+            return new ArtifactLastEventInfo(
+                    reportContext.updatedAt().toString(),
+                    reportContext.status().isBlank()
+                            ? "Report artifact updated."
+                            : "Report artifact recorded status " + reportContext.status() + ".");
+        }
+        if (livePageContext != null && livePageContext.updatedAt() != null) {
+            return new ArtifactLastEventInfo(
+                    livePageContext.updatedAt().toString(),
+                    "Live page artifact captured.");
+        }
+        if (runDir == null || !Files.isDirectory(runDir)) {
+            return ArtifactLastEventInfo.EMPTY;
+        }
+        Path runtimeLog = runDir.resolve("runtime.log").normalize();
+        if (!runtimeLog.startsWith(runDir) || !Files.isRegularFile(runtimeLog)) {
+            return ArtifactLastEventInfo.EMPTY;
+        }
+        return new ArtifactLastEventInfo(
+                Files.getLastModifiedTime(runtimeLog).toInstant().toString(),
+                "Runtime log artifact updated.");
     }
 
     private String resolveLastEventSummary(Map<String, Object> latestEvent) {
@@ -152,6 +185,10 @@ public final class RunStatusService {
                 textOr(latestEvent, "title", ""),
                 textOr(latestEvent, "type", ""),
                 textOr(latestEvent, "status", ""));
+    }
+
+    private record ArtifactLastEventInfo(String at, String summary) {
+        private static final ArtifactLastEventInfo EMPTY = new ArtifactLastEventInfo("", "");
     }
 
     private boolean hasRunArtifactStatusContext(

@@ -2929,3 +2929,16 @@
   - Verification:
     - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
     - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`
+- 2026-05-14: Tightened monitor `lastEventSummary` / `lastEventAt` priority inside `/status`.
+  - Backend:
+    - when `/status.sourceLayer` is effectively artifact-strengthened, `RunStatusService` now prefers stronger artifact-derived last-event context before falling back to the latest scheduler event
+    - current artifact priority is:
+      - report artifact updated/status context
+      - live-page artifact updated context
+      - runtime.log artifact modified-time context
+      - latest scheduler event fallback
+  - Tests/docs:
+    - `LocalAdminApiServerTest` now asserts artifact-backed status returns `lastEventSummary` / `lastEventAt` from the artifact path rather than the older scheduler detail
+    - synced `monitor/interface-spec.md`
+  - Verification:
+    - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`

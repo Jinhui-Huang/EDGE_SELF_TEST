@@ -1206,6 +1206,8 @@ class LocalAdminApiServerTest {
             assertTrue(artifactBacked.body().contains("\"assertionsTotal\":2"));
             assertTrue(artifactBacked.body().contains("\"aiCalls\":2"));
             assertTrue(artifactBacked.body().contains("\"heals\":1"));
+            assertTrue(artifactBacked.body().contains("\"lastEventSummary\":\"Report artifact recorded status FAILED.\""));
+            assertTrue(artifactBacked.body().contains("\"lastEventAt\":\"2026-05-07T09:04:12Z\""));
             assertTrue(artifactBacked.body().contains("\"canPause\":false"));
             assertTrue(artifactBacked.body().contains("\"canAbort\":false"));
             assertTrue(artifactBacked.body().contains("\"lastUpdatedAt\":\"2026-05-07T09:04:12Z\""));

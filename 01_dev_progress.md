@@ -5923,6 +5923,26 @@ Remaining limits:
   - `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
   - `npm test -- --run src/screens/MonitorScreen.test.tsx`
 
+## 2026-05-14 P3-4 monitor last-event artifact-priority tightening
+
+## Completed
+- Updated backend `RunStatusService.java`:
+  - artifact-strengthened `/status` responses now prefer stronger artifact-derived `lastEventSummary` / `lastEventAt` before falling back to the latest scheduler event
+  - current priority is:
+    - report artifact updated/status context
+    - live-page artifact updated context
+    - runtime.log artifact modified-time context
+    - latest scheduler event fallback
+- Expanded regression coverage:
+  - `LocalAdminApiServerTest` now asserts artifact-backed status returns:
+    - `lastEventSummary` from the artifact path
+    - `lastEventAt` from the artifact path
+  - the existing scheduler-fallback assertions remain intact
+
+## Verification
+- Ran:
+  - `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+
 ## Remaining Limits
 - `runtime-log` fallback is now more informative when request context exists, but it still remains a compact shell rather than a richer structured runtime artifact model
 - if scheduler requests also lack persisted page/runtime/locator fields, runtime-log fallback can still end up sparse or empty
