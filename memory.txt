@@ -3003,3 +3003,17 @@
     - added an extra footer regression for the explicit `none last` helper path when both run-local and snapshot context are absent
   - Verification:
     - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`
+- 2026-05-14: Started the first real monitor footer fallback removal on `Queue pressure`.
+  - Frontend:
+    - when selected `runId` status payload now explicitly carries `queueStateSource: "NONE"`, `MonitorScreen` no longer falls back to parent `snapshot.workQueue[0].detail`
+    - that branch now shows an explicit run-local none copy instead:
+      - `No run-local queue context is available yet.`
+    - compatibility boundary is preserved:
+      - explicit marker `NONE` -> trust run-local none semantics
+      - legacy payload missing `queueStateSource` -> keep the older snapshot fallback
+  - Tests/docs:
+    - `MonitorScreen.test.tsx` now asserts explicit `queueStateSource: "NONE"` suppresses the snapshot queue fallback
+    - existing legacy fallback coverage remains intact
+    - synced `monitor/interface-spec.md` and `monitor/functional-spec.md`
+  - Verification:
+    - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`

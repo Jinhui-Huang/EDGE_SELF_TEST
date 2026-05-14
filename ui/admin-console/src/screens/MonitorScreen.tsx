@@ -266,7 +266,7 @@ export function MonitorScreen({
   const elapsedFormatted = progress ? formatMs(progress.elapsedMs) : "--";
   const estimatedFormatted = progress ? formatMs(progress.estimatedTotalMs) : "--";
   const percentText = progress ? `${progress.percent}%` : "0%";
-  const queuePressureFooter = resolveQueuePressureFooter(runStatus, snapshot.workQueue[0]);
+  const queuePressureFooter = resolveQueuePressureFooter(runStatus, snapshot.workQueue[0], t);
   const lastEventFooter = resolveLastEventFooter(runStatus, snapshot.timeline[0]);
   const queueStateSourceText = describeQueueStateSource(queuePressureFooter.source, t);
   const lastEventSourceText = describeLastEventSource(lastEventFooter.source, t);
@@ -790,10 +790,17 @@ function resolveLastEventSource(
 
 function resolveQueuePressureFooter(
   runStatus: RunStatus | null,
-  snapshotQueueItem?: AdminConsoleSnapshot["workQueue"][number]
+  snapshotQueueItem: AdminConsoleSnapshot["workQueue"][number] | undefined,
+  t: (copySet: Copy) => string
 ): { text: string; source: "REQUEST_CONTEXT" | "SNAPSHOT_FALLBACK" | "NONE" } {
-  const text = runStatus?.queueState || snapshotQueueItem?.detail || "--";
   const source = resolveQueueStateSource(runStatus, snapshotQueueItem?.detail);
+  const text = source === "REQUEST_CONTEXT"
+    ? runStatus?.queueState || "--"
+    : source === "SNAPSHOT_FALLBACK"
+      ? snapshotQueueItem?.detail || "--"
+      : runStatus?.queueStateSource === "NONE"
+        ? t(copy("No run-local queue context is available yet.", "当前还没有可用的运行态队列上下文。", "まだ run-local のキュー文脈はありません。"))
+        : "--";
   return { text, source };
 }
 

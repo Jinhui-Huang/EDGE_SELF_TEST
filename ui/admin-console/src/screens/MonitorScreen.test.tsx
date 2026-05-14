@@ -299,6 +299,30 @@ describe("MonitorScreen", () => {
     expect(screen.getByText("Queue source: snapshot fallback")).toBeInTheDocument();
   });
 
+  it("stops using the parent snapshot queue fallback when queueStateSource is explicitly NONE", async () => {
+    vi.stubGlobal("fetch", createFetchMock({
+      status: {
+        ...runStatusResponse,
+        queueState: undefined,
+        queueStateSource: "NONE"
+      }
+    }));
+
+    render(
+      <MonitorScreen
+        snapshot={snapshot}
+        title="Execution monitor"
+        locale="en"
+        selectedRunId="checkout-web-smoke"
+        apiBaseUrl="http://127.0.0.1:8787"
+      />
+    );
+
+    expect(await screen.findByText("No run-local queue context is available yet.")).toBeInTheDocument();
+    expect(screen.getByText("Queue source: none")).toBeInTheDocument();
+    expect(screen.queryByText("1 active / 1 waiting")).not.toBeInTheDocument();
+  });
+
   it("prefers run-local last event summary and time over the parent snapshot timeline detail", async () => {
     vi.stubGlobal("fetch", createFetchMock({
       status: {

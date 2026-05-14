@@ -243,6 +243,8 @@ Response body:
 - `SNAPSHOT_FALLBACK`
 - `NONE`
 
+When `queueStateSource` is explicitly `NONE`, `MonitorScreen` should stop using the older parent `snapshot.workQueue[0].detail` fallback and instead show a run-local no-context copy. Only older payloads that omit `queueStateSource` entirely should continue to use the legacy snapshot fallback.
+
 `lastEventSummary` is also additive and optional. When present, `MonitorScreen` should prefer it for the footer `Last event` text; when absent, the screen may still fall back to the older parent `snapshot.timeline[0]` copy.
 
 `lastEventSource` is additive and optional. When present, `MonitorScreen` should show a lightweight provenance hint beside the footer `Last event` text. The current values are:

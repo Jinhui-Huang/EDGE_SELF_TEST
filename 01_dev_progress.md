@@ -5265,6 +5265,42 @@ Remaining limits:
 - this round only centralized the fallback ordering; it did not remove the remaining snapshot footer dependency yet
 - the helper outputs still consume the existing run-local status fields rather than a richer dedicated footer/read model
 
+## 2026-05-14 P3-4 monitor queue-pressure fallback tightening
+
+## Completed
+- Updated `ui/admin-console/src/screens/MonitorScreen.tsx`:
+  - `Queue pressure` now treats explicit `runStatus.queueStateSource === "NONE"` as authoritative run-local no-context state
+  - in that branch, the footer no longer falls back to `snapshot.workQueue[0].detail`
+  - instead it shows explicit copy:
+    - `No run-local queue context is available yet.`
+  - compatibility boundary remains intact:
+    - explicit marker present -> trust marker
+    - marker absent in older payloads -> keep the legacy snapshot fallback
+- Expanded front-end regression coverage:
+  - explicit `queueStateSource: "NONE"` now asserts the snapshot queue fallback is suppressed
+  - legacy missing-marker fallback coverage remains intact
+- Synced docs/records:
+  - `docs/phase3/interface/monitor/interface-spec.md`
+  - `docs/phase3/interface/monitor/functional-spec.md`
+  - `memory.txt`
+  - `01_dev_progress.md`
+
+## Modified Files
+- `ui/admin-console/src/screens/MonitorScreen.tsx`
+- `ui/admin-console/src/screens/MonitorScreen.test.tsx`
+- `docs/phase3/interface/monitor/interface-spec.md`
+- `docs/phase3/interface/monitor/functional-spec.md`
+- `memory.txt`
+- `01_dev_progress.md`
+
+## Verification
+- Ran:
+  - `npm test -- --run src/screens/MonitorScreen.test.tsx`
+
+## Remaining Limits
+- this round only removes the snapshot queue fallback when the newer `queueStateSource: "NONE"` marker is present; older payloads still intentionally keep the legacy fallback path
+- other footer areas still retain their existing snapshot compatibility behavior
+
 ## 2026-05-08 P3-4 monitor scheduler-context fallback follow-up
 
 ## Task
