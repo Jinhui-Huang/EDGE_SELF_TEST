@@ -270,6 +270,7 @@ export function MonitorScreen({
   const snapshotLastEvent = snapshot.timeline[0];
   const queuePressureText = runStatus?.queueState || queueLead?.detail || "--";
   const lastEventText = runStatus?.lastEventSummary || snapshotLastEvent?.detail || snapshotLastEvent?.title || "--";
+  const lastEventTimeText = runStatus?.lastEventAt ? formatTimestamp(runStatus.lastEventAt) : "";
   const runningStep = steps.find((step) => step.state === "RUNNING");
   const showUnavailableSteps = stepsAvailability === "UNAVAILABLE";
   const showUnavailableRuntimeLog = runtimeLogAvailability === "UNAVAILABLE";
@@ -681,6 +682,7 @@ export function MonitorScreen({
         <div className="monitorFooterItem">
           <span>{t(copy("Last event", "最后事件", "最新イベント"))}</span>
           <strong>{lastEventText}</strong>
+          {lastEventTimeText ? <span className="monitorMono">{lastEventTimeText}</span> : null}
         </div>
         <div className="monitorFooterItem">
           <span>{t(copy("Owner", "负责人", "担当者"))}</span>

@@ -273,11 +273,12 @@ describe("MonitorScreen", () => {
     expect(await screen.findByText("1 active / 1 waiting")).toBeInTheDocument();
   });
 
-  it("prefers run-local last event summary over the parent snapshot timeline detail", async () => {
+  it("prefers run-local last event summary and time over the parent snapshot timeline detail", async () => {
     vi.stubGlobal("fetch", createFetchMock({
       status: {
         ...runStatusResponse,
-        lastEventSummary: "Run-local scheduler event won"
+        lastEventSummary: "Run-local scheduler event won",
+        lastEventAt: "2026-05-05T10:03:45Z"
       }
     }));
 
@@ -292,7 +293,29 @@ describe("MonitorScreen", () => {
     );
 
     expect(await screen.findByText("Run-local scheduler event won")).toBeInTheDocument();
+    expect(screen.getAllByText("19:03:45").length).toBeGreaterThan(0);
     expect(screen.queryByText("Parent snapshot fallback detail")).not.toBeInTheDocument();
+  });
+
+  it("still shows run-local last event summary when last event time is absent", async () => {
+    vi.stubGlobal("fetch", createFetchMock({
+      status: {
+        ...runStatusResponse,
+        lastEventSummary: "Run-local summary without time"
+      }
+    }));
+
+    render(
+      <MonitorScreen
+        snapshot={snapshot}
+        title="Execution monitor"
+        locale="en"
+        selectedRunId="checkout-web-smoke"
+        apiBaseUrl="http://127.0.0.1:8787"
+      />
+    );
+
+    expect(await screen.findByText("Run-local summary without time")).toBeInTheDocument();
   });
 
   it("falls back to the parent snapshot timeline detail when last event summary is absent", async () => {

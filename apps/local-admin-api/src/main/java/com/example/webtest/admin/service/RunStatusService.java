@@ -138,6 +138,7 @@ public final class RunStatusService {
         result.put("control", control);
 
         putIfNotBlank(result, "lastEventSummary", resolveLastEventSummary(latestEvent));
+        putIfNotBlank(result, "lastEventAt", textOr(latestEvent, "at", ""));
         result.put("lastUpdatedAt", resolveLastUpdatedAt(now, latestEvent, reportContext, livePageContext, runDir));
         return result;
     }
