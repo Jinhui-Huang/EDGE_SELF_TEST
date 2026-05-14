@@ -451,7 +451,10 @@ Response body:
   "status": "ACCEPTED",
   "kind": "run-control-pause",
   "runId": "checkout-web-smoke",
-  "requestedState": "PAUSING"
+  "requestedState": "PAUSING",
+  "requestedBy": "qa-platform",
+  "requestReason": "Need manual verification before payment submit",
+  "requestedAt": "2026-04-18T11:00:00Z"
 }
 ```
 
@@ -459,6 +462,10 @@ Functional rules:
 
 - return current-state result if run is already paused or finished
 - append a persisted runtime-control phase event into scheduler/runtime history
+- the accepted POST response may immediately echo lightweight control-request readback fields:
+  - `requestedBy`
+  - `requestReason`
+  - `requestedAt`
 - until a stronger artifact-backed terminal status exists, `GET /api/phase3/runs/{runId}/status` should read that phase event back as `PAUSING`
 - while `status === "PAUSING"`, `control.canPause` is `false`
 - while `status === "PAUSING"`, `status.control` may also read back:
@@ -490,7 +497,10 @@ Response body:
   "status": "ACCEPTED",
   "kind": "run-control-abort",
   "runId": "checkout-web-smoke",
-  "requestedState": "ABORTING"
+  "requestedState": "ABORTING",
+  "requestedBy": "ops-oncall",
+  "requestReason": "Unsafe DOM mismatch after payment redirect",
+  "requestedAt": "2026-04-18T11:00:00Z"
 }
 ```
 
@@ -498,6 +508,10 @@ Functional rules:
 
 - should be idempotent for already-finished runs
 - append a persisted runtime-control phase event into scheduler/runtime history
+- the accepted POST response may immediately echo lightweight control-request readback fields:
+  - `requestedBy`
+  - `requestReason`
+  - `requestedAt`
 - until a stronger artifact-backed terminal status exists, `GET /api/phase3/runs/{runId}/status` should read that phase event back as `ABORTING`
 - while `status === "ABORTING"`, both `control.canPause` and `control.canAbort` are `false`
 - while `status === "ABORTING"`, `status.control` may also read back:

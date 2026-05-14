@@ -1551,6 +1551,9 @@ class LocalAdminApiServerTest {
             assertEquals(202, pauseOnRunning.statusCode());
             assertTrue(pauseOnRunning.body().contains("\"ACCEPTED\""));
             assertTrue(pauseOnRunning.body().contains("\"requestedState\":\"PAUSING\""));
+            assertTrue(pauseOnRunning.body().contains("\"requestedBy\":\"qa-platform\""));
+            assertTrue(pauseOnRunning.body().contains("\"requestReason\":\"Need manual verification before payment submit\""));
+            assertTrue(pauseOnRunning.body().contains("\"requestedAt\":\"2026-04-18T11:00:00Z\""));
 
             HttpResponse<String> pausingStatus = client.send(
                     request(server, "/api/phase3/runs/running-run/status"),
@@ -1607,6 +1610,9 @@ class LocalAdminApiServerTest {
             assertEquals(202, abortOnRunning.statusCode());
             assertTrue(abortOnRunning.body().contains("\"ACCEPTED\""));
             assertTrue(abortOnRunning.body().contains("\"requestedState\":\"ABORTING\""));
+            assertTrue(abortOnRunning.body().contains("\"requestedBy\":\"ops-oncall\""));
+            assertTrue(abortOnRunning.body().contains("\"requestReason\":\"Unsafe DOM mismatch after payment redirect\""));
+            assertTrue(abortOnRunning.body().contains("\"requestedAt\":\"2026-04-18T11:00:00Z\""));
 
             HttpResponse<String> abortingStatus = client.send(
                     request(server, "/api/phase3/runs/aborting-run/status"),
@@ -1634,6 +1640,41 @@ class LocalAdminApiServerTest {
             assertTrue(abortingRuntimeLog.body().contains("\"requestedBy\":\"ops-oncall\""));
             assertTrue(abortingRuntimeLog.body().contains("\"requestedAt\":\"2026-04-18T11:00:00Z\""));
             assertTrue(abortingRuntimeLog.body().contains("\"requestReason\":\"Unsafe DOM mismatch after payment redirect\""));
+
+            Files.writeString(schedulerRequestsFile, Jsons.writeValueAsString(Map.of(
+                    "requests", List.of(Map.of(
+                            "runId", "requested-at-priority-run",
+                            "projectKey", "test-project",
+                            "owner", "qa",
+                            "environment", "staging",
+                            "status", "QUEUED")))), StandardCharsets.UTF_8);
+            Files.writeString(schedulerEventsFile, Jsons.writeValueAsString(Map.of(
+                    "events", List.of(
+                            Map.of(
+                                    "runId", "requested-at-priority-run",
+                                    "type", "ABORTING",
+                                    "status", "ABORTING",
+                                    "state", "ABORTING",
+                                    "owner", "ops-oncall",
+                                    "detail", "Use requestedAt over event at",
+                                    "requestedAt", "2026-04-18T11:20:00Z",
+                                    "at", "2026-04-18T11:19:00Z")))), StandardCharsets.UTF_8);
+
+            HttpResponse<String> requestedAtPriorityStatus = client.send(
+                    request(server, "/api/phase3/runs/requested-at-priority-run/status"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, requestedAtPriorityStatus.statusCode());
+            assertTrue(requestedAtPriorityStatus.body().contains("\"status\":\"ABORTING\""));
+            assertTrue(requestedAtPriorityStatus.body().contains("\"requestedAt\":\"2026-04-18T11:20:00Z\""));
+            assertTrue(!requestedAtPriorityStatus.body().contains("\"requestedAt\":\"2026-04-18T11:19:00Z\""));
+
+            HttpResponse<String> requestedAtPriorityRuntimeLog = client.send(
+                    request(server, "/api/phase3/runs/requested-at-priority-run/runtime-log"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, requestedAtPriorityRuntimeLog.statusCode());
+            assertTrue(requestedAtPriorityRuntimeLog.body().contains("\"type\":\"ABORTING\""));
+            assertTrue(requestedAtPriorityRuntimeLog.body().contains("\"requestedAt\":\"2026-04-18T11:20:00Z\""));
+            assertTrue(!requestedAtPriorityRuntimeLog.body().contains("\"requestedAt\":\"2026-04-18T11:19:00Z\""));
         }
     }
 

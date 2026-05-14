@@ -5,6 +5,7 @@ import {
   LivePage,
   Locale,
   MutationState,
+  RunControlResponse,
   RunStatus,
   RunStep,
   RunStepsResponse,
@@ -18,8 +19,8 @@ type MonitorScreenProps = {
   locale: Locale;
   selectedRunId?: string | null;
   apiBaseUrl: string;
-  onPauseRun?: (runId: string) => Promise<void>;
-  onAbortRun?: (runId: string) => Promise<void>;
+  onPauseRun?: (runId: string) => Promise<RunControlResponse>;
+  onAbortRun?: (runId: string) => Promise<RunControlResponse>;
 };
 
 type LoadState = "idle" | "loading" | "loaded" | "error";
@@ -55,6 +56,7 @@ export function MonitorScreen({
   const [selectedLog, setSelectedLog] = useState<RuntimeLogEntry | null>(null);
   const [pauseState, setPauseState] = useState<MutationState>({ kind: "idle", message: "" });
   const [abortState, setAbortState] = useState<MutationState>({ kind: "idle", message: "" });
+  const [optimisticControlResponse, setOptimisticControlResponse] = useState<RunControlResponse | null>(null);
 
   const fetchMonitorData = useCallback(async (fetchRunId: string) => {
     setLoadState("loading");
@@ -89,6 +91,9 @@ export function MonitorScreen({
       setRuntimeLogSourceLayer(resolveRuntimeLogSourceLayer(logData));
       setLivePage(liveData);
       setLivePageSourceLayer(liveData ? resolveLivePageSourceLayer(liveData) : null);
+      setOptimisticControlResponse((current) =>
+        shouldClearOptimisticControlResponse(current, statusData.status) ? null : current
+      );
       setLoadState("loaded");
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : String(error));
@@ -122,6 +127,7 @@ export function MonitorScreen({
       setRuntimeLogSourceLayer(null);
       setLivePage(null);
       setLivePageSourceLayer(null);
+      setOptimisticControlResponse(null);
       return;
     }
     void fetchMonitorData(runId);
@@ -133,7 +139,8 @@ export function MonitorScreen({
     }
     setPauseState({ kind: "pending", message: t(copy("Pausing...", "暂停中...", "一時停止中...")) });
     try {
-      await onPauseRun(runId);
+      const result = await onPauseRun(runId);
+      setOptimisticControlResponse(result);
       setPauseState({ kind: "success", message: t(copy("Pause requested", "已请求暂停", "一時停止を要求しました")) });
       await fetchMonitorData(runId);
     } catch (error) {
@@ -147,7 +154,8 @@ export function MonitorScreen({
     }
     setAbortState({ kind: "pending", message: t(copy("Aborting...", "中止中...", "中止中...")) });
     try {
-      await onAbortRun(runId);
+      const result = await onAbortRun(runId);
+      setOptimisticControlResponse(result);
       setAbortState({ kind: "success", message: t(copy("Abort requested", "已请求中止", "中止を要求しました")) });
       await fetchMonitorData(runId);
     } catch (error) {
@@ -227,10 +235,10 @@ export function MonitorScreen({
     );
   }
 
-  const status = runStatus?.status ?? "";
+  const status = optimisticControlResponse?.requestedState ?? runStatus?.status ?? "";
   const progress = runStatus?.progress;
   const counters = runStatus?.counters;
-  const control = runStatus?.control;
+  const control = mergeOptimisticControl(runStatus?.control, optimisticControlResponse);
   const elapsedFormatted = progress ? formatMs(progress.elapsedMs) : "--";
   const estimatedFormatted = progress ? formatMs(progress.estimatedTotalMs) : "--";
   const percentText = progress ? `${progress.percent}%` : "0%";
@@ -822,6 +830,42 @@ function describeControlPhaseBanner(status: string, t: (copySet: Copy) => string
     "制御フェーズが落ち着くまで、ランタイムログ・ステップ・ライブページは直前のスナップショットのまま残ることがあります。"
   ));
   return `${phaseLead} ${snapshotNote}`;
+}
+
+function mergeOptimisticControl(
+  control: RunStatus["control"] | null | undefined,
+  optimisticControlResponse: RunControlResponse | null
+): RunStatus["control"] | undefined {
+  if (!optimisticControlResponse) {
+    return control ?? undefined;
+  }
+  const requestedState = optimisticControlResponse.requestedState;
+  return {
+    canPause: false,
+    canAbort: requestedState === "ABORTING" ? false : true,
+    requestedBy: optimisticControlResponse.requestedBy ?? control?.requestedBy,
+    requestReason: optimisticControlResponse.requestReason ?? control?.requestReason,
+    requestedAt: optimisticControlResponse.requestedAt ?? control?.requestedAt
+  };
+}
+
+function shouldClearOptimisticControlResponse(
+  optimisticControlResponse: RunControlResponse | null,
+  nextStatus: string
+): boolean {
+  if (!optimisticControlResponse || !nextStatus) {
+    return false;
+  }
+  if (nextStatus === optimisticControlResponse.requestedState) {
+    return true;
+  }
+  if (optimisticControlResponse.requestedState === "PAUSING" && nextStatus === "PAUSED") {
+    return true;
+  }
+  if (optimisticControlResponse.requestedState === "ABORTING" && nextStatus === "ABORTED") {
+    return true;
+  }
+  return false;
 }
 
 function isControlPhaseStatus(status: string): boolean {

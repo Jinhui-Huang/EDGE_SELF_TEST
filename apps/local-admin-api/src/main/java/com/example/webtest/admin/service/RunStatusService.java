@@ -201,7 +201,9 @@ public final class RunStatusService {
                 return new ControlRequestInfo(
                         textOr(event, "owner", ""),
                         textOr(event, "detail", ""),
-                        textOr(event, "at", ""));
+                        firstNonBlank(
+                                textOr(event, "requestedAt", ""),
+                                textOr(event, "at", "")));
             }
         }
         return null;
@@ -360,6 +362,7 @@ public final class RunStatusService {
 
     private Map<String, Object> buildSchedulerEventRuntimeLogEntry(Map<String, Object> event) {
         String at = textOr(event, "at", Instant.now(clock).toString());
+        String requestedAt = firstNonBlank(textOr(event, "requestedAt", ""), at);
         String type = textOr(event, "type", "INFO");
         String detail = textOr(event, "detail", "");
         Map<String, Object> entry = new LinkedHashMap<>();
@@ -374,7 +377,7 @@ public final class RunStatusService {
             entry.put("message", firstNonBlank(detail, textOr(event, "title", type + " event")));
             Map<String, Object> detailMap = new LinkedHashMap<>();
             putIfNotBlank(detailMap, "requestedBy", textOr(event, "owner", ""));
-            putIfNotBlank(detailMap, "requestedAt", at);
+            putIfNotBlank(detailMap, "requestedAt", requestedAt);
             putIfNotBlank(detailMap, "requestReason", detail);
             if (!detailMap.isEmpty()) {
                 entry.put("detail", detailMap);
@@ -837,6 +840,7 @@ public final class RunStatusService {
         Map<String, Object> body = parseBodySafe(requestBody);
         String operator = textOr(body, "operator", "monitor");
         String reason = textOr(body, "reason", "Pause requested from monitor.");
+        String requestedAt = Instant.now(clock).toString();
 
         // Write a real scheduler event
         String eventPayload = Jsons.writeValueAsString(Map.of(
@@ -845,11 +849,17 @@ public final class RunStatusService {
                 "status", "PAUSING",
                 "state", "PAUSING",
                 "owner", operator,
-                "detail", reason));
+                "detail", reason,
+                "requestedAt", requestedAt));
         schedulerPersistence.appendEvent(eventPayload);
 
-        return controlResponse("ACCEPTED", "run-control-pause", runId, "PAUSING",
-                "Pause request recorded.");
+        return controlResponse(
+                "ACCEPTED",
+                "run-control-pause",
+                runId,
+                "PAUSING",
+                "Pause request recorded.",
+                new ControlRequestInfo(operator, reason, requestedAt));
     }
 
     // ---- POST /api/phase3/runs/{runId}/abort ----
@@ -875,6 +885,7 @@ public final class RunStatusService {
         Map<String, Object> body = parseBodySafe(requestBody);
         String operator = textOr(body, "operator", "monitor");
         String reason = textOr(body, "reason", "Abort requested from monitor.");
+        String requestedAt = Instant.now(clock).toString();
 
         String eventPayload = Jsons.writeValueAsString(Map.of(
                 "runId", runId,
@@ -882,11 +893,17 @@ public final class RunStatusService {
                 "status", "ABORTING",
                 "state", "ABORTING",
                 "owner", operator,
-                "detail", reason));
+                "detail", reason,
+                "requestedAt", requestedAt));
         schedulerPersistence.appendEvent(eventPayload);
 
-        return controlResponse("ACCEPTED", "run-control-abort", runId, "ABORTING",
-                "Abort request recorded.");
+        return controlResponse(
+                "ACCEPTED",
+                "run-control-abort",
+                runId,
+                "ABORTING",
+                "Abort request recorded.",
+                new ControlRequestInfo(operator, reason, requestedAt));
     }
 
     // ---- Helpers ----
@@ -1459,12 +1476,27 @@ public final class RunStatusService {
 
     private Map<String, Object> controlResponse(
             String status, String kind, String runId, String requestedState, String message) {
+        return controlResponse(status, kind, runId, requestedState, message, null);
+    }
+
+    private Map<String, Object> controlResponse(
+            String status,
+            String kind,
+            String runId,
+            String requestedState,
+            String message,
+            ControlRequestInfo controlRequestInfo) {
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("status", status);
         response.put("kind", kind);
         response.put("runId", runId);
         response.put("requestedState", requestedState);
         response.put("message", message);
+        if (controlRequestInfo != null) {
+            putIfNotBlank(response, "requestedBy", controlRequestInfo.requestedBy());
+            putIfNotBlank(response, "requestReason", controlRequestInfo.requestReason());
+            putIfNotBlank(response, "requestedAt", controlRequestInfo.requestedAt());
+        }
         return response;
     }
 

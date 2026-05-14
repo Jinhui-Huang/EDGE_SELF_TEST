@@ -2534,7 +2534,8 @@ export function App() {
               });
               const result = await response.json() as RunControlResponse;
               if (result.status !== "ACCEPTED") throw new Error(result.message || `Control rejected: ${result.status}`);
-              await loadSnapshot();
+              void loadSnapshot();
+              return result;
             }}
             onAbortRun={async (monitorRunId) => {
               const response = await fetch(`${apiBaseUrl}/api/phase3/runs/${encodeURIComponent(monitorRunId)}/abort`, {
@@ -2544,7 +2545,8 @@ export function App() {
               });
               const result = await response.json() as RunControlResponse;
               if (result.status !== "ACCEPTED") throw new Error(result.message || `Control rejected: ${result.status}`);
-              await loadSnapshot();
+              void loadSnapshot();
+              return result;
             }}
           />
         );

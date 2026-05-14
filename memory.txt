@@ -2868,3 +2868,22 @@
     - synced `monitor/functional-spec.md`
   - Verification:
     - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`
+- 2026-05-14: Added immediate local control-request feedback for monitor `pause` / `abort`.
+  - Backend:
+    - accepted `POST /api/phase3/runs/{runId}/pause` and `abort` responses now also echo:
+      - `requestedBy`
+      - `requestReason`
+      - `requestedAt`
+    - those values are aligned with the persisted control event by explicitly writing `requestedAt` into the event payload before append
+  - Frontend:
+    - `App.tsx` now returns the accepted control response immediately instead of waiting for snapshot reload to finish
+    - `MonitorScreen` now keeps a small optimistic control-response overlay
+    - after a successful pause/abort click, the screen can update the control-phase banner / request summary / button gating immediately, even before `/status` has read back the new phase
+    - that optimistic overlay is cleared once `/status` reaches either the same requested phase or a direct stronger terminal handoff such as `PAUSING -> PAUSED` or `ABORTING -> ABORTED`
+  - Tests/docs:
+    - backend monitor test now asserts accepted pause/abort POST responses include `requestedBy` / `requestReason` / `requestedAt`
+    - front-end monitor test now covers immediate pause/abort feedback driven by the POST response rather than only by later status polling
+    - synced `monitor/interface-spec.md` and `monitor/functional-spec.md`
+  - Verification:
+    - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+    - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`

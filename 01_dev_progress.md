@@ -5801,6 +5801,41 @@ Remaining limits:
 - this slice is still explanatory UI only; it does not add any real executor-side pause/abort progress signal
 - the `live-page` control-phase branch currently adds a contextual note ahead of the existing unavailable-shell content rather than introducing a separate structured empty-state model
 
+## 2026-05-14 P3-4 monitor immediate control-response feedback follow-up
+
+## Task
+- Stay on `P3-4 monitor`, but make pause/abort feel more immediate without adding any new endpoint:
+  - let accepted `pause` / `abort` POST responses echo lightweight control-request metadata
+  - let `MonitorScreen` use that response locally until the next `status` readback takes over
+  - do not change existing GET contracts or connect to a real external executor
+
+## Completed
+- Updated `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/RunStatusService.java`:
+  - accepted `pause` / `abort` responses now also include:
+    - `requestedBy`
+    - `requestReason`
+    - `requestedAt`
+  - the same `requestedAt` is now explicitly written into the persisted control event payload so the POST response and later readback stay aligned
+- Updated `ui/admin-console/src/App.tsx`:
+  - monitor pause/abort handlers now return the accepted `RunControlResponse` immediately
+  - snapshot reload still starts, but no longer blocks the child screen from using the control response right away
+- Updated `ui/admin-console/src/screens/MonitorScreen.tsx`:
+  - added a small optimistic control-response overlay
+  - after a successful pause/abort click, banner text, request summary, and button gating can switch to the returned `PAUSING` / `ABORTING` state immediately
+  - the optimistic overlay is cleared once `/status` reaches either the same requested phase or a direct stronger terminal handoff such as `PAUSING -> PAUSED` or `ABORTING -> ABORTED`
+- Expanded tests:
+  - `LocalAdminApiServerTest` now asserts accepted pause/abort POST responses include `requestedBy` / `requestReason` / `requestedAt`
+  - `MonitorScreen.test.tsx` now covers immediate local pause/abort feedback driven by the POST response before status readback catches up
+
+## Verification
+- Ran:
+  - `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+  - `npm test -- --run src/screens/MonitorScreen.test.tsx`
+
+## Remaining Limits
+- this is still optimistic local feedback only; it does not confirm that an external executor has actually paused or aborted
+- the optimistic control overlay now clears on the same requested phase or on the direct terminal handoff paths currently covered (`PAUSING -> PAUSED`, `ABORTING -> ABORTED`), but there is still no richer general control-progress model or separate control event stream
+
 ## Remaining Limits
 - `runtime-log` fallback is now more informative when request context exists, but it still remains a compact shell rather than a richer structured runtime artifact model
 - if scheduler requests also lack persisted page/runtime/locator fields, runtime-log fallback can still end up sparse or empty

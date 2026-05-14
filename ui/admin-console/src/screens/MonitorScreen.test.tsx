@@ -297,6 +297,182 @@ describe("MonitorScreen", () => {
     expect(screen.getAllByText(/Unsafe DOM mismatch after payment redirect/)).toHaveLength(1);
   });
 
+  it("shows immediate local pause feedback from the control POST response before status readback catches up", async () => {
+    vi.stubGlobal("fetch", createFetchMock());
+    const onPauseRun = vi.fn().mockResolvedValue({
+      status: "ACCEPTED",
+      kind: "run-control-pause",
+      runId: "checkout-web-smoke",
+      requestedState: "PAUSING",
+      message: "Pause request recorded.",
+      requestedBy: "monitor-ui",
+      requestReason: "Waiting for manual checkout verification",
+      requestedAt: "2026-05-05T10:06:00Z"
+    });
+
+    render(
+      <MonitorScreen
+        snapshot={snapshot}
+        title="Execution monitor"
+        locale="en"
+        selectedRunId="checkout-web-smoke"
+        apiBaseUrl="http://127.0.0.1:8787"
+        onPauseRun={onPauseRun}
+      />
+    );
+
+    await userEvent.click(await screen.findByRole("button", { name: "Pause" }));
+
+    expect(onPauseRun).toHaveBeenCalledWith("checkout-web-smoke");
+    expect(await screen.findByText("pausing")).toBeInTheDocument();
+    expect(screen.getByText(/Pause request is in progress/)).toBeInTheDocument();
+    expect(screen.getByText(/Pause requested by monitor-ui/)).toBeInTheDocument();
+    expect(screen.getByText(/Waiting for manual checkout verification/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Pause" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Abort" })).not.toBeDisabled();
+  });
+
+  it("shows immediate local abort feedback from the control POST response before status readback catches up", async () => {
+    vi.stubGlobal("fetch", createFetchMock());
+    const onAbortRun = vi.fn().mockResolvedValue({
+      status: "ACCEPTED",
+      kind: "run-control-abort",
+      runId: "checkout-web-smoke",
+      requestedState: "ABORTING",
+      message: "Abort request recorded.",
+      requestedBy: "ops-oncall",
+      requestReason: "Unsafe DOM mismatch after payment redirect",
+      requestedAt: "2026-05-05T10:07:00Z"
+    });
+
+    render(
+      <MonitorScreen
+        snapshot={snapshot}
+        title="Execution monitor"
+        locale="en"
+        selectedRunId="checkout-web-smoke"
+        apiBaseUrl="http://127.0.0.1:8787"
+        onAbortRun={onAbortRun}
+      />
+    );
+
+    await userEvent.click(await screen.findByRole("button", { name: "Abort" }));
+
+    expect(onAbortRun).toHaveBeenCalledWith("checkout-web-smoke");
+    expect(await screen.findByText("aborting")).toBeInTheDocument();
+    expect(screen.getByText(/Abort request is in progress/)).toBeInTheDocument();
+    expect(screen.getByText(/Abort requested by ops-oncall/)).toBeInTheDocument();
+    expect(screen.getByText(/Unsafe DOM mismatch after payment redirect/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Pause" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Abort" })).toBeDisabled();
+  });
+
+  it("clears a pausing optimistic overlay when the next status readback lands directly on paused", async () => {
+    let statusCallCount = 0;
+    vi.stubGlobal("fetch", vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/status")) {
+        statusCallCount += 1;
+        return jsonResponse(statusCallCount === 1
+          ? runStatusResponse
+          : {
+              ...runStatusResponse,
+              status: "PAUSED",
+              control: {
+                canPause: false,
+                canAbort: true
+              }
+            });
+      }
+      if (url.endsWith("/steps")) return jsonResponse(stepsResponse);
+      if (url.endsWith("/runtime-log")) return jsonResponse(runtimeLogResponse);
+      if (url.endsWith("/live-page")) return jsonResponse(livePageResponse);
+      throw new Error(`Unexpected fetch: ${url}`);
+    }));
+    const onPauseRun = vi.fn().mockResolvedValue({
+      status: "ACCEPTED",
+      kind: "run-control-pause",
+      runId: "checkout-web-smoke",
+      requestedState: "PAUSING",
+      message: "Pause request recorded.",
+      requestedBy: "monitor-ui",
+      requestReason: "Waiting for manual checkout verification",
+      requestedAt: "2026-05-05T10:06:00Z"
+    });
+
+    render(
+      <MonitorScreen
+        snapshot={snapshot}
+        title="Execution monitor"
+        locale="en"
+        selectedRunId="checkout-web-smoke"
+        apiBaseUrl="http://127.0.0.1:8787"
+        onPauseRun={onPauseRun}
+      />
+    );
+
+    await userEvent.click(await screen.findByRole("button", { name: "Pause" }));
+
+    expect(await screen.findByText("paused")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByText("pausing")).not.toBeInTheDocument();
+    });
+    expect(screen.queryByText(/Pause request is in progress/)).not.toBeInTheDocument();
+  });
+
+  it("clears an aborting optimistic overlay when the next status readback lands directly on aborted", async () => {
+    let statusCallCount = 0;
+    vi.stubGlobal("fetch", vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/status")) {
+        statusCallCount += 1;
+        return jsonResponse(statusCallCount === 1
+          ? runStatusResponse
+          : {
+              ...runStatusResponse,
+              status: "ABORTED",
+              control: {
+                canPause: false,
+                canAbort: false
+              }
+            });
+      }
+      if (url.endsWith("/steps")) return jsonResponse(stepsResponse);
+      if (url.endsWith("/runtime-log")) return jsonResponse(runtimeLogResponse);
+      if (url.endsWith("/live-page")) return jsonResponse(livePageResponse);
+      throw new Error(`Unexpected fetch: ${url}`);
+    }));
+    const onAbortRun = vi.fn().mockResolvedValue({
+      status: "ACCEPTED",
+      kind: "run-control-abort",
+      runId: "checkout-web-smoke",
+      requestedState: "ABORTING",
+      message: "Abort request recorded.",
+      requestedBy: "ops-oncall",
+      requestReason: "Unsafe DOM mismatch after payment redirect",
+      requestedAt: "2026-05-05T10:07:00Z"
+    });
+
+    render(
+      <MonitorScreen
+        snapshot={snapshot}
+        title="Execution monitor"
+        locale="en"
+        selectedRunId="checkout-web-smoke"
+        apiBaseUrl="http://127.0.0.1:8787"
+        onAbortRun={onAbortRun}
+      />
+    );
+
+    await userEvent.click(await screen.findByRole("button", { name: "Abort" }));
+
+    expect(await screen.findByText("aborted")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByText("aborting")).not.toBeInTheDocument();
+    });
+    expect(screen.queryByText(/Abort request is in progress/)).not.toBeInTheDocument();
+  });
+
   it("opens runtime log detail when clicking a runtime log row", async () => {
     vi.stubGlobal("fetch", createFetchMock());
 

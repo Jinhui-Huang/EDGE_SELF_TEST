@@ -359,6 +359,9 @@ export type RunControlResponse = {
   runId: string;
   requestedState: string;
   message: string;
+  requestedBy?: string;
+  requestReason?: string;
+  requestedAt?: string;
 };
 
 // ---- AI generation flow types (P1-1) ----
