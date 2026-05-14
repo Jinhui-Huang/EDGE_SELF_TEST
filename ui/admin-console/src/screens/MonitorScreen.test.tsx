@@ -394,6 +394,37 @@ describe("MonitorScreen", () => {
     expect(screen.getByText("Event source: none")).toBeInTheDocument();
   });
 
+  it("keeps footer fallback ordering explicit when neither run-local nor snapshot footer context exists", async () => {
+    vi.stubGlobal("fetch", createFetchMock({
+      status: {
+        ...runStatusResponse,
+        queueState: undefined,
+        queueStateSource: undefined,
+        lastEventSummary: undefined,
+        lastEventAt: undefined,
+        lastEventSource: undefined
+      }
+    }));
+
+    render(
+      <MonitorScreen
+        snapshot={{
+          ...snapshot,
+          workQueue: [],
+          timeline: []
+        }}
+        title="Execution monitor"
+        locale="en"
+        selectedRunId="checkout-web-smoke"
+        apiBaseUrl="http://127.0.0.1:8787"
+      />
+    );
+
+    expect((await screen.findAllByText("--")).length).toBeGreaterThan(0);
+    expect(screen.getByText("Queue source: none")).toBeInTheDocument();
+    expect(screen.getByText("Event source: none")).toBeInTheDocument();
+  });
+
   it("shows a pausing control-phase banner and keeps pause disabled", async () => {
     vi.stubGlobal("fetch", createFetchMock({
       status: {

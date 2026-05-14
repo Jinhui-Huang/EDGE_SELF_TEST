@@ -2987,3 +2987,19 @@
   - Verification:
     - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
     - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`
+- 2026-05-14: Refactored monitor footer snapshot fallbacks into explicit helper resolvers without changing behavior.
+  - Frontend:
+    - `MonitorScreen` no longer reads `snapshot.workQueue[0]` and `snapshot.timeline[0]` inline in JSX
+    - queue footer now goes through a dedicated resolver that makes the order explicit:
+      - run-local `queueState` first
+      - snapshot queue detail second
+      - none last
+    - last-event footer now goes through a dedicated resolver that makes the order explicit:
+      - run-local `lastEventSummary` / `lastEventAt` first
+      - snapshot timeline fallback second
+      - none last
+  - Tests:
+    - `MonitorScreen.test.tsx` keeps the existing queue/last-event precedence coverage green
+    - added an extra footer regression for the explicit `none last` helper path when both run-local and snapshot context are absent
+  - Verification:
+    - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`

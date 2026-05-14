@@ -5231,6 +5231,40 @@ Remaining limits:
 - `queueStateSource` is still only a coarse provenance hint and does not model deeper queue ownership or richer scheduling context
 - frontend legacy inference is intentionally split between run-local `REQUEST_CONTEXT` and parent `SNAPSHOT_FALLBACK`; the backend itself still only emits run-local semantics
 
+## 2026-05-14 P3-4 monitor footer fallback helper consolidation
+
+## Completed
+- Refactored `ui/admin-console/src/screens/MonitorScreen.tsx` so the remaining parent-snapshot footer reads are no longer scattered inline:
+  - queue footer now resolves through a dedicated helper with explicit ordering:
+    - run-local `queueState`
+    - snapshot `workQueue[0].detail`
+    - none
+  - last-event footer now resolves through a dedicated helper with explicit ordering:
+    - run-local `lastEventSummary` / `lastEventAt`
+    - snapshot `timeline[0]`
+    - none
+- Kept behavior unchanged:
+  - no new endpoint
+  - no contract change
+  - no report/plugin impact
+- Expanded front-end regression coverage:
+  - existing queue and last-event run-local-first / snapshot-fallback tests remain green
+  - added a new explicit `none last` footer regression for the case where neither run-local nor snapshot footer context exists
+
+## Modified Files
+- `ui/admin-console/src/screens/MonitorScreen.tsx`
+- `ui/admin-console/src/screens/MonitorScreen.test.tsx`
+- `memory.txt`
+- `01_dev_progress.md`
+
+## Verification
+- Ran:
+  - `npm test -- --run src/screens/MonitorScreen.test.tsx`
+
+## Remaining Limits
+- this round only centralized the fallback ordering; it did not remove the remaining snapshot footer dependency yet
+- the helper outputs still consume the existing run-local status fields rather than a richer dedicated footer/read model
+
 ## 2026-05-08 P3-4 monitor scheduler-context fallback follow-up
 
 ## Task

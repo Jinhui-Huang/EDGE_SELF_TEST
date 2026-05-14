@@ -266,13 +266,10 @@ export function MonitorScreen({
   const elapsedFormatted = progress ? formatMs(progress.elapsedMs) : "--";
   const estimatedFormatted = progress ? formatMs(progress.estimatedTotalMs) : "--";
   const percentText = progress ? `${progress.percent}%` : "0%";
-  const queueLead = snapshot.workQueue[0];
-  const snapshotLastEvent = snapshot.timeline[0];
-  const queuePressureText = runStatus?.queueState || queueLead?.detail || "--";
-  const queueStateSourceText = describeQueueStateSource(resolveQueueStateSource(runStatus, queueLead?.detail), t);
-  const lastEventText = runStatus?.lastEventSummary || snapshotLastEvent?.detail || snapshotLastEvent?.title || "--";
-  const lastEventTimeText = runStatus?.lastEventAt ? formatTimestamp(runStatus.lastEventAt) : "";
-  const lastEventSourceText = describeLastEventSource(resolveLastEventSource(runStatus), t);
+  const queuePressureFooter = resolveQueuePressureFooter(runStatus, snapshot.workQueue[0]);
+  const lastEventFooter = resolveLastEventFooter(runStatus, snapshot.timeline[0]);
+  const queueStateSourceText = describeQueueStateSource(queuePressureFooter.source, t);
+  const lastEventSourceText = describeLastEventSource(lastEventFooter.source, t);
   const runningStep = steps.find((step) => step.state === "RUNNING");
   const showUnavailableSteps = stepsAvailability === "UNAVAILABLE";
   const showUnavailableRuntimeLog = runtimeLogAvailability === "UNAVAILABLE";
@@ -679,13 +676,13 @@ export function MonitorScreen({
       <section className="monitorFooter">
         <div className="monitorFooterItem">
           <span>{t(copy("Queue pressure", "队列压力", "キュー圧力"))}</span>
-          <strong>{queuePressureText}</strong>
+          <strong>{queuePressureFooter.text}</strong>
           <span className="monitorMono muted">{queueStateSourceText}</span>
         </div>
         <div className="monitorFooterItem">
           <span>{t(copy("Last event", "最后事件", "最新イベント"))}</span>
-          <strong>{lastEventText}</strong>
-          {lastEventTimeText ? <span className="monitorMono">{lastEventTimeText}</span> : null}
+          <strong>{lastEventFooter.text}</strong>
+          {lastEventFooter.timeText ? <span className="monitorMono">{lastEventFooter.timeText}</span> : null}
           <span className="monitorMono muted">{lastEventSourceText}</span>
         </div>
         <div className="monitorFooterItem">
@@ -789,6 +786,25 @@ function resolveLastEventSource(
     return "ARTIFACT";
   }
   return "SCHEDULER";
+}
+
+function resolveQueuePressureFooter(
+  runStatus: RunStatus | null,
+  snapshotQueueItem?: AdminConsoleSnapshot["workQueue"][number]
+): { text: string; source: "REQUEST_CONTEXT" | "SNAPSHOT_FALLBACK" | "NONE" } {
+  const text = runStatus?.queueState || snapshotQueueItem?.detail || "--";
+  const source = resolveQueueStateSource(runStatus, snapshotQueueItem?.detail);
+  return { text, source };
+}
+
+function resolveLastEventFooter(
+  runStatus: RunStatus | null,
+  snapshotEvent?: AdminConsoleSnapshot["timeline"][number]
+): { text: string; timeText: string; source: "ARTIFACT" | "SCHEDULER" | "NONE" } {
+  const text = runStatus?.lastEventSummary || snapshotEvent?.detail || snapshotEvent?.title || "--";
+  const timeText = runStatus?.lastEventAt ? formatTimestamp(runStatus.lastEventAt) : "";
+  const source = resolveLastEventSource(runStatus);
+  return { text, timeText, source };
 }
 
 function resolveQueueStateSource(
