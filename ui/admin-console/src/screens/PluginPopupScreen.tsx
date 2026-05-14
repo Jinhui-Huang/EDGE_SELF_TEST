@@ -85,6 +85,7 @@ export function PluginPopupScreen({ apiBaseUrl, title, locale }: PluginPopupScre
   const pageStatus = popupSnapshot?.status?.trim().toLowerCase() || "recognized";
   const pageAssistiveSummary = popupSnapshot?.summary?.trim() || "3 forms / 8 buttons";
   const queueState = runtime?.queueState ?? "Idle";
+  const runtimeQueueBadge = runtime?.queueState?.trim().toLowerCase() || "idle";
   const isRunning = queueState.toLowerCase().includes("active") || queueState.toLowerCase().includes("running");
 
   return (
@@ -155,7 +156,7 @@ export function PluginPopupScreen({ apiBaseUrl, title, locale }: PluginPopupScre
                 <div className="pluginRunCard">
                   <div className="pluginRunMeta">
                     <span className={`pluginBadge info dot`}>
-                      {isRunning ? "running" : "idle"}
+                      {runtimeQueueBadge}
                     </span>
                     <span className="pluginRunId">
                       {runtime?.mode ?? "Audit-first"}

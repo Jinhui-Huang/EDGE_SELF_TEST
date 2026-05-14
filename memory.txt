@@ -3126,3 +3126,15 @@
     - synced `plugin/interface-spec.md` and `plugin/functional-spec.md`
   - Verification:
     - ran `npm test -- --run src/App.test.tsx -t "plugin popup"`
+- 2026-05-14: Continued `P3-4 plugin` with one more fixed active-run status cleanup.
+  - Frontend:
+    - the `Active run` badge no longer collapses all loaded states into the old binary `running` / `idle` copy
+    - it now prefers the concrete `popupSnapshot.runtime.queueState` text
+    - `idle` remains only as the legacy fallback when queue state text is absent
+  - Tests/docs:
+    - `App.test.tsx` now asserts:
+      - real popup queue state (`RUNNING`) still renders as `running`
+      - missing popup queue state falls back to `idle`
+    - synced `plugin/interface-spec.md` and `plugin/functional-spec.md`
+  - Verification:
+    - ran `npm test -- --run src/App.test.tsx -t "plugin popup"`

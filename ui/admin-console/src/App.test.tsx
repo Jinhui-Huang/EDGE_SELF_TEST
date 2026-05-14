@@ -2982,7 +2982,7 @@ describe("App", () => {
       },
       runtime: {
         mode: "Audit-first",
-        queueState: "IDLE",
+        queueState: "",
         auditState: "READY",
         nextAction: "Open platform"
       },
@@ -3007,6 +3007,7 @@ describe("App", () => {
 
     expect(await screen.findByText("3 forms / 8 buttons")).toBeInTheDocument();
     expect(screen.getAllByText("edge.test")).toHaveLength(2);
+    expect(screen.getByText("idle")).toBeInTheDocument();
   });
 
   it("shows plugin popup error state when extension-popup endpoint fails", async () => {

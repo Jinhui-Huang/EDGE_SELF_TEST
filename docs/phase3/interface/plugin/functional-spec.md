@@ -145,7 +145,8 @@ Functional role:
 Current behavior:
 
 - runtime mode, queue state, audit state, and next action rendered from `popupSnapshot.runtime`
-- running/idle badge derived from `runtime.queueState`
+- active-run badge now prefers the concrete `runtime.queueState` text
+- the old binary `idle` badge remains only as the fallback when queue state text is absent
 - progress bar shown when queue state indicates active or running
 
 ### 6.4 Quick Actions Section
