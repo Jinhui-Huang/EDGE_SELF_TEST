@@ -5395,6 +5395,36 @@ Remaining limits:
 - queue footer now has an explicit modern-marker boundary, but other areas still rely on the broader selected-run legacy compatibility layer
 - malformed modern payloads still show a generic `--` when run-local queue text is missing; this round only guarantees they do not silently fall back to snapshot data
 
+## 2026-05-14 P3-4 monitor last-event modern-marker hard boundary
+
+## Completed
+- Updated `ui/admin-console/src/screens/MonitorScreen.tsx`:
+  - `resolveLastEventFooter()` now treats the presence of modern `lastEventSource` as a hard boundary
+  - once the marker exists:
+    - `ARTIFACT` / `SCHEDULER` -> last-event footer may only render run-local `lastEventSummary / lastEventAt`
+    - `NONE` -> last-event footer may only render the run-local none copy
+  - `legacyMonitorFallback` is now only eligible for last-event footer when the marker is absent in older payloads
+- Expanded front-end regression coverage:
+  - added a malformed-modern-payload regression:
+    - `lastEventSource: "SCHEDULER"`
+    - missing `lastEventSummary` / `lastEventAt`
+    - snapshot timeline fallback must still stay suppressed
+  - existing legacy fallback and explicit-none regressions remain green
+
+## Modified Files
+- `ui/admin-console/src/screens/MonitorScreen.tsx`
+- `ui/admin-console/src/screens/MonitorScreen.test.tsx`
+- `memory.txt`
+- `01_dev_progress.md`
+
+## Verification
+- Ran:
+  - `npm test -- --run src/screens/MonitorScreen.test.tsx`
+
+## Remaining Limits
+- last-event footer now has an explicit modern-marker boundary, but other areas still rely on the broader selected-run legacy compatibility layer
+- malformed modern payloads still show a generic `--` when run-local event summary/time is missing; this round only guarantees they do not silently fall back to snapshot data
+
 ## 2026-05-08 P3-4 monitor scheduler-context fallback follow-up
 
 ## Task

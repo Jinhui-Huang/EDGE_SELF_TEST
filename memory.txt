@@ -3057,3 +3057,15 @@
     - existing legacy fallback and explicit-none regressions remain green
   - Verification:
     - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`
+- 2026-05-14: Applied the same modern-marker hard boundary to `Last event`.
+  - Frontend:
+    - `resolveLastEventFooter()` now treats the presence of a modern `lastEventSource` marker as a hard boundary
+    - once that marker exists:
+      - `ARTIFACT` / `SCHEDULER` -> only run-local `lastEventSummary / lastEventAt` may render
+      - `NONE` -> only run-local none copy may render
+    - `legacyMonitorFallback` is now only consulted for last-event footer when the marker is absent in older payloads
+  - Tests:
+    - added a regression proving malformed modern payloads (`lastEventSource: "SCHEDULER"` with missing summary/time) still do not backfill from snapshot timeline
+    - existing legacy fallback and explicit-none regressions remain green
+  - Verification:
+    - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`

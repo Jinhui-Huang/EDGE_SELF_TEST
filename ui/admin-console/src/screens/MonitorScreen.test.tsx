@@ -467,6 +467,31 @@ describe("MonitorScreen", () => {
     expect(screen.queryByText("Parent snapshot fallback detail")).not.toBeInTheDocument();
   });
 
+  it("never lets legacyMonitorFallback backfill last-event text once a modern lastEventSource marker is present", async () => {
+    vi.stubGlobal("fetch", createFetchMock({
+      status: {
+        ...runStatusResponse,
+        lastEventSummary: undefined,
+        lastEventAt: undefined,
+        lastEventSource: "SCHEDULER"
+      }
+    }));
+
+    render(
+      <MonitorScreen
+        snapshot={snapshot}
+        title="Execution monitor"
+        locale="en"
+        selectedRunId="checkout-web-smoke"
+        apiBaseUrl="http://127.0.0.1:8787"
+      />
+    );
+
+    expect((await screen.findAllByText("--")).length).toBeGreaterThan(0);
+    expect(screen.getByText("Event source: scheduler")).toBeInTheDocument();
+    expect(screen.queryByText("Parent snapshot fallback detail")).not.toBeInTheDocument();
+  });
+
   it("keeps legacyMonitorFallback available for legacy payloads but never overrides explicit none markers", async () => {
     vi.stubGlobal("fetch", createFetchMock({
       status: {

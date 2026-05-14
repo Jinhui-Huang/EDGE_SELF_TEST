@@ -817,6 +817,16 @@ function resolveLastEventFooter(
   legacyFallback: LegacyMonitorFallback,
   t: (copySet: Copy) => string
 ): { text: string; timeText: string; source: "ARTIFACT" | "SCHEDULER" | "NONE" } {
+  if (hasModernLastEventSourceMarker(runStatus)) {
+    const source = runStatus.lastEventSource;
+    const text = source === "NONE"
+      ? t(copy("No run-local event context is available yet.", "当前还没有可用的运行态事件上下文。", "まだ run-local のイベント文脈はありません。"))
+      : runStatus.lastEventSummary || "--";
+    const timeText = source === "ARTIFACT" || source === "SCHEDULER"
+      ? runStatus.lastEventAt ? formatTimestamp(runStatus.lastEventAt) : ""
+      : "";
+    return { text, timeText, source };
+  }
   const source = resolveLastEventSource(runStatus);
   const text = source === "ARTIFACT" || source === "SCHEDULER"
     ? runStatus?.lastEventSummary || "--"
@@ -860,6 +870,12 @@ function resolveQueueStateSource(
 
 function hasModernQueueStateSourceMarker(runStatus: RunStatus | null): boolean {
   return runStatus?.queueStateSource === "REQUEST_CONTEXT" || runStatus?.queueStateSource === "NONE";
+}
+
+function hasModernLastEventSourceMarker(runStatus: RunStatus | null): runStatus is RunStatus & { lastEventSource: "ARTIFACT" | "SCHEDULER" | "NONE" } {
+  return runStatus?.lastEventSource === "ARTIFACT"
+    || runStatus?.lastEventSource === "SCHEDULER"
+    || runStatus?.lastEventSource === "NONE";
 }
 
 function describeQueueStateSource(
