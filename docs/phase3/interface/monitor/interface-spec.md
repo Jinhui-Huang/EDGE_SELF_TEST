@@ -228,11 +228,14 @@ Response body:
     "canPause": true,
     "canAbort": true
   },
+  "lastEventSummary": "Worker slot 4 is executing checkout smoke.",
   "lastUpdatedAt": "2026-04-20T05:32:10Z"
 }
 ```
 
 `queueState` is additive and optional. When present, `MonitorScreen` should prefer it for small queue-context footer copy; when absent, the screen may still fall back to the older parent `snapshot.workQueue[0].detail`.
+
+`lastEventSummary` is also additive and optional. When present, `MonitorScreen` should prefer it for the footer `Last event` text; when absent, the screen may still fall back to the older parent `snapshot.timeline[0]` copy.
 
 The top-level `sourceLayer` tells the front end which status layer currently owns the response:
 

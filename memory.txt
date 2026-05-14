@@ -2918,3 +2918,14 @@
   - Verification:
     - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
     - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`
+- 2026-05-14: Continued shrinking monitor footer snapshot dependence by moving last-event text to run-local status first.
+  - Backend:
+    - `GET /api/phase3/runs/{runId}/status` now adds optional top-level `lastEventSummary`
+    - the current summary is derived from the latest scheduler-backed event detail/title/type/status in that order
+  - Frontend:
+    - `RunStatus` now accepts optional `lastEventSummary`
+    - monitor footer `Last event` now prefers `runStatus.lastEventSummary`
+    - when `lastEventSummary` is absent, the footer still falls back to `snapshot.timeline[0]` copy
+  - Verification:
+    - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+    - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`

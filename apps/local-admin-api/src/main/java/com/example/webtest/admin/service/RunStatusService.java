@@ -137,8 +137,20 @@ public final class RunStatusService {
         }
         result.put("control", control);
 
+        putIfNotBlank(result, "lastEventSummary", resolveLastEventSummary(latestEvent));
         result.put("lastUpdatedAt", resolveLastUpdatedAt(now, latestEvent, reportContext, livePageContext, runDir));
         return result;
+    }
+
+    private String resolveLastEventSummary(Map<String, Object> latestEvent) {
+        if (latestEvent == null || latestEvent.isEmpty()) {
+            return "";
+        }
+        return firstNonBlank(
+                textOr(latestEvent, "detail", ""),
+                textOr(latestEvent, "title", ""),
+                textOr(latestEvent, "type", ""),
+                textOr(latestEvent, "status", ""));
     }
 
     private boolean hasRunArtifactStatusContext(

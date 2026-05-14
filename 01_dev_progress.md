@@ -5902,6 +5902,27 @@ Remaining limits:
   - `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
   - `npm test -- --run src/screens/MonitorScreen.test.tsx`
 
+## 2026-05-14 P3-4 monitor last-event run-local fallback reduction
+
+## Completed
+- Updated backend `RunStatusService.java`:
+  - `GET /api/phase3/runs/{runId}/status` now emits optional top-level `lastEventSummary`
+  - the summary is currently derived from the latest scheduler-backed event detail/title/type/status in that priority order
+- Updated front-end monitor typing/rendering:
+  - `RunStatus` now accepts optional `lastEventSummary`
+  - `MonitorScreen` footer `Last event` now prefers `runStatus.lastEventSummary`
+  - if the run-local status payload does not provide an event summary, the footer still falls back to `snapshot.timeline[0]` copy
+- Expanded regression coverage:
+  - `LocalAdminApiServerTest` now asserts scheduler-fallback status exposes `lastEventSummary`
+  - `MonitorScreen.test.tsx` now covers both:
+    - run-local `lastEventSummary` winning over parent snapshot timeline copy
+    - legacy fallback to parent snapshot timeline copy when `lastEventSummary` is absent
+
+## Verification
+- Ran:
+  - `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+  - `npm test -- --run src/screens/MonitorScreen.test.tsx`
+
 ## Remaining Limits
 - `runtime-log` fallback is now more informative when request context exists, but it still remains a compact shell rather than a richer structured runtime artifact model
 - if scheduler requests also lack persisted page/runtime/locator fields, runtime-log fallback can still end up sparse or empty

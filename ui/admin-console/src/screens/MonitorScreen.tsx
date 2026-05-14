@@ -267,7 +267,9 @@ export function MonitorScreen({
   const estimatedFormatted = progress ? formatMs(progress.estimatedTotalMs) : "--";
   const percentText = progress ? `${progress.percent}%` : "0%";
   const queueLead = snapshot.workQueue[0];
+  const snapshotLastEvent = snapshot.timeline[0];
   const queuePressureText = runStatus?.queueState || queueLead?.detail || "--";
+  const lastEventText = runStatus?.lastEventSummary || snapshotLastEvent?.detail || snapshotLastEvent?.title || "--";
   const runningStep = steps.find((step) => step.state === "RUNNING");
   const showUnavailableSteps = stepsAvailability === "UNAVAILABLE";
   const showUnavailableRuntimeLog = runtimeLogAvailability === "UNAVAILABLE";
@@ -678,7 +680,7 @@ export function MonitorScreen({
         </div>
         <div className="monitorFooterItem">
           <span>{t(copy("Last event", "最后事件", "最新イベント"))}</span>
-          <strong>{runStatus?.lastUpdatedAt ? formatTimestamp(runStatus.lastUpdatedAt) : "--"}</strong>
+          <strong>{lastEventText}</strong>
         </div>
         <div className="monitorFooterItem">
           <span>{t(copy("Owner", "负责人", "担当者"))}</span>

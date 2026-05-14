@@ -275,6 +275,7 @@ export type RunStatus = {
   model: string;
   owner: string;
   queueState?: string;
+  lastEventSummary?: string;
   progress: {
     currentStep: number;
     totalSteps: number;

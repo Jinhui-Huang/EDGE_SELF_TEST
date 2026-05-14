@@ -1220,6 +1220,7 @@ class LocalAdminApiServerTest {
             assertTrue(fallbackBacked.body().contains("\"estimatedTotalMs\":0"));
             assertTrue(fallbackBacked.body().contains("\"url\":\"https://fallback.example/checkout/payment\""));
             assertTrue(fallbackBacked.body().contains("\"queueState\":\"queued\""));
+            assertTrue(fallbackBacked.body().contains("\"lastEventSummary\":\"fallback still uses scheduler context\""));
             assertTrue(fallbackBacked.body().contains("\"state\":\"audit-first / queued / watching payment iframe\""));
             assertTrue(fallbackBacked.body().contains("\"aiCalls\":1"));
             assertTrue(fallbackBacked.body().contains("\"heals\":1"));
