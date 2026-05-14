@@ -5425,6 +5425,36 @@ Remaining limits:
 - last-event footer now has an explicit modern-marker boundary, but other areas still rely on the broader selected-run legacy compatibility layer
 - malformed modern payloads still show a generic `--` when run-local event summary/time is missing; this round only guarantees they do not silently fall back to snapshot data
 
+## 2026-05-14 P3-4 monitor selected-run footer modern/legacy split
+
+## Completed
+- Refactored `ui/admin-console/src/screens/MonitorScreen.tsx` so the selected-run footer now branches explicitly at the top level:
+  - modern footer path when both footer markers are present
+  - legacy compatibility path when either marker is still absent
+- On the modern path:
+  - queue footer resolves directly from run-local `queueStateSource`
+  - last-event footer resolves directly from run-local `lastEventSource`
+  - `legacyMonitorFallback` is not consulted at all
+- On the legacy path:
+  - existing compatibility behavior remains intact for older payloads that omit one or both markers
+- Expanded front-end regression coverage:
+  - added a combined modern-path test proving simultaneous queue + last-event markers suppress all snapshot fallback
+  - added a combined legacy-path test proving missing markers still route through `legacyMonitorFallback`
+
+## Modified Files
+- `ui/admin-console/src/screens/MonitorScreen.tsx`
+- `ui/admin-console/src/screens/MonitorScreen.test.tsx`
+- `memory.txt`
+- `01_dev_progress.md`
+
+## Verification
+- Ran:
+  - `npm test -- --run src/screens/MonitorScreen.test.tsx`
+
+## Remaining Limits
+- this round only makes the modern-vs-legacy footer split explicit; it does not yet remove the legacy compatibility branch itself
+- malformed modern payloads still degrade to `--` for missing run-local footer text; the important guarantee remains that they do not silently fall back to snapshot data
+
 ## 2026-05-08 P3-4 monitor scheduler-context fallback follow-up
 
 ## Task

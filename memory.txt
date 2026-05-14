@@ -3069,3 +3069,17 @@
     - existing legacy fallback and explicit-none regressions remain green
   - Verification:
     - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`
+- 2026-05-14: Split selected-run footer into explicit modern-vs-legacy paths.
+  - Frontend:
+    - `MonitorScreen` now resolves selected-run footer through a dedicated top-level branch:
+      - modern path when both footer markers are present
+      - legacy compatibility path when either marker is still absent
+    - modern path now directly resolves:
+      - queue footer from run-local `queueStateSource`
+      - last-event footer from run-local `lastEventSource`
+    - `legacyMonitorFallback` is only consulted from the dedicated legacy branch and no longer sits inline on the main footer path
+  - Tests:
+    - added a combined modern-path regression proving simultaneous queue + last-event markers prevent all snapshot fallback
+    - added a combined legacy-path regression proving missing markers still route through `legacyMonitorFallback`
+  - Verification:
+    - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`

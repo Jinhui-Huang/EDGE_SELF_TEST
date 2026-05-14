@@ -492,6 +492,35 @@ describe("MonitorScreen", () => {
     expect(screen.queryByText("Parent snapshot fallback detail")).not.toBeInTheDocument();
   });
 
+  it("routes selected-run footer entirely through the modern path when both footer markers are present", async () => {
+    vi.stubGlobal("fetch", createFetchMock({
+      status: {
+        ...runStatusResponse,
+        queueState: undefined,
+        queueStateSource: "REQUEST_CONTEXT",
+        lastEventSummary: undefined,
+        lastEventAt: undefined,
+        lastEventSource: "SCHEDULER"
+      }
+    }));
+
+    render(
+      <MonitorScreen
+        snapshot={snapshot}
+        title="Execution monitor"
+        locale="en"
+        selectedRunId="checkout-web-smoke"
+        apiBaseUrl="http://127.0.0.1:8787"
+      />
+    );
+
+    expect((await screen.findAllByText("--")).length).toBeGreaterThan(0);
+    expect(screen.getByText("Queue source: request context")).toBeInTheDocument();
+    expect(screen.getByText("Event source: scheduler")).toBeInTheDocument();
+    expect(screen.queryByText("1 active / 1 waiting")).not.toBeInTheDocument();
+    expect(screen.queryByText("Parent snapshot fallback detail")).not.toBeInTheDocument();
+  });
+
   it("keeps legacyMonitorFallback available for legacy payloads but never overrides explicit none markers", async () => {
     vi.stubGlobal("fetch", createFetchMock({
       status: {
@@ -518,6 +547,34 @@ describe("MonitorScreen", () => {
     expect(screen.getByText("No run-local event context is available yet.")).toBeInTheDocument();
     expect(screen.queryByText("1 active / 1 waiting")).not.toBeInTheDocument();
     expect(screen.queryByText("Parent snapshot fallback detail")).not.toBeInTheDocument();
+  });
+
+  it("routes selected-run footer through legacyMonitorFallback only when both footer markers are absent", async () => {
+    vi.stubGlobal("fetch", createFetchMock({
+      status: {
+        ...runStatusResponse,
+        queueState: undefined,
+        queueStateSource: undefined,
+        lastEventSummary: undefined,
+        lastEventAt: undefined,
+        lastEventSource: undefined
+      }
+    }));
+
+    render(
+      <MonitorScreen
+        snapshot={snapshot}
+        title="Execution monitor"
+        locale="en"
+        selectedRunId="checkout-web-smoke"
+        apiBaseUrl="http://127.0.0.1:8787"
+      />
+    );
+
+    expect(await screen.findByText("1 active / 1 waiting")).toBeInTheDocument();
+    expect(screen.getByText("Queue source: snapshot fallback")).toBeInTheDocument();
+    expect(screen.getByText("Parent snapshot fallback detail")).toBeInTheDocument();
+    expect(screen.getByText("Event source: none")).toBeInTheDocument();
   });
 
   it("keeps footer fallback ordering explicit when neither run-local nor snapshot footer context exists", async () => {
