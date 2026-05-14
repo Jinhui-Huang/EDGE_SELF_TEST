@@ -269,6 +269,7 @@ export function MonitorScreen({
   const queueLead = snapshot.workQueue[0];
   const snapshotLastEvent = snapshot.timeline[0];
   const queuePressureText = runStatus?.queueState || queueLead?.detail || "--";
+  const queueStateSourceText = describeQueueStateSource(resolveQueueStateSource(runStatus, queueLead?.detail), t);
   const lastEventText = runStatus?.lastEventSummary || snapshotLastEvent?.detail || snapshotLastEvent?.title || "--";
   const lastEventTimeText = runStatus?.lastEventAt ? formatTimestamp(runStatus.lastEventAt) : "";
   const lastEventSourceText = describeLastEventSource(resolveLastEventSource(runStatus), t);
@@ -679,6 +680,7 @@ export function MonitorScreen({
         <div className="monitorFooterItem">
           <span>{t(copy("Queue pressure", "队列压力", "キュー圧力"))}</span>
           <strong>{queuePressureText}</strong>
+          <span className="monitorMono muted">{queueStateSourceText}</span>
         </div>
         <div className="monitorFooterItem">
           <span>{t(copy("Last event", "最后事件", "最新イベント"))}</span>
@@ -787,6 +789,35 @@ function resolveLastEventSource(
     return "ARTIFACT";
   }
   return "SCHEDULER";
+}
+
+function resolveQueueStateSource(
+  runStatus: RunStatus | null,
+  snapshotQueueDetail?: string
+): "REQUEST_CONTEXT" | "SNAPSHOT_FALLBACK" | "NONE" {
+  if (runStatus?.queueStateSource === "REQUEST_CONTEXT"
+    || runStatus?.queueStateSource === "SNAPSHOT_FALLBACK"
+    || runStatus?.queueStateSource === "NONE") {
+    return runStatus.queueStateSource;
+  }
+  if (runStatus?.queueState) {
+    return "REQUEST_CONTEXT";
+  }
+  return snapshotQueueDetail ? "SNAPSHOT_FALLBACK" : "NONE";
+}
+
+function describeQueueStateSource(
+  source: "REQUEST_CONTEXT" | "SNAPSHOT_FALLBACK" | "NONE",
+  t: (copySet: Copy) => string
+): string {
+  switch (source) {
+    case "REQUEST_CONTEXT":
+      return t(copy("Queue source: request context", "队列来源：请求上下文", "キューソース: request context"));
+    case "SNAPSHOT_FALLBACK":
+      return t(copy("Queue source: snapshot fallback", "队列来源：快照兜底", "キューソース: snapshot fallback"));
+    default:
+      return t(copy("Queue source: none", "队列来源：无", "キューソース: none"));
+  }
 }
 
 function describeLastEventSource(

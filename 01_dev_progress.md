@@ -5190,6 +5190,47 @@ Remaining limits:
 - `lastEventSource` is still only a coarse top-level provenance hint; it does not model per-entry provenance or richer event metadata
 - legacy payload inference remains intentionally minimal and only exists to preserve compatibility while older status payloads omit the marker
 
+## 2026-05-14 P3-4 monitor queue-pressure provenance hint
+
+## Completed
+- Updated backend `RunStatusService.java`:
+  - `GET /api/phase3/runs/{runId}/status` now emits additive top-level `queueStateSource`
+  - backend values stay minimal:
+    - `REQUEST_CONTEXT`
+    - `NONE`
+  - when persisted request context provides `queueState`, `/status` marks it as `REQUEST_CONTEXT`
+  - when run-local status has no queue context, the backend stays conservative with `NONE` and does not pretend to own snapshot fallback semantics
+- Updated front-end monitor typing/rendering:
+  - `RunStatus` now accepts optional `queueStateSource`
+  - `MonitorScreen` footer `Queue pressure` now shows a lightweight provenance hint
+  - if older payloads omit the marker, the footer still keeps a minimal compatibility inference path and preserves the existing snapshot fallback
+- Expanded regression coverage:
+  - `LocalAdminApiServerTest` now asserts request-context and none `queueStateSource` values
+  - `MonitorScreen.test.tsx` now covers:
+    - explicit queue source hint rendering
+    - legacy missing-marker compatibility
+    - snapshot-fallback source hint rendering
+
+## Modified Files
+- `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/RunStatusService.java`
+- `apps/local-admin-api/src/test/java/com/example/webtest/admin/http/LocalAdminApiServerTest.java`
+- `ui/admin-console/src/types.ts`
+- `ui/admin-console/src/screens/MonitorScreen.tsx`
+- `ui/admin-console/src/screens/MonitorScreen.test.tsx`
+- `docs/phase3/interface/monitor/interface-spec.md`
+- `docs/phase3/interface/monitor/functional-spec.md`
+- `memory.txt`
+- `01_dev_progress.md`
+
+## Verification
+- Ran:
+  - `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+  - `npm test -- --run src/screens/MonitorScreen.test.tsx`
+
+## Remaining Limits
+- `queueStateSource` is still only a coarse provenance hint and does not model deeper queue ownership or richer scheduling context
+- frontend legacy inference is intentionally split between run-local `REQUEST_CONTEXT` and parent `SNAPSHOT_FALLBACK`; the backend itself still only emits run-local semantics
+
 ## 2026-05-08 P3-4 monitor scheduler-context fallback follow-up
 
 ## Task

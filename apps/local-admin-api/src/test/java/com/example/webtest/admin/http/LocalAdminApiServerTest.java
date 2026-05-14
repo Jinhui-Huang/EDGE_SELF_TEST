@@ -1209,6 +1209,7 @@ class LocalAdminApiServerTest {
             assertTrue(artifactBacked.body().contains("\"assertionsTotal\":2"));
             assertTrue(artifactBacked.body().contains("\"aiCalls\":2"));
             assertTrue(artifactBacked.body().contains("\"heals\":1"));
+            assertTrue(artifactBacked.body().contains("\"queueStateSource\":\"NONE\""));
             assertTrue(artifactBacked.body().contains("\"lastEventSummary\":\"Report artifact recorded status FAILED.\""));
             assertTrue(artifactBacked.body().contains("\"lastEventAt\":\"2026-05-07T09:04:12Z\""));
             assertTrue(artifactBacked.body().contains("\"lastEventSource\":\"ARTIFACT\""));
@@ -1226,6 +1227,7 @@ class LocalAdminApiServerTest {
             assertTrue(fallbackBacked.body().contains("\"estimatedTotalMs\":0"));
             assertTrue(fallbackBacked.body().contains("\"url\":\"https://fallback.example/checkout/payment\""));
             assertTrue(fallbackBacked.body().contains("\"queueState\":\"queued\""));
+            assertTrue(fallbackBacked.body().contains("\"queueStateSource\":\"REQUEST_CONTEXT\""));
             assertTrue(fallbackBacked.body().contains("\"lastEventSummary\":\"fallback still uses scheduler context\""));
             assertTrue(fallbackBacked.body().contains("\"lastEventAt\":\"2026-05-07T09:06:01Z\""));
             assertTrue(fallbackBacked.body().contains("\"lastEventSource\":\"SCHEDULER\""));
@@ -1237,6 +1239,7 @@ class LocalAdminApiServerTest {
             assertTrue(!fallbackBacked.body().contains("\"totalSteps\":8"));
 
             assertEquals(200, missingBacked.statusCode());
+            assertTrue(missingBacked.body().contains("\"queueStateSource\":\"NONE\""));
             assertTrue(missingBacked.body().contains("\"lastEventSource\":\"NONE\""));
             assertTrue(!missingBacked.body().contains("\"lastEventSummary\""));
             assertTrue(!missingBacked.body().contains("\"lastEventAt\""));

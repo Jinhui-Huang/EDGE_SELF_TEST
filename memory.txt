@@ -2965,3 +2965,25 @@
   - Verification:
     - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
     - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`
+- 2026-05-14: Added the same lightweight provenance treatment to monitor footer `Queue pressure`.
+  - Backend:
+    - `GET /api/phase3/runs/{runId}/status` now also includes additive `queueStateSource`
+    - the backend values stay minimal:
+      - `REQUEST_CONTEXT`
+      - `NONE`
+    - when persisted scheduler request context provides `queueState`, `/status` marks it as `REQUEST_CONTEXT`
+    - when run-local status does not provide queue context, the backend stays conservative with `NONE` and does not invent snapshot-owned semantics
+  - Frontend:
+    - `RunStatus` now accepts optional `queueStateSource`
+    - monitor footer `Queue pressure` now shows a lightweight source hint beside the queue text
+    - when older status payloads omit the marker, `MonitorScreen` keeps compatibility by inferring:
+      - `REQUEST_CONTEXT` from run-local `queueState`
+      - `SNAPSHOT_FALLBACK` from the existing parent snapshot footer fallback
+      - `NONE` only when neither source exists
+  - Tests/docs:
+    - `LocalAdminApiServerTest` now asserts request-context and none `queueStateSource` branches
+    - `MonitorScreen.test.tsx` now covers explicit source hints plus legacy missing-marker compatibility
+    - synced `monitor/interface-spec.md` and `monitor/functional-spec.md`
+  - Verification:
+    - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+    - ran `npm test -- --run src/screens/MonitorScreen.test.tsx`

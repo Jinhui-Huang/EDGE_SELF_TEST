@@ -275,6 +275,7 @@ export type RunStatus = {
   model: string;
   owner: string;
   queueState?: string;
+  queueStateSource?: "REQUEST_CONTEXT" | "SNAPSHOT_FALLBACK" | "NONE";
   lastEventSummary?: string;
   lastEventAt?: string;
   lastEventSource?: "ARTIFACT" | "SCHEDULER" | "NONE";

@@ -237,6 +237,12 @@ Response body:
 
 `queueState` is additive and optional. When present, `MonitorScreen` should prefer it for small queue-context footer copy; when absent, the screen may still fall back to the older parent `snapshot.workQueue[0].detail`.
 
+`queueStateSource` is additive and optional. When present, `MonitorScreen` should show a lightweight provenance hint beside the footer `Queue pressure` text. The current values are:
+
+- `REQUEST_CONTEXT`
+- `SNAPSHOT_FALLBACK`
+- `NONE`
+
 `lastEventSummary` is also additive and optional. When present, `MonitorScreen` should prefer it for the footer `Last event` text; when absent, the screen may still fall back to the older parent `snapshot.timeline[0]` copy.
 
 `lastEventSource` is additive and optional. When present, `MonitorScreen` should show a lightweight provenance hint beside the footer `Last event` text. The current values are:

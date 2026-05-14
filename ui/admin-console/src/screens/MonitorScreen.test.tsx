@@ -239,7 +239,8 @@ describe("MonitorScreen", () => {
     vi.stubGlobal("fetch", createFetchMock({
       status: {
         ...runStatusResponse,
-        queueState: "2 queued / 1 active / 1 waiting"
+        queueState: "2 queued / 1 active / 1 waiting",
+        queueStateSource: "REQUEST_CONTEXT"
       }
     }));
 
@@ -254,7 +255,31 @@ describe("MonitorScreen", () => {
     );
 
     expect(await screen.findByText("2 queued / 1 active / 1 waiting")).toBeInTheDocument();
+    expect(screen.getByText("Queue source: request context")).toBeInTheDocument();
     expect(screen.queryByText("1 active / 1 waiting")).not.toBeInTheDocument();
+  });
+
+  it("keeps the queue source hint when legacy status payloads omit the marker", async () => {
+    vi.stubGlobal("fetch", createFetchMock({
+      status: {
+        ...runStatusResponse,
+        queueState: "legacy queue state without marker",
+        queueStateSource: undefined
+      }
+    }));
+
+    render(
+      <MonitorScreen
+        snapshot={snapshot}
+        title="Execution monitor"
+        locale="en"
+        selectedRunId="checkout-web-smoke"
+        apiBaseUrl="http://127.0.0.1:8787"
+      />
+    );
+
+    expect(await screen.findByText("legacy queue state without marker")).toBeInTheDocument();
+    expect(screen.getByText("Queue source: request context")).toBeInTheDocument();
   });
 
   it("falls back to the parent snapshot footer detail when queue state is absent", async () => {
@@ -271,6 +296,7 @@ describe("MonitorScreen", () => {
     );
 
     expect(await screen.findByText("1 active / 1 waiting")).toBeInTheDocument();
+    expect(screen.getByText("Queue source: snapshot fallback")).toBeInTheDocument();
   });
 
   it("prefers run-local last event summary and time over the parent snapshot timeline detail", async () => {
