@@ -3245,3 +3245,15 @@
     - synced `plugin/functional-spec.md`
   - Verification:
     - ran `npm test -- --run src/App.test.tsx -t "plugin popup"`
+- 2026-05-15: Continued `P3-4 plugin` with one quick-smoke helper-copy cleanup.
+  - Frontend:
+    - the `Quick smoke test` row now prefers real popup page-path context
+    - when `page.url` is present, its helper copy becomes `Run on /...`
+    - when popup URL context is absent, it still falls back to the fixed `Run on current URL` demo text
+  - Tests/docs:
+    - `App.test.tsx` now asserts:
+      - real popup page context overrides the fixed quick-smoke helper copy
+      - missing popup URL context still falls back to the demo helper text
+    - synced `plugin/functional-spec.md`
+  - Verification:
+    - ran `npm test -- --run src/App.test.tsx -t "plugin popup"`

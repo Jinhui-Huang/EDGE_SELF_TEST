@@ -7483,6 +7483,35 @@ Remaining limits:
 - `candidate review` is still a compact mirror, not a full plugin-side recommendation workflow with richer confidence/risk narration
 - wider plugin popup copy still keeps some demo-oriented language outside the chosen slice
 
+## 2026-05-15 P3-4 plugin quick-smoke helper copy
+
+## Task
+- Keep the current `P3-4 plugin` thread narrow:
+  - tighten one obviously demo-looking section helper copy
+  - prefer existing popup page context
+  - leave the fixed quick-smoke helper text as fallback
+
+## Completed
+- Updated `PluginPopupScreen.tsx`:
+  - the `Quick smoke test` helper copy now prefers the current popup page path
+  - when `page.url` is present, the row renders `Run on /...`
+  - when popup URL context is absent, it still falls back to `Run on current URL`
+- Synced `plugin/functional-spec.md`, `memory.txt`
+
+## Modified Files
+- `ui/admin-console/src/screens/PluginPopupScreen.tsx`
+- `ui/admin-console/src/App.test.tsx`
+- `docs/phase3/interface/plugin/functional-spec.md`
+- `memory.txt`
+- `01_dev_progress.md`
+
+## Verification
+- Ran `npm test -- --run src/App.test.tsx -t "plugin popup"`
+
+## Remaining Limits
+- this slice only tightens one quick-smoke helper line; it does not extend the popup into a fuller plugin-side smoke-test workflow
+- broader popup copy still keeps some demo-oriented language outside the chosen slice
+
 ## 2026-05-07 P3-3 dataDiff restore-result doc example alignment follow-up
 
 ## Task
