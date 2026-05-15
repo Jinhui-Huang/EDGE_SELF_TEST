@@ -90,6 +90,10 @@ export function PluginPopupScreen({ apiBaseUrl, title, locale }: PluginPopupScre
   const selectedElementMeta = page?.locator?.trim()
     ? `locator: ${page.locator.trim()}`
     : "role=button / 140x38px / visible";
+  const pickModeBadge = popupSnapshot?.status?.trim().toLowerCase() || "active";
+  const pickModeSummary = page?.locator?.trim()
+    ? `Locator ready for review: ${page.locator.trim()}`
+    : t({ en: "Hover to highlight / click to select", zh: "悬停高亮 / 单击选中", ja: "ホバーでハイライト / クリックで選択" });
   const normalizedLocatorCandidates = page?.locatorCandidates
     ?.filter((candidate) => candidate.value.trim().length > 0)
     .map((candidate) => ({
@@ -212,9 +216,9 @@ export function PluginPopupScreen({ apiBaseUrl, title, locale }: PluginPopupScre
         <div className="pluginPickerHeader">
           <div>
             <strong>{t({ en: "Pick mode", zh: "拾取模式", ja: "ピックモード" })}</strong>
-            <p>{t({ en: "Hover to highlight / click to select", zh: "悬停高亮 / 单击选中", ja: "ホバーでハイライト / クリックで選択" })}</p>
+            <p>{pickModeSummary}</p>
           </div>
-          <span className="pluginBadge active dot">active</span>
+          <span className="pluginBadge active dot">{pickModeBadge}</span>
         </div>
 
         <div className="pluginPickerBody">

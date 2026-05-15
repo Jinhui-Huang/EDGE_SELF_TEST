@@ -3174,3 +3174,17 @@
   - Verification:
     - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
     - ran `npm test -- --run src/App.test.tsx -t "plugin popup"`
+- 2026-05-15: Continued `P3-4 plugin` with one more pick-mode header/state cleanup.
+  - Frontend:
+    - the popup mirror pick-mode header no longer stays on the fixed `active` badge plus hover/click copy when real locator context exists
+    - it now prefers:
+      - `popupSnapshot.status` for the pick-mode badge
+      - `page.locator` for the pick-mode summary line
+    - the old `Hover to highlight / click to select` plus `active` badge remain as the legacy fallback when locator/status context is absent
+  - Tests/docs:
+    - `App.test.tsx` now asserts:
+      - real popup locator context shows `Locator ready for review: ...`
+      - missing locator context still falls back to the old hover/click instruction and `active`
+    - synced `plugin/functional-spec.md`
+  - Verification:
+    - ran `npm test -- --run src/App.test.tsx -t "plugin popup"`

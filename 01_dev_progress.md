@@ -7311,6 +7311,35 @@ Remaining limits:
 - `pick-mode` header / state copy is still mostly demo UI text
 - candidate rows now prefer persisted popup context, but the screen still does not model a full plugin-side locator review workflow
 
+## 2026-05-15 P3-4 plugin pick-mode header realism
+
+## Task
+- Keep the current `P3-4 plugin` thread narrow:
+  - tighten one obviously demo-looking pick-mode header/state copy
+  - prefer existing popup snapshot context
+  - leave old copy as legacy fallback
+
+## Completed
+- Updated `PluginPopupScreen.tsx`:
+  - pick-mode badge now prefers `popupSnapshot.status`
+  - pick-mode summary now prefers `page.locator`
+  - old hover/click instruction plus `active` badge remain only as legacy fallback
+- Synced `plugin/functional-spec.md`, `memory.txt`
+
+## Modified Files
+- `ui/admin-console/src/screens/PluginPopupScreen.tsx`
+- `ui/admin-console/src/App.test.tsx`
+- `docs/phase3/interface/plugin/functional-spec.md`
+- `memory.txt`
+- `01_dev_progress.md`
+
+## Verification
+- Ran `npm test -- --run src/App.test.tsx -t "plugin popup"`
+
+## Remaining Limits
+- `pick-mode` candidate review area is still a simplified mirror, not a full plugin-side pick workflow
+- quick-action copy and wider popup affordances still retain some demo-oriented language
+
 ## 2026-05-07 P3-3 dataDiff restore-result doc example alignment follow-up
 
 ## Task
