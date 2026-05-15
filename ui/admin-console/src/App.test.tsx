@@ -2969,6 +2969,8 @@ describe("App", () => {
     expect(screen.queryByText("3 forms / 8 buttons")).not.toBeInTheDocument();
     expect(screen.getAllByText("staging.example.test").length).toBeGreaterThan(0);
     expect(screen.getAllByText("edge.test")).toHaveLength(1);
+    expect(screen.getByText("Use the platform UI for configuration and report review.")).toBeInTheDocument();
+    expect(screen.queryByText("Full report and logs")).not.toBeInTheDocument();
     expect(await screen.findByText("Pay now")).toBeInTheDocument();
     expect(screen.getByText("locator: #pay-submit")).toBeInTheDocument();
     expect(screen.getByText("Locator ready for review: #pay-submit")).toBeInTheDocument();
@@ -3027,6 +3029,7 @@ describe("App", () => {
     expect(screen.getByText("idle")).toBeInTheDocument();
     expect(screen.getAllByText("Pay $89.10").length).toBeGreaterThan(0);
     expect(screen.getByText("role=button / 140x38px / visible")).toBeInTheDocument();
+    expect(screen.getByText("Full report and logs")).toBeInTheDocument();
     expect(screen.getByText("button:has-text('Pay')")).toBeInTheDocument();
     expect(screen.getByText("Preferred text locator for quick review.")).toBeInTheDocument();
     expect(screen.getByText("Hover to highlight / click to select")).toBeInTheDocument();

@@ -107,6 +107,8 @@ export function PluginPopupScreen({ apiBaseUrl, title, locale }: PluginPopupScre
   const candidateLocators = normalizedLocatorCandidates?.length
     ? normalizedLocatorCandidates
     : fallbackCandidateLocators;
+  const openInPlatformSub = popupSnapshot?.hints?.find((hint) => hint.trim().length > 0)?.trim()
+    || quickActions[3].sub.en;
   const isRunning = queueState.toLowerCase().includes("active") || queueState.toLowerCase().includes("running");
 
   return (
@@ -202,7 +204,7 @@ export function PluginPopupScreen({ apiBaseUrl, title, locale }: PluginPopupScre
                     <div className={`pluginQuickIcon ${action.tone}`}>{action.icon}</div>
                     <div className="pluginQuickText">
                       <strong>{t(action.title)}</strong>
-                      <p>{t(action.sub)}</p>
+                      <p>{action.title.en === "Open in platform" ? openInPlatformSub : t(action.sub)}</p>
                     </div>
                     <span className="pluginQuickArrow">{">"}</span>
                   </div>

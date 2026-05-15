@@ -7340,6 +7340,34 @@ Remaining limits:
 - `pick-mode` candidate review area is still a simplified mirror, not a full plugin-side pick workflow
 - quick-action copy and wider popup affordances still retain some demo-oriented language
 
+## 2026-05-15 P3-4 plugin quick-action subtitle realism
+
+## Task
+- Keep the current `P3-4 plugin` thread narrow:
+  - tighten one obviously demo-looking quick-action subtitle
+  - prefer existing popup snapshot context
+  - keep the old copy as legacy fallback
+
+## Completed
+- Updated `PluginPopupScreen.tsx`:
+  - the `Open in platform` quick-action subtitle now prefers `popupSnapshot.hints[0]`
+  - the old `Full report and logs` subtitle remains only as fallback when popup hints are absent
+- Synced `plugin/functional-spec.md`, `memory.txt`
+
+## Modified Files
+- `ui/admin-console/src/screens/PluginPopupScreen.tsx`
+- `ui/admin-console/src/App.test.tsx`
+- `docs/phase3/interface/plugin/functional-spec.md`
+- `memory.txt`
+- `01_dev_progress.md`
+
+## Verification
+- Ran `npm test -- --run src/App.test.tsx -t "plugin popup"`
+
+## Remaining Limits
+- quick-action behavior is still mostly a compact mirror, not a full plugin-side action workflow with richer per-action state
+- other quick-action copy outside the selected subtitle still retains some demo-oriented language
+
 ## 2026-05-15 P3-4 plugin candidate-review reason copy
 
 ## Task
