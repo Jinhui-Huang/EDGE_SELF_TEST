@@ -3292,3 +3292,14 @@
     - synced `plugin/functional-spec.md`
   - Verification:
     - ran `npm test -- --run src/App.test.tsx -t "plugin popup"`
+- 2026-05-15: Continued `P3-4 plugin` with one candidate-status realism cleanup.
+  - Frontend:
+    - low-score real popup locator candidates now surface a `fragile` badge
+    - legacy/demo fallback candidates still keep the old fragile marker behavior
+  - Tests/docs:
+    - `App.test.tsx` now asserts:
+      - real low-score candidates render `fragile`
+      - legacy/demo fallback list still shows its fragile row
+    - synced `plugin/functional-spec.md`
+  - Verification:
+    - ran `npm test -- --run src/App.test.tsx -t "plugin popup"`

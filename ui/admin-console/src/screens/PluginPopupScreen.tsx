@@ -104,7 +104,7 @@ export function PluginPopupScreen({ apiBaseUrl, title, locale }: PluginPopupScre
       score: formatLocatorScore(candidate.score),
       type: candidate.type?.trim() || "locator",
       recommended: candidate.recommended ?? false,
-      fragile: false,
+      fragile: isFragileLocatorScore(candidate.score),
       reason: candidate.reason?.trim() || ""
     }));
   const usesRunLocalCandidateLocators = Boolean(normalizedLocatorCandidates?.length);
@@ -315,4 +315,15 @@ function formatLocatorScore(score: number | string | null | undefined) {
     return score.trim();
   }
   return "--";
+}
+
+function isFragileLocatorScore(score: number | string | null | undefined) {
+  if (typeof score === "number" && Number.isFinite(score)) {
+    return score < 0.5;
+  }
+  if (typeof score === "string" && score.trim().length > 0) {
+    const parsed = Number.parseFloat(score.trim());
+    return Number.isFinite(parsed) && parsed < 0.5;
+  }
+  return false;
 }

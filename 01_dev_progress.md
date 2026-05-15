@@ -7598,6 +7598,34 @@ Remaining limits:
 - this slice only tightens one quick-action helper line; it does not extend the popup into a fuller plugin-side page-summary workflow
 - broader popup copy still keeps some demo-oriented language outside the chosen slice
 
+## 2026-05-15 P3-4 plugin candidate fragile badge
+
+## Task
+- Keep the current `P3-4 plugin` thread narrow:
+  - tighten one obviously demo-looking candidate status label
+  - prefer existing popup locator-candidate context
+  - keep the older fragile marker behavior for legacy/demo rows
+
+## Completed
+- Updated `PluginPopupScreen.tsx`:
+  - low-score real popup locator candidates now surface a `fragile` badge
+  - legacy/demo fallback rows keep their existing fragile marker behavior
+- Synced `plugin/functional-spec.md`, `memory.txt`
+
+## Modified Files
+- `ui/admin-console/src/screens/PluginPopupScreen.tsx`
+- `ui/admin-console/src/App.test.tsx`
+- `docs/phase3/interface/plugin/functional-spec.md`
+- `memory.txt`
+- `01_dev_progress.md`
+
+## Verification
+- Ran `npm test -- --run src/App.test.tsx -t "plugin popup"`
+
+## Remaining Limits
+- this slice only tightens one candidate-status badge; it does not extend the popup into a fuller plugin-side locator-risk workflow
+- broader popup copy still keeps some demo-oriented language outside the chosen slice
+
 ## 2026-05-07 P3-3 dataDiff restore-result doc example alignment follow-up
 
 ## Task

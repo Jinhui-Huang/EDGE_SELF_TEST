@@ -3044,6 +3044,7 @@ describe("App", () => {
     expect(screen.getByText("Run on current URL")).toBeInTheDocument();
     expect(screen.getByText("button:has-text('Pay')")).toBeInTheDocument();
     expect(screen.getByText("recommended")).toBeInTheDocument();
+    expect(screen.getByText("fragile")).toBeInTheDocument();
     expect(screen.getByText("Review candidate strength before copying to DSL.")).toBeInTheDocument();
     expect(screen.getByText("Preferred text locator for quick review.")).toBeInTheDocument();
     expect(screen.getByText("Hover to highlight / click to select")).toBeInTheDocument();
@@ -3141,6 +3142,53 @@ describe("App", () => {
     expect(await screen.findByText("Top candidate: #pay-submit")).toBeInTheDocument();
     expect(screen.getAllByText("top match")).toHaveLength(1);
     expect(screen.getAllByText("recommended")).toHaveLength(1);
+  });
+
+  it("marks low-score run-local locator candidates as fragile", async () => {
+    const popupSnapshot = {
+      generatedAt: "2026-04-20T04:00:00Z",
+      status: "READY",
+      summary: "Phase 3 popup assistive snapshot",
+      page: {
+        title: "Checkout - Payment",
+        url: "https://staging.example.test/checkout/payment",
+        domain: "staging.example.test",
+        lastUpdatedAt: "2026-04-20T04:00:00Z",
+        locator: "#pay-submit",
+        actionHints: ["Pay now"],
+        locatorCandidates: [
+          { type: "id", value: "#pay-submit", score: 0.98, recommended: true, reason: "Preferred for DSL handoff." },
+          { type: "css", value: "form > div:nth-child(3) > button", score: 0.42, reason: "Structural fallback for manual review." }
+        ]
+      },
+      runtime: {
+        mode: "Audit-first",
+        queueState: "RUNNING",
+        auditState: "ATTENTION",
+        nextAction: "Review latest run"
+      },
+      hints: []
+    };
+
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
+      if (url.endsWith("/api/phase3/extension-popup")) return jsonResponse(popupSnapshot);
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+    await screen.findByText("Needs attention");
+
+    const allButtons = screen.getAllByRole("button");
+    const pluginNavButton = allButtons.find((btn) => btn.textContent?.includes("Plugin popup"));
+    expect(pluginNavButton).toBeTruthy();
+    await userEvent.click(pluginNavButton!);
+
+    expect(await screen.findByText("form > div:nth-child(3) > button")).toBeInTheDocument();
+    expect(screen.getByText("Structural fallback for manual review.")).toBeInTheDocument();
+    expect(screen.getByText("fragile")).toBeInTheDocument();
   });
 
   it("prefers runtime audit state over the fixed active-run empty copy when nextAction is missing", async () => {
