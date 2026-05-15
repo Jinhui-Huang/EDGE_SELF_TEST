@@ -82,7 +82,8 @@ export function PluginPopupScreen({ apiBaseUrl, title, locale }: PluginPopupScre
   const pagePath = page?.url ? new URL(page.url).pathname : "/checkout/payment";
   const pageDomain = page?.domain ?? "staging.example.test";
   const popupHostLabel = page?.domain?.trim() || "edge.test";
-  const pageStatus = popupSnapshot?.status?.trim().toLowerCase() || "recognized";
+  const pageStatus = popupSnapshot?.status?.trim().toLowerCase()
+    || ((page?.title?.trim() || page?.url?.trim() || popupSnapshot?.summary?.trim()) ? "ready" : "recognized");
   const pageAssistiveSummary = popupSnapshot?.summary?.trim() || "3 forms / 8 buttons";
   const queueState = runtime?.queueState ?? "Idle";
   const runtimeQueueBadge = runtime?.queueState?.trim().toLowerCase() || "idle";
