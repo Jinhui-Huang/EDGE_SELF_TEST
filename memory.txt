@@ -3257,3 +3257,15 @@
     - synced `plugin/functional-spec.md`
   - Verification:
     - ran `npm test -- --run src/App.test.tsx -t "plugin popup"`
+- 2026-05-15: Continued `P3-4 plugin` with one popup-header status-label cleanup.
+  - Frontend:
+    - the small host-status label in the popup header now prefers real runtime queue context
+    - when `runtime.queueState` is present, the header renders `host connected / running`-style copy
+    - when runtime queue context is absent, it still falls back to the old environment-style label
+  - Tests/docs:
+    - `App.test.tsx` now asserts:
+      - real popup runtime queue state overrides the old header suffix
+      - missing runtime queue context still falls back to `staging`
+    - synced `plugin/functional-spec.md`
+  - Verification:
+    - ran `npm test -- --run src/App.test.tsx -t "plugin popup"`

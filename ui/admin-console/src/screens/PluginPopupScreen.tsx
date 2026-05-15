@@ -122,6 +122,9 @@ export function PluginPopupScreen({ apiBaseUrl, title, locale }: PluginPopupScre
   const quickSmokeTestSub = page?.url?.trim()
     ? `Run on ${pagePath}`
     : quickActions[2].sub.en;
+  const popupHeaderContextLabel = runtime?.queueState?.trim().toLowerCase()
+    || pageDomain.split(".")[0]
+    || "staging";
   const isRunning = queueState.toLowerCase().includes("active") || queueState.toLowerCase().includes("running");
 
   return (
@@ -169,7 +172,7 @@ export function PluginPopupScreen({ apiBaseUrl, title, locale }: PluginPopupScre
                         ? t({ en: "host unreachable", zh: "主机不可达", ja: "ホスト接続不可" })
                         : t({ en: "host connected", zh: "主机已连接", ja: "ホスト接続済み" })}
                   </span>{" "}
-                  / {pageDomain.split(".")[0] || "staging"}
+                  / {popupHeaderContextLabel}
                 </p>
               </div>
             </div>

@@ -7512,6 +7512,35 @@ Remaining limits:
 - this slice only tightens one quick-smoke helper line; it does not extend the popup into a fuller plugin-side smoke-test workflow
 - broader popup copy still keeps some demo-oriented language outside the chosen slice
 
+## 2026-05-15 P3-4 plugin popup-header status label
+
+## Task
+- Keep the current `P3-4 plugin` thread narrow:
+  - tighten one obviously demo-looking popup header status/helper copy
+  - prefer existing popup runtime context
+  - leave the older environment-style suffix as fallback
+
+## Completed
+- Updated `PluginPopupScreen.tsx`:
+  - the small popup-header status suffix now prefers `runtime.queueState`
+  - when queue context is present, it renders `host connected / running`-style copy
+  - when queue context is absent, it still falls back to the older environment-style label
+- Synced `plugin/functional-spec.md`, `memory.txt`
+
+## Modified Files
+- `ui/admin-console/src/screens/PluginPopupScreen.tsx`
+- `ui/admin-console/src/App.test.tsx`
+- `docs/phase3/interface/plugin/functional-spec.md`
+- `memory.txt`
+- `01_dev_progress.md`
+
+## Verification
+- Ran `npm test -- --run src/App.test.tsx -t "plugin popup"`
+
+## Remaining Limits
+- this slice only tightens one small popup-header status suffix; it does not extend the popup into a fuller plugin-side state model
+- broader popup copy still keeps some demo-oriented language outside the chosen slice
+
 ## 2026-05-07 P3-3 dataDiff restore-result doc example alignment follow-up
 
 ## Task

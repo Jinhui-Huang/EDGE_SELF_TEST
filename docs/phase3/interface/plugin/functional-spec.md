@@ -417,6 +417,7 @@ The `plugin` screen is not currently responsible for:
 - `Open in platform` and `Use in DSL` now carry richer popup/native-host/tab/content-script context through `PLATFORM_HANDOFF_PREPARE`, and `App.tsx` consumes that context into `execution` / `aiGenerate` without adding a new route system.
 - `Quick smoke test` now reuses that same caller-context-first pattern so the persisted scheduler request keeps richer page/runtime/DOM startup context, while still staying on the existing scheduler request protocol.
 - In the popup mirror, the `Quick smoke test` helper copy now prefers the current popup page path (`Run on /...`) and only falls back to the fixed `Run on current URL` demo text when popup page URL context is absent.
+- In the popup mirror header, the small host-status context label now prefers real `runtime.queueState` (`host connected / running`, etc.) and only falls back to the old environment-style label when runtime queue context is absent.
 - Real pick mode stays fully inside the extension boundary:
   - popup triggers
   - background bridges
