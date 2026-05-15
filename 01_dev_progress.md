@@ -7713,6 +7713,35 @@ Remaining limits:
 - this slice only tightens one current-page status fallback; it does not extend the popup into a fuller plugin-side page-state workflow
 - broader popup copy still keeps some demo-oriented language outside the chosen slice
 
+## 2026-05-15 P3-4 plugin active-run queue badge fallback
+
+## Task
+- Keep the current `P3-4 plugin` thread narrow:
+  - tighten one obviously demo-looking active-run badge fallback
+  - prefer existing popup runtime context
+  - keep the older `idle` label only as the last fallback
+
+## Completed
+- Updated `PluginPopupScreen.tsx`:
+  - the active-run queue badge now prefers `runtime.queueState`
+  - when queue state is missing but `runtime.auditState` exists, it falls back to that status text
+  - only when both are absent does it keep the fixed `idle` label
+- Synced `plugin/functional-spec.md`, `memory.txt`
+
+## Modified Files
+- `ui/admin-console/src/screens/PluginPopupScreen.tsx`
+- `ui/admin-console/src/App.test.tsx`
+- `docs/phase3/interface/plugin/functional-spec.md`
+- `memory.txt`
+- `01_dev_progress.md`
+
+## Verification
+- Ran `npm test -- --run src/App.test.tsx -t "plugin popup"`
+
+## Remaining Limits
+- this slice only tightens one active-run badge fallback; it does not extend the popup into a fuller plugin-side runtime state workflow
+- broader popup copy still keeps some demo-oriented language outside the chosen slice
+
 ## 2026-05-07 P3-3 dataDiff restore-result doc example alignment follow-up
 
 ## Task

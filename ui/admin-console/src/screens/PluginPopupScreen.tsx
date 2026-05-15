@@ -86,7 +86,9 @@ export function PluginPopupScreen({ apiBaseUrl, title, locale }: PluginPopupScre
     || ((page?.title?.trim() || page?.url?.trim() || popupSnapshot?.summary?.trim()) ? "ready" : "recognized");
   const pageAssistiveSummary = popupSnapshot?.summary?.trim() || "3 forms / 8 buttons";
   const queueState = runtime?.queueState ?? "Idle";
-  const runtimeQueueBadge = runtime?.queueState?.trim().toLowerCase() || "idle";
+  const runtimeQueueBadge = runtime?.queueState?.trim().toLowerCase()
+    || runtime?.auditState?.trim().toLowerCase()
+    || "idle";
   const activeRunHeadline = runtime?.nextAction?.trim() || runtime?.auditState?.trim()
     || t({ en: "No active run", zh: "无活跃运行", ja: "実行なし" });
   const activeRunDetail = runtime?.nextAction?.trim() ? (runtime?.auditState ?? "") : (runtime?.queueState?.trim() || "");

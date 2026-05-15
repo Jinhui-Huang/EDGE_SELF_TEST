@@ -3337,3 +3337,15 @@
     - synced `plugin/functional-spec.md`
   - Verification:
     - ran `npm test -- --run src/App.test.tsx -t "plugin popup"`
+- 2026-05-15: Continued `P3-4 plugin` with one active-run badge fallback cleanup.
+  - Frontend:
+    - the active-run queue badge now prefers explicit `runtime.queueState`
+    - when queue state is missing but `runtime.auditState` exists, it falls back to that status text
+    - only when both are absent does it keep the fixed `idle` fallback
+  - Tests/docs:
+    - `App.test.tsx` now asserts:
+      - missing queue state still renders `ready` when audit state exists
+      - missing queue state plus missing audit state still renders `idle`
+    - synced `plugin/functional-spec.md`
+  - Verification:
+    - ran `npm test -- --run src/App.test.tsx -t "plugin popup"`

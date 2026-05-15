@@ -424,6 +424,7 @@ The `plugin` screen is not currently responsible for:
 - In the popup mirror pick-mode header, the badge now prefers explicit popup `status`, then falls back to locator-ready context (`ready`) when `page.locator` is present, and only then to the older fixed `active` label.
 - In the popup mirror quick-action area, the `Pick element` helper copy now prefers the current popup locator (`Inspect locator ...`) and only falls back to the older hover/capture demo copy when locator context is absent.
 - In the popup mirror current-page card, the status badge now prefers explicit popup `status`, then falls back to `ready` when page context already exists, and only then to the older fixed `recognized` label.
+- In the popup mirror active-run card, the queue badge now prefers explicit `runtime.queueState`, then falls back to `runtime.auditState`, and only then to the older fixed `idle` label.
 - Real pick mode stays fully inside the extension boundary:
   - popup triggers
   - background bridges
