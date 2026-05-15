@@ -3191,6 +3191,50 @@ describe("App", () => {
     expect(screen.getByText("fragile")).toBeInTheDocument();
   });
 
+  it("prefers locator-ready pick-mode badge over the fixed active fallback when popup status is missing", async () => {
+    const popupSnapshot = {
+      generatedAt: "2026-04-20T04:00:00Z",
+      status: "",
+      summary: "Phase 3 popup assistive snapshot",
+      page: {
+        title: "Checkout - Payment",
+        url: "https://staging.example.test/checkout/payment",
+        domain: "staging.example.test",
+        lastUpdatedAt: "2026-04-20T04:00:00Z",
+        locator: "#pay-submit",
+        actionHints: ["Pay now"],
+        locatorCandidates: []
+      },
+      runtime: {
+        mode: "Audit-first",
+        queueState: "RUNNING",
+        auditState: "ATTENTION",
+        nextAction: "Review latest run"
+      },
+      hints: []
+    };
+
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
+      if (url.endsWith("/api/phase3/extension-popup")) return jsonResponse(popupSnapshot);
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+    await screen.findByText("Needs attention");
+
+    const allButtons = screen.getAllByRole("button");
+    const pluginNavButton = allButtons.find((btn) => btn.textContent?.includes("Plugin popup"));
+    expect(pluginNavButton).toBeTruthy();
+    await userEvent.click(pluginNavButton!);
+
+    expect(await screen.findByText("Locator ready for review: #pay-submit")).toBeInTheDocument();
+    expect(screen.getAllByText("ready").length).toBeGreaterThan(0);
+    expect(screen.queryByText("active")).not.toBeInTheDocument();
+  });
+
   it("prefers runtime audit state over the fixed active-run empty copy when nextAction is missing", async () => {
     const popupSnapshot = {
       generatedAt: "2026-04-20T04:00:00Z",

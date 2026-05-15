@@ -421,6 +421,7 @@ The `plugin` screen is not currently responsible for:
 - In the popup mirror candidate list, the recommended-locator badge now prefers a more specific run-local label (`top match`) when real popup candidates are present, while legacy/demo fallback rows keep the older `recommended` badge.
 - In the popup mirror quick-action area, the `Page summary` helper copy now prefers real popup summary text and only falls back to the fixed `Structured view` demo label when popup summary context is absent.
 - In the popup mirror candidate list, low-score real popup candidates now also surface a `fragile` badge, while legacy/demo fallback rows keep their existing fragile marker.
+- In the popup mirror pick-mode header, the badge now prefers explicit popup `status`, then falls back to locator-ready context (`ready`) when `page.locator` is present, and only then to the older fixed `active` label.
 - Real pick mode stays fully inside the extension boundary:
   - popup triggers
   - background bridges

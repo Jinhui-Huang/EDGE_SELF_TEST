@@ -3303,3 +3303,13 @@
     - synced `plugin/functional-spec.md`
   - Verification:
     - ran `npm test -- --run src/App.test.tsx -t "plugin popup"`
+- 2026-05-15: Continued `P3-4 plugin` with one pick-mode badge fallback cleanup.
+  - Frontend:
+    - the pick-mode badge now prefers explicit popup `status`
+    - when popup `status` is missing but `page.locator` exists, it falls back to `ready`
+    - only when both are absent does it keep the fixed `active` fallback
+  - Tests/docs:
+    - `App.test.tsx` now asserts missing popup status still renders `ready` when locator context exists
+    - synced `plugin/functional-spec.md`
+  - Verification:
+    - ran `npm test -- --run src/App.test.tsx -t "plugin popup"`

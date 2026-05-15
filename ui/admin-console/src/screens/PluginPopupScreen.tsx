@@ -93,7 +93,8 @@ export function PluginPopupScreen({ apiBaseUrl, title, locale }: PluginPopupScre
   const selectedElementMeta = page?.locator?.trim()
     ? `locator: ${page.locator.trim()}`
     : "role=button / 140x38px / visible";
-  const pickModeBadge = popupSnapshot?.status?.trim().toLowerCase() || "active";
+  const pickModeBadge = popupSnapshot?.status?.trim().toLowerCase()
+    || (page?.locator?.trim() ? "ready" : "active");
   const pickModeSummary = page?.locator?.trim()
     ? `Locator ready for review: ${page.locator.trim()}`
     : t({ en: "Hover to highlight / click to select", zh: "悬停高亮 / 单击选中", ja: "ホバーでハイライト / クリックで選択" });

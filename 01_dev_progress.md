@@ -7626,6 +7626,35 @@ Remaining limits:
 - this slice only tightens one candidate-status badge; it does not extend the popup into a fuller plugin-side locator-risk workflow
 - broader popup copy still keeps some demo-oriented language outside the chosen slice
 
+## 2026-05-15 P3-4 plugin pick-mode badge fallback
+
+## Task
+- Keep the current `P3-4 plugin` thread narrow:
+  - tighten one obviously demo-looking pick-mode status fallback
+  - prefer existing popup locator context
+  - keep the older `active` label only as the last fallback
+
+## Completed
+- Updated `PluginPopupScreen.tsx`:
+  - the pick-mode badge now prefers explicit popup `status`
+  - when popup `status` is missing but `page.locator` exists, it falls back to `ready`
+  - only when both are absent does it keep the fixed `active` label
+- Synced `plugin/functional-spec.md`, `memory.txt`
+
+## Modified Files
+- `ui/admin-console/src/screens/PluginPopupScreen.tsx`
+- `ui/admin-console/src/App.test.tsx`
+- `docs/phase3/interface/plugin/functional-spec.md`
+- `memory.txt`
+- `01_dev_progress.md`
+
+## Verification
+- Ran `npm test -- --run src/App.test.tsx -t "plugin popup"`
+
+## Remaining Limits
+- this slice only tightens one pick-mode status fallback; it does not extend the popup into a fuller plugin-side pick workflow
+- broader popup copy still keeps some demo-oriented language outside the chosen slice
+
 ## 2026-05-07 P3-3 dataDiff restore-result doc example alignment follow-up
 
 ## Task
