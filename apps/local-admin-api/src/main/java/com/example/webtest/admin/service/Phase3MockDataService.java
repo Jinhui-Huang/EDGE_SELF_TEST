@@ -173,7 +173,8 @@ public final class Phase3MockDataService {
                         pageDomain,
                         now.toString(),
                         popupContext.locator(),
-                        popupContext.actionHints()),
+                        popupContext.actionHints(),
+                        popupContext.locatorCandidates()),
                 new ExtensionPopupSnapshot.RuntimeStatus(
                         firstNonBlank(popupContext.runtimeMode(), "Audit-first"),
                         queueState(queueItems, executions),
@@ -208,6 +209,7 @@ public final class Phase3MockDataService {
                         textValue(request, "runtimeMode"),
                         textValue(request, "locator"),
                         stringListValue(request, "actionHints"),
+                        locatorCandidatesValue(request, "locatorCandidates"),
                         textValue(request, "bodySummary"),
                         instantValue(textValue(request, "requestedAt")));
                 if (candidate.isEmpty()) {
@@ -901,6 +903,34 @@ public final class Phase3MockDataService {
         return List.copyOf(items);
     }
 
+    private List<ExtensionPopupSnapshot.LocatorCandidate> locatorCandidatesValue(
+            com.fasterxml.jackson.databind.JsonNode node,
+            String field) {
+        if (node == null || !node.path(field).isArray()) {
+            return List.of();
+        }
+        List<ExtensionPopupSnapshot.LocatorCandidate> candidates = new ArrayList<>();
+        node.path(field).forEach(item -> {
+            String value = item.path("value").asText("").trim();
+            if (value.isBlank()) {
+                return;
+            }
+            String type = item.path("type").asText("").trim();
+            Double score = item.path("score").isNumber() ? item.path("score").doubleValue() : null;
+            String reason = item.path("reason").asText("").trim();
+            Boolean recommended = item.has("recommended") && !item.path("recommended").isNull()
+                    ? item.path("recommended").asBoolean()
+                    : null;
+            candidates.add(new ExtensionPopupSnapshot.LocatorCandidate(
+                    type,
+                    value,
+                    score,
+                    reason,
+                    recommended));
+        });
+        return List.copyOf(candidates);
+    }
+
     private int intValue(Object value) {
         if (value instanceof Number number) {
             return number.intValue();
@@ -1079,10 +1109,11 @@ public final class Phase3MockDataService {
             String runtimeMode,
             String locator,
             List<String> actionHints,
+            List<ExtensionPopupSnapshot.LocatorCandidate> locatorCandidates,
             String bodySummary,
             Instant requestedAt) {
         private static PopupRequestContext empty() {
-            return new PopupRequestContext("", "", "", "", "", List.of(), "", null);
+            return new PopupRequestContext("", "", "", "", "", List.of(), List.of(), "", null);
         }
 
         private boolean isEmpty() {
@@ -1092,6 +1123,7 @@ public final class Phase3MockDataService {
                     && runtimeMode.isBlank()
                     && locator.isBlank()
                     && actionHints.isEmpty()
+                    && locatorCandidates.isEmpty()
                     && bodySummary.isBlank();
         }
     }

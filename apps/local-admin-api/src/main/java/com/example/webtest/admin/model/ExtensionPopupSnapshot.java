@@ -16,7 +16,16 @@ public record ExtensionPopupSnapshot(
             String domain,
             String lastUpdatedAt,
             String locator,
-            List<String> actionHints) {
+            List<String> actionHints,
+            List<LocatorCandidate> locatorCandidates) {
+    }
+
+    public record LocatorCandidate(
+            String type,
+            String value,
+            Double score,
+            String reason,
+            Boolean recommended) {
     }
 
     public record RuntimeStatus(String mode, String queueState, String auditState, String nextAction) {

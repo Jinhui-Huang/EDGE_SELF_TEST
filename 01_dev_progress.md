@@ -7275,6 +7275,42 @@ Remaining limits:
 - `reportDetail` main summary still keeps snapshot-derived fallback when backend detail reads fail
 - screenshot/artifact content still remains listing-path-only rather than inline view/download
 
+## 2026-05-15 P3-4 plugin popup candidate locators realism
+
+## Task
+- Keep the current `P3-4 plugin` thread narrow:
+  - tighten the popup mirror `Candidate locators` block
+  - prefer run-local / persisted plugin context
+  - leave the old fixed locator list only as legacy fallback
+
+## Completed
+- Extended persisted scheduler request context and `/api/phase3/extension-popup` with additive `page.locatorCandidates[]`
+- Updated `PluginPopupScreen.tsx`:
+  - `Candidate locators` now prefers real `page.locatorCandidates[]`
+  - the old fixed locator list only renders when popup page context omits candidates
+- Synced `plugin/interface-spec.md`, `plugin/functional-spec.md`, `memory.txt`
+
+## Modified Files
+- `apps/local-admin-api/src/main/java/com/example/webtest/admin/model/ExtensionPopupSnapshot.java`
+- `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/Phase3MockDataService.java`
+- `apps/local-admin-api/src/main/java/com/example/webtest/admin/service/SchedulerPersistenceService.java`
+- `apps/local-admin-api/src/test/java/com/example/webtest/admin/http/LocalAdminApiServerTest.java`
+- `ui/admin-console/src/types.ts`
+- `ui/admin-console/src/screens/PluginPopupScreen.tsx`
+- `ui/admin-console/src/App.test.tsx`
+- `docs/phase3/interface/plugin/interface-spec.md`
+- `docs/phase3/interface/plugin/functional-spec.md`
+- `memory.txt`
+- `01_dev_progress.md`
+
+## Verification
+- Ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+- Ran `npm test -- --run src/App.test.tsx -t "plugin popup"`
+
+## Remaining Limits
+- `pick-mode` header / state copy is still mostly demo UI text
+- candidate rows now prefer persisted popup context, but the screen still does not model a full plugin-side locator review workflow
+
 ## 2026-05-07 P3-3 dataDiff restore-result doc example alignment follow-up
 
 ## Task

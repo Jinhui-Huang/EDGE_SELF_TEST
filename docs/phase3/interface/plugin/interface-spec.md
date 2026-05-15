@@ -65,6 +65,7 @@ Current backend read priority for `popupSnapshot.page`:
 - `popupSnapshot.page.domain` is also reused by the floating popup host label when present
 - `popupSnapshot.runtime.queueState` is also reused directly by the active-run badge when present
 - `popupSnapshot.page.locator` and `popupSnapshot.page.actionHints[]` are now also reused by the compact selected-element card in the popup mirror
+- `popupSnapshot.page.locatorCandidates[]` is now also reused by the compact candidate-locators list in the popup mirror
 
 - persisted scheduler request context (`pageTitle`, `pageUrl`, `pageDomain`, `runtimeMode`, `bodySummary`) when available
 - legacy built-in popup demo defaults when persisted request context is absent
@@ -84,7 +85,12 @@ Response model:
     "title": "Checkout - Payment",
     "url": "https://staging.example.test/checkout/payment",
     "domain": "staging.example.test",
-    "lastUpdatedAt": "2026-04-20T04:00:00Z"
+    "lastUpdatedAt": "2026-04-20T04:00:00Z",
+    "locator": "#pay-submit",
+    "actionHints": ["Pay now"],
+    "locatorCandidates": [
+      { "type": "id", "value": "#pay-submit", "score": 0.98, "recommended": true }
+    ]
   },
   "runtime": {
     "mode": "Audit-first",

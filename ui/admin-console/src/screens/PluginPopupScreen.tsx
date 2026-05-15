@@ -14,7 +14,7 @@ type LocalizedCopy = {
   ja: string;
 };
 
-const candidateLocators = [
+const fallbackCandidateLocators = [
   { value: "button:has-text('Pay')", score: "0.94", type: "text", recommended: true },
   { value: "#pay-submit", score: "0.88", type: "id" },
   { value: "[data-testid='checkout-pay']", score: "0.86", type: "testid" },
@@ -90,6 +90,18 @@ export function PluginPopupScreen({ apiBaseUrl, title, locale }: PluginPopupScre
   const selectedElementMeta = page?.locator?.trim()
     ? `locator: ${page.locator.trim()}`
     : "role=button / 140x38px / visible";
+  const normalizedLocatorCandidates = page?.locatorCandidates
+    ?.filter((candidate) => candidate.value.trim().length > 0)
+    .map((candidate) => ({
+      value: candidate.value.trim(),
+      score: formatLocatorScore(candidate.score),
+      type: candidate.type?.trim() || "locator",
+      recommended: candidate.recommended ?? false,
+      fragile: false
+    }));
+  const candidateLocators = normalizedLocatorCandidates?.length
+    ? normalizedLocatorCandidates
+    : fallbackCandidateLocators;
   const isRunning = queueState.toLowerCase().includes("active") || queueState.toLowerCase().includes("running");
 
   return (
@@ -250,4 +262,14 @@ export function PluginPopupScreen({ apiBaseUrl, title, locale }: PluginPopupScre
       </aside>
     </div>
   );
+}
+
+function formatLocatorScore(score: number | string | null | undefined) {
+  if (typeof score === "number" && Number.isFinite(score)) {
+    return score.toFixed(2);
+  }
+  if (typeof score === "string" && score.trim().length > 0) {
+    return score.trim();
+  }
+  return "--";
 }

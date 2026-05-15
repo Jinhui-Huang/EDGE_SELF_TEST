@@ -782,6 +782,13 @@ export type ExtensionPopupSnapshot = {
     lastUpdatedAt: string;
     locator?: string;
     actionHints?: string[];
+    locatorCandidates?: Array<{
+      type?: string;
+      value: string;
+      score?: number | string | null;
+      reason?: string;
+      recommended?: boolean | null;
+    }>;
   };
   runtime: {
     mode: string;

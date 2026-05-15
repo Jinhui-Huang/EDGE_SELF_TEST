@@ -3158,3 +3158,19 @@
   - Verification:
     - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
     - ran `npm test -- --run src/App.test.tsx -t "plugin popup"`
+- 2026-05-15: Continued `P3-4 plugin` with the smallest candidate-locators realism follow-up.
+  - Backend:
+    - persisted scheduler request context now preserves additive `locatorCandidates[]`
+    - `GET /api/phase3/extension-popup` now surfaces `page.locatorCandidates[]` from that persisted context when present
+  - Frontend:
+    - the popup mirror `Candidate locators` list now prefers `page.locatorCandidates[]`
+    - the old fixed locator list remains only as the legacy demo fallback when popup page context omits candidates
+  - Tests/docs:
+    - `LocalAdminApiServerTest` now asserts `/extension-popup` returns persisted `locatorCandidates[]`
+    - `App.test.tsx` now asserts:
+      - real popup locator candidates override the old fixed list
+      - missing popup candidates still fall back to the old demo list
+    - synced `plugin/interface-spec.md` and `plugin/functional-spec.md`
+  - Verification:
+    - ran `mvn -pl apps/local-admin-api -Dtest=LocalAdminApiServerTest test`
+    - ran `npm test -- --run src/App.test.tsx -t "plugin popup"`

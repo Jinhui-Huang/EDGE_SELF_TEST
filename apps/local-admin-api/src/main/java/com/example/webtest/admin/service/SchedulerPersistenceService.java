@@ -139,6 +139,7 @@ public final class SchedulerPersistenceService {
         putIfStringList(entry, "headings", payload.get("headings"));
         putIfStringList(entry, "formHints", payload.get("formHints"));
         putIfStringList(entry, "actionHints", payload.get("actionHints"));
+        putIfObjectList(entry, "locatorCandidates", payload.get("locatorCandidates"));
     }
 
     private Map<String, Object> accepted(
@@ -236,6 +237,25 @@ public final class SchedulerPersistenceService {
             String text = String.valueOf(item).trim();
             if (!text.isEmpty()) {
                 values.add(text);
+            }
+        }
+        if (!values.isEmpty()) {
+            target.put(key, values);
+        }
+    }
+
+    private void putIfObjectList(Map<String, Object> target, String key, Object rawValue) {
+        if (!(rawValue instanceof List<?> list)) {
+            return;
+        }
+        List<Map<String, Object>> values = new ArrayList<>();
+        for (Object item : list) {
+            if (!(item instanceof Map<?, ?> map)) {
+                continue;
+            }
+            Map<String, Object> object = castMap(map);
+            if (!object.isEmpty()) {
+                values.add(object);
             }
         }
         if (!values.isEmpty()) {

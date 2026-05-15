@@ -465,24 +465,35 @@ class LocalAdminApiServerTest {
             server.start();
             HttpClient client = HttpClient.newHttpClient();
 
+            String requestPayload = Jsons.writeValueAsString(Map.ofEntries(
+                    Map.entry("runId", "checkout-web-smoke"),
+                    Map.entry("projectKey", "checkout-web"),
+                    Map.entry("owner", "qa-platform"),
+                    Map.entry("environment", "prod-like"),
+                    Map.entry("detail", "Accepted from operator launch panel."),
+                    Map.entry("pageTitle", "Checkout"),
+                    Map.entry("pageUrl", "https://checkout.example.test/pay"),
+                    Map.entry("pageDomain", "checkout.example.test"),
+                    Map.entry("pagePath", "/pay"),
+                    Map.entry("runtimeMode", "Audit-first"),
+                    Map.entry("queueState", "Queued"),
+                    Map.entry("auditState", "Idle"),
+                    Map.entry("locator", "#pay-submit"),
+                    Map.entry("bodySummary", "Review your order total before confirming payment."),
+                    Map.entry("headings", List.of("Checkout", "Payment details")),
+                    Map.entry("actionHints", List.of("Pay now")),
+                    Map.entry("locatorCandidates", List.of(
+                            Map.of(
+                                    "type", "id",
+                                    "value", "#pay-submit",
+                                    "score", 0.98,
+                                    "recommended", true),
+                            Map.of(
+                                    "type", "name",
+                                    "value", "[name=\"payment-submit\"]",
+                                    "score", 0.90)))));
             HttpResponse<String> requestMutation = client.send(
-                    request(server, "/api/phase3/scheduler/requests", "POST", Jsons.writeValueAsString(Map.ofEntries(
-                            Map.entry("runId", "checkout-web-smoke"),
-                            Map.entry("projectKey", "checkout-web"),
-                            Map.entry("owner", "qa-platform"),
-                            Map.entry("environment", "prod-like"),
-                            Map.entry("detail", "Accepted from operator launch panel."),
-                            Map.entry("pageTitle", "Checkout"),
-                            Map.entry("pageUrl", "https://checkout.example.test/pay"),
-                            Map.entry("pageDomain", "checkout.example.test"),
-                            Map.entry("pagePath", "/pay"),
-                            Map.entry("runtimeMode", "Audit-first"),
-                            Map.entry("queueState", "Queued"),
-                            Map.entry("auditState", "Idle"),
-                            Map.entry("locator", "#pay-submit"),
-                            Map.entry("bodySummary", "Review your order total before confirming payment."),
-                            Map.entry("headings", List.of("Checkout", "Payment details")),
-                            Map.entry("actionHints", List.of("Pay now"))))),
+                    request(server, "/api/phase3/scheduler/requests", "POST", requestPayload),
                     HttpResponse.BodyHandlers.ofString());
             HttpResponse<String> eventMutation = client.send(
                     request(server, "/api/phase3/scheduler/events", "POST", Jsons.writeValueAsString(Map.of(
@@ -535,6 +546,9 @@ class LocalAdminApiServerTest {
             assertTrue(extension.body().contains("\"checkout.example.test\""));
             assertTrue(extension.body().contains("\"locator\":\"#pay-submit\""));
             assertTrue(extension.body().contains("\"actionHints\":[\"Pay now\"]"));
+            assertTrue(extension.body().contains("\"locatorCandidates\":["));
+            assertTrue(extension.body().contains("\"value\":\"#pay-submit\""));
+            assertTrue(extension.body().contains("\"value\":\"[name=\\\"payment-submit\\\"]\""));
             assertTrue(extension.body().contains("\"Review your order total before confirming payment.\""));
             assertTrue(extension.body().contains("\"1 queued / 1 active / 0 waiting / 0 review\""));
         }

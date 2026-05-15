@@ -2925,7 +2925,11 @@ describe("App", () => {
         domain: "staging.example.test",
         lastUpdatedAt: "2026-04-20T04:00:00Z",
         locator: "#pay-submit",
-        actionHints: ["Pay now"]
+        actionHints: ["Pay now"],
+        locatorCandidates: [
+          { type: "id", value: "#pay-submit", score: 0.98, recommended: true },
+          { type: "name", value: "[name=\"payment-submit\"]", score: 0.9 }
+        ]
       },
       runtime: {
         mode: "Audit-first",
@@ -2967,6 +2971,8 @@ describe("App", () => {
     expect(screen.getAllByText("edge.test")).toHaveLength(1);
     expect(await screen.findByText("Pay now")).toBeInTheDocument();
     expect(screen.getByText("locator: #pay-submit")).toBeInTheDocument();
+    expect(screen.getByText("[name=\"payment-submit\"]")).toBeInTheDocument();
+    expect(screen.queryByText("button:has-text('Pay')")).not.toBeInTheDocument();
 
     // Verify active run section shows runtime data from popup snapshot
     expect(await screen.findByText("running")).toBeInTheDocument();
@@ -2984,7 +2990,8 @@ describe("App", () => {
         domain: "",
         lastUpdatedAt: "2026-04-20T04:00:00Z",
         locator: "",
-        actionHints: []
+        actionHints: [],
+        locatorCandidates: []
       },
       runtime: {
         mode: "Audit-first",
@@ -3016,6 +3023,53 @@ describe("App", () => {
     expect(screen.getByText("idle")).toBeInTheDocument();
     expect(screen.getAllByText("Pay $89.10").length).toBeGreaterThan(0);
     expect(screen.getByText("role=button / 140x38px / visible")).toBeInTheDocument();
+    expect(screen.getByText("button:has-text('Pay')")).toBeInTheDocument();
+  });
+
+  it("keeps the plugin popup demo locator list as a legacy fallback when popup locator candidates are malformed", async () => {
+    const popupSnapshot = {
+      generatedAt: "2026-04-20T04:00:00Z",
+      status: "READY",
+      summary: "Phase 3 popup assistive snapshot",
+      page: {
+        title: "Checkout - Payment",
+        url: "https://staging.example.test/checkout/payment",
+        domain: "staging.example.test",
+        lastUpdatedAt: "2026-04-20T04:00:00Z",
+        locator: "#pay-submit",
+        actionHints: ["Pay now"],
+        locatorCandidates: [
+          { type: "id", value: "   ", score: 0.98, recommended: true },
+          { type: "name", value: "", score: 0.9 }
+        ]
+      },
+      runtime: {
+        mode: "Audit-first",
+        queueState: "RUNNING",
+        auditState: "ATTENTION",
+        nextAction: "Review latest run"
+      },
+      hints: []
+    };
+
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
+      if (url.endsWith("/api/phase3/extension-popup")) return jsonResponse(popupSnapshot);
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+    await screen.findByText("Needs attention");
+
+    const allButtons = screen.getAllByRole("button");
+    const pluginNavButton = allButtons.find((btn) => btn.textContent?.includes("Plugin popup"));
+    expect(pluginNavButton).toBeTruthy();
+    await userEvent.click(pluginNavButton!);
+
+    expect(await screen.findByText("button:has-text('Pay')")).toBeInTheDocument();
+    expect(screen.queryByText("[name=\"payment-submit\"]")).not.toBeInTheDocument();
   });
 
   it("shows plugin popup error state when extension-popup endpoint fails", async () => {
