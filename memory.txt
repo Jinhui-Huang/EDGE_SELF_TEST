@@ -3269,3 +3269,15 @@
     - synced `plugin/functional-spec.md`
   - Verification:
     - ran `npm test -- --run src/App.test.tsx -t "plugin popup"`
+- 2026-05-15: Continued `P3-4 plugin` with one candidate-badge realism cleanup.
+  - Frontend:
+    - the recommended locator badge now distinguishes real popup candidates from legacy demo rows
+    - when run-local `locatorCandidates[]` are present, the preferred row shows `top match`
+    - when the popup falls back to demo candidates, the old `recommended` badge remains
+  - Tests/docs:
+    - `App.test.tsx` now asserts:
+      - real popup candidates show `top match`
+      - legacy/demo fallback candidates still show `recommended`
+    - synced `plugin/functional-spec.md`
+  - Verification:
+    - ran `npm test -- --run src/App.test.tsx -t "plugin popup"`

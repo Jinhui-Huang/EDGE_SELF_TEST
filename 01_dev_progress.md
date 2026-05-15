@@ -7541,6 +7541,35 @@ Remaining limits:
 - this slice only tightens one small popup-header status suffix; it does not extend the popup into a fuller plugin-side state model
 - broader popup copy still keeps some demo-oriented language outside the chosen slice
 
+## 2026-05-15 P3-4 plugin candidate badge realism
+
+## Task
+- Keep the current `P3-4 plugin` thread narrow:
+  - tighten one obviously demo-looking candidate badge/status label
+  - prefer existing popup locator-candidate context
+  - keep the older recommended badge as fallback for legacy/demo rows
+
+## Completed
+- Updated `PluginPopupScreen.tsx`:
+  - the candidate-list recommendation badge now distinguishes modern popup candidates from demo fallback rows
+  - when run-local `locatorCandidates[]` are present, the preferred row shows `top match`
+  - when the list falls back to legacy/demo candidates, it still shows `recommended`
+- Synced `plugin/functional-spec.md`, `memory.txt`
+
+## Modified Files
+- `ui/admin-console/src/screens/PluginPopupScreen.tsx`
+- `ui/admin-console/src/App.test.tsx`
+- `docs/phase3/interface/plugin/functional-spec.md`
+- `memory.txt`
+- `01_dev_progress.md`
+
+## Verification
+- Ran `npm test -- --run src/App.test.tsx -t "plugin popup"`
+
+## Remaining Limits
+- this slice only tightens one candidate-list badge label; it does not extend the popup into a fuller plugin-side locator-review workflow
+- broader popup copy still keeps some demo-oriented language outside the chosen slice
+
 ## 2026-05-07 P3-3 dataDiff restore-result doc example alignment follow-up
 
 ## Task

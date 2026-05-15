@@ -107,7 +107,8 @@ export function PluginPopupScreen({ apiBaseUrl, title, locale }: PluginPopupScre
       fragile: false,
       reason: candidate.reason?.trim() || ""
     }));
-  const candidateLocators = normalizedLocatorCandidates?.length
+  const usesRunLocalCandidateLocators = Boolean(normalizedLocatorCandidates?.length);
+  const candidateLocators = usesRunLocalCandidateLocators
     ? normalizedLocatorCandidates
     : fallbackCandidateLocators;
   const recommendedCandidate = normalizedLocatorCandidates?.find((candidate) => candidate.recommended);
@@ -267,7 +268,13 @@ export function PluginPopupScreen({ apiBaseUrl, title, locale }: PluginPopupScre
                     <strong>{locator.value}</strong>
                     <div className="pluginBadgeRow">
                       <span className="pluginBadge neutral">{locator.type}</span>
-                      {locator.recommended ? <span className="pluginBadge info dot">recommended</span> : null}
+                      {locator.recommended ? (
+                        <span className="pluginBadge info dot">
+                          {usesRunLocalCandidateLocators && locator.value === recommendedCandidate?.value
+                            ? "top match"
+                            : "recommended"}
+                        </span>
+                      ) : null}
                       {locator.fragile ? <span className="pluginBadge warning">fragile</span> : null}
                     </div>
                     {locator.reason ? <p>{locator.reason}</p> : null}
