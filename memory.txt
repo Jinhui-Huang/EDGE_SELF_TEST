@@ -3281,3 +3281,14 @@
     - synced `plugin/functional-spec.md`
   - Verification:
     - ran `npm test -- --run src/App.test.tsx -t "plugin popup"`
+- 2026-05-15: Continued `P3-4 plugin` with one page-summary helper-copy cleanup.
+  - Frontend:
+    - the `Page summary` quick-action subtitle now prefers real popup summary text
+    - when popup summary context is absent, it still falls back to the fixed `Structured view` demo copy
+  - Tests/docs:
+    - `App.test.tsx` now asserts:
+      - real popup summary text overrides the fixed helper label
+      - missing popup summary text still falls back to `Structured view`
+    - synced `plugin/functional-spec.md`
+  - Verification:
+    - ran `npm test -- --run src/App.test.tsx -t "plugin popup"`

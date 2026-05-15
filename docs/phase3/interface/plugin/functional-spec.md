@@ -419,6 +419,7 @@ The `plugin` screen is not currently responsible for:
 - In the popup mirror, the `Quick smoke test` helper copy now prefers the current popup page path (`Run on /...`) and only falls back to the fixed `Run on current URL` demo text when popup page URL context is absent.
 - In the popup mirror header, the small host-status context label now prefers real `runtime.queueState` (`host connected / running`, etc.) and only falls back to the old environment-style label when runtime queue context is absent.
 - In the popup mirror candidate list, the recommended-locator badge now prefers a more specific run-local label (`top match`) when real popup candidates are present, while legacy/demo fallback rows keep the older `recommended` badge.
+- In the popup mirror quick-action area, the `Page summary` helper copy now prefers real popup summary text and only falls back to the fixed `Structured view` demo label when popup summary context is absent.
 - Real pick mode stays fully inside the extension boundary:
   - popup triggers
   - background bridges

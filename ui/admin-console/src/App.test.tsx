@@ -2966,8 +2966,9 @@ describe("App", () => {
     expect(await screen.findByText(/host connected|主机已连接|ホスト接続済み/)).toBeInTheDocument();
     expect(screen.getAllByText((_, element) => element?.textContent?.includes("host connected / running") ?? false).length).toBeGreaterThan(0);
     expect(await screen.findByText("Checkout - Payment")).toBeInTheDocument();
-    expect(await screen.findByText("Phase 3 popup assistive snapshot")).toBeInTheDocument();
+    expect(screen.getAllByText("Phase 3 popup assistive snapshot").length).toBeGreaterThan(0);
     expect(screen.queryByText("3 forms / 8 buttons")).not.toBeInTheDocument();
+    expect(screen.queryByText("Structured view")).not.toBeInTheDocument();
     expect(screen.getAllByText("staging.example.test").length).toBeGreaterThan(0);
     expect(screen.getAllByText("edge.test")).toHaveLength(1);
     expect(screen.getByText("Use the platform UI for configuration and report review.")).toBeInTheDocument();
@@ -3032,6 +3033,7 @@ describe("App", () => {
     await userEvent.click(pluginNavButton!);
 
     expect(await screen.findByText("3 forms / 8 buttons")).toBeInTheDocument();
+    expect(screen.getByText("Structured view")).toBeInTheDocument();
     expect(screen.getAllByText((_, element) => element?.textContent?.includes("host connected / staging") ?? false).length).toBeGreaterThan(0);
     expect(screen.getAllByText("edge.test")).toHaveLength(2);
     expect(screen.getByText("idle")).toBeInTheDocument();
