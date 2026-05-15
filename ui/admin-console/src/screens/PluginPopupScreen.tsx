@@ -107,6 +107,9 @@ export function PluginPopupScreen({ apiBaseUrl, title, locale }: PluginPopupScre
   const candidateLocators = normalizedLocatorCandidates?.length
     ? normalizedLocatorCandidates
     : fallbackCandidateLocators;
+  const selectedElementReason = normalizedLocatorCandidates?.find((candidate) => candidate.recommended && candidate.reason)?.reason
+    || normalizedLocatorCandidates?.find((candidate) => candidate.reason)?.reason
+    || "Review the best locator before copying it into DSL.";
   const openInPlatformSub = popupSnapshot?.hints?.find((hint) => hint.trim().length > 0)?.trim()
     || quickActions[3].sub.en;
   const isRunning = queueState.toLowerCase().includes("active") || queueState.toLowerCase().includes("running");
@@ -231,6 +234,7 @@ export function PluginPopupScreen({ apiBaseUrl, title, locale }: PluginPopupScre
               <div className="pluginCodeTag">&lt;button&gt;</div>
               <div className="pluginCodeText">{selectedElementLabel}</div>
               <p>{selectedElementMeta}</p>
+              <p>{`Recommended locator rationale: ${selectedElementReason}`}</p>
             </div>
           </section>
 

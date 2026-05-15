@@ -7368,6 +7368,35 @@ Remaining limits:
 - quick-action behavior is still mostly a compact mirror, not a full plugin-side action workflow with richer per-action state
 - other quick-action copy outside the selected subtitle still retains some demo-oriented language
 
+## 2026-05-15 P3-4 plugin selected-element rationale copy
+
+## Task
+- Keep the current `P3-4 plugin` thread narrow:
+  - tighten one obviously demo-looking supporting line near the selected-element card
+  - prefer existing popup locator-candidate context
+  - keep a fixed fallback reminder when that context is absent
+
+## Completed
+- Updated `PluginPopupScreen.tsx`:
+  - the selected-element card now shows a supporting rationale line
+  - it prefers the recommended candidate `reason`, then any available candidate `reason`
+  - when popup candidate reasons are absent, it falls back to `Review the best locator before copying it into DSL.`
+- Synced `plugin/functional-spec.md`, `memory.txt`
+
+## Modified Files
+- `ui/admin-console/src/screens/PluginPopupScreen.tsx`
+- `ui/admin-console/src/App.test.tsx`
+- `docs/phase3/interface/plugin/functional-spec.md`
+- `memory.txt`
+- `01_dev_progress.md`
+
+## Verification
+- Ran `npm test -- --run src/App.test.tsx -t "plugin popup"`
+
+## Remaining Limits
+- `selected element` and `candidate review` remain a compact mirror, not a full plugin-side recommendation workflow
+- broader pick workflow and other popup copy still keep some demo-oriented language outside this chosen slice
+
 ## 2026-05-15 P3-4 plugin candidate-review reason copy
 
 ## Task

@@ -3200,6 +3200,18 @@
     - synced `plugin/functional-spec.md`
   - Verification:
     - ran `npm test -- --run src/App.test.tsx -t "plugin popup"`
+- 2026-05-15: Continued `P3-4 plugin` with one selected-element rationale cleanup.
+  - Frontend:
+    - the compact selected-element card now shows a supporting locator rationale line
+    - it prefers the recommended candidate `reason`, then any available candidate `reason`
+    - when popup candidate reasons are absent, it falls back to a fixed review reminder
+  - Tests/docs:
+    - `App.test.tsx` now asserts:
+      - real popup candidate reasons drive the selected-element rationale line
+      - missing popup candidate reasons still fall back to the fixed reminder
+    - synced `plugin/functional-spec.md`
+  - Verification:
+    - ran `npm test -- --run src/App.test.tsx -t "plugin popup"`
 - 2026-05-15: Continued `P3-4 plugin` with one small candidate-review explanation cleanup.
   - Frontend:
     - candidate rows now render real `locatorCandidates[].reason` inline when present

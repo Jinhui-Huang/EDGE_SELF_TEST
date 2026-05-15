@@ -192,6 +192,7 @@ Current behavior:
 - the admin-console popup mirror now prefers persisted popup page context for the compact selected-element card:
   - first `actionHints[0]` as the selected label
   - `locator` as the selected meta line
+  - the supporting rationale line prefers the recommended candidate `reason`, then any candidate `reason`, before falling back to a fixed review reminder
 - the popup mirror candidate-locators list now prefers persisted popup page context:
   - first `page.locatorCandidates[]` when present
   - `locatorCandidates[].reason` is rendered inline when available

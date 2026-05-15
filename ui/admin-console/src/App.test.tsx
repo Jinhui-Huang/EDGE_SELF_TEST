@@ -2927,7 +2927,7 @@ describe("App", () => {
         locator: "#pay-submit",
         actionHints: ["Pay now"],
         locatorCandidates: [
-          { type: "id", value: "#pay-submit", score: 0.98, recommended: true, reason: "Stable explicit id." },
+          { type: "id", value: "#pay-submit", score: 0.98, recommended: true, reason: "Preferred for DSL handoff." },
           { type: "name", value: "[name=\"payment-submit\"]", score: 0.9, reason: "Stable field name." }
         ]
       },
@@ -2973,9 +2973,10 @@ describe("App", () => {
     expect(screen.queryByText("Full report and logs")).not.toBeInTheDocument();
     expect(await screen.findByText("Pay now")).toBeInTheDocument();
     expect(screen.getByText("locator: #pay-submit")).toBeInTheDocument();
+    expect(screen.getByText("Recommended locator rationale: Preferred for DSL handoff.")).toBeInTheDocument();
     expect(screen.getByText("Locator ready for review: #pay-submit")).toBeInTheDocument();
     expect(screen.getByText("[name=\"payment-submit\"]")).toBeInTheDocument();
-    expect(screen.getByText("Stable explicit id.")).toBeInTheDocument();
+    expect(screen.getByText("Preferred for DSL handoff.")).toBeInTheDocument();
     expect(screen.getByText("Stable field name.")).toBeInTheDocument();
     expect(screen.queryByText("button:has-text('Pay')")).not.toBeInTheDocument();
     expect(screen.getAllByText("ready").length).toBeGreaterThan(0);
@@ -3029,6 +3030,7 @@ describe("App", () => {
     expect(screen.getByText("idle")).toBeInTheDocument();
     expect(screen.getAllByText("Pay $89.10").length).toBeGreaterThan(0);
     expect(screen.getByText("role=button / 140x38px / visible")).toBeInTheDocument();
+    expect(screen.getByText("Recommended locator rationale: Review the best locator before copying it into DSL.")).toBeInTheDocument();
     expect(screen.getByText("Full report and logs")).toBeInTheDocument();
     expect(screen.getByText("button:has-text('Pay')")).toBeInTheDocument();
     expect(screen.getByText("Preferred text locator for quick review.")).toBeInTheDocument();
