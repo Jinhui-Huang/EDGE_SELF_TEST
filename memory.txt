@@ -3200,6 +3200,16 @@
     - synced `plugin/functional-spec.md`
   - Verification:
     - ran `npm test -- --run src/App.test.tsx -t "plugin popup"`
+- 2026-05-15: Continued `P3-4 plugin` with one active-run empty-state cleanup.
+  - Frontend:
+    - the popup mirror active-run card no longer jumps straight to the fixed `No active run` copy when `runtime.nextAction` is absent
+    - it now prefers `runtime.auditState` as the headline and uses `runtime.queueState` as the supporting line
+    - the fixed `No active run` copy remains only as the final fallback when both runtime fields are absent
+  - Tests/docs:
+    - `App.test.tsx` now asserts missing `nextAction` still renders real runtime context instead of the fixed empty copy
+    - synced `plugin/functional-spec.md`
+  - Verification:
+    - ran `npm test -- --run src/App.test.tsx -t "plugin popup"`
 - 2026-05-15: Continued `P3-4 plugin` with one selected-element rationale cleanup.
   - Frontend:
     - the compact selected-element card now shows a supporting locator rationale line

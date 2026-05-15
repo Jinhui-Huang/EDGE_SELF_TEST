@@ -86,6 +86,9 @@ export function PluginPopupScreen({ apiBaseUrl, title, locale }: PluginPopupScre
   const pageAssistiveSummary = popupSnapshot?.summary?.trim() || "3 forms / 8 buttons";
   const queueState = runtime?.queueState ?? "Idle";
   const runtimeQueueBadge = runtime?.queueState?.trim().toLowerCase() || "idle";
+  const activeRunHeadline = runtime?.nextAction?.trim() || runtime?.auditState?.trim()
+    || t({ en: "No active run", zh: "无活跃运行", ja: "実行なし" });
+  const activeRunDetail = runtime?.nextAction?.trim() ? (runtime?.auditState ?? "") : (runtime?.queueState?.trim() || "");
   const selectedElementLabel = page?.actionHints?.find((hint) => hint.trim().length > 0)?.trim() || "Pay $89.10";
   const selectedElementMeta = page?.locator?.trim()
     ? `locator: ${page.locator.trim()}`
@@ -192,8 +195,8 @@ export function PluginPopupScreen({ apiBaseUrl, title, locale }: PluginPopupScre
                       {runtime?.mode ?? "Audit-first"}
                     </span>
                   </div>
-                  <strong>{runtime?.nextAction ?? t({ en: "No active run", zh: "无活跃运行", ja: "実行なし" })}</strong>
-                  <p>{runtime?.auditState ?? ""}</p>
+                  <strong>{activeRunHeadline}</strong>
+                  <p>{activeRunDetail}</p>
                   {isRunning && (
                     <div className="pluginProgress">
                       <div />

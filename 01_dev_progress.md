@@ -7368,6 +7368,35 @@ Remaining limits:
 - quick-action behavior is still mostly a compact mirror, not a full plugin-side action workflow with richer per-action state
 - other quick-action copy outside the selected subtitle still retains some demo-oriented language
 
+## 2026-05-15 P3-4 plugin active-run empty-state realism
+
+## Task
+- Keep the current `P3-4 plugin` thread narrow:
+  - tighten one obviously demo-looking active-run empty-state copy
+  - prefer existing popup runtime context
+  - keep the fixed empty-state text only as final fallback
+
+## Completed
+- Updated `PluginPopupScreen.tsx`:
+  - active-run card now prefers `runtime.nextAction`
+  - when `nextAction` is absent, it prefers `runtime.auditState` as the headline and `runtime.queueState` as supporting text
+  - `No active run` remains only as the final fallback
+- Synced `plugin/functional-spec.md`, `memory.txt`
+
+## Modified Files
+- `ui/admin-console/src/screens/PluginPopupScreen.tsx`
+- `ui/admin-console/src/App.test.tsx`
+- `docs/phase3/interface/plugin/functional-spec.md`
+- `memory.txt`
+- `01_dev_progress.md`
+
+## Verification
+- Ran `npm test -- --run src/App.test.tsx -t "plugin popup"`
+
+## Remaining Limits
+- active-run card is still a compact mirror, not a fuller plugin-side execution state model
+- broader popup copy still keeps some demo-oriented language outside this chosen slice
+
 ## 2026-05-15 P3-4 plugin selected-element rationale copy
 
 ## Task

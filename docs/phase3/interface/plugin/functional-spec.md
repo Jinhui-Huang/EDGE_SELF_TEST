@@ -205,6 +205,10 @@ Current behavior:
   - the old hover/click instruction plus `active` badge remain only as the legacy fallback when locator/status context is absent
 - the popup mirror `Open in platform` quick-action subtitle now prefers `popupSnapshot.hints[0]`
 - the old `Full report and logs` text remains only as the legacy fallback when popup hints are absent
+- the popup mirror active-run card now prefers real runtime empty-state context:
+  - `runtime.nextAction`
+  - then `runtime.auditState`
+  - only then the fixed `No active run` copy
 - the old `Pay $89.10` / `role=button / 140x38px / visible` text remains only as the demo fallback when popup page context omits those fields
 - popup renders tag / text / id / name, candidate locators, recommended locator, and recommendation reason
 - `Copy` writes the current real recommended locator to the popup-local clipboard
