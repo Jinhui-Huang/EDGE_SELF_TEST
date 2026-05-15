@@ -2927,8 +2927,8 @@ describe("App", () => {
         locator: "#pay-submit",
         actionHints: ["Pay now"],
         locatorCandidates: [
-          { type: "id", value: "#pay-submit", score: 0.98, recommended: true },
-          { type: "name", value: "[name=\"payment-submit\"]", score: 0.9 }
+          { type: "id", value: "#pay-submit", score: 0.98, recommended: true, reason: "Stable explicit id." },
+          { type: "name", value: "[name=\"payment-submit\"]", score: 0.9, reason: "Stable field name." }
         ]
       },
       runtime: {
@@ -2973,6 +2973,8 @@ describe("App", () => {
     expect(screen.getByText("locator: #pay-submit")).toBeInTheDocument();
     expect(screen.getByText("Locator ready for review: #pay-submit")).toBeInTheDocument();
     expect(screen.getByText("[name=\"payment-submit\"]")).toBeInTheDocument();
+    expect(screen.getByText("Stable explicit id.")).toBeInTheDocument();
+    expect(screen.getByText("Stable field name.")).toBeInTheDocument();
     expect(screen.queryByText("button:has-text('Pay')")).not.toBeInTheDocument();
     expect(screen.getAllByText("ready").length).toBeGreaterThan(0);
 
@@ -3026,6 +3028,7 @@ describe("App", () => {
     expect(screen.getAllByText("Pay $89.10").length).toBeGreaterThan(0);
     expect(screen.getByText("role=button / 140x38px / visible")).toBeInTheDocument();
     expect(screen.getByText("button:has-text('Pay')")).toBeInTheDocument();
+    expect(screen.getByText("Preferred text locator for quick review.")).toBeInTheDocument();
     expect(screen.getByText("Hover to highlight / click to select")).toBeInTheDocument();
     expect(screen.getAllByText("ready").length).toBeGreaterThan(0);
   });

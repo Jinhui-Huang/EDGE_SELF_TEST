@@ -15,11 +15,11 @@ type LocalizedCopy = {
 };
 
 const fallbackCandidateLocators = [
-  { value: "button:has-text('Pay')", score: "0.94", type: "text", recommended: true },
-  { value: "#pay-submit", score: "0.88", type: "id" },
-  { value: "[data-testid='checkout-pay']", score: "0.86", type: "testid" },
-  { value: "form > div:nth-child(3) > button", score: "0.42", type: "css", fragile: true },
-  { value: "role=button[name='Pay $89.10']", score: "0.81", type: "role" }
+  { value: "button:has-text('Pay')", score: "0.94", type: "text", recommended: true, reason: "Preferred text locator for quick review." },
+  { value: "#pay-submit", score: "0.88", type: "id", reason: "Stable explicit id from the mirrored checkout action." },
+  { value: "[data-testid='checkout-pay']", score: "0.86", type: "testid", reason: "Useful test id fallback when text changes." },
+  { value: "form > div:nth-child(3) > button", score: "0.42", type: "css", fragile: true, reason: "Fragile structural fallback kept for manual review." },
+  { value: "role=button[name='Pay $89.10']", score: "0.81", type: "role", reason: "Accessible-name locator remains available as a secondary cue." }
 ];
 
 const quickActions: Array<{ icon: string; tone: string; title: LocalizedCopy; sub: LocalizedCopy }> = [
@@ -101,7 +101,8 @@ export function PluginPopupScreen({ apiBaseUrl, title, locale }: PluginPopupScre
       score: formatLocatorScore(candidate.score),
       type: candidate.type?.trim() || "locator",
       recommended: candidate.recommended ?? false,
-      fragile: false
+      fragile: false,
+      reason: candidate.reason?.trim() || ""
     }));
   const candidateLocators = normalizedLocatorCandidates?.length
     ? normalizedLocatorCandidates
@@ -243,6 +244,7 @@ export function PluginPopupScreen({ apiBaseUrl, title, locale }: PluginPopupScre
                       {locator.recommended ? <span className="pluginBadge info dot">recommended</span> : null}
                       {locator.fragile ? <span className="pluginBadge warning">fragile</span> : null}
                     </div>
+                    {locator.reason ? <p>{locator.reason}</p> : null}
                   </div>
                   <div
                     className={`pluginLocatorScore${

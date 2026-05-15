@@ -7340,6 +7340,34 @@ Remaining limits:
 - `pick-mode` candidate review area is still a simplified mirror, not a full plugin-side pick workflow
 - quick-action copy and wider popup affordances still retain some demo-oriented language
 
+## 2026-05-15 P3-4 plugin candidate-review reason copy
+
+## Task
+- Keep the current `P3-4 plugin` thread narrow:
+  - tighten one obviously demo-looking candidate-review text gap
+  - prefer existing popup locator-candidate context
+  - leave demo explanation as fallback
+
+## Completed
+- Updated `PluginPopupScreen.tsx`:
+  - candidate rows now render real `locatorCandidates[].reason` inline when present
+  - fallback demo rows now include lightweight explanation copy instead of staying reason-less
+- Synced `plugin/functional-spec.md`, `memory.txt`
+
+## Modified Files
+- `ui/admin-console/src/screens/PluginPopupScreen.tsx`
+- `ui/admin-console/src/App.test.tsx`
+- `docs/phase3/interface/plugin/functional-spec.md`
+- `memory.txt`
+- `01_dev_progress.md`
+
+## Verification
+- Ran `npm test -- --run src/App.test.tsx -t "plugin popup"`
+
+## Remaining Limits
+- `candidate review` is still a compact mirror, not a full plugin-side recommendation workflow with richer confidence/risk narration
+- wider plugin popup copy still keeps some demo-oriented language outside the chosen slice
+
 ## 2026-05-07 P3-3 dataDiff restore-result doc example alignment follow-up
 
 ## Task

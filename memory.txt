@@ -3188,3 +3188,14 @@
     - synced `plugin/functional-spec.md`
   - Verification:
     - ran `npm test -- --run src/App.test.tsx -t "plugin popup"`
+- 2026-05-15: Continued `P3-4 plugin` with one small candidate-review explanation cleanup.
+  - Frontend:
+    - candidate rows now render real `locatorCandidates[].reason` inline when present
+    - the old fixed locator rows now carry lightweight fallback reasons, so the candidate-review area no longer looks explanation-free in legacy/demo mode
+  - Tests/docs:
+    - `App.test.tsx` now asserts:
+      - real popup candidate reasons override demo explanations
+      - missing popup candidate reasons still fall back to the demo explanation copy
+    - synced `plugin/functional-spec.md`
+  - Verification:
+    - ran `npm test -- --run src/App.test.tsx -t "plugin popup"`

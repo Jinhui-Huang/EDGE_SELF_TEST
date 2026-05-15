@@ -194,6 +194,7 @@ Current behavior:
   - `locator` as the selected meta line
 - the popup mirror candidate-locators list now prefers persisted popup page context:
   - first `page.locatorCandidates[]` when present
+  - `locatorCandidates[].reason` is rendered inline when available
   - only falls back to the old fixed demo locator list when popup page context omits candidates
 - the popup mirror pick-mode header now prefers real popup page/status context:
   - `page.locator` drives the header summary when a persisted locator is available
