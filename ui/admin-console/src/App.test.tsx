@@ -3282,6 +3282,50 @@ describe("App", () => {
     expect(screen.queryByText("recognized")).not.toBeInTheDocument();
   });
 
+  it("keeps the recognized current-page badge fallback when popup status and page context are both missing", async () => {
+    const popupSnapshot = {
+      generatedAt: "2026-04-20T04:00:00Z",
+      status: "",
+      summary: "",
+      page: {
+        title: "",
+        url: "",
+        domain: "",
+        lastUpdatedAt: "2026-04-20T04:00:00Z",
+        locator: "",
+        actionHints: [],
+        locatorCandidates: []
+      },
+      runtime: {
+        mode: "Audit-first",
+        queueState: "",
+        auditState: "READY",
+        nextAction: ""
+      },
+      hints: []
+    };
+
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/phase3/admin-console")) return jsonResponse(snapshot);
+      if (url.endsWith("/api/phase3/extension-popup")) return jsonResponse(popupSnapshot);
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+    await screen.findByText("Needs attention");
+
+    const allButtons = screen.getAllByRole("button");
+    const pluginNavButton = allButtons.find((btn) => btn.textContent?.includes("Plugin popup"));
+    expect(pluginNavButton).toBeTruthy();
+    await userEvent.click(pluginNavButton!);
+
+    expect(await screen.findByText("3 forms / 8 buttons")).toBeInTheDocument();
+    expect(screen.getByText("recognized")).toBeInTheDocument();
+    expect(screen.queryByText("ready")).not.toBeInTheDocument();
+  });
+
   it("prefers runtime audit state over the fixed active-run empty copy when nextAction is missing", async () => {
     const popupSnapshot = {
       generatedAt: "2026-04-20T04:00:00Z",

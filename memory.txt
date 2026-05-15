@@ -3331,7 +3331,9 @@
     - when popup `status` is missing but page context exists, it falls back to `ready`
     - only when both popup status and page context are absent does it keep the fixed `recognized` fallback
   - Tests/docs:
-    - `App.test.tsx` now asserts missing popup status still renders `ready` when page context exists
+    - `App.test.tsx` now asserts:
+      - missing popup status still renders `ready` when page context exists
+      - missing popup status plus missing page context still renders `recognized`
     - synced `plugin/functional-spec.md`
   - Verification:
     - ran `npm test -- --run src/App.test.tsx -t "plugin popup"`
