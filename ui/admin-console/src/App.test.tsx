@@ -2974,6 +2974,7 @@ describe("App", () => {
     expect(await screen.findByText("Pay now")).toBeInTheDocument();
     expect(screen.getByText("locator: #pay-submit")).toBeInTheDocument();
     expect(screen.getByText("Recommended locator rationale: Preferred for DSL handoff.")).toBeInTheDocument();
+    expect(screen.getByText("Top candidate: #pay-submit")).toBeInTheDocument();
     expect(screen.getByText("Locator ready for review: #pay-submit")).toBeInTheDocument();
     expect(screen.getByText("[name=\"payment-submit\"]")).toBeInTheDocument();
     expect(screen.getByText("Preferred for DSL handoff.")).toBeInTheDocument();
@@ -3033,6 +3034,7 @@ describe("App", () => {
     expect(screen.getByText("Recommended locator rationale: Review the best locator before copying it into DSL.")).toBeInTheDocument();
     expect(screen.getByText("Full report and logs")).toBeInTheDocument();
     expect(screen.getByText("button:has-text('Pay')")).toBeInTheDocument();
+    expect(screen.getByText("Review candidate strength before copying to DSL.")).toBeInTheDocument();
     expect(screen.getByText("Preferred text locator for quick review.")).toBeInTheDocument();
     expect(screen.getByText("Hover to highlight / click to select")).toBeInTheDocument();
     expect(screen.getAllByText("ready").length).toBeGreaterThan(0);

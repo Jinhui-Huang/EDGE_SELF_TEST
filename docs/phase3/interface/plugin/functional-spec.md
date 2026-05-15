@@ -197,6 +197,8 @@ Current behavior:
   - first `page.locatorCandidates[]` when present
   - `locatorCandidates[].reason` is rendered inline when available
   - only falls back to the old fixed demo locator list when popup page context omits candidates
+- the candidate panel helper line now prefers the current recommended candidate value
+- it is derived only from real popup candidates and falls back to a fixed review reminder when no recommended run-local candidate is available
 - the popup mirror pick-mode header now prefers real popup page/status context:
   - `page.locator` drives the header summary when a persisted locator is available
   - popup `status` drives the badge text

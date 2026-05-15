@@ -7397,6 +7397,35 @@ Remaining limits:
 - `selected element` and `candidate review` remain a compact mirror, not a full plugin-side recommendation workflow
 - broader pick workflow and other popup copy still keep some demo-oriented language outside this chosen slice
 
+## 2026-05-15 P3-4 plugin candidate-panel helper line
+
+## Task
+- Keep the current `P3-4 plugin` thread narrow:
+  - tighten one obviously demo-looking helper line in the candidate panel
+  - prefer existing popup locator-candidate context
+  - keep a fixed fallback reminder when no recommendation is available
+
+## Completed
+- Updated `PluginPopupScreen.tsx`:
+  - candidate panel now shows a helper line above the locator list
+  - it prefers the current recommended candidate value
+  - it is derived only from real popup candidates; when no recommended run-local candidate is available, it falls back to a fixed review reminder
+- Synced `plugin/functional-spec.md`, `memory.txt`
+
+## Modified Files
+- `ui/admin-console/src/screens/PluginPopupScreen.tsx`
+- `ui/admin-console/src/App.test.tsx`
+- `docs/phase3/interface/plugin/functional-spec.md`
+- `memory.txt`
+- `01_dev_progress.md`
+
+## Verification
+- Ran `npm test -- --run src/App.test.tsx -t "plugin popup"`
+
+## Remaining Limits
+- candidate panel remains a compact mirror, not a fuller plugin-side review workflow with richer recommendation state
+- broader popup copy still keeps some demo-oriented language outside this chosen slice
+
 ## 2026-05-15 P3-4 plugin candidate-review reason copy
 
 ## Task

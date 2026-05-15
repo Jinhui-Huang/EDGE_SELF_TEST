@@ -107,6 +107,10 @@ export function PluginPopupScreen({ apiBaseUrl, title, locale }: PluginPopupScre
   const candidateLocators = normalizedLocatorCandidates?.length
     ? normalizedLocatorCandidates
     : fallbackCandidateLocators;
+  const recommendedCandidate = normalizedLocatorCandidates?.find((candidate) => candidate.recommended);
+  const candidatePanelSummary = recommendedCandidate
+    ? `Top candidate: ${recommendedCandidate.value}`
+    : "Review candidate strength before copying to DSL.";
   const selectedElementReason = normalizedLocatorCandidates?.find((candidate) => candidate.recommended && candidate.reason)?.reason
     || normalizedLocatorCandidates?.find((candidate) => candidate.reason)?.reason
     || "Review the best locator before copying it into DSL.";
@@ -240,6 +244,7 @@ export function PluginPopupScreen({ apiBaseUrl, title, locale }: PluginPopupScre
 
           <section>
             <h4>{t({ en: "Candidate locators", zh: "候选定位器", ja: "候補ロケーター" })}</h4>
+            <p>{candidatePanelSummary}</p>
             <div className="pluginLocatorList">
               {candidateLocators.map((locator) => (
                 <div key={locator.value} className={`pluginLocatorRow${locator.recommended ? " recommended" : ""}`}>

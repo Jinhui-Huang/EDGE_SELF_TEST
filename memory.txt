@@ -3212,6 +3212,18 @@
     - synced `plugin/functional-spec.md`
   - Verification:
     - ran `npm test -- --run src/App.test.tsx -t "plugin popup"`
+- 2026-05-15: Continued `P3-4 plugin` with one candidate-panel helper-line cleanup.
+  - Frontend:
+    - the candidate panel now shows a small helper line above the locator list
+    - it prefers the current recommended candidate value
+    - it is derived only from real popup candidates; when no recommended run-local candidate is available, it falls back to a fixed review reminder
+  - Tests/docs:
+    - `App.test.tsx` now asserts:
+      - real popup candidates drive the helper line
+      - fallback/demo candidate rows do not fabricate a top candidate and instead show the fixed review reminder
+    - synced `plugin/functional-spec.md`
+  - Verification:
+    - ran `npm test -- --run src/App.test.tsx -t "plugin popup"`
 - 2026-05-15: Continued `P3-4 plugin` with one small candidate-review explanation cleanup.
   - Frontend:
     - candidate rows now render real `locatorCandidates[].reason` inline when present
