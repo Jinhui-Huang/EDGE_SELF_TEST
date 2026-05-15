@@ -121,6 +121,9 @@ export function PluginPopupScreen({ apiBaseUrl, title, locale }: PluginPopupScre
     || "Review the best locator before copying it into DSL.";
   const openInPlatformSub = popupSnapshot?.hints?.find((hint) => hint.trim().length > 0)?.trim()
     || quickActions[3].sub.en;
+  const pickElementSub = page?.locator?.trim()
+    ? `Inspect locator ${page.locator.trim()}`
+    : quickActions[0].sub.en;
   const pageSummarySub = popupSnapshot?.summary?.trim()
     || quickActions[1].sub.en;
   const quickSmokeTestSub = page?.url?.trim()
@@ -227,6 +230,8 @@ export function PluginPopupScreen({ apiBaseUrl, title, locale }: PluginPopupScre
                       <p>{
                         action.title.en === "Open in platform"
                           ? openInPlatformSub
+                          : action.title.en === "Pick element"
+                            ? pickElementSub
                           : action.title.en === "Page summary"
                             ? pageSummarySub
                           : action.title.en === "Quick smoke test"

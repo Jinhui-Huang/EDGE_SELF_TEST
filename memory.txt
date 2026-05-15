@@ -3313,3 +3313,15 @@
     - synced `plugin/functional-spec.md`
   - Verification:
     - ran `npm test -- --run src/App.test.tsx -t "plugin popup"`
+- 2026-05-15: Continued `P3-4 plugin` with one pick-element helper-copy cleanup.
+  - Frontend:
+    - the `Pick element` quick-action subtitle now prefers current locator context
+    - when `page.locator` is present, it renders `Inspect locator ...`
+    - when locator context is absent, it still falls back to `Hover to capture locator`
+  - Tests/docs:
+    - `App.test.tsx` now asserts:
+      - real locator context overrides the fixed pick-element helper copy
+      - missing locator context still falls back to the demo helper text
+    - synced `plugin/functional-spec.md`
+  - Verification:
+    - ran `npm test -- --run src/App.test.tsx -t "plugin popup"`

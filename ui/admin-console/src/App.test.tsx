@@ -2973,6 +2973,8 @@ describe("App", () => {
     expect(screen.getAllByText("edge.test")).toHaveLength(1);
     expect(screen.getByText("Use the platform UI for configuration and report review.")).toBeInTheDocument();
     expect(screen.queryByText("Full report and logs")).not.toBeInTheDocument();
+    expect(screen.getByText("Inspect locator #pay-submit")).toBeInTheDocument();
+    expect(screen.queryByText("Hover to capture locator")).not.toBeInTheDocument();
     expect(screen.getByText("Run on /checkout/payment")).toBeInTheDocument();
     expect(screen.queryByText("Run on current URL")).not.toBeInTheDocument();
     expect(await screen.findByText("Pay now")).toBeInTheDocument();
@@ -3041,6 +3043,7 @@ describe("App", () => {
     expect(screen.getByText("role=button / 140x38px / visible")).toBeInTheDocument();
     expect(screen.getByText("Recommended locator rationale: Review the best locator before copying it into DSL.")).toBeInTheDocument();
     expect(screen.getByText("Full report and logs")).toBeInTheDocument();
+    expect(screen.getByText("Hover to capture locator")).toBeInTheDocument();
     expect(screen.getByText("Run on current URL")).toBeInTheDocument();
     expect(screen.getByText("button:has-text('Pay')")).toBeInTheDocument();
     expect(screen.getByText("recommended")).toBeInTheDocument();
